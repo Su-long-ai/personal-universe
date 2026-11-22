@@ -709,9 +709,16 @@ function check(mode, baseArg, headArg) {
 
   const registry = readJson(REGISTRY_PATH, "reuse registry");
   const registryIndex = validateRegistry(registry);
-  const approvals = approvalSources().map((path) => validateApprovalToken(path, registry, registryIndex, head));
+  const relevantApprovalPaths = approvalSources().filter((path) => {
+    const token = readJson(path, "approval token");
+    const planned = Array.isArray(token.planned_files) ? token.planned_files : [];
+    return implementation.some((file) => planned.some((pattern) => matchPlanned(file, pattern)));
+  });
+  const approvals = relevantApprovalPaths.map((path) =>
+    validateApprovalToken(path, registry, registryIndex, head)
+  );
   if (approvals.length === 0) {
-    die("protected implementation changed but no reuse approval tokens exist.");
+    die("protected implementation changed but no relevant reuse approval tokens exist.");
   }
 
   const uncovered = [];
