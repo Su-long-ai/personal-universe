@@ -845,6 +845,27 @@ select {
   text-align: center;
 }
 
+.navigator-empty.is-loading {
+  color: rgba(151, 228, 241, 0.58);
+}
+
+.navigator-action-error {
+  margin: 0 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 157, 132, 0.22);
+  background: rgba(106, 40, 28, 0.12);
+  color: rgba(255, 205, 190, 0.82);
+  font-size: 10px;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+}
+
+.navigator-result-open:disabled,
+.navigator-locate:disabled {
+  cursor: progress;
+  opacity: 0.56;
+}
+
 .navigator-footer {
   padding: 11px 18px 13px;
   border-top: 1px solid rgba(174, 221, 255, 0.08);
