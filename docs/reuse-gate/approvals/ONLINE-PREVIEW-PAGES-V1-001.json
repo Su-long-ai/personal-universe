@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "ONLINE-PREVIEW-PAGES-V1-001",
+  "approved_at": "2026-11-22T18:56:00.000Z",
+  "baseline_commit": "7bcba9f37c3d1d1e2e3e3d089e1de1a383d03e4c",
+  "record_path": "docs/reuse-gate/tasks/ONLINE-PREVIEW-PAGES-V1-001.json",
+  "record_sha256": "41f455bf7f5d3605151a09fb8a12b8637ec301900b01bef47a55e8d1101e2d98",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-base-url": "ebdc55c69abbc1db2612243fb329c538a480a83af0c06dfcb9d2623d20153b98",
+    "cloudflare-pages-git": "5c0b9344544684689550f804fe13d507f172e9938e8b8b7f6c94b00ea48c10ce",
+    "github-pages-actions": "cdda04a1d8bbcd91288c70dbb72efa9b7ed8627216f901cd1060f3a16be77918",
+    "vercel-preview-deployments": "b3b24d36808806186022cb0f5e5467a3500bdfe2ba9ae62a7ef7b878d8a02111"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Online production preview hosting and Astro repository-subpath compatibility"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "astro.config.mjs",
+    ".github/workflows/pages-preview.yml",
+    "src/lib/universe/useAmbientAudio.ts",
+    "src/lib/universe/yeis/index.ts",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/GalaxyScene.tsx",
+    "docs/development/cloud-workflow.md"
+  ],
+  "selected_ids": [
+    "github-pages-astro-base",
+    "astro-base-url"
+  ],
+  "candidate_scores": {
+    "github-pages-astro-base": 54,
+    "astro-base-url": 57,
+    "cloudflare-pages-git": 47,
+    "vercel-preview-deployments": 47
+  }
+}

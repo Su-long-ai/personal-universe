@@ -8,7 +8,7 @@ import { initI18n } from "../../../vendor/yeis/i18n";
 
 export const YEIS_UPSTREAM_COMMIT =
   "e52056897364e060fbd6d00951628f163b57d7a1";
-export const YEIS_DATA_BASE_URL = "/vendor/yeis/";
+export const YEIS_DATA_BASE_URL = `${import.meta.env.BASE_URL}vendor/yeis/`;
 export const HERO_SYSTEM_ID = "h-aurora";
 export const HERO_PLANET_ID = "aurora-01";
 

@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "task_id": "ONLINE-PREVIEW-PAGES-V1-001",
+  "title": "Publish Personal Universe as a working GitHub Pages project site",
+  "scope": {
+    "level": "architecture",
+    "subject": "Online production preview hosting and Astro repository-subpath compatibility"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "GitHub Pages is already wired into the repository and requires no third-party project or deploy secret. Astro officially supports repository project sites through the base option. A repository scan found only four remaining root-relative runtime asset references, while vendored landmark assets already use import.meta.env.BASE_URL. Therefore a small BASE_URL migration plus an Astro base setting is lower risk than adding Cloudflare or Vercel solely to obtain a root-hosted URL. Keep Cloudflare Pages and Vercel as mature fallbacks if Pages enablement or plan settings block publication.",
+  "planned_files": [
+    "astro.config.mjs",
+    ".github/workflows/pages-preview.yml",
+    "src/lib/universe/useAmbientAudio.ts",
+    "src/lib/universe/yeis/index.ts",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/GalaxyScene.tsx",
+    "docs/development/cloud-workflow.md"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.astro.build/en/guides/deploy/github/",
+      "finding": "Astro officially supports GitHub Pages project sites by setting site and base so generated and internal paths use the repository subpath."
+    },
+    {
+      "url": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+      "finding": "GitHub Pages custom workflows deploy static artifacts using configure-pages, upload-pages-artifact and deploy-pages with Pages/OIDC permissions."
+    },
+    {
+      "url": "https://developers.cloudflare.com/pages/get-started/git-integration/",
+      "finding": "Cloudflare Pages supports private GitHub repositories, automatic production builds and branch/PR preview URLs on a root pages.dev hostname."
+    },
+    {
+      "url": "https://vercel.com/docs/git",
+      "finding": "Vercel Git integration automatically deploys production branches and creates preview deployments for branch pushes and pull requests."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Cloudflare Pages and Vercel both provide mature root-hosted production and PR preview deployments, but each requires an external project/account integration that is unnecessary if the existing Pages path needs only a small base-path fix.",
+      "source_refs": [
+        2,
+        3
+      ],
+      "registry_refs": [
+        "cloudflare-pages-git",
+        "vercel-preview-deployments"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Astro has first-class site/base configuration and exposes import.meta.env.BASE_URL for client asset URLs, covering repository-subpath compatibility without a custom URL framework.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "astro-base-url"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "GitHub Pages Actions is already present, uses the same repository identity and requires no third-party deployment token; it is the lowest-integration-cost production host if base-path compatibility is clean.",
+      "source_refs": [
+        1
+      ],
+      "registry_refs": [
+        "github-pages-actions"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "The needed runtime migration is limited to replacing four hard-coded root-relative public asset references with Astro/Vite BASE_URL semantics; no package is required.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "astro-base-url"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "github-pages-astro-base",
+      "name": "GitHub Pages + Astro base/BASE_URL",
+      "level": "subsystem",
+      "registry_id": "github-pages-actions",
+      "source": "GitHub Pages Actions and Astro project-site configuration",
+      "license": "GitHub hosted service / Astro MIT",
+      "decision": "reuse",
+      "reason": "Reuses the already-integrated deployment workflow and requires only a small, centralized base-path migration found by repository scan.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "astro-base-url",
+      "name": "Astro base + import.meta.env.BASE_URL",
+      "level": "framework_engine",
+      "registry_id": "astro-base-url",
+      "source": "Astro deployment/configuration semantics",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Makes public assets work both at local root and under /personal-universe without hand-maintained URL rewriting.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "cloudflare-pages-git",
+      "name": "Cloudflare Pages Git integration",
+      "level": "full_solution",
+      "registry_id": "cloudflare-pages-git",
+      "source": "Cloudflare Pages",
+      "license": "Commercial hosted service",
+      "decision": "reject",
+      "reason": "Excellent root hosting and PR previews for private repositories, but requires external account/GitHub App setup that is unnecessary if Pages works after the small base-path fix.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 3,
+        "license_fit": 3,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "vercel-preview-deployments",
+      "name": "Vercel Preview Deployments",
+      "level": "full_solution",
+      "registry_id": "vercel-preview-deployments",
+      "source": "Vercel Git integration",
+      "license": "Commercial hosted service",
+      "decision": "reject",
+      "reason": "Mature zero-config Astro hosting with PR previews, but also requires an external project connection; retain as fallback rather than duplicating hosting now.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 3,
+        "license_fit": 3,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Working public production URL without Windows",
+      "importance": "high",
+      "coverage": {
+        "github-pages-astro-base": "full",
+        "astro-base-url": "partial",
+        "cloudflare-pages-git": "full",
+        "vercel-preview-deployments": "full"
+      },
+      "decision": "Use the existing Pages workflow once Astro/public asset paths are repository-subpath safe."
+    },
+    {
+      "capability": "Private GitHub repository support",
+      "importance": "high",
+      "coverage": {
+        "github-pages-astro-base": "full",
+        "astro-base-url": "none",
+        "cloudflare-pages-git": "full",
+        "vercel-preview-deployments": "full"
+      },
+      "decision": "All three hosts are viable on paid/private-repo-compatible plans; Pages has the lowest integration cost because it is already in-repo."
+    },
+    {
+      "capability": "Root-hosted branch/PR previews",
+      "importance": "medium",
+      "coverage": {
+        "github-pages-astro-base": "partial",
+        "astro-base-url": "none",
+        "cloudflare-pages-git": "full",
+        "vercel-preview-deployments": "full"
+      },
+      "decision": "Accept one production Pages URL now; use Cloudflare/Vercel later only if per-PR live URLs materially outweigh the extra account integration."
+    },
+    {
+      "capability": "Custom domain later",
+      "importance": "medium",
+      "coverage": {
+        "github-pages-astro-base": "full",
+        "astro-base-url": "partial",
+        "cloudflare-pages-git": "full",
+        "vercel-preview-deployments": "full"
+      },
+      "decision": "Keep URLs base-aware so switching to a custom domain/root host later is configuration-only."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "github-pages-astro-base",
+      "astro-base-url"
+    ],
+    "rationale": "The root-relative scan proves Pages compatibility is a small change, so reuse GitHub Pages and Astro's official base semantics rather than adding a new hosting vendor. Cloudflare Pages and Vercel remain ready fallbacks if repository Pages enablement cannot be satisfied.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "cloudflare-pages-git",
+        "reason": "Superior automatic PR preview URLs, but external GitHub App/account setup is a larger integration cost than four BASE_URL fixes."
+      },
+      {
+        "candidate_id": "vercel-preview-deployments",
+        "reason": "Strong Astro zero-config hosting and rollbacks, but requires an external project connection and is unnecessary for the first stable online URL."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If GitHub Pages cannot be enabled for this private repository/account, connect Vercel or Cloudflare Pages and deploy the same static Astro build at root without reverting the BASE_URL-safe asset changes."
+  }
+}

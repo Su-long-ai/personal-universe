@@ -1,6 +1,9 @@
 name: Pages Preview
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -18,6 +21,10 @@ concurrency:
   group: pages-preview
   cancel-in-progress: true
 
+env:
+  PUBLIC_SITE_URL: https://su-long-ai.github.io
+  PUBLIC_BASE_PATH: /personal-universe
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,11 +33,12 @@ jobs:
       - name: Checkout selected ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Ensure main ref is available
+        if: github.event_name == 'workflow_dispatch'
         run: git fetch origin main --no-tags
 
       - name: Setup Node
@@ -46,19 +54,19 @@ jobs:
       - name: Machine Reuse Gate for selected ref
         run: npm run gate:reuse:ci
         env:
-          REUSE_GATE_BASE_SHA: origin/main
+          REUSE_GATE_BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && 'origin/main' || github.event.before }}
           REUSE_GATE_HEAD_SHA: HEAD
 
-      - name: Build
+      - name: Build repository-subpath site
         run: npm run build
 
       - name: Bundle guard
         run: node tests/ci/bundle-guard.mjs
 
-      - name: Preserve build even when Pages is unavailable
+      - name: Preserve deployable Pages build
         uses: actions/upload-artifact@v4
         with:
-          name: pages-preview-dist-${{ github.sha }}
+          name: pages-preview-dist-${{ github.run_id }}
           path: dist
           if-no-files-found: error
           retention-days: 7
@@ -67,17 +75,13 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Refuse a broken repository-subpath deployment
+      - name: Verify configured Pages base path
         shell: bash
         run: |
-          if [ -n "${{ steps.pages.outputs.base_path }}" ]; then
-            {
-              echo "## Pages preview not deployed"
-              echo
-              echo "This Astro/YEIS build currently assumes root-relative runtime assets."
-              echo "GitHub Pages reports base_path=`${{ steps.pages.outputs.base_path }}`, so deploying it unchanged would create a broken preview."
-              echo "The validated dist artifact above remains available. Use a root/custom-domain Pages site, or add a separate base-path compatibility change before enabling deployment."
-            } >> "$GITHUB_STEP_SUMMARY"
+          expected="/personal-universe"
+          actual="${{ steps.pages.outputs.base_path }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "Expected Pages base path $expected but configure-pages reported $actual" >&2
             exit 1
           fi
 
@@ -97,3 +101,19 @@ jobs:
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify live homepage and YEIS catalogue
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          base="${PAGE_URL%/}/"
+          curl --fail --silent --show-error --location --retry 6 --retry-all-errors --retry-delay 5 "${base}" >/dev/null
+          curl --fail --silent --show-error --location --retry 6 --retry-all-errors --retry-delay 5 "${base}vendor/yeis/data/stars.bin" >/dev/null
+          {
+            echo "## Personal Universe is online"
+            echo
+            echo "- Production URL: ${base}"
+            echo "- Live homepage probe: PASS"
+            echo "- Live YEIS stars.bin probe: PASS"
+          } >> "$GITHUB_STEP_SUMMARY"
