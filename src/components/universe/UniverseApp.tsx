@@ -386,6 +386,21 @@ export default function UniverseApp({
                 name === bodyId
               );
             }) ?? null;
+        } else if (destination.target.kind === "observed-body") {
+          planet =
+            system.planets.find(
+              (candidate) =>
+                candidate.id === destination.target.bodyId,
+            ) ?? null;
+          if (!planet) {
+            console.error(
+              "[UNIVERSE-NAV] observed exoplanet missing from resolved host",
+              destination.target.markerId,
+              destination.target.bodyId,
+            );
+            document.documentElement.dataset.universeNavigationError =
+              destination.id;
+          }
         }
 
         if (destination.target.kind === "body" && !planet) {
@@ -436,9 +451,11 @@ export default function UniverseApp({
               ? destination.target.nativeId + "/" + destination.target.entryId
               : destination.target.kind === "body"
                 ? destination.target.starId + "/" + destination.target.bodyId
-                : destination.target.kind === "star"
-                  ? destination.target.nativeId
-                  : destination.id;
+                : destination.target.kind === "observed-body"
+                  ? destination.target.markerId + "/" + destination.target.bodyId
+                  : destination.target.kind === "star"
+                    ? destination.target.nativeId
+                    : destination.id;
         document.documentElement.dataset.universeNavigationTarget =
           nativeTarget;
         document.documentElement.dataset.universeNavigationPhase =
