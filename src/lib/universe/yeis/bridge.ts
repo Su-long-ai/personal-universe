@@ -101,6 +101,29 @@ export function buildYeisGalaxyIndex(
   };
 }
 
+export function markerForYeisStarId(
+  runtime: YeisRuntimeLike,
+  markers: GalaxyMarker[],
+  starId: string,
+): GalaxyMarker {
+  const existing = markers.find((marker) => marker.nativeId === starId);
+  if (existing) return existing;
+
+  const info = runtime.universe.starInfo(starId);
+  const position = runtime.universe.starPositionPc(starId);
+
+  return {
+    id: `yeis:${starId}`,
+    name: runtime.universe.starName(starId),
+    seed: `yeis:${starId}`,
+    source: starId.startsWith("c") ? "catalog" : "procedural",
+    engine: "yeis",
+    nativeId: starId,
+    position: visualPosition(position.x, position.y, position.z),
+    spectralType: spectralClass(info.spectral || info.catalogSpectral || "G"),
+  };
+}
+
 export function resolveYeisSystem(
   runtime: YeisRuntimeLike,
   marker: GalaxyMarker,

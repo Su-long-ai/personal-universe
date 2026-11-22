@@ -153,3 +153,54 @@ belonged to the replaced planet are discarded so no orphaned hierarchy survives.
 This keeps AURORA fully authored while preventing a sparse one-world flagship system
 and, importantly, avoids reviving the retired V2 system generator merely as filler.
 
+
+
+## Native R3F galaxy renderer
+
+The selected YEIS renderer does not require its upstream product application
+or a second canvas. A compatibility PoC and the migration path host the exact
+MIT renderer classes inside the existing React Three Fiber Canvas:
+
+- `StarPoints`: 109,401 real HYG-derived stars, magnitude/color shader and pick;
+- `ProcStarPoints`: deterministic procedural star tiers and pick;
+- `GalaxyCloud`: analytic Milky Way near/inside representation;
+- `GalaxySprites`: far-galaxy representation;
+- `CameraController`: absolute-km state with the Three camera kept at the
+  floating origin.
+
+The Canvas enables `logarithmicDepthBuffer` on the YEIS engine path. The
+website initializes `CameraController` in its existing fixed-point orbit mode
+around the Milky Way centre, so drag rotates the view and wheel changes
+distance; free-flight remains available as an engine capability rather than
+the homepage default interaction.
+
+Native catalog/procedural star clicks use the upstream `pick()` methods.
+A picked catalog id first resolves through the HIP crosswalk, so a physical
+HYG star with a confirmed NASA system enters the observed-system override.
+The old V2 galaxy remains the default/fallback until native Hero/HIP-less
+observed overlays and return-state persistence reach parity.
+
+### Native renderer validation
+
+Validated on 2026-11-22 against the production build on the local RTX 4060
+Laptop GPU:
+
+- Reuse Gate covers 47 renderer/camera/picking files and passes.
+- Clean Astro build passes with the native renderer closure.
+- Browser runtime reaches `data-yeis-native-galaxy="ready"` and renders the
+  native Milky Way cloud plus the 109,401-star catalogue in the existing R3F
+  Canvas.
+- Projected Hero picking enters `AURORA SYSTEM` with all six worlds intact.
+- After zooming from the galaxy overview into the stellar regime, 2,532
+  procedural stars met the native pick brightness threshold in the tested
+  view; clicking one entered its generated 9-world YEIS system.
+- Three isolated production-browser runs measured native-renderer ready time
+  at a 1.42 s median versus 0.24 s for V2. The added cost is concentrated in
+  initial catalogue/renderer setup; steady frame pacing showed no regression
+  in the same headless GPU test.
+
+The remaining cutover blockers are product semantics rather than renderer
+viability: HIP-less observed hosts need a native-overlay representation, and
+returning from a system should preserve the visitor's native galaxy camera
+state before V2 can be retired as the default.
+

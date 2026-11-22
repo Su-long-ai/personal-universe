@@ -1,28 +1,41 @@
 {
   "schema": 2,
-  "task_id": "YEIS-HERO-SYSTEM-COMPOSITION-001",
-  "approved_at": "2026-11-22T13:47:29.054Z",
-  "baseline_commit": "137f359e492c0e662b96ddf865ea2a6da6ff806a",
+  "task_id": "YEIS-NATIVE-GALAXY-RENDERER-001",
+  "approved_at": "2026-11-22T13:59:34.740Z",
+  "baseline_commit": "9744ac9ee71323748329f365580fd441669b52aa",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "2ea565738979708ca85799c030729dbff040c608f90b5b0144072a5082b60222",
+  "record_sha256": "4221e873134f1d6a7b83f6854dc9a881177be8035fc58416d69cf02eed9b5336",
   "registry_path": "docs/reuse-gate/registry.json",
-  "registry_sha256": "3afba0e7961b018d74060856786e3ebff54040e222d222a682b1eea9b013ef55",
+  "registry_sha256": "93e9fcda8e53101752e0161e1bf50683784d7f9cffc04defa3b6c1beef22824a",
   "scope": {
-    "level": "subsystem",
-    "subject": "AURORA ExtraSystem companion-world composition under the YEIS mother model"
+    "level": "architecture",
+    "subject": "Galaxy renderer and cross-scale camera migration"
   },
   "policy_change": false,
   "planned_files": [
-    "src/lib/universe/yeis/index.ts",
+    "src/vendor/yeis/camera/CameraController.ts",
+    "src/vendor/yeis/input/Input.ts",
+    "src/vendor/yeis/render/StarPoints.ts",
+    "src/vendor/yeis/render/ProcStarPoints.ts",
+    "src/vendor/yeis/render/GalaxyCloud.ts",
+    "src/vendor/yeis/render/GalaxySprites.ts",
+    "src/vendor/yeis/render/shaders/**",
+    "src/vendor/yeis/PATCHES.md",
+    "src/lib/universe/yeis/bridge.ts",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
     "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "yeis-native-generated-companions"
+    "r3f-host-yeis-native",
+    "native-pick-methods"
   ],
   "candidate_scores": {
-    "yeis-native-generated-companions": 55,
-    "v2-generated-companions": 49,
-    "hand-authored-companions": 38,
-    "keep-single-hero-world": 48
+    "r3f-host-yeis-native": 52,
+    "full-yeis-app": 33,
+    "keep-v2-galaxy": 51.5,
+    "custom-r3f-port": 39,
+    "native-pick-methods": 52.5
   }
 }

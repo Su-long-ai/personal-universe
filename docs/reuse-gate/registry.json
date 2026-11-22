@@ -301,7 +301,7 @@
         "black holes, nebulae and landmarks",
         "hand-made ExtraSystem exceptions"
       ],
-      "notes": "Code-level and runtime verified on 2026-11-22: npm ci/build passes; headless browser boots; a minimal public registerExtraSystem patch successfully injected HELION + AURORA-01 and the stock renderer displayed the Hero planet. Main bundle ~2.54 MB; 449 MB dist is dominated by optional lessons/tours (~389 MB) that are not needed for Personal Universe.",
+      "notes": "Code-level and runtime verified on 2026-11-22: npm ci/build passes; headless browser boots; a minimal public registerExtraSystem patch successfully injected HELION + AURORA-01 and the stock renderer displayed the Hero planet. Main bundle ~2.54 MB; 449 MB dist is dominated by optional lessons/tours (~389 MB) that are not needed for Personal Universe. Additional renderer PoC on 2026-11-22: StarPoints + ProcStarPoints + GalaxyCloud + GalaxySprites + CameraController + Input ran inside the same React Three Fiber 8 / Three 0.185.1 Canvas with logarithmicDepthBuffer; strict TS, Vite build and headless runtime all passed, rendering the 109,401-star catalog without a second canvas.",
       "last_checked": "2026-11-22"
     },
     {
@@ -318,6 +318,23 @@
         "TAP/API snapshots"
       ],
       "notes": "Already used by Personal Universe. TAP schema exposes hip_name, hd_name and gaia_dr3_id in pscomppars; 2026-11-22 research found 51/64 nearest snapshot hosts have HIP identifiers and all 51 exactly match the vendored HYG-derived YEIS star binary.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "react-three-fiber",
+      "name": "React Three Fiber",
+      "url": "https://r3f.docs.pmnd.rs/",
+      "level": "framework_engine",
+      "license": "MIT",
+      "status": "adopt",
+      "covers": [
+        "React lifecycle for Three.js",
+        "shared Canvas renderer",
+        "frame loop",
+        "pointer events",
+        "Three scene access"
+      ],
+      "notes": "Current project host. Research PoC proved YEIS renderer classes can attach directly to R3F's existing scene/gl/camera instead of running a second WebGL application.",
       "last_checked": "2026-11-22"
     }
   ]

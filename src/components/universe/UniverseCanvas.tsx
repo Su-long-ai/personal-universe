@@ -10,6 +10,7 @@ import type {
   QualityMode,
   SystemDefinition,
   UniversePhase,
+  UniverseEngine,
 } from "../../lib/universe/types";
 
 const LazyPlanetScene = lazy(() =>
@@ -18,9 +19,15 @@ const LazyPlanetScene = lazy(() =>
 const LazySurfaceScene = lazy(() =>
   import("./SurfaceScene").then((module) => ({ default: module.SurfaceScene })),
 );
+const LazyYeisGalaxyScene = lazy(() =>
+  import("./YeisGalaxyScene").then((module) => ({
+    default: module.YeisGalaxyScene,
+  })),
+);
 
 export function UniverseCanvas({
   phase,
+  engineMode,
   markers,
   selectedSystem,
   selectedPlanet,
@@ -32,6 +39,7 @@ export function UniverseCanvas({
   onCinematicPhaseComplete,
 }: {
   phase: UniversePhase;
+  engineMode: UniverseEngine;
   markers: GalaxyMarker[];
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
@@ -46,16 +54,33 @@ export function UniverseCanvas({
     <Canvas
       dpr={quality === "low" ? [1, 1] : [1, 1.75]}
       camera={{ position: [0, 26.5, 43], fov: 48, near: 0.05, far: 260 }}
-      gl={{ antialias: quality !== "low", powerPreference: "high-performance" }}
+      gl={{
+        antialias: quality !== "low",
+        powerPreference: "high-performance",
+        logarithmicDepthBuffer: engineMode === "yeis",
+      }}
     >
-      <CinematicCamera
+      {!(engineMode === "yeis" && phase === "galaxy") && (
+        <CinematicCamera
         phase={phase}
         scrollDepth={scrollDepth}
         reducedMotion={reducedMotion}
         onPhaseComplete={onCinematicPhaseComplete}
-      />
+        />
+      )}
 
-      {(phase === "galaxy" || phase === "returning") && (
+      {phase === "galaxy" && engineMode === "yeis" && (
+        <Suspense fallback={null}>
+          <LazyYeisGalaxyScene
+            markers={markers}
+            onSelectSystem={onSelectSystem}
+            quality={quality}
+          />
+        </Suspense>
+      )}
+
+      {(phase === "galaxy" || phase === "returning") &&
+        engineMode !== "yeis" && (
         <GalaxyScene
           markers={markers}
           onSelectSystem={onSelectSystem}

@@ -1,25 +1,41 @@
 {
   "schema": 2,
-  "task_id": "YEIS-HERO-SYSTEM-COMPOSITION-001",
-  "title": "Restore Hero-system richness with the native YEIS system generator",
+  "task_id": "YEIS-NATIVE-GALAXY-RENDERER-001",
+  "title": "Host the native YEIS galaxy renderer and picking inside the existing React Three Fiber canvas",
   "scope": {
-    "level": "subsystem",
-    "subject": "AURORA ExtraSystem companion-world composition under the YEIS mother model"
+    "level": "architecture",
+    "subject": "Galaxy renderer and cross-scale camera migration"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "Runtime regression testing of the YEIS model bridge showed AURORA SYSTEM collapsed from a populated flagship system to a single Hero planet because the current ExtraSystem body factory contains only HELION and AURORA-01. Reintroducing V2 companions would preserve two competing model authorities. The selected YEIS MIT snapshot already has a deterministic SystemGenerator that builds complete systems from StarInfo. Reuse it for HELION, replace the generated planet nearest AURORA's authored 1.08 AU orbit with AURORA-01, remove only moons belonging to that replaced planet, and retain all other native YEIS-generated companions. This exact composition was already runtime-smoked locally and produced six worlds while preserving the Hero surface path.",
+  "research_summary": "The model/data migration is complete, but the current YEIS mode still renders the local V2 GalaxyScene, so the product does not yet reuse YEIS's strongest cross-scale rendering assets. A compatibility PoC against the pinned MIT snapshot proved that StarPoints, ProcStarPoints, GalaxyCloud, GalaxySprites, CameraController and Input can run directly inside the existing R3F 8 / Three 0.185.1 Canvas with logarithmicDepthBuffer: no iframe, second canvas, or upstream app shell is required. The 109,401-star HYG catalog, procedural tiers, galaxy cloud/sprites, floating-origin camera state and native pick methods can therefore be reused nearly verbatim. Native catalog picks must resolve through the existing HIP crosswalk before falling back to YEIS generation, and Hero remains an explicit overlay. Choose a narrow R3F host around the pinned upstream renderer classes; add only React lifecycle disposal hooks where the upstream whole-app ownership model otherwise leaks listeners/GPU resources.",
+  "policy_change": false,
   "planned_files": [
-    "src/lib/universe/yeis/index.ts",
+    "src/vendor/yeis/camera/CameraController.ts",
+    "src/vendor/yeis/input/Input.ts",
+    "src/vendor/yeis/render/StarPoints.ts",
+    "src/vendor/yeis/render/ProcStarPoints.ts",
+    "src/vendor/yeis/render/GalaxyCloud.ts",
+    "src/vendor/yeis/render/GalaxySprites.ts",
+    "src/vendor/yeis/render/shaders/**",
+    "src/vendor/yeis/PATCHES.md",
+    "src/lib/universe/yeis/bridge.ts",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
     "docs/architecture/universe-backbone.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/gen/SystemGenerator.ts",
-      "finding": "The pinned MIT generator deterministically creates a complete multi-planet system and moons from StarInfo, so it can supply HELION's ordinary companion worlds without V2."
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1/src",
+      "finding": "The pinned MIT snapshot contains the native star point clouds, procedural stars, galaxy cloud/sprites, floating-origin camera controller, input and shaders already proven with the selected universe model."
     },
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
-      "finding": "ExtraSystem accepts a BodyData factory, allowing native generated bodies to be composed with one authored Hero replacement without modifying normal YEIS generation."
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber exposes the existing Three scene, renderer, camera and frame loop through hooks, allowing foreign Three objects/classes to be hosted without a second canvas."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/renderers/WebGLRenderer",
+      "finding": "Three WebGLRenderer supports logarithmicDepthBuffer at renderer creation, matching the cross-scale depth strategy used by the native YEIS path."
     }
   ],
   "search_ladder": [
@@ -30,13 +46,26 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0,
-        1
+        0
       ],
-      "conclusion": "The selected YEIS mother already contains the required full system-generation capability; no second product or engine is needed."
+      "conclusion": "The full YEIS app contains the renderer, but importing its product shell would duplicate routing/UI/runtime; reuse the renderer closure only."
     },
     {
       "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "The existing R3F Canvas can host the native YEIS Three objects and frame loop directly; this avoids a second renderer/application."
+    },
+    {
+      "level": "subsystem",
       "status": "found",
       "registry_refs": [
         "your-eyes-in-space-mit-e520568"
@@ -44,87 +73,90 @@
       "source_refs": [
         0
       ],
-      "conclusion": "Reuse generateSystem(StarInfo) directly and compose the Hero override at the BodyData boundary."
+      "conclusion": "Reuse StarPoints, ProcStarPoints, GalaxyCloud, GalaxySprites, CameraController and Input as the renderer/camera subsystem, keeping upstream algorithms intact."
     },
     {
-      "level": "subsystem",
+      "level": "component_asset",
       "status": "found",
       "registry_refs": [
-        "your-eyes-in-space-mit-e520568",
-        "helios-procedural-system"
+        "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
         0
       ],
-      "conclusion": "Both YEIS and the old V2/Helios-derived generator can populate companions, but only YEIS preserves one model authority."
-    },
-    {
-      "level": "component_asset",
-      "status": "not_applicable",
-      "registry_refs": [],
-      "source_refs": [],
-      "conclusion": "No new renderer or asset is needed; the regression is purely system-data composition."
+      "conclusion": "Reuse native pick methods and shader files rather than porting/recreating star picking, magnitude/color logic or galaxy shaders."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "restore multiple ordinary companion worlds",
+      "capability": "real 109,401-star field and native magnitude/color rendering",
       "importance": "high",
       "coverage": {
-        "yeis-native-generated-companions": "full",
-        "v2-generated-companions": "full",
-        "hand-authored-companions": "full",
-        "keep-single-hero-world": "none"
+        "r3f-host-yeis-native": "full",
+        "full-yeis-app": "full",
+        "keep-v2-galaxy": "none",
+        "custom-r3f-port": "partial"
       },
-      "decision": "Use the already-selected YEIS generator."
+      "decision": "Host native StarPoints in R3F."
     },
     {
-      "capability": "keep one universe/system model authority",
+      "capability": "procedural stars and near/far galaxy scale regimes",
       "importance": "high",
       "coverage": {
-        "yeis-native-generated-companions": "full",
-        "v2-generated-companions": "none",
-        "hand-authored-companions": "partial",
-        "keep-single-hero-world": "full"
+        "r3f-host-yeis-native": "full",
+        "full-yeis-app": "full",
+        "keep-v2-galaxy": "partial",
+        "custom-r3f-port": "partial"
       },
-      "decision": "Do not revive V2 in the Hero path."
+      "decision": "Reuse ProcStarPoints + GalaxyCloud + GalaxySprites."
     },
     {
-      "capability": "preserve authored AURORA identity and surface",
+      "capability": "single Astro/React/R3F product shell",
       "importance": "high",
       "coverage": {
-        "yeis-native-generated-companions": "full",
-        "v2-generated-companions": "full",
-        "hand-authored-companions": "full",
-        "keep-single-hero-world": "full"
+        "r3f-host-yeis-native": "full",
+        "full-yeis-app": "none",
+        "keep-v2-galaxy": "full",
+        "custom-r3f-port": "full"
       },
-      "decision": "Replace one native generated orbital slot with the existing AURORA BodyData."
+      "decision": "Do not embed/fork the upstream application."
     },
     {
-      "capability": "deterministic low-maintenance composition",
+      "capability": "native star picking with observed NASA override",
+      "importance": "high",
+      "coverage": {
+        "r3f-host-yeis-native": "full",
+        "full-yeis-app": "partial",
+        "keep-v2-galaxy": "partial",
+        "custom-r3f-port": "partial"
+      },
+      "decision": "Reuse upstream pick() and resolve star ids through the HIP-aware bridge."
+    },
+    {
+      "capability": "React-safe listener/GPU lifecycle",
       "importance": "medium",
       "coverage": {
-        "yeis-native-generated-companions": "full",
-        "v2-generated-companions": "partial",
-        "hand-authored-companions": "partial",
-        "keep-single-hero-world": "full"
+        "r3f-host-yeis-native": "full",
+        "full-yeis-app": "full",
+        "keep-v2-galaxy": "full",
+        "custom-r3f-port": "full"
       },
-      "decision": "Keep the adapter narrow and leave generation to upstream YEIS."
+      "decision": "Add narrow dispose hooks only; do not rewrite renderer algorithms."
     }
   ],
   "candidates": [
     {
-      "id": "yeis-native-generated-companions",
-      "name": "YEIS SystemGenerator companions + one AURORA replacement",
+      "id": "r3f-host-yeis-native",
+      "name": "Host pinned YEIS renderer classes directly inside the existing R3F Canvas",
       "level": "framework_engine",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/gen/SystemGenerator.ts",
-      "license": "MIT pinned source",
+      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1/src/render",
+      "license": "MIT pinned source; HYG data notices retained",
       "decision": "reuse",
-      "reason": "Restores flagship-system richness without reviving V2 or hand-authoring filler worlds.",
+      "reason": "Captures the mature cross-scale renderer while preserving the current product shell and one WebGL canvas.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1,
+        "integration_cost": 2,
         "license_fit": 5,
         "maintenance_health": 4,
         "performance_fit": 5,
@@ -133,59 +165,78 @@
       }
     },
     {
-      "id": "v2-generated-companions",
-      "name": "Keep old V2 companions around AURORA",
-      "level": "subsystem",
-      "registry_id": "helios-procedural-system",
-      "source": "local V2 generator",
-      "license": "project / ISC-derived",
+      "id": "full-yeis-app",
+      "name": "Run or fork the complete YEIS application renderer",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "license": "MIT pinned source",
       "decision": "reject",
-      "reason": "Would leave two competing procedural system models alive in the same flagship system.",
+      "reason": "Provides maximum renderer coverage but introduces a duplicate product runtime/UI/canvas and weakens shared state integration.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 2,
+        "integration_cost": 5,
         "license_fit": 5,
         "maintenance_health": 3,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 4
+        "performance_fit": 3,
+        "customization_fit": 2,
+        "maturity": 5
       }
     },
     {
-      "id": "hand-authored-companions",
-      "name": "Author fixed filler planets beside AURORA",
+      "id": "keep-v2-galaxy",
+      "name": "Keep the current local R3F GalaxyScene as the YEIS presentation layer",
       "level": "subsystem",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "local authored BodyData",
+      "registry_id": "react-three-fiber",
+      "source": "local current renderer",
       "license": "project code",
       "decision": "reject",
-      "reason": "Creates bespoke filler data the selected mother already generates more consistently.",
+      "reason": "Low integration cost but leaves the most important YEIS rendering/camera capability unused and keeps duplicated galaxy logic.",
       "evaluation": {
-        "coverage": 4,
-        "integration_cost": 3,
-        "license_fit": 5,
-        "maintenance_health": 2,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 2
-      }
-    },
-    {
-      "id": "keep-single-hero-world",
-      "name": "Keep AURORA SYSTEM as a one-planet exception",
-      "level": "component_asset",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "current adapter",
-      "license": "project code",
-      "decision": "reject",
-      "reason": "Runtime regression showed an unnecessarily sparse flagship system.",
-      "evaluation": {
-        "coverage": 2,
+        "coverage": 3.5,
         "integration_cost": 0,
         "license_fit": 5,
-        "maintenance_health": 5,
+        "maintenance_health": 4,
         "performance_fit": 5,
         "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "custom-r3f-port",
+      "name": "Rewrite YEIS galaxy rendering concepts into new local R3F components",
+      "level": "subsystem",
+      "registry_id": "react-three-fiber",
+      "source": "local rewrite based on upstream reference",
+      "license": "project code derived from MIT source",
+      "decision": "reject",
+      "reason": "Recreates shaders/picking/cross-scale logic already available in the verified upstream renderer and makes future audit harder.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 3
+      }
+    },
+    {
+      "id": "native-pick-methods",
+      "name": "Reuse YEIS StarPoints/ProcStarPoints native pick methods",
+      "level": "component_asset",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1/src/render",
+      "license": "MIT pinned source",
+      "decision": "reuse",
+      "reason": "Preserves upstream screen-space picking behavior and lets physical stars route through the existing HIP override without rebuilding hit testing.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
         "maturity": 5
       }
     }
@@ -193,16 +244,21 @@
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "yeis-native-generated-companions"
+      "r3f-host-yeis-native",
+      "native-pick-methods"
     ],
-    "rationale": "Generate a normal deterministic HELION system with the selected YEIS mother, then substitute AURORA at one orbital slot. This preserves the authored Hero while restoring native system richness and continuing the removal of V2 model authority.",
+    "rationale": "Use the exact pinned YEIS renderer/camera/picking subsystems as guests of the existing R3F Canvas. This maximizes mature reuse and cross-scale fidelity without importing the upstream application or creating a second WebGL runtime.",
     "higher_level_tradeoffs": [
       {
-        "candidate_id": "v2-generated-companions",
-        "reason": "It restores count immediately but keeps duplicate model authority, which is worse globally than native YEIS composition."
+        "candidate_id": "full-yeis-app",
+        "reason": "The full app covers more immediately but duplicates the website runtime and product UI; the R3F-hosted native closure retains the valuable renderer with much less coupling."
+      },
+      {
+        "candidate_id": "keep-v2-galaxy",
+        "reason": "Keeping V2 is cheaper locally but preserves the duplicate galaxy implementation the mother-engine migration is intended to retire."
       }
     ],
     "score_overrides": [],
-    "fallback": "If HELION generation ever yields no replaceable planet, retain the generated star/system and append AURORA; never fall back to V2 generation."
+    "fallback": "If one native renderer class cannot be hosted safely in R3F, retain the surrounding native stack and substitute only that class with the existing local renderer; do not abandon the full native path for a small local incompatibility."
   }
 }

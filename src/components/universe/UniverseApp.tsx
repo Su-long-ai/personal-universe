@@ -7,6 +7,7 @@ import type {
   QualityMode,
   SystemDefinition,
   UniversePhase,
+  UniverseEngine,
 } from "../../lib/universe/types";
 import {
   buildGalaxyIndex,
@@ -54,7 +55,7 @@ export default function UniverseApp() {
     detail: string;
   } | null>(null);
   const yeisResolverRef = useRef<((marker: GalaxyMarker) => SystemDefinition) | null>(null);
-  const engineMode =
+  const engineMode: UniverseEngine =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("engine") === "yeis"
       ? "yeis"
@@ -242,7 +243,7 @@ export default function UniverseApp() {
     if (phase === "system") {
       setSelectedSystem(null);
       setSelectedPlanet(null);
-      setPhase("returning");
+      setPhase(engineMode === "yeis" ? "galaxy" : "returning");
       return;
     }
 
@@ -254,7 +255,7 @@ export default function UniverseApp() {
     } else {
       setPhase("galaxy");
     }
-  }, [phase, selectedSystem]);
+  }, [engineMode, phase, selectedSystem]);
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
@@ -266,7 +267,7 @@ export default function UniverseApp() {
     <main
       className={`universe-root ${transitionClass}`}
       onWheel={(event) => {
-        if (phase !== "galaxy") return;
+        if (phase !== "galaxy" || engineMode === "yeis") return;
         setScrollDepth((value) =>
           Math.max(-3.5, Math.min(4.5, value + Math.sign(event.deltaY) * 0.42)),
         );
@@ -275,6 +276,7 @@ export default function UniverseApp() {
       <div className="universe-canvas">
         <UniverseCanvas
           phase={phase}
+          engineMode={engineMode}
           markers={galaxy.markers}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}

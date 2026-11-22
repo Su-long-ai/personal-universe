@@ -40,3 +40,19 @@ the same pinned snapshot. The binary contains 109,401 HYG-derived stars.
 
 See `UPSTREAM_NOTICE.md` for third-party attribution and licensing, including
 the CC BY-SA 4.0 HYG-derived catalogue terms.
+
+
+4. `input/Input.ts`
+   - Adds an explicit `dispose()` lifecycle method and stable handler references.
+   - Upstream owns the whole application lifetime; Personal Universe mounts/unmounts
+     the native camera inside React, so window/document listeners must be removed.
+
+5. `render/StarPoints.ts`, `render/ProcStarPoints.ts`,
+   `render/GalaxySprites.ts`
+   - Add explicit `dispose(scene)` methods that remove their Three objects and free
+     geometry/material GPU resources.
+   - `GalaxyCloud` already had upstream disposal support.
+
+The camera, picking, magnitude, galaxy sampling and shader algorithms remain
+upstream logic. These lifecycle patches only adapt ownership to React Three
+Fiber.
