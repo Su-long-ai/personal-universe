@@ -127,7 +127,7 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
     allowFailedRequests: [stars],
   });
 
-  await page.route("**/vendor/yeis/data/stars.bin", async (route) => {
+  await page.route(stars, async (route) => {
     await route.abort("failed");
   });
   await page.goto("/?freeze=1");
