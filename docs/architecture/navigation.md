@@ -152,9 +152,13 @@ changes.
 
 ## Canvas picking
 
-The native YEIS canvas routes picks back into the same destination model.
+Both galaxy-scale and system-scale canvas interactions route back into the
+same destination model. In the system view, a clicked planet is adapted to the
+same Personal Signal / observed-exoplanet / native-body / Hero destination used
+by Search, Places and deep links. The legacy direct planet callback remains only
+for the `?engine=v2` rollback path or an unmappable fallback.
 
-Pick priority is:
+In the native YEIS galaxy view, pick priority is:
 
 1. Personal Signal overlay;
 2. Hero;
