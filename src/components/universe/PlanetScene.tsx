@@ -5,6 +5,7 @@ import { bakePlanet } from "procedural-planets";
 import * as THREE from "three";
 import {
   PLANET_ANCHOR,
+  PLANET_RENDER_RADIUS,
   type PlanetArchetype,
   type PlanetDefinition,
   type QualityMode,
@@ -166,7 +167,7 @@ export function PlanetScene({
           return;
         }
         group.position.set(...PLANET_ANCHOR);
-        group.scale.setScalar(3.65 / radius);
+        group.scale.setScalar(PLANET_RENDER_RADIUS / radius);
         group.rotation.set(0.08, -0.65, -0.16);
         group.name = planet.name;
         setBaked(group);
@@ -255,7 +256,7 @@ export function PlanetScene({
         <mesh
           ref={fallback}
           position={PLANET_ANCHOR}
-          scale={3.65}
+          scale={PLANET_RENDER_RADIUS}
         >
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
