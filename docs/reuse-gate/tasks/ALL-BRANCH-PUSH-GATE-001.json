@@ -1,0 +1,211 @@
+{
+  "schema": 2,
+  "task_id": "ALL-BRANCH-PUSH-GATE-001",
+  "title": "Run the machine reuse gate on every development branch push",
+  "scope": {
+    "level": "architecture",
+    "subject": "Repository-wide push-time reuse enforcement without duplicating expensive browser CI"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "Extend the existing GitHub Actions and repository-local Node reuse gate so every branch push receives authoritative push-range policy validation, while keeping production build and Playwright work limited to main pushes, pull requests, and explicit manual validation.",
+  "planned_files": [
+    ".github/workflows/ci.yml"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+      "finding": "GitHub Actions push branch filters can match every branch with a glob while keeping tags out when only branches are configured; job-level conditions can then limit downstream expensive jobs."
+    },
+    {
+      "url": "https://www.openpolicyagent.org/docs",
+      "finding": "OPA is a mature general-purpose policy-as-code engine suitable for CI/CD, but introducing it here would duplicate the repository-local Node policy engine already used by the machine reuse gate."
+    },
+    {
+      "url": "https://backstage.io/docs/features/software-catalog/",
+      "finding": "Backstage provides a broad centralized software-governance/catalog platform intended for much larger organizational surfaces than one repository push-policy gap."
+    },
+    {
+      "url": "https://git-scm.com/docs/githooks.html",
+      "finding": "Git hooks provide local lifecycle enforcement but are client-side and cannot serve as the authoritative control for changes pushed from GitHub-only or other remote development environments."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Backstage can model broad software governance, but deploying a full developer portal is disproportionate to enforcing one repository's push-time reuse policy.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "backstage-catalog"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "OPA/Conftest can express the policy generically, but adopting a second policy language and runtime would duplicate the existing Node gate for no meaningful coverage gain.",
+      "source_refs": [
+        1
+      ],
+      "registry_refs": [
+        "opa-conftest"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "GitHub Actions already receives branch push events and the existing Node gate already understands commit ranges, so widening the workflow trigger is the smallest authoritative remote enforcement change.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "github-actions-pr-diff-gate"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Git hooks remain useful fast local feedback, but cannot enforce pushes created from remote agents or GitHub-only editing and therefore remain supplemental.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "git-hooks"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "github-actions-all-branch-push-gate",
+      "name": "Existing Node reuse gate on every GitHub branch push",
+      "level": "subsystem",
+      "registry_id": "github-actions-pr-diff-gate",
+      "source": "GitHub Actions push event plus repository-local Node gate",
+      "license": "Project code plus GitHub hosted CI",
+      "decision": "reuse",
+      "reason": "Reuses the current authoritative gate and its push-range diff support, closes the branch-push bypass, and adds only a lightweight hosted job instead of another policy runtime.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "opa-push-policy",
+      "name": "OPA / Conftest push policy",
+      "level": "framework_engine",
+      "registry_id": "opa-conftest",
+      "source": "OPA / Conftest",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Capable but would add Rego and another policy runtime while the existing Node gate already implements the exact approval, provenance, and changed-file semantics required here.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "backstage-push-governance",
+      "name": "Backstage governance platform",
+      "level": "full_solution",
+      "registry_id": "backstage-catalog",
+      "source": "Backstage",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Its organization-scale catalog and portal capabilities are much broader than this repository trigger gap and would impose a service-sized operational surface.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "git-hooks-push-feedback",
+      "name": "Local Git hooks only",
+      "level": "component_asset",
+      "registry_id": "git-hooks",
+      "source": "Git hooks / core.hooksPath",
+      "license": "Git tooling",
+      "decision": "partial",
+      "reason": "Retain local hooks for fast feedback, but they cannot be authoritative for remote agents or GitHub-side edits and therefore cannot close the branch-push enforcement gap alone.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Authoritative enforcement on every ordinary development branch push",
+      "importance": "high",
+      "coverage": {
+        "github-actions-all-branch-push-gate": "full",
+        "opa-push-policy": "full",
+        "backstage-push-governance": "partial",
+        "git-hooks-push-feedback": "none"
+      },
+      "decision": "Use the existing Node gate in GitHub Actions on all branch pushes so remote and local development paths receive the same commit-range policy check."
+    },
+    {
+      "capability": "Avoid expensive duplicate build and browser work for branch pushes that already receive pull-request validation",
+      "importance": "high",
+      "coverage": {
+        "github-actions-all-branch-push-gate": "full",
+        "opa-push-policy": "partial",
+        "backstage-push-governance": "none",
+        "git-hooks-push-feedback": "full"
+      },
+      "decision": "Run the lightweight reuse-gate job for every branch push, but condition production build and Playwright jobs to main pushes, pull requests, or manual validation."
+    },
+    {
+      "capability": "Preserve the existing approval/provenance policy implementation",
+      "importance": "high",
+      "coverage": {
+        "github-actions-all-branch-push-gate": "full",
+        "opa-push-policy": "partial",
+        "backstage-push-governance": "partial",
+        "git-hooks-push-feedback": "partial"
+      },
+      "decision": "Keep one policy authority by reusing the current Node gate rather than translating the approval and Git-provenance semantics into a second engine."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "github-actions-all-branch-push-gate"
+    ],
+    "rationale": "Widen the existing GitHub Actions push trigger to all branches and reuse the current commit-range-aware Node gate. Keep costly build and Playwright jobs conditional so ordinary branch pushes gain machine enforcement without multiplying browser CI cost.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "backstage-push-governance",
+        "reason": "Backstage is a broader full solution, but its catalog, portal, deployment, and operational requirements are disproportionate to a single-repository push enforcement gap."
+      },
+      {
+        "candidate_id": "opa-push-policy",
+        "reason": "OPA is a broader policy framework, but translating the already-working task approval and Git provenance semantics would duplicate policy ownership without increasing enforcement coverage."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If GitHub Actions push-run cost becomes material, split the machine gate into a dedicated lightweight workflow with path filters while preserving all-branch push coverage for protected implementation files."
+  }
+}
