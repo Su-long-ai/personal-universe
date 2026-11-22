@@ -1,0 +1,234 @@
+{
+  "schema": 2,
+  "task_id": "LIVE-WORLD-RENDERER-V3-001",
+  "title": "Upgrade world approach/orbit rendering from baked meshes to the installed live ProceduralPlanets pipeline",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Product-grade YEIS-selected world rendering inside the existing shared React Three Fiber Canvas without adding a second navigation or render authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Keep the existing R3F/EffectComposer host and single universe destination model. Reuse the already-installed ProceduralPlanets v0.5.1 live Planet + PlanetPass path for approach/orbit worlds instead of its current baked tier. Retain pinned MIT YEIS as the higher-level universe/system authority; do not replace navigation or copy AGPL upstream.",
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "docs/architecture/rendering.md",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "ProceduralPlanets v0.5.1 documents live Planet rendering inside an existing Three scene, logarithmic depth support, impostor LOD, and an EffectComposer path where PlanetPass is inserted immediately after RenderPass."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/src/lib/PlanetPass.js",
+      "finding": "PlanetPass is a small EffectComposer pass that reuses PlanetRenderer, preserves RenderPass depth, writes linear HDR into the composer buffer, and disposes its renderer."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS already owns the cross-scale universe/system/body model and native renderer semantics; this task must stay subordinate to that higher-level authority rather than introduce a parallel universe engine."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/objects",
+      "finding": "React Three Fiber can host existing Three Object3D instances through primitive while the application remains responsible for disposal of externally-created objects."
+    },
+    {
+      "url": "https://github.com/beevr-labs/Cosmos",
+      "finding": "Cosmos is a broader universe-scale renderer candidate with camera-relative coordinates and LOD, but adopting it here would duplicate the already-selected YEIS universe and R3F host."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Pinned MIT YEIS remains the chosen higher-level universe solution; Cosmos is also capable but would duplicate universe ownership. Neither should be swapped in merely to repair the close-world visual tier.",
+      "source_refs": [
+        2,
+        4
+      ],
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "cosmos-web-universe"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "The existing React Three Fiber shared Canvas already provides lifecycle, scene access and the single WebGL renderer. Reuse it; do not create a second canvas or renderer authority.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "react-three-fiber"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "ProceduralPlanets v0.5.1 already ships the exact live Planet and PlanetPass subsystem needed, including composer integration, depth compositing, LOD/impostors and logarithmic-depth compatibility. Upgrade the existing baked use to this live path.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "procedural-planets"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "The existing CinematicPipeline already uses Three EffectComposer with RenderPass, bloom and OutputPass, so PlanetPass can be inserted into the established chain rather than creating custom post-processing glue.",
+      "source_refs": [
+        1
+      ],
+      "registry_refs": [
+        "procedural-planets"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-full-world-stack",
+      "name": "Pinned YEIS MIT renderer as the complete world stack",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "YEIS MIT e520568",
+      "license": "MIT at pinned commit",
+      "decision": "partial",
+      "reason": "Correct higher-level authority and valuable for the subsequent System renderer, but replacing the close-world tier with its full physical-km camera/body pipeline is a much larger integration than needed for the immediate visual defect.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4.5,
+        "customization_fit": 4.5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "cosmos-full-replacement",
+      "name": "Cosmos universe renderer",
+      "level": "full_solution",
+      "registry_id": "cosmos-web-universe",
+      "source": "Cosmos",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Broad visual coverage but would introduce a second universe/camera stack next to YEIS and duplicate the adopted R3F integration.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 3.5,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 3.5
+      }
+    },
+    {
+      "id": "r3f-shared-host",
+      "name": "Existing React Three Fiber shared Canvas",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "React Three Fiber already in project",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Keeps one renderer/canvas and lets the live Planet object coexist with the existing HUD, camera and transition lifecycle.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-planets-live",
+      "name": "ProceduralPlanets v0.5.1 Planet + PlanetPass",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "ProceduralPlanets v0.5.1",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already installed and already adopted for world generation; the live tier directly fixes close-up terrain/atmosphere/cloud quality and plugs into the existing EffectComposer without a new engine.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Close world surface quality at approach/orbit scale",
+      "importance": "high",
+      "coverage": {
+        "yeis-full-world-stack": "full",
+        "cosmos-full-replacement": "full",
+        "r3f-shared-host": "partial",
+        "procedural-planets-live": "full"
+      },
+      "decision": "Use ProceduralPlanets live terrain/atmosphere/cloud rendering for the current selected-world tier while retaining YEIS as universe authority."
+    },
+    {
+      "capability": "Reuse existing post-processing and shared Canvas without a second WebGL owner",
+      "importance": "high",
+      "coverage": {
+        "yeis-full-world-stack": "partial",
+        "cosmos-full-replacement": "partial",
+        "r3f-shared-host": "full",
+        "procedural-planets-live": "full"
+      },
+      "decision": "Keep R3F and insert PlanetPass into the current EffectComposer immediately after RenderPass."
+    },
+    {
+      "capability": "Performance scaling for desktop/iPad/mobile",
+      "importance": "high",
+      "coverage": {
+        "yeis-full-world-stack": "full",
+        "cosmos-full-replacement": "full",
+        "r3f-shared-host": "partial",
+        "procedural-planets-live": "full"
+      },
+      "decision": "Reuse ProceduralPlanets visibility culling and impostor LOD, then map existing quality mode to live renderer parameters only where necessary."
+    },
+    {
+      "capability": "Preserve navigation/content authority and deep-link semantics",
+      "importance": "high",
+      "coverage": {
+        "yeis-full-world-stack": "full",
+        "cosmos-full-replacement": "partial",
+        "r3f-shared-host": "full",
+        "procedural-planets-live": "full"
+      },
+      "decision": "Renderer receives the already-selected PlanetDefinition only; Search/Places/Canvas/deep-link/Journey remain unchanged."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "r3f-shared-host",
+      "procedural-planets-live"
+    ],
+    "rationale": "Keep the current R3F Canvas and YEIS navigation/universe authority, but replace the baked close-world visual tier with ProceduralPlanets' already-installed live Planet + PlanetPass subsystem. This removes the visible baked-texture limitation without another canvas, another route model or custom planet shaders.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "yeis-full-world-stack",
+        "reason": "YEIS remains the higher-level selected engine and will be reused for the System layer next, but pulling its full physical-km camera/body rendering stack into the close-world phase first would enlarge the change while leaving an already-adopted live planet subsystem unused."
+      },
+      {
+        "candidate_id": "cosmos-full-replacement",
+        "reason": "Cosmos is broad enough to solve the visual tier, but replacing YEIS/R3F universe ownership solely for this gap would duplicate current navigation, content binding and runtime work."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the live PlanetPass cannot meet mobile GPU or composer compatibility gates on the existing package version, retain baked mode only as a low-quality fallback and evaluate the pinned YEIS BodyRenderer during the System renderer task before writing custom shaders."
+  }
+}
