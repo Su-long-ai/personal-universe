@@ -67,6 +67,27 @@ astronomy. The keyboard contract is:
 The vendored YEIS `Input.isTyping()` check prevents the 3D hotkey layer from
 claiming keystrokes while the input is focused.
 
+## Navigation failure recovery
+
+Native YEIS camera failures remain part of the same shared destination
+execution path. `UniverseApp` preserves the exact failed
+`UniverseNavigationCameraRequest` and renders one persistent, non-modal
+recovery notice rather than falling back to console-only diagnostics.
+
+The notice follows the pinned-MIT YEIS single-notification concept without
+copying the legacy UI implementation. It is announced as an ARIA alert, does
+not take focus, and does not auto-dismiss. `RETRY` only refreshes
+`requestId` and reissues the same camera target/mode through
+`YeisGalaxyScene`; it does not re-resolve to a different destination or
+create another navigation authority. `DISMISS` clears only the active error
+feedback. Any new Search/Places/Canvas navigation or a successful native
+arrival clears stale failure state.
+
+A full toast queue/provider was intentionally not introduced: the product has
+one authoritative native navigation request at a time, so Radix/React Aria
+toast machinery would add queue and focus infrastructure without improving the
+destination contract.
+
 ## Navigator interaction lifecycle
 
 The Navigator keeps YEIS/shared destination resolution authoritative while the
@@ -373,8 +394,9 @@ The navigation mainline retains the frozen `YEIS-FULL-PLACES-TRAVEL-001`
 approval for its original protected closure. Later productization units use
 independent immutable task approvals, including
 `PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
-`NAVIGATOR-INTERACTION-LIFECYCLE-001`, and
-`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`.
+`NAVIGATOR-INTERACTION-LIFECYCLE-001`,
+`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`, and
+`NAVIGATION-FAILURE-RECOVERY-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
