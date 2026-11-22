@@ -67,6 +67,30 @@ astronomy. The keyboard contract is:
 The vendored YEIS `Input.isTyping()` check prevents the 3D hotkey layer from
 claiming keystrokes while the input is focused.
 
+## Navigator interaction lifecycle
+
+The Navigator keeps YEIS/shared destination resolution authoritative while the
+React shell owns only presentation lifecycle.
+
+- changing the query immediately invalidates the previous rows and marks the
+  result region busy before the debounced search starts, so a former Places row
+  cannot be activated as if it matched the new query;
+- loading has a visible `Scanning destinations…` state rather than a blank
+  list;
+- Open/Travel and Locate expose a single pending action, disable competing row
+  actions, and close the dialog only after the shared destination executor
+  accepts the action;
+- an immediate resolver/executor rejection stays visible in the dialog instead
+  of becoming console-only;
+- ArrowUp/ArrowDown, Enter, Shift+Enter and Escape remain the same keyboard
+  contract and do not introduce a second selection/search authority.
+
+cmdk and XState were evaluated for this lifecycle. cmdk has strong generic
+loading/empty/group primitives but would duplicate selection/filter plumbing
+while dual Open/Locate remains custom; XState is disproportionate for the small
+local state surface. Existing React state/refs/effects therefore close this gap
+around the retained pinned-MIT YEIS destination model.
+
 ## Places / Destinations
 
 With an empty query the same navigator becomes a grouped Places surface.
