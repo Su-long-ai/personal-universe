@@ -27,6 +27,28 @@ test("default YEIS boots with native galaxy and personal signals", async ({
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
+  await expect
+    .poll(
+      async () =>
+        page
+          .locator("html")
+          .getAttribute("data-yeis-landmark-photos-complete"),
+      { timeout: 20_000 },
+    )
+    .toBe("1");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-requested",
+    "15",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-loaded",
+    "15",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-failed",
+    "0",
+  );
+
   const content = await positiveDataset(page, "data-personal-content");
   const signals = await positiveDataset(page, "data-personal-signals");
   const overlay = await positiveDataset(page, "data-personal-signal-overlay");
@@ -157,7 +179,7 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
 
-  const search = page.getByRole("textbox", { name: "Search universe" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Personal Universe");
   await expect
     .poll(async () =>
