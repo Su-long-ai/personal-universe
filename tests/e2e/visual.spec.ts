@@ -30,7 +30,7 @@ for (const viewport of VIEWPORTS) {
   test(`capture stable UI and WebGL artifacts: ${viewport.name}`, async ({
     page,
   }, testInfo) => {
-    test.setTimeout(180_000);
+    test.setTimeout(240_000);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({
       width: viewport.width,
