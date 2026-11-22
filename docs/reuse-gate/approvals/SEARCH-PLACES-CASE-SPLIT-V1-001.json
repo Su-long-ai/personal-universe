@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "task_id": "SEARCH-PLACES-CASE-SPLIT-V1-001",
+  "approved_at": "2026-11-22T19:24:00.000Z",
+  "baseline_commit": "a5faeb0c44ada1f36f6079e9b9ca4dad45d54855",
+  "record_path": "docs/reuse-gate/tasks/SEARCH-PLACES-CASE-SPLIT-V1-001.json",
+  "record_sha256": "2421655ec2350d5041be7d5acf191087303c7a371a9e65079d490df07244d1e4",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Functional E2E case isolation for Search, Places and exact-body deep-link flows"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "independent-playwright-functional-cases",
+    "native-shard-rebalance"
+  ],
+  "candidate_scores": {
+    "independent-playwright-functional-cases": 57,
+    "native-shard-rebalance": 57,
+    "increase-timeout": 38
+  }
+}
