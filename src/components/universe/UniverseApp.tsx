@@ -187,6 +187,12 @@ export default function UniverseApp({
   const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
     null,
   );
+  const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
+    null,
+  );
+  const [pendingDestinationMode, setPendingDestinationMode] = useState<
+    "locating" | "traveling" | null
+  >(null);
   const [signalHover, setSignalHover] = useState<{
     title: string;
     kind: string;
@@ -499,9 +505,9 @@ export default function UniverseApp({
         destination.target.kind === "landmark" ||
         destination.target.kind === "blackhole";
 
-      setActiveDestinationId(destination.id);
-      document.documentElement.dataset.universeActiveDestination =
-        destination.id;
+      setPendingDestinationId(null);
+      setPendingDestinationMode(null);
+      delete document.documentElement.dataset.universePendingDestination;
 
       if (!spatial) {
         const marker = await navigationMarker(destination, galaxy.markers);
@@ -564,8 +570,15 @@ export default function UniverseApp({
               destinationId: destination.id,
               navigationMode: "open",
             });
+            setActiveDestinationId(null);
+            delete document.documentElement.dataset.universeActiveDestination;
+            setPendingDestinationId(destination.id);
+            setPendingDestinationMode("traveling");
+            document.documentElement.dataset.universePendingDestination =
+              destination.id;
             setNavigationRequest({
               requestId: navigationRequestSeq.current,
+              destinationId: destination.id,
               mode: "travel",
               target: cameraTarget,
               title: destination.title,
@@ -588,6 +601,9 @@ export default function UniverseApp({
 
         setNavigationRequest(null);
         setNavigationStatus(null);
+        setActiveDestinationId(destination.id);
+        document.documentElement.dataset.universeActiveDestination =
+          destination.id;
         setSelectedSystem(system);
         setSelectedPlanet(planet);
         openedWorldDestinationRef.current = planet ? destination.id : null;
@@ -669,8 +685,15 @@ export default function UniverseApp({
         destinationId: destination.id,
         navigationMode: "open",
       });
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      setPendingDestinationId(destination.id);
+      setPendingDestinationMode("traveling");
+      document.documentElement.dataset.universePendingDestination =
+        destination.id;
       setNavigationRequest({
         requestId: navigationRequestSeq.current,
+        destinationId: destination.id,
         mode: "travel",
         target: cameraTarget,
         title: destination.title,
@@ -714,7 +737,12 @@ export default function UniverseApp({
       }
 
       navigationRequestSeq.current += 1;
-      setActiveDestinationId(destination.id);
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      setPendingDestinationId(destination.id);
+      setPendingDestinationMode("locating");
+      document.documentElement.dataset.universePendingDestination =
+        destination.id;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
@@ -730,14 +758,13 @@ export default function UniverseApp({
       });
       setNavigationRequest({
         requestId: navigationRequestSeq.current,
+        destinationId: destination.id,
         mode: "locate",
         target: cameraTarget,
         title: destination.title,
       });
       setNavigationStatus("locating");
       const target = cameraTargetLabel(cameraTarget);
-      document.documentElement.dataset.universeActiveDestination =
-        destination.id;
       document.documentElement.dataset.universeNavigationTarget = target;
       console.info(
         "[UNIVERSE-NAV] locate " +
@@ -955,6 +982,11 @@ export default function UniverseApp({
     ) => {
       setNavigationStatus(null);
       setNavigationRequest(null);
+      setPendingDestinationId(null);
+      setPendingDestinationMode(null);
+      delete document.documentElement.dataset.universePendingDestination;
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
       setNavigationFailure({ request, reason });
       document.documentElement.dataset.universeNavigationError =
         cameraTargetLabel(request.target);
@@ -972,6 +1004,12 @@ export default function UniverseApp({
     (request: UniverseNavigationCameraRequest) => {
       delete document.documentElement.dataset.universeNavigationError;
       setNavigationFailure(null);
+      setPendingDestinationId(null);
+      setPendingDestinationMode(null);
+      delete document.documentElement.dataset.universePendingDestination;
+      setActiveDestinationId(request.destinationId);
+      document.documentElement.dataset.universeActiveDestination =
+        request.destinationId;
       setNavigationStatus(
         request.mode === "travel" ? "arrived" : "located",
       );
@@ -987,6 +1025,12 @@ export default function UniverseApp({
       requestId: navigationRequestSeq.current,
     };
     setNavigationFailure(null);
+    setPendingDestinationId(request.destinationId);
+    setPendingDestinationMode(
+      request.mode === "travel" ? "traveling" : "locating",
+    );
+    document.documentElement.dataset.universePendingDestination =
+      request.destinationId;
     setNavigationRequest(request);
     setNavigationStatus(
       request.mode === "travel" ? "traveling" : "locating",
@@ -1338,6 +1382,8 @@ export default function UniverseApp({
         placements={contentPlacements}
         currentSystem={selectedSystem}
         activeDestinationId={activeDestinationId}
+        pendingDestinationId={pendingDestinationId}
+        pendingDestinationMode={pendingDestinationMode}
         onClose={() => setNavigatorOpen(false)}
         onNavigate={handleNavigateDestination}
         onLocate={handleLocateDestination}
