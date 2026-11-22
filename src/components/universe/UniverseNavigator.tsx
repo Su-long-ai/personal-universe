@@ -104,7 +104,7 @@ export function UniverseNavigator({
     if (!active) return;
     resultRefs.current.get(active.id)?.scrollIntoView({
       block: "nearest",
-      behavior: "instant",
+      behavior: "auto",
     });
   }, [activeIndex, results]);
 
