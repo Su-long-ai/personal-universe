@@ -23,7 +23,7 @@ async function shot(
 ) {
   const path = testInfo.outputPath("visual", `${viewport}--${name}.png`);
   mkdirSync(dirname(path), { recursive: true });
-  await page.screenshot({ path, fullPage: true });
+  await page.screenshot({ path });
   await testInfo.attach(`${viewport}--${name}`, {
     path,
     contentType: "image/png",
