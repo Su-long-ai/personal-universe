@@ -69,3 +69,27 @@
 - HYG-derived star catalogue: CC BY-SA 4.0. The binary contains 109,401 stars.
 - Full copied upstream attribution: `src/vendor/yeis/UPSTREAM_NOTICE.md`
 - Exact host patches: `src/vendor/yeis/PATCHES.md`
+
+## Your Eyes In Space — deep-sky landmark photographs
+
+- Local files: `/nebulae/*.jpg` (15 images, 512px atlas sources, ~1.45 MB total)
+- Pinned source: `berkcomba/youreyesinspace@e52056897364e060fbd6d00951628f163b57d7a1`
+- Upstream metadata: `src/data/landmarkImages.ts`
+- Use: real-position deep-sky landmark billboard atlas in the pinned MIT `LandmarkSprites` renderer.
+- Licenses: public-domain NASA/ESA/STScI imagery or CC BY 4.0 ESO / ESA-Hubble imagery, as identified by the pinned upstream metadata.
+- Credits:
+  - M42: NASA, ESA, M. Robberto (STScI/ESA), HST Orion Treasury Project
+  - Carina: ESO (CC BY 4.0)
+  - M16: ESO (CC BY 4.0)
+  - M8: ESO / S. Guisard (CC BY 4.0)
+  - M1: NASA, ESA, J. Hester & A. Loll (ASU)
+  - M57: Hubble Heritage Team (AURA/STScI/NASA)
+  - M27: ESO (CC BY 4.0)
+  - Helix: NASA, ESA, C.R. O'Dell (Vanderbilt), NOAO/CTIO
+  - Cassiopeia A: NASA/JPL-Caltech/STScI/CXC/SAO
+  - 30 Doradus: TRAPPIST / E. Jehin / ESO (CC BY 4.0)
+  - SN 1987A: ESA/Hubble & NASA (CC BY 4.0)
+  - NGC 346: ESA/Hubble & NASA, A. Nota, P. Massey, E. Sabbi, C. Murray, M. Zamani (CC BY 4.0)
+  - NGC 604: NASA, Hubble Space Telescope
+  - Pleiades: NASA, ESA, AURA/Caltech, Palomar Observatory
+  - Omega Centauri: ESO (CC BY 4.0)

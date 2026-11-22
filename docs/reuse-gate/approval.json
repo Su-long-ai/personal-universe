@@ -1,27 +1,37 @@
 {
   "schema": 2,
-  "task_id": "NAVIGATION-LAZY-BOUNDARY-001",
-  "approved_at": "2026-11-22T15:38:42.107Z",
-  "baseline_commit": "74e04a1ae0812f1f03b2b7d092e799018caf3ff0",
+  "task_id": "YEIS-FULL-PLACES-TRAVEL-001",
+  "approved_at": "2026-11-22T15:48:27.089Z",
+  "baseline_commit": "7bb69fe4bd2b16cdc8a26c01f7129b0b69be9a0e",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "2f6ac9c061d63072c5b6a0e4db069fd387ae4daba42d7b0b308a2aa15079fd35",
+  "record_sha256": "e4befba8007b63c98c9da636483aaa4683ccbadacddadb9946302ecd784f5f17",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "4041a3ab6511cb220709b4e9b6279b8e2f32b9b91dfbf55ae13bfae6378bd6a5",
   "scope": {
-    "level": "implementation",
-    "subject": "Navigation module dependency graph and initial bundle boundary"
+    "level": "subsystem",
+    "subject": "Native multi-scale Places navigation, dynamic galaxy detail, and deep-sky landmark rendering"
   },
   "policy_change": false,
   "planned_files": [
     "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/universe.css",
+    "src/vendor/yeis/render/LandmarkSprites.ts",
+    "src/vendor/yeis/data/landmarkImages.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "public/nebulae/**",
+    "public/THIRD_PARTY_ASSETS.md",
     "docs/architecture/navigation.md"
   ],
   "selected_ids": [
-    "lazy-yeis-navigation"
+    "restore-full-mit-places"
   ],
   "candidate_scores": {
-    "lazy-yeis-navigation": 57,
-    "eager-navigation-core": 49,
-    "duplicate-light-index": 41
+    "restore-full-mit-places": 52.5,
+    "travel-without-render-parity": 39,
+    "custom-spatial-index": 34.5
   }
 }

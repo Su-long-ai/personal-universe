@@ -1,30 +1,44 @@
 {
   "schema": 2,
-  "task_id": "NAVIGATION-LAZY-BOUNDARY-001",
-  "title": "Restore the YEIS lazy-loading boundary after Search/Locate integration",
+  "task_id": "YEIS-FULL-PLACES-TRAVEL-001",
+  "title": "Restore full pinned-MIT YEIS Places travel for stars, galaxies, and deep-sky landmarks",
   "scope": {
-    "level": "implementation",
-    "subject": "Navigation module dependency graph and initial bundle boundary"
+    "level": "subsystem",
+    "subject": "Native multi-scale Places navigation, dynamic galaxy detail, and deep-sky landmark rendering"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The production build warns that the YEIS core dynamic import is ineffective because the statically imported navigation module itself statically imports Universe/index. Official ES/Vite semantics confirm that static imports eagerly join the initial module graph while import() creates an on-demand graph boundary. Keep the navigator UI and result types static, but load YEIS runtime/normalization only inside async navigation functions. This preserves one YEIS search implementation without duplicating an astronomical index.",
+  "research_summary": "The current navigator restored MIT YEIS Search/Places but only star/system targets are first-class. The exact pinned MIT upstream already defines multi-scale navigation semantics: stars switch/open systems, galaxies use CameraController.goToPoint to arrive about 2.6 radii from the galaxy centre, and non-stellar landmarks arrive at 3.2 radii (5 radii for remnants). Upstream also dynamically maintains up to three GalaxyCloud renderers for galaxies within 18 radii, so travel to Andromeda/other galaxies does not collapse into an unresolved sprite. Deep-sky visibility is provided by LandmarkSprites, whose minimal code dependency closure is already mostly vendored; it adds landmarkImages metadata and approximately 1.5 MB of 15 licensed 512px photographs, while procedural billboards remain the base representation. Restore these upstream mechanisms rather than inventing a second spatial-navigation model.",
   "policy_change": false,
   "planned_files": [
     "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/universe.css",
+    "src/vendor/yeis/render/LandmarkSprites.ts",
+    "src/vendor/yeis/data/landmarkImages.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "public/nebulae/**",
+    "public/THIRD_PARTY_ASSETS.md",
     "docs/architecture/navigation.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
-      "finding": "Pinned MIT Universe owns the normalization/search semantics that navigation reuses."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/main.ts",
+      "finding": "Pinned MIT upstream implements goToGalaxy/goToLandmark with CameraController.goToPoint and dynamically keeps up to three GalaxyCloud instances for nearby galaxies."
     },
     {
-      "url": "https://vite.dev/guide/features",
-      "finding": "Vite preserves lazy loading for dynamic imports; statically reachable dependencies belong to the eager graph."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/render/LandmarkSprites.ts",
+      "finding": "Pinned MIT LandmarkSprites renders nebulae, clusters, remnants and record stars as real-position instanced billboards, with photograph atlas as progressive enhancement."
     },
     {
-      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import",
-      "finding": "Dynamic import is evaluated on demand, unlike static import declarations that make modules eager dependencies."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/landmarkImages.ts",
+      "finding": "Pinned metadata identifies 15 512px deep-sky photographs as public domain NASA/ESA/STScI or CC BY 4.0 ESO/ESA-Hubble imagery and records per-image credits."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/places.ts",
+      "finding": "Pinned MIT Places catalogue already groups stars, galaxies, black holes, planets and deep-sky objects as curated destinations."
     }
   ],
   "search_ladder": [
@@ -35,21 +49,24 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0
+        0,
+        1,
+        2,
+        3
       ],
-      "conclusion": "Keep the selected YEIS mother engine and its search semantics; no replacement search product is needed."
+      "conclusion": "The selected mother engine already contains the complete spatial navigation/rendering semantics; reuse the pinned implementation rather than another planetarium/navigation product."
     },
     {
       "level": "framework_engine",
       "status": "found",
       "registry_refs": [
-        "astro-content-collections"
+        "react-three-fiber"
       ],
       "source_refs": [
-        1,
-        2
+        0,
+        1
       ],
-      "conclusion": "The existing Astro/Vite build already provides the lazy module boundary needed; no bundler plugin is required."
+      "conclusion": "The existing R3F-hosted YEIS scene can own upstream CameraController, GalaxyCloud and LandmarkSprites objects without a second canvas."
     },
     {
       "level": "subsystem",
@@ -59,121 +76,142 @@
       ],
       "source_refs": [
         0,
-        1,
-        2
+        1
       ],
-      "conclusion": "Move YEIS runtime imports into the async navigation operations while preserving the existing destination API."
+      "conclusion": "Restore upstream dynamic GalaxyCloud bookkeeping plus native goToPoint formulas and LandmarkSprites as one coherent Places subsystem."
     },
     {
       "level": "component_asset",
-      "status": "none",
-      "registry_refs": [],
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
       "source_refs": [
         1,
         2
       ],
-      "conclusion": "No component package can improve this module-graph issue."
+      "conclusion": "LandmarkSprites and its small pinned photograph set cover deep-sky visuals; no new billboard/search/render package is needed."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "preserve YEIS as the single astronomical search source",
+      "capability": "star/system destinations keep current Personal Universe Open semantics",
       "importance": "high",
       "coverage": {
-        "lazy-yeis-navigation": "full",
-        "eager-navigation-core": "full",
-        "duplicate-light-index": "partial"
+        "restore-full-mit-places": "full",
+        "travel-without-render-parity": "full",
+        "custom-spatial-index": "partial"
       },
-      "decision": "Do not add a second star/search index."
+      "decision": "Keep product SystemScene entry for star-like targets; only spatial galaxy/landmark targets stay in native galactic view."
     },
     {
-      "capability": "keep heavy YEIS core out of the static navigator graph",
+      "capability": "galaxy travel remains visually resolved near arrival",
       "importance": "high",
       "coverage": {
-        "lazy-yeis-navigation": "full",
-        "eager-navigation-core": "none",
-        "duplicate-light-index": "full"
+        "restore-full-mit-places": "full",
+        "travel-without-render-parity": "none",
+        "custom-spatial-index": "partial"
       },
-      "decision": "Use function-local dynamic imports for runtime-only dependencies."
+      "decision": "Restore upstream nearby-galaxy cloud lifecycle, not just goToPoint."
     },
     {
-      "capability": "keep Search/Open/Locate behavior unchanged",
+      "capability": "non-stellar landmarks are visible and searchable at real coordinates",
       "importance": "high",
       "coverage": {
-        "lazy-yeis-navigation": "full",
-        "eager-navigation-core": "full",
-        "duplicate-light-index": "partial"
+        "restore-full-mit-places": "full",
+        "travel-without-render-parity": "none",
+        "custom-spatial-index": "partial"
       },
-      "decision": "Only dependency timing changes; the destination API stays stable."
+      "decision": "Vendor pinned LandmarkSprites + metadata/photos and update it in the native frame loop."
+    },
+    {
+      "capability": "reuse one physical coordinate/navigation authority",
+      "importance": "high",
+      "coverage": {
+        "restore-full-mit-places": "full",
+        "travel-without-render-parity": "full",
+        "custom-spatial-index": "none"
+      },
+      "decision": "All camera travel remains owned by pinned YEIS CameraController."
+    },
+    {
+      "capability": "licensing remains explicit and pinned",
+      "importance": "high",
+      "coverage": {
+        "restore-full-mit-places": "full",
+        "travel-without-render-parity": "full",
+        "custom-spatial-index": "partial"
+      },
+      "decision": "Keep code at e520568 MIT boundary and record each photograph source/license in project attribution."
     }
   ],
   "candidates": [
     {
-      "id": "lazy-yeis-navigation",
-      "name": "Function-local dynamic YEIS imports inside navigation operations",
-      "level": "subsystem",
+      "id": "restore-full-mit-places",
+      "name": "Restore pinned MIT YEIS multi-scale Places travel + dynamic galaxy clouds + LandmarkSprites",
+      "level": "full_solution",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "existing navigation API + native import()",
-      "license": "MIT pinned YEIS / web platform",
+      "source": "Pinned MIT src/main.ts + render/LandmarkSprites.ts + data/landmarkImages.ts",
+      "license": "MIT source at e520568; landmark photos public domain or CC BY 4.0 as recorded upstream",
       "decision": "reuse",
-      "reason": "Restores the intended lazy boundary while retaining the single upstream search implementation and current navigator API.",
+      "reason": "Highest global coverage and lowest semantic risk: camera formulas, galaxy LOD lifecycle, landmark coordinates, renderer and curated Places all come from the already-selected mother engine.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1,
-        "license_fit": 5,
+        "integration_cost": 2,
+        "license_fit": 4.5,
         "maintenance_health": 5,
-        "performance_fit": 5,
+        "performance_fit": 4.5,
         "customization_fit": 5,
         "maturity": 5
       }
     },
     {
-      "id": "eager-navigation-core",
-      "name": "Keep YEIS core statically reachable through navigation.ts",
+      "id": "travel-without-render-parity",
+      "name": "Add goToPoint targets but keep one Milky Way cloud and no LandmarkSprites",
       "level": "subsystem",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "current build graph",
+      "source": "Partial reuse of pinned camera formulas",
       "license": "MIT pinned YEIS",
       "decision": "reject",
-      "reason": "Works functionally but defeats the existing dynamic boundary and produces Vite ineffective-dynamic-import warnings.",
+      "reason": "Creates destinations that can arrive at unresolved/blank near views; locally cheaper but globally incomplete.",
       "evaluation": {
-        "coverage": 4,
-        "integration_cost": 0,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 2,
-        "customization_fit": 4,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "duplicate-light-index",
-      "name": "Build a separate lightweight project/star search index to avoid loading YEIS",
-      "level": "component_asset",
-      "registry_id": "cmdk-fuse-navigation",
-      "source": "generic client-side search stack",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "Could make the navigator light but duplicates astronomical search/ranking and creates a second mapping layer back to YEIS IDs.",
-      "evaluation": {
-        "coverage": 3.5,
-        "integration_cost": 3,
+        "coverage": 2.5,
+        "integration_cost": 1,
         "license_fit": 5,
         "maintenance_health": 3,
         "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 3
+      }
+    },
+    {
+      "id": "custom-spatial-index",
+      "name": "Build a separate project-owned galaxy/landmark destination model and camera flight layer",
+      "level": "subsystem",
+      "registry_id": "react-three-fiber",
+      "source": "New local R3F navigation implementation",
+      "license": "project code / MIT framework",
+      "decision": "reject",
+      "reason": "Duplicates coordinates, arrival heuristics and LOD behavior already present in YEIS and creates two spatial authorities.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 4,
         "customization_fit": 5,
-        "maturity": 5
+        "maturity": 2.5
       }
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "lazy-yeis-navigation"
+      "restore-full-mit-places"
     ],
-    "rationale": "Preserve the static navigator shell but move all YEIS runtime-only dependencies behind import() inside async search/marker resolution. This restores code splitting without a second search index.",
+    "rationale": "Restore the pinned MIT YEIS navigation and rendering mechanisms as a coherent subsystem. Personal Universe continues to own product-phase semantics and content presentation, while YEIS remains the single authority for spatial coordinates, camera travel, galaxy LOD and deep-sky landmark rendering.",
     "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If Vite still reports a static path into the core, inspect the remaining navigation imports and move only runtime values behind the same lazy boundary; keep type-only imports static."
+    "fallback": "If photo assets prove too costly, keep the exact LandmarkSprites procedural billboard path and disable only the photograph atlas; do not remove landmark coordinates or native travel."
   }
 }

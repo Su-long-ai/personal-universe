@@ -8,28 +8,35 @@ export type UniverseNavigationKind =
   | "featured"
   | "star"
   | "blackhole"
-  | "landmark";
+  | "landmark"
+  | "galaxy";
+
+export type UniverseNavigationTarget =
+  | { kind: "star"; nativeId: string }
+  | { kind: "galaxy"; index: number }
+  | { kind: "landmark"; index: number };
 
 export interface UniverseNavigationDestination {
   id: string;
   kind: UniverseNavigationKind;
   title: string;
   detail: string;
-  nativeId: string;
+  target: UniverseNavigationTarget;
   markerId?: string;
   entryId?: string;
 }
 
-export interface UniverseNavigationFocusRequest {
+export interface UniverseNavigationCameraRequest {
   requestId: number;
-  nativeId: string;
+  mode: "locate" | "travel";
+  target: UniverseNavigationTarget;
   title: string;
 }
 
 /**
- * Small English-facing subset of the pinned MIT YEIS Places list.
- * The stable refs come from src/ui/places.ts at e520568; the current product
- * shell owns presentation/copy while the astronomical lookup stays in YEIS.
+ * English-facing subset of the pinned MIT YEIS Places list.
+ * Stable refs and spatial semantics come from src/ui/places.ts / src/main.ts
+ * at e520568; Personal Universe owns only product presentation.
  */
 const FEATURED_STAR_REFS = [
   "Proxima Centauri",
@@ -37,6 +44,20 @@ const FEATURED_STAR_REFS = [
   "Vega",
   "Betelgeuse",
   "Polaris",
+] as const;
+
+const FEATURED_GALAXY_REFS = [
+  "Andromeda",
+  "M33",
+  "Büyük Macellan",
+  "M87",
+] as const;
+
+const FEATURED_LANDMARK_REFS = [
+  "l-m42",
+  "l-pleiades",
+  "l-m1",
+  "l-omegacen",
 ] as const;
 
 export async function loadUniverseNavigation(
@@ -59,15 +80,24 @@ export async function navigationMarker(
   destination: UniverseNavigationDestination,
   markers: GalaxyMarker[],
 ): Promise<GalaxyMarker> {
+  if (destination.target.kind !== "star") {
+    throw new Error(
+      `Navigation target ${destination.id} is spatial, not a star/system target`,
+    );
+  }
+
   const { loadYeisCore } = await import("./index");
   const runtime = await loadYeisCore();
   const existing =
     (destination.markerId
       ? markers.find((marker) => marker.id === destination.markerId)
       : undefined) ??
-    markers.find((marker) => marker.nativeId === destination.nativeId);
+    markers.find((marker) => marker.nativeId === destination.target.nativeId);
 
-  return existing ?? markerForYeisStarId(runtime, markers, destination.nativeId);
+  return (
+    existing ??
+    markerForYeisStarId(runtime, markers, destination.target.nativeId)
+  );
 }
 
 function browseDestinations(
@@ -85,9 +115,25 @@ function browseDestinations(
       id: "featured:" + nativeId,
       kind: "featured",
       title: runtime.catalog.nameOf(hit),
-      detail: "FEATURED PLACE · " + formatDistanceLy(runtime.catalog.distancePc(hit)),
-      nativeId,
+      detail:
+        "FEATURED STAR · " +
+        formatDistanceLy(runtime.catalog.distancePc(hit)),
+      target: { kind: "star", nativeId },
     });
+  }
+
+  for (const ref of FEATURED_GALAXY_REFS) {
+    const hit = runtime.universe.galaxies.search(ref, 1)[0];
+    if (hit === undefined) continue;
+    out.push(galaxyDestination(runtime, hit, "featured"));
+  }
+
+  for (const id of FEATURED_LANDMARK_REFS) {
+    const index = runtime.universe.landmarks.findIndex(
+      (landmark) => landmark.def.id === id,
+    );
+    if (index < 0) continue;
+    out.push(landmarkDestination(runtime, index, "featured"));
   }
 
   const sagA = runtime.universe.blackHole("b0");
@@ -97,11 +143,11 @@ function browseDestinations(
       kind: "featured",
       title: sagA.entry.name,
       detail: "FEATURED PLACE · BLACK HOLE",
-      nativeId: sagA.systemStarId,
+      target: { kind: "star", nativeId: sagA.systemStarId },
     });
   }
 
-  return dedupe(out).slice(0, 12);
+  return dedupe(out).slice(0, 18);
 }
 
 function searchDestinations(
@@ -137,7 +183,7 @@ function searchDestinations(
       kind: "featured",
       title: "AURORA",
       detail: "HERO SYSTEM · PERSONAL UNIVERSE",
-      nativeId: runtime.heroSystem.id,
+      target: { kind: "star", nativeId: runtime.heroSystem.id },
     });
   }
 
@@ -152,7 +198,7 @@ function searchDestinations(
         (info.catalogSpectral || info.spectral || "STAR") +
         " · " +
         formatDistanceLy(info.distancePc),
-      nativeId,
+      target: { kind: "star", nativeId },
     });
   }
 
@@ -162,23 +208,66 @@ function searchDestinations(
       kind: "blackhole",
       title: blackHole.entry.name,
       detail: "BLACK HOLE · YEIS PLACE",
-      nativeId: blackHole.systemStarId,
+      target: { kind: "star", nativeId: blackHole.systemStarId },
     });
   }
 
-  for (const index of runtime.universe.searchLandmarks(query, 5)) {
-    const landmark = runtime.universe.landmarks[index];
-    if (!landmark?.systemId) continue;
-    out.push({
+  for (const index of runtime.universe.searchLandmarks(query, 6)) {
+    out.push(landmarkDestination(runtime, index));
+  }
+
+  for (const index of runtime.universe.galaxies.search(query, 6)) {
+    out.push(galaxyDestination(runtime, index));
+  }
+
+  return dedupe(out).slice(0, 16);
+}
+
+function galaxyDestination(
+  runtime: YeisCoreRuntime,
+  index: number,
+  kind: UniverseNavigationKind = "galaxy",
+): UniverseNavigationDestination {
+  const galaxies = runtime.universe.galaxies;
+  const distancePc = Math.hypot(
+    galaxies.positions[index * 3],
+    galaxies.positions[index * 3 + 1],
+    galaxies.positions[index * 3 + 2],
+  );
+  return {
+    id: "galaxy:" + index,
+    kind,
+    title: galaxies.name(index),
+    detail:
+      "GALAXY · " +
+      (index === 0 ? "HOME" : formatDistanceLy(distancePc)),
+    target: { kind: "galaxy", index },
+  };
+}
+
+function landmarkDestination(
+  runtime: YeisCoreRuntime,
+  index: number,
+  kind: UniverseNavigationKind = "landmark",
+): UniverseNavigationDestination {
+  const landmark = runtime.universe.landmarks[index];
+  if (landmark.systemId) {
+    return {
       id: "landmark:" + landmark.def.id,
-      kind: "landmark",
+      kind,
       title: landmark.def.name,
       detail: landmark.def.kind.toUpperCase() + " · YEIS LANDMARK",
-      nativeId: landmark.systemId,
-    });
+      target: { kind: "star", nativeId: landmark.systemId },
+    };
   }
 
-  return dedupe(out).slice(0, 12);
+  return {
+    id: "landmark:" + landmark.def.id,
+    kind,
+    title: landmark.def.name,
+    detail: landmark.def.kind.toUpperCase() + " · DEEP-SKY PLACE",
+    target: { kind: "landmark", index },
+  };
 }
 
 function personalDestinations(
@@ -201,7 +290,7 @@ function personalDestinations(
           placement.entry.kind.toUpperCase() +
           " · " +
           (marker?.name ?? nativeId),
-        nativeId,
+        target: { kind: "star" as const, nativeId },
         markerId: placement.markerId,
         entryId: placement.entry.id,
       },
@@ -217,16 +306,22 @@ function dedupe(
     const key =
       destination.kind === "personal"
         ? destination.id
-        : destination.kind + ":" + destination.nativeId;
+        : targetKey(destination.target);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
+function targetKey(target: UniverseNavigationTarget): string {
+  if (target.kind === "star") return "star:" + target.nativeId;
+  return target.kind + ":" + target.index;
+}
+
 function formatDistanceLy(distancePc: number): string {
   const ly = distancePc * 3.26156;
   if (ly < 100) return ly.toFixed(1) + " LY";
   if (ly < 10_000) return ly.toFixed(0) + " LY";
-  return (ly / 1000).toFixed(1) + " KLY";
+  if (ly < 1_000_000) return (ly / 1000).toFixed(1) + " KLY";
+  return (ly / 1_000_000).toFixed(2) + " MLY";
 }

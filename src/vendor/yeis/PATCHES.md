@@ -2,7 +2,7 @@
 
 Upstream: https://github.com/berkcomba/youreyesinspace  
 Pinned source commit: `e52056897364e060fbd6d00951628f163b57d7a1`  
-Vendored subset: 22 TypeScript files forming the dependency closure of
+Vendored subset: 24 TypeScript files forming the dependency closure of
 `Universe`, `StarSystem`, `CelestialBody`, and `StarCatalog`.
 
 This directory intentionally does **not** track the upstream default branch.
@@ -56,3 +56,17 @@ the CC BY-SA 4.0 HYG-derived catalogue terms.
 The camera, picking, magnitude, galaxy sampling and shader algorithms remain
 upstream logic. These lifecycle patches only adapt ownership to React Three
 Fiber.
+
+6. `render/LandmarkSprites.ts`
+   - Adds `dispose(scene)` so the R3F host can remove the instanced landmark
+     mesh and release its geometry, shader material, and photo atlas texture.
+   - Rendering, coordinate, LOD, atlas, and picking logic remain the exact
+     pinned MIT implementation.
+
+## Deep-sky landmark imagery
+
+`data/landmarkImages.ts` and the 15 files under `/public/nebulae/` are copied
+from the same pinned snapshot. Upstream metadata records the photographs as
+NASA/ESA/STScI public-domain material or ESO / ESA-Hubble CC BY 4.0 assets.
+The exact per-image credit lines are retained in `landmarkImages.ts` and in
+`public/THIRD_PARTY_ASSETS.md`.

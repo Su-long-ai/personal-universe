@@ -139,7 +139,7 @@ export function UniverseNavigator({
                 else activate(result);
               }
             }}
-            placeholder="Search projects, stars, black holes, landmarks…"
+            placeholder="Search projects, stars, galaxies, black holes, landmarks…"
             aria-label="Search universe"
           />
           <kbd>CTRL K</kbd>
@@ -194,7 +194,9 @@ export function UniverseNavigator({
                   <strong>{result.title}</strong>
                   <small>{result.detail}</small>
                 </span>
-                <span className="navigator-open">OPEN →</span>
+                <span className="navigator-open">
+                  {result.target.kind === "star" ? "OPEN →" : "TRAVEL →"}
+                </span>
               </button>
               <button
                 type="button"
@@ -210,7 +212,7 @@ export function UniverseNavigator({
 
         <footer className="navigator-footer">
           <span>↑↓ SELECT</span>
-          <span>ENTER OPEN</span>
+          <span>ENTER OPEN / TRAVEL</span>
           <span>SHIFT+ENTER LOCATE</span>
           <span>ESC CLOSE</span>
         </footer>
