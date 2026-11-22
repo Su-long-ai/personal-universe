@@ -179,11 +179,17 @@ export function UniverseNavigator({
   if (!open) return null;
 
   const activate = (destination: UniverseNavigationDestination) => {
-    void Promise.resolve(onNavigate(destination)).then(onClose);
+    onClose();
+    void Promise.resolve(onNavigate(destination)).catch((error) => {
+      console.error("[UNIVERSE-NAV] destination activation failed", error);
+    });
   };
 
   const locate = (destination: UniverseNavigationDestination) => {
-    void Promise.resolve(onLocate(destination)).then(onClose);
+    onClose();
+    void Promise.resolve(onLocate(destination)).catch((error) => {
+      console.error("[UNIVERSE-NAV] destination locate failed", error);
+    });
   };
 
   let flatIndex = -1;
