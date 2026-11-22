@@ -60,6 +60,21 @@ jobs:
           grep -Eq 'data-universe-navigator-results="[1-9][0-9]*"' /tmp/personal-universe-nav.html
           grep -q 'Earth' /tmp/personal-universe-nav.html
 
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-gl=angle --use-angle=swiftshader --window-size=1440,900 --virtual-time-budget=12000 --screenshot=/tmp/personal-universe-default.png http://127.0.0.1:4321/
+          "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage --use-gl=angle --use-angle=swiftshader --window-size=1440,900 --virtual-time-budget=12000 --screenshot=/tmp/personal-universe-navigator.png 'http://127.0.0.1:4321/?navigator=1&navq=Earth'
+
+      - name: Upload visual smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-visual-smoke-${{ github.sha }}
+          path: |
+            /tmp/personal-universe-default.png
+            /tmp/personal-universe-navigator.png
+            /tmp/personal-universe-dom.html
+            /tmp/personal-universe-nav.html
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
