@@ -132,6 +132,7 @@ type UniverseJourneyState = {
   destinations: UniverseNavigationDestination[];
   index: number;
   paused: boolean;
+  completed: boolean;
 };
 
 
@@ -424,6 +425,11 @@ export default function UniverseApp({
 
   const handleSelectSystem = useCallback(
     (marker: GalaxyMarker) => {
+      journeyNavigationRef.current = false;
+      journeyRef.current = null;
+      setJourney(null);
+      delete document.documentElement.dataset.universeJourney;
+      delete document.documentElement.dataset.universeJourneyComplete;
       const system = resolveMarker(marker);
       const destination = navigationDestinationForMarker(
         marker,
@@ -457,6 +463,8 @@ export default function UniverseApp({
       if (!journeyDriven) {
         journeyRef.current = null;
         setJourney(null);
+        delete document.documentElement.dataset.universeJourney;
+        delete document.documentElement.dataset.universeJourneyComplete;
       }
       if (activeEngine !== "yeis") return;
       delete document.documentElement.dataset.universeNavigationError;
@@ -654,6 +662,8 @@ export default function UniverseApp({
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
+      delete document.documentElement.dataset.universeJourney;
+      delete document.documentElement.dataset.universeJourneyComplete;
       if (activeEngine !== "yeis") return;
       delete document.documentElement.dataset.universeNavigationError;
       const cameraTarget = navigationCameraTarget(destination, galaxy.markers);
@@ -710,7 +720,9 @@ export default function UniverseApp({
         destinations,
         index: 0,
         paused: false,
+        completed: false,
       };
+      delete document.documentElement.dataset.universeJourneyComplete;
       journeyRef.current = next;
       setJourney(next);
       journeyNavigationRef.current = true;
@@ -733,14 +745,17 @@ export default function UniverseApp({
       const nextIndex = current.index + delta;
       if (nextIndex < 0) return;
       if (nextIndex >= current.destinations.length) {
-        journeyRef.current = null;
-        setJourney(null);
-        delete document.documentElement.dataset.universeJourney;
+        const completed = { ...current, paused: true, completed: true };
+        journeyRef.current = completed;
+        setJourney(completed);
+        document.documentElement.dataset.universeJourneyComplete =
+          current.title;
         console.info("[UNIVERSE-JOURNEY] complete " + current.title);
         return;
       }
 
-      const next = { ...current, index: nextIndex };
+      const next = { ...current, index: nextIndex, completed: false };
+      delete document.documentElement.dataset.universeJourneyComplete;
       journeyRef.current = next;
       setJourney(next);
       journeyNavigationRef.current = true;
@@ -752,6 +767,7 @@ export default function UniverseApp({
   const handleToggleJourneyPause = useCallback(() => {
     const current = journeyRef.current;
     if (!current) return;
+    if (current.completed) return;
     const next = { ...current, paused: !current.paused };
     journeyRef.current = next;
     setJourney(next);
@@ -762,6 +778,7 @@ export default function UniverseApp({
     journeyRef.current = null;
     setJourney(null);
     delete document.documentElement.dataset.universeJourney;
+    delete document.documentElement.dataset.universeJourneyComplete;
   }, []);
 
   useEffect(() => {
@@ -772,6 +789,7 @@ export default function UniverseApp({
     if (
       !journey ||
       journey.paused ||
+      journey.completed ||
       navigatorOpen ||
       reducedMotion ||
       journey.destinations.length < 2 ||
@@ -983,6 +1001,7 @@ export default function UniverseApp({
     journeyRef.current = null;
     setJourney(null);
     delete document.documentElement.dataset.universeJourney;
+    delete document.documentElement.dataset.universeJourneyComplete;
 
     if (phase === "system") {
       setSelectedSystem(null);
@@ -1129,7 +1148,7 @@ export default function UniverseApp({
         <aside className="universe-journey-controls">
           <header>
             <div>
-              <span>GUIDED JOURNEY</span>
+              <span>{journey.completed ? "JOURNEY COMPLETE" : "GUIDED JOURNEY"}</span>
               <strong>{journey.title}</strong>
             </div>
             <button
@@ -1167,27 +1186,37 @@ export default function UniverseApp({
             >
               ← PREV
             </button>
+            {!journey.completed && (
+              <button
+                type="button"
+                onClick={handleToggleJourneyPause}
+              >
+                {journey.paused ? "RESUME" : "PAUSE"}
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleToggleJourneyPause}
+              onClick={
+                journey.completed
+                  ? handleStopJourney
+                  : () => handleJourneyStep(1)
+              }
             >
-              {journey.paused ? "RESUME" : "PAUSE"}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleJourneyStep(1)}
-            >
-              {journey.index >= journey.destinations.length - 1
-                ? "DONE"
-                : "NEXT →"}
+              {journey.completed
+                ? "CLOSE"
+                : journey.index >= journey.destinations.length - 1
+                  ? "DONE"
+                  : "NEXT →"}
             </button>
           </div>
           <small className="journey-mode">
-            {reducedMotion
-              ? "REDUCED MOTION · MANUAL ADVANCE"
-              : journey.paused
-                ? "PAUSED · CAMERA REMAINS FREE"
-                : "AUTO ADVANCE · CAMERA REMAINS FREE"}
+            {journey.completed
+              ? "COMPLETE · CAMERA REMAINS FREE"
+              : reducedMotion
+                ? "REDUCED MOTION · MANUAL ADVANCE"
+                : journey.paused
+                  ? "PAUSED · CAMERA REMAINS FREE"
+                  : "AUTO ADVANCE · CAMERA REMAINS FREE"}
           </small>
         </aside>
       )}

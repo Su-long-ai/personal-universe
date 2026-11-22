@@ -367,6 +367,76 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Guided Journey completes visibly and competing navigation interrupts", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const navigatorButton = page.getByRole("button", {
+    name: /SEARCH \/ PLACES/,
+  });
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const controls = page.locator(".universe-journey-controls");
+  const html = page.locator("html");
+
+  await navigatorButton.click();
+  await expect(dialog).toBeVisible();
+  const featuredJourney = page.getByRole("button", {
+    name: /Featured Journey/,
+  });
+  await expect(featuredJourney).toBeEnabled();
+  await featuredJourney.click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeVisible();
+  await expect(controls).toContainText("REDUCED MOTION · MANUAL ADVANCE");
+  await expect(html).toHaveAttribute(
+    "data-universe-journey",
+    "Featured Journey",
+  );
+  await expect(page.locator(".world-content-card")).toBeVisible();
+
+  await controls.getByRole("button", { name: "DONE" }).click();
+  await expect(controls).toContainText("JOURNEY COMPLETE");
+  await expect(controls).toContainText("COMPLETE · CAMERA REMAINS FREE");
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-complete",
+    "Featured Journey",
+  );
+
+  await controls.getByRole("button", { name: "CLOSE" }).click();
+  await expect(controls).toBeHidden();
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  await expect(html).not.toHaveAttribute("data-universe-journey-complete");
+
+  await navigatorButton.click();
+  await expect(dialog).toBeVisible();
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+  await expect(controls).toBeVisible();
+
+  await navigatorButton.click();
+  await expect(dialog).toBeVisible();
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Earth");
+  const earth = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ hasText: "Earth" })
+    .first();
+  await expect(earth).toBeVisible();
+  await earth.locator(".navigator-result-open").click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeHidden();
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  await expect(html).not.toHaveAttribute("data-universe-journey-complete");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("landmark Search shares the same travel destination contract", async ({
   page,
 }, testInfo) => {
