@@ -495,8 +495,19 @@ export function YeisGalaxyScene({
           signalHoverRef.current(null);
         };
 
-        const onSignalPointerMove = (event: PointerEvent) => {
-          if (state.disposed || state.input.coarse || state.input.dragging) {
+        let hoverFrame = 0;
+        let hoverEvent: PointerEvent | null = null;
+
+        const resolveSignalHover = () => {
+          hoverFrame = 0;
+          const event = hoverEvent;
+          hoverEvent = null;
+          if (
+            !event ||
+            state.disposed ||
+            state.input.coarse ||
+            state.input.dragging
+          ) {
             clearSignalHover();
             return;
           }
@@ -547,11 +558,21 @@ export function YeisGalaxyScene({
           });
         };
 
+        const onSignalPointerMove = (event: PointerEvent) => {
+          hoverEvent = event;
+          if (!hoverFrame) {
+            hoverFrame = window.requestAnimationFrame(resolveSignalHover);
+          }
+        };
+
         gl.domElement.addEventListener("pointermove", onSignalPointerMove);
         gl.domElement.addEventListener("pointerleave", clearSignalHover);
         removeHoverListeners = () => {
           gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
           gl.domElement.removeEventListener("pointerleave", clearSignalHover);
+          if (hoverFrame) window.cancelAnimationFrame(hoverFrame);
+          hoverFrame = 0;
+          hoverEvent = null;
           clearSignalHover();
         };
 
