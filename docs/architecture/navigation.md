@@ -179,3 +179,27 @@ local browser:
 This browser smoke is now part of the branch CI, in addition to Reuse Gate and
 the Astro production build.
 
+## Shareable star and world links
+
+Implemented under task `SHAREABLE-NAV-LINKS-002`.
+
+The existing debug URL contract is promoted into a stable single-page deep-link
+contract rather than introducing a router:
+
+- `phase=<phase>`
+- `star=<native YEIS star id>`
+- optional `body=<native YEIS body id>`
+
+On initial load, `body` is resolved inside the requested native YEIS system
+before the content/Hero/first-world fallback, so an exact shared world wins.
+Opening a star or world through normal navigation updates the same query
+parameters with the browser History API. Returning to the galactic overview
+removes only `phase`, `star` and `body`.
+
+Unrelated query state such as `engine`, `diagnostic`, `freeze`,
+`navigator` and `navq` is preserved because URL mutation starts from the
+current `window.location`.
+
+The serialized identity remains YEIS-owned; Personal Universe does not create a
+second slug or route identity for astronomical objects.
+
