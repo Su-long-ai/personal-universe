@@ -451,6 +451,22 @@
       ],
       "notes": "Use the repository-local Node policy engine inside GitHub Actions, but evaluate the PR commit range instead of only a dirty working tree. Pair with a required status check so changing or deleting the workflow cannot silently bypass merge gating.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "i18next",
+      "name": "i18next",
+      "url": "https://www.i18next.com/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "runtime translation lookup",
+        "locale resource loading",
+        "interpolation and pluralization",
+        "browser localization integrations"
+      ],
+      "notes": "Mature generic i18n subsystem. Useful when an application owns its translation resources, but redundant when reusing YEIS data that already ships matching pinned dictionaries and lookup semantics.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
