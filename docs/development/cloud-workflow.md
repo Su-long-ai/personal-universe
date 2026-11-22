@@ -66,6 +66,8 @@ worker per machine, but distributes the suite across four GitHub-hosted runners:
 `workers: 1`, so multiple SwiftShader/WebGL browsers do not contend inside the
 same runner.
 
+CI keeps one retry for diagnostic traces but enables Playwright's native `failOnFlakyTests`; a test that only passes on retry is therefore still a failed CI signal and must be hardened before merge.
+
 This follows Playwright's native CI sharding model rather than weakening visual
 coverage or adding another browser-test service.
 
