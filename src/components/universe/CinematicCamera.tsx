@@ -28,9 +28,18 @@ const SHOTS: Partial<
       positionTolerance: number;
       targetTolerance: number;
       frameScale?: number;
+      transition?: boolean;
     }
   >
 > = {
+  system: {
+    position: [0, 8.6, 18.5],
+    target: [0, 0, 0],
+    smoothTime: 0.52,
+    maxSpeed: 28,
+    positionTolerance: 0.16,
+    targetTolerance: 0.1,
+  },
   approach: {
     position: [1.35, 1.15, 13.6],
     target: [WORLD[0] - 0.15, WORLD[1] + 0.15, WORLD[2]],
@@ -56,6 +65,15 @@ const SHOTS: Partial<
     maxSpeed: 12,
     positionTolerance: 0.08,
     targetTolerance: 0.06,
+  },
+  surface: {
+    position: [0.5, 22.0, 18.0],
+    target: [0, 8.0, -16.0],
+    smoothTime: 0.38,
+    maxSpeed: 24,
+    positionTolerance: 0.14,
+    targetTolerance: 0.1,
+    transition: false,
   },
   returning: {
     position: [0, 24, 41],
@@ -104,28 +122,6 @@ export function CinematicCamera({
       return;
     }
 
-    if (phase === "system") {
-      controls.smoothTime = reducedMotion ? 0.05 : 0.52;
-      controls.maxSpeed = 28;
-      void controls.setLookAt(
-        0,
-        8.6,
-        18.5,
-        0,
-        0,
-        0,
-        !reducedMotion,
-      );
-      return;
-    }
-
-    if (phase === "surface") {
-      controls.smoothTime = reducedMotion ? 0.05 : 0.38;
-      controls.maxSpeed = 24;
-      void controls.setLookAt(0.5, 22.0, 18.0, 0, 8.0, -16.0, false);
-      return;
-    }
-
     const shot = SHOTS[phase];
     if (!shot) return;
 
@@ -152,7 +148,7 @@ export function CinematicCamera({
       desiredTarget.current.x,
       desiredTarget.current.y,
       desiredTarget.current.z,
-      !reducedMotion,
+      shot.transition ?? !reducedMotion,
     );
   }, [height, phase, reducedMotion, scrollDepth, width]);
 
