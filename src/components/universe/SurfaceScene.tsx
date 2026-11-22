@@ -1,64 +1,96 @@
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { SurfaceTerrain } from "./SurfaceTerrain";
 
-export function SurfaceScene() {
-  const beacon = useRef<THREE.Mesh>(null);
-  const [active, setActive] = useState(false);
+function ArrivalBeacon({ active, onToggle, height }: { active: boolean; onToggle: () => void; height: number }) {
+  const beacon = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
     if (!beacon.current) return;
-    beacon.current.rotation.y += delta * 0.4;
-    const pulse = 1 + Math.sin(state.clock.elapsedTime * 2.2) * 0.08;
-    beacon.current.scale.setScalar(active ? pulse * 1.18 : pulse);
+    beacon.current.rotation.y += delta * 0.12;
+    const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.55) * 0.035;
+    beacon.current.scale.setScalar(active ? pulse * 1.06 : pulse);
   });
 
   return (
-    <>
-      <color attach="background" args={["#06151f"]} />
-      <fog attach="fog" args={["#0b2931", 7, 30]} />
-      <hemisphereLight args={["#95d9ff", "#0b1618", 2.2]} />
-      <directionalLight position={[5, 8, 2]} intensity={3.8} color="#ffd8a0" />
-
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.8, 0]}>
-        <planeGeometry args={[80, 80, 64, 64]} />
-        <meshStandardMaterial color="#133b3c" roughness={0.96} metalness={0.05} />
-      </mesh>
-
-      <group position={[0, -1.4, -8]}>
-        {[-7, -4, -1, 2, 5, 8].map((x, i) => (
-          <mesh key={x} position={[x, 0.15 + (i % 2) * 0.5, -i * 1.1]} scale={[2.2, 3.1 + (i % 3), 1.8]}>
-            <coneGeometry args={[1, 1, 5]} />
-            <meshStandardMaterial color={i % 2 ? "#193e42" : "#21484b"} roughness={1} />
-          </mesh>
-        ))}
-      </group>
-
-      <mesh
-        ref={beacon}
-        position={[0, -0.35, -3.4]}
-        onClick={() => setActive((value) => !value)}
-      >
-        <octahedronGeometry args={[0.52, 0]} />
+    <group ref={beacon} position={[0.4, height, -5.4]} onClick={onToggle}>
+      <mesh scale={[0.1, 1.45, 0.1]}>
+        <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial
-          color={active ? "#ffe6a3" : "#87e8ff"}
-          emissive={active ? "#ffb74d" : "#2dd8ff"}
-          emissiveIntensity={active ? 5 : 3}
-          roughness={0.18}
-          metalness={0.35}
+          color={active ? "#ffd7a0" : "#b9e8ff"}
+          emissive={active ? "#ff9a45" : "#5ac8ff"}
+          emissiveIntensity={active ? 4.5 : 2.2}
+          metalness={0.64}
+          roughness={0.22}
         />
       </mesh>
-
-      <mesh position={[0, -0.35, -3.4]} scale={2.2}>
-        <sphereGeometry args={[0.52, 24, 24]} />
+      <mesh position={[0, 0.65, 0]} scale={active ? 0.42 : 0.3}>
+        <sphereGeometry args={[0.24, 24, 24]} />
         <meshBasicMaterial
-          color={active ? "#ffb74d" : "#4ee8ff"}
+          color={active ? "#ffd9a0" : "#7fd8ff"}
           transparent
-          opacity={0.08}
+          opacity={0.22}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function DistantMoon() {
+  return (
+    <group position={[20, 15, -48]}>
+      <mesh>
+        <sphereGeometry args={[5.8, 64, 64]} />
+        <meshStandardMaterial
+          color="#9aa5ad"
+          roughness={0.95}
+          metalness={0}
+          emissive="#1b232b"
+          emissiveIntensity={0.12}
+        />
+      </mesh>
+      <mesh scale={1.035}>
+        <sphereGeometry args={[5.8, 48, 48]} />
+        <meshBasicMaterial
+          color="#8fcaff"
+          transparent
+          opacity={0.055}
+          side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
+    </group>
+  );
+}
+
+export function SurfaceScene() {
+  const [active, setActive] = useState(false);
+  const [anchorHeight, setAnchorHeight] = useState(4.8);
+
+  return (
+    <>
+      <color attach="background" args={["#030b12"]} />
+      <fog attach="fog" args={["#07141d", 34, 118]} />
+
+      <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
+      <directionalLight
+        position={[-12, 9, 4]}
+        intensity={4.6}
+        color="#ffc27d"
+        castShadow
+      />
+      <pointLight position={[0.4, anchorHeight + 1.0, -5.4]} intensity={active ? 7 : 2.8} distance={11} color={active ? "#ffb46d" : "#74d8ff"} />
+
+      <Suspense fallback={null}>
+        <SurfaceTerrain onAnchorHeight={setAnchorHeight} />
+      </Suspense>
+
+      <DistantMoon />
+      <ArrivalBeacon active={active} height={anchorHeight} onToggle={() => setActive((value) => !value)} />
     </>
   );
 }

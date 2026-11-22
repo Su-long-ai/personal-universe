@@ -98,7 +98,7 @@ export function CinematicCamera({
     if (phase === "surface") {
       controls.smoothTime = reducedMotion ? 0.05 : 0.38;
       controls.maxSpeed = 24;
-      void controls.setLookAt(0, 1.4, 8.5, 0, -0.2, -3.2, false);
+      void controls.setLookAt(0.5, 22.0, 18.0, 0, 8.0, -16.0, false);
       return;
     }
 

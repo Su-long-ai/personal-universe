@@ -15,3 +15,21 @@
 - Source: https://github.com/ZyFou/ProceduralPlanets
 - License: MIT
 - Use: live hero-planet terrain, ocean, clouds and atmosphere via `Planet` + `PlanetPass`.
+
+
+## ProceduralTerrains
+
+- Package: `procedural-terrains@2.0.5`
+- Source: https://github.com/ZyFou/ProceduralTerrains
+- License: MIT
+- Use: finite surface terrain generation, LOD, height sampling and terrain shader.
+
+## Poly Haven — Boulder 01
+
+- Local files: `/models/boulder_01/**`
+- Asset: Boulder 01
+- Source: https://polyhaven.com/
+- Download API: https://api.polyhaven.com/files/boulder_01
+- License: CC0
+- Use: locally hosted 1K glTF + PBR textures for near-field surface detail.
+- Runtime dependency on Poly Haven API: none.

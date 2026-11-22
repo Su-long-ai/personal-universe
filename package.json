@@ -32,12 +32,13 @@
     "howler": "^2.2.4",
     "postprocessing": "^6.39.6",
     "procedural-planets": "^0.5.1",
+    "procedural-terrains": "^2.0.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "three": "^0.187.0"
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/howler": "^2.2.13",
-    "@types/three": "^0.187.0"
+    "@types/three": "^0.185.1"
   }
 }

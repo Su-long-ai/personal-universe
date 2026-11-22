@@ -1,13 +1,17 @@
 {
   "schema": 1,
-  "task_id": "V1-CINEMATIC-APPROACH-001",
-  "approved_at": "2026-11-22T10:04:55.763Z",
-  "baseline_commit": "ee9e2c284c2a0cf6f30a7b1d5e14e0891278935f",
+  "task_id": "V1-SURFACE-WORLD-001",
+  "approved_at": "2026-11-22T10:21:30.082Z",
+  "baseline_commit": "4abb564cb54cce932c9fc6025bfd810ca717eddc",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "2f0c548d8c4708fa2f0e293094745b51407b05890474887701eedff590cfd0f9",
+  "record_sha256": "608ce33ed47ee85b5319134091dc120ff0364ddd5f7d30012b4e91412da815d1",
   "planned_files": [
+    "package.json",
+    "package-lock.json",
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/SurfaceScene.tsx",
     "src/components/universe/CinematicCamera.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/UniverseApp.tsx"
+    "public/models/boulder_01/**",
+    "public/THIRD_PARTY_ASSETS.md"
   ]
 }

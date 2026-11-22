@@ -1,93 +1,87 @@
 {
-  "task_id": "V1-CINEMATIC-APPROACH-001",
-  "title": "Replace hand-written damp camera with reusable cinematic camera controls",
+  "task_id": "V1-SURFACE-WORLD-001",
+  "title": "Replace placeholder surface with reusable finite terrain and CC0 photogrammetry detail",
   "researched_at": "2026-11-22",
-  "research_summary": "Use Drei 9.122.0's CameraControls wrapper, which in this installed tree is backed by camera-controls 2.10.1. It integrates directly with R3F's active camera and renderer and retains SmoothDamp/Promise-based transition APIs. Avoid the separately installed root camera-controls 3.1.2 in this task so we do not mix major versions. Defer Theatre.js to authored polish after the path is stable, and defer Three RenderTransitionPass to the later Galaxy->Surface scene swap.",
+  "research_summary": "Use ProceduralTerrains 2.0.5 finite runtime for terrain geometry/LOD/material, pin the shared Three.js runtime to 0.185.1 (the common supported intersection of R3F, Drei, postprocessing, ProceduralPlanets and ProceduralTerrains), and add a locally hosted Poly Haven CC0 boulder glTF for near-field photogrammetry detail. Avoid ProceduralTerrains water/cloud pipeline in this slice because the existing planet renderer already owns the orbital atmosphere/cloud stack and the surface goal is only to stop the visual quality drop after landing.",
   "planned_files": [
+    "package.json",
+    "package-lock.json",
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/SurfaceScene.tsx",
     "src/components/universe/CinematicCamera.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/UniverseApp.tsx"
+    "public/models/boulder_01/**",
+    "public/THIRD_PARTY_ASSETS.md"
   ],
   "sources": [
     {
-      "url": "https://drei.docs.pmnd.rs/controls/camera-controls",
-      "finding": "Drei provides a React Three Fiber CameraControls component backed by the official camera-controls implementation, connected to R3F camera/renderer and exposing transition/rest callbacks."
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
+      "finding": "The runtime exposes createTerrain/FiniteTerrain with caller-owned renderer, prepare/update/sampleHeight/dispose, finite noise sources and direct renderer.render support; it explicitly targets three@~0.185.1."
     },
     {
-      "url": "https://github.com/yomotsu/camera-controls",
-      "finding": "camera-controls v3 supports SmoothDamp transitions; setLookAt and related transition methods return Promises for composing complex camera moves."
+      "url": "https://github.com/ZyFou/ProceduralTerrains/releases",
+      "finding": "2.0.5 is the current release and reports production runtime/browser validation, 994 frontend tests, 18 API tests, and public npm packaging."
     },
     {
-      "url": "https://www.theatrejs.com/docs/latest/getting-started/with-react-three-fiber",
-      "finding": "Theatre.js supports an editable R3F PerspectiveCamera and exported timeline state, making it suitable for later authored camera polish rather than the first runtime transition implementation."
+      "url": "https://polyhaven.com/our-api",
+      "finding": "Poly Haven's API is publicly available with a User-Agent requirement; downloaded assets themselves remain CC0 and can be hosted locally instead of depending on the API at runtime."
     },
     {
-      "url": "https://threejs.org/docs/pages/RenderTransitionPass.html",
-      "finding": "Three.js RenderTransitionPass blends two separate scenes/cameras and is better reserved for the later galaxy-to-surface scene swap."
+      "url": "https://polyhaven.com/license",
+      "finding": "Poly Haven assets are CC0; locally bundled assets do not carry the live API attribution condition."
     },
     {
-      "url": "https://gsap.com/docs/v3/GSAP/Timeline/",
-      "finding": "GSAP Timeline is strong for deterministic sequencing and callbacks, but camera-controls already owns camera state/constraints, so using GSAP directly on the camera would duplicate responsibility."
+      "url": "https://docs.polyhaven.com/en/technical-standards/textures",
+      "finding": "Poly Haven PBR assets are photoscanned/photometric, calibrated, seamless and include diffuse/roughness/normal/displacement-style maps, making them suitable for breaking the procedural look."
     },
     {
-      "url": "https://www.npmjs.com/package/@react-three/drei/v/9.122.0",
-      "finding": "Local package inspection confirms Drei 9.122.0 resolves camera-controls 2.10.1; the task will use Drei's own wrapper/dependency rather than the root camera-controls 3.x."
+      "url": "https://threejs.org/docs/pages/ImprovedNoise.html",
+      "finding": "Three.js ships ImprovedNoise as a stable fallback if the external terrain runtime fails integration."
     }
   ],
   "candidates": [
     {
-      "name": "Drei 9.122 CameraControls + bundled camera-controls 2.10.1",
-      "source": "https://drei.docs.pmnd.rs/controls/camera-controls",
+      "name": "ProceduralTerrains 2.0.5 finite runtime",
+      "source": "https://github.com/ZyFou/ProceduralTerrains",
       "license": "MIT",
       "decision": "reuse",
-      "reason": "Already installed, native to R3F, supports smooth Promise-based transitions, and avoids custom lifecycle/adaptor code. Local dependency inspection confirms the bundled version is 2.10.1."
+      "reason": "Provides mature finite terrain generation, LOD, built-in terrain shader, height sampling and lifecycle. Isolated build and real WebGL render both succeeded against Three 0.187; mainline will instead pin the documented 0.185.1 peer."
     },
     {
-      "name": "Theatre.js R3F camera",
-      "source": "https://www.theatrejs.com/docs/latest/api/r3f",
-      "license": "Apache-2.0 runtime core",
-      "decision": "partial",
-      "reason": "Excellent for visual keyframe authoring and later polish, but adds project-state/editor workflow before the basic camera route is proven."
+      "name": "Poly Haven Boulder 01",
+      "source": "https://polyhaven.com/",
+      "license": "CC0",
+      "decision": "reuse",
+      "reason": "Photogrammetry model with LODs and 1K glTF/PBR files adds real near-field rock detail without custom modeling; files will be downloaded and hosted locally."
     },
     {
-      "name": "Three RenderTransitionPass",
-      "source": "https://threejs.org/docs/pages/RenderTransitionPass.html",
+      "name": "Three.js ImprovedNoise + custom plane terrain",
+      "source": "https://threejs.org/docs/pages/ImprovedNoise.html",
       "license": "MIT",
       "decision": "partial",
-      "reason": "Useful for future scene A/B transitions, not for moving one camera through the existing orbital scene."
+      "reason": "Stable fallback with no extra peer constraint, but would require rebuilding terrain LOD/material/sampling behavior that ProceduralTerrains already provides."
     },
     {
-      "name": "GSAP camera position/lookAt tweening",
-      "source": "https://gsap.com/docs/v3/GSAP/Timeline/",
-      "license": "GSAP Standard no-charge license",
+      "name": "ProceduralTerrains water/cloud/render pipeline",
+      "source": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
+      "license": "MIT",
       "decision": "reject",
-      "reason": "Would require our own camera target synchronization and constraints, duplicating camera-controls' purpose."
+      "reason": "Would introduce another full-scene pipeline and duplicate cloud/water responsibilities before the landing scene itself is proven."
     },
     {
-      "name": "Continue custom MathUtils.damp CameraDirector",
-      "source": "local V0 implementation",
+      "name": "Keep current cone mountains and flat plane",
+      "source": "local V0 placeholder",
       "license": "Project code",
       "decision": "reject",
-      "reason": "No authored path semantics, completion signal, input constraints, or reusable transition primitives; already caps cinematic quality."
-    },
-    {
-      "name": "Direct root camera-controls 3.1.2",
-      "source": "https://github.com/yomotsu/camera-controls",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "The root package is a different major version from Drei 9.122's bundled 2.10.1; mixing both would add avoidable integration/version risk."
+      "reason": "Already visibly drops quality after cinematic atmospheric entry."
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected": [
-      "@react-three/drei 9.122 CameraControls",
-      "bundled camera-controls 2.10.1"
+      "procedural-terrains@2.0.5 finite terrain",
+      "three@0.185.1 common peer version",
+      "Poly Haven Boulder 01 1K glTF/PBR asset"
     ],
-    "deferred": [
-      "Theatre.js for authored polish",
-      "RenderTransitionPass for Galaxy->Surface cut"
-    ],
-    "implementation_note": "Camera transition completion will drive phase progression instead of fixed timers, while debug freeze remains available for visual snapshots."
+    "fallback": "Three ImprovedNoise if terrain integration regresses the existing orbital renderer."
   }
 }
