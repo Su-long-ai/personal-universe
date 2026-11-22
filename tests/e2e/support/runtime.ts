@@ -1,7 +1,12 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 
 type Problem = {
-  kind: "pageerror" | "console" | "requestfailed" | "http";
+  kind:
+    | "pageerror"
+    | "unhandledrejection"
+    | "console"
+    | "requestfailed"
+    | "http";
   detail: string;
 };
 
@@ -24,11 +29,31 @@ function isCritical(url: string) {
   return CRITICAL_REQUESTS.some((pattern) => pattern.test(url));
 }
 
-export function observeRuntime(
+export async function observeRuntime(
   page: Page,
   options: RuntimeGuardOptions = {},
 ) {
   const problems: Problem[] = [];
+
+  await page.exposeFunction("__puRecordUnhandledRejection", (detail: string) => {
+    problems.push({ kind: "unhandledrejection", detail });
+  });
+  await page.addInitScript(() => {
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event.reason;
+      const detail =
+        reason instanceof Error
+          ? reason.stack || reason.message
+          : typeof reason === "string"
+            ? reason
+            : JSON.stringify(reason);
+      void (
+        window as typeof window & {
+          __puRecordUnhandledRejection: (value: string) => Promise<void>;
+        }
+      ).__puRecordUnhandledRejection(detail || "Unhandled promise rejection");
+    });
+  });
 
   page.on("pageerror", (error) => {
     problems.push({ kind: "pageerror", detail: error.message });

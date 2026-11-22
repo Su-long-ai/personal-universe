@@ -9,7 +9,7 @@ import {
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
 }, testInfo) => {
-  const runtime = observeRuntime(page);
+  const runtime = await observeRuntime(page);
   const initialRequests = new Set<string>();
   const initialScripts = new Set<string>();
 
@@ -72,7 +72,7 @@ test("default YEIS boots with native galaxy and personal signals", async ({
 });
 
 test("v2 query remains a healthy rollback path", async ({ page }, testInfo) => {
-  const runtime = observeRuntime(page);
+  const runtime = await observeRuntime(page);
   await page.goto("/?engine=v2&freeze=1");
 
   await expect(page.locator("html")).toHaveAttribute(
@@ -87,7 +87,7 @@ test("v2 query remains a healthy rollback path", async ({ page }, testInfo) => {
 test("personal signal deep link reaches system and world content", async ({
   page,
 }, testInfo) => {
-  const runtime = observeRuntime(page);
+  const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
@@ -119,7 +119,7 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
   page,
 }, testInfo) => {
   const stars = /\/vendor\/yeis\/data\/stars\.bin(?:\?|$)/;
-  const runtime = observeRuntime(page, {
+  const runtime = await observeRuntime(page, {
     allowConsoleErrors: [
       /^\[YEIS-BRIDGE\] FAILED; retaining V2 fallback/,
       /^\[YEIS-NATIVE-GALAXY\] FAILED/,
@@ -146,7 +146,7 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
 test("Search keyboard navigation and Places destination both navigate", async ({
   page,
 }, testInfo) => {
-  const runtime = observeRuntime(page);
+  const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
