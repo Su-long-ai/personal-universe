@@ -172,7 +172,7 @@ jobs:
   e2e-report:
     name: Combined Playwright Report
     needs: e2e
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
