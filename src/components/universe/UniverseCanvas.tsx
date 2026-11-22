@@ -1,8 +1,8 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { MathUtils, Vector3 } from "three";
 import { GalaxyScene } from "./GalaxyScene";
 import { SurfaceScene } from "./SurfaceScene";
+import { CinematicPipeline } from "./CinematicPipeline";
 import { TEST_WORLD, type QualityMode, type UniversePhase } from "../../lib/universe/types";
 
 const TARGETS: Record<Exclude<UniversePhase, "surface">, [number, number, number]> = {
@@ -66,7 +66,7 @@ export function UniverseCanvas({
   return (
     <Canvas
       dpr={quality === "low" ? [1, 1] : [1, 1.75]}
-      camera={{ position: [0, 0.4, 20], fov: 48, near: 0.05, far: 140 }}
+      camera={{ position: [0, 0.4, 20], fov: 48, near: 0.05, far: 180 }}
       gl={{ antialias: quality !== "low", powerPreference: "high-performance" }}
     >
       <CameraDirector phase={phase} scrollDepth={scrollDepth} reducedMotion={reducedMotion} />
@@ -75,15 +75,7 @@ export function UniverseCanvas({
       ) : (
         <GalaxyScene phase={phase} onSelectPlanet={onSelectPlanet} quality={quality} />
       )}
-      <EffectComposer multisampling={quality === "low" ? 0 : 4}>
-        <Bloom
-          luminanceThreshold={0.62}
-          luminanceSmoothing={0.82}
-          intensity={quality === "low" ? 0.62 : 1.18}
-          mipmapBlur
-        />
-        <Vignette eskil={false} offset={0.13} darkness={0.74} />
-      </EffectComposer>
+      <CinematicPipeline quality={quality} />
     </Canvas>
   );
 }

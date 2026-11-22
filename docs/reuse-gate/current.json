@@ -1,54 +1,88 @@
 {
-  "task_id": "GATE-001",
-  "title": "Mandatory reuse-first implementation gate",
+  "task_id": "V1-VISUAL-BENCHMARK-001",
+  "title": "Replace V0 placeholder planet and sky with reusable cinematic rendering stack",
   "researched_at": "2026-11-22",
-  "research_summary": "Reuse Git native hooks and npm lifecycle pre-scripts instead of inventing a daemon. The only custom code is a small validator that freezes a research record before implementation and checks file coverage later.",
+  "research_summary": "Keep the current stable R3F v8/WebGL2 stack. Reuse procedural-planets for the hero planet and its physically based atmosphere/ocean/volumetric clouds, Solar System Scope for a real Milky Way sky texture, Three.js/EffectComposer for the rendering pipeline, and the existing GSAP/camera-controls stack later for authored travel. Do not adopt @pmndrs/sky yet because its React bindings require R3F v10 alpha/WebGPU.",
   "planned_files": [
-    "scripts/reuse-gate.mjs",
-    ".githooks/pre-commit",
-    "docs/reuse-gate/**",
     "package.json",
-    "AGENTS.md"
+    "package-lock.json",
+    "src/components/universe/BenchmarkPlanet.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/GalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/universe.css",
+    "public/textures/stars_milky_way.jpg",
+    "public/THIRD_PARTY_ASSETS.md"
   ],
   "sources": [
     {
-      "url": "https://git-scm.com/docs/githooks",
-      "finding": "Git natively runs pre-commit hooks and supports a repository-defined hooks directory via core.hooksPath."
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "procedural-planets 0.5.1 is MIT, WebGL2, Three >=0.160, with terrain LOD, analytic ocean, volumetric clouds, physically based atmosphere, and PlanetPass/EffectComposer integration."
     },
     {
-      "url": "https://docs.npmjs.com/using-npm/scripts.html/",
-      "finding": "npm supports pre<event> lifecycle scripts; a non-zero pre-script aborts the requested lifecycle command."
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/main/docs/embedding.md",
+      "finding": "PlanetPass is designed to render directly after a RenderPass into an HDR composer so bloom and final tone mapping can see the planet."
+    },
+    {
+      "url": "https://www.solarsystemscope.com/textures/",
+      "finding": "Solar System Scope provides a Stars + Milky Way equirectangular texture pack under CC BY 4.0, based on NASA imagery/data."
+    },
+    {
+      "url": "https://github.com/zjoooooo/galaxy-explorer",
+      "finding": "Galaxy Explorer is MIT and demonstrates a production-oriented separation of painted galactic disc, procedural star points, cinematic travel and performance fallback."
+    },
+    {
+      "url": "https://github.com/pmndrs/sky",
+      "finding": "@pmndrs/sky is MIT and high quality, but React bindings require R3F >=10 alpha and WebGPU, so it is not selected for the stable V1 mainline."
     }
   ],
   "candidates": [
     {
-      "name": "Git native pre-commit hook + core.hooksPath",
-      "source": "https://git-scm.com/docs/githooks",
-      "license": "Git built-in capability",
+      "name": "procedural-planets 0.5.1",
+      "source": "https://github.com/ZyFou/ProceduralPlanets",
+      "license": "MIT",
       "decision": "reuse",
-      "reason": "Already installed, dependency-free, blocks commits at the machine layer."
+      "reason": "Directly compatible with our Three 0.187/WebGL2 stack and replaces the hand-built sphere shell with terrain, ocean, clouds and atmosphere."
     },
     {
-      "name": "npm predev/prebuild lifecycle",
-      "source": "https://docs.npmjs.com/using-npm/scripts.html/",
-      "license": "npm built-in capability",
+      "name": "Solar System Scope Stars + Milky Way texture",
+      "source": "https://www.solarsystemscope.com/textures/",
+      "license": "CC BY 4.0",
       "decision": "reuse",
-      "reason": "Blocks local run/build when implementation lacks an approved research token."
+      "reason": "Provides a real-looking deep-sky foundation immediately; attribution can be retained locally."
     },
     {
-      "name": "Custom background policy daemon/file watcher",
-      "source": "local design alternative",
-      "license": "N/A",
+      "name": "Galaxy Explorer",
+      "source": "https://github.com/zjoooooo/galaxy-explorer",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "Reuse its rendering/composition ideas and later port selected galaxy techniques; for this benchmark the priority is the hero planet, not a full galaxy transplant."
+    },
+    {
+      "name": "@pmndrs/sky 0.6",
+      "source": "https://github.com/pmndrs/sky",
+      "license": "MIT",
       "decision": "reject",
-      "reason": "Duplicates Git/npm enforcement, adds process lifecycle failure modes, and is unnecessary."
+      "reason": "Excellent visual candidate but its React path requires R3F 10 alpha/WebGPU. Upgrading the whole app would add unnecessary stability risk before the benchmark passes."
+    },
+    {
+      "name": "Continue polishing the existing sphere + transparent shell",
+      "source": "local V0 implementation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "The V0 technique has already demonstrated a low visual ceiling and duplicates mature atmospheric/planet rendering work."
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected": [
-      "Git native hooks",
-      "npm lifecycle scripts"
+      "procedural-planets",
+      "Solar System Scope Milky Way texture",
+      "Three.js EffectComposer/UnrealBloom/OutputPass"
     ],
-    "custom_code": "Minimal validator only; no custom daemon."
+    "deferred": [
+      "@pmndrs/sky until R3F v10/WebGPU is stable enough",
+      "full Galaxy Explorer port until the hero-frame benchmark passes"
+    ]
   }
 }

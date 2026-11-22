@@ -1,15 +1,19 @@
 {
   "schema": 1,
-  "task_id": "GATE-001",
-  "approved_at": "2026-11-22T09:44:00.726Z",
-  "baseline_commit": "8632e405819882559602da82ac815f9d7afe4d48",
+  "task_id": "V1-VISUAL-BENCHMARK-001",
+  "approved_at": "2026-11-22T09:51:46.374Z",
+  "baseline_commit": "27df31c3b9a57d5d48fb507833f98bde2b2fda65",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "42b7dca39e04de929bd1231c685996f4c39390deeea001379671de7bebc96381",
+  "record_sha256": "1868b27e1cad4d556cdbb8f88a98b5a0e31437b62e82c59727798824272bffe6",
   "planned_files": [
-    "scripts/reuse-gate.mjs",
-    ".githooks/pre-commit",
-    "docs/reuse-gate/**",
     "package.json",
-    "AGENTS.md"
+    "package-lock.json",
+    "src/components/universe/BenchmarkPlanet.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/GalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/universe.css",
+    "public/textures/stars_milky_way.jpg",
+    "public/THIRD_PARTY_ASSETS.md"
   ]
 }
