@@ -1,0 +1,148 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-SIGNAL-HOVER-V3-001",
+  "title": "Scalable Personal Signal hover metadata in the native YEIS galaxy",
+  "scope": {
+    "level": "implementation",
+    "subject": "Desktop hover discovery for Personal Signal points without a second picking or tooltip framework"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Reuse existing Three.js projection and the hosted R3F Canvas surface to identify nearby Personal Signal points in screen space. Keep the label as a simple non-interactive React overlay; do not add Floating UI or retrofit R3F raycast handlers onto imperative YEIS Points solely for hover.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "docs/architecture/content-layer.md"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/events",
+      "finding": "React Three Fiber provides a mature raycast-backed pointer-event system for scene objects that register pointer handlers, but the hosted YEIS sky points are imperative renderer objects rather than JSX interaction nodes."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/math/Vector3.project",
+      "finding": "Three.js provides Vector3 camera projection, which can convert the already-known Personal Signal sky directions into normalized screen coordinates using the active camera."
+    },
+    {
+      "url": "https://floating-ui.com/docs/virtual-elements",
+      "finding": "Floating UI supports virtual point/cursor anchors for collision-aware floating DOM positioning, but it does not solve WebGL signal identification and would add a dependency for a simple non-interactive label."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "conclusion": "A full onboarding or annotation product would exceed this narrow hover-label implementation and still require the same WebGL signal hit detection.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "The existing React Three Fiber host already supplies a Canvas and pointer/raycast framework, so no second rendering or input framework should be introduced.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "react-three-fiber"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "not_applicable",
+      "conclusion": "This hover path is a small interaction implementation inside the existing YEIS galaxy renderer rather than a standalone reusable subsystem.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Three.js camera projection directly solves 3D-to-screen mapping; Floating UI virtual elements are a mature alternative for DOM positioning but are unnecessary for this bounded non-interactive card.",
+      "source_refs": [
+        1,
+        2
+      ],
+      "registry_refs": [
+        "three-vector3-project",
+        "floating-ui-virtual-elements"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-pointer-events",
+      "name": "React Three Fiber raycast pointer events",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing R3F event manager",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Useful for declarative R3F objects, but the Personal Signal sky is owned by imperative YEIS Points. Retrofitting event-handler registration or duplicate hit meshes solely for hover would add scene objects and interaction ownership.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "three-screen-projection",
+      "name": "Three.js Vector3.project plus existing Canvas pointer coordinates",
+      "level": "component_asset",
+      "registry_id": "three-vector3-project",
+      "source": "Three.js already present in project",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Uses the active YEIS/R3F camera and known Personal Signal positions directly, adds no dependency or duplicate 3D geometry, and can share the same point list used for rendering/picking.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "floating-ui-point-tooltip",
+      "name": "Floating UI virtual-point tooltip",
+      "level": "component_asset",
+      "registry_id": "floating-ui-virtual-elements",
+      "source": "Floating UI virtual elements",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Excellent after a DOM/reference point is already known, but it does not identify the hovered WebGL signal. For a small non-interactive card, adding its positioning runtime duplicates simple viewport clamping.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "three-screen-projection"
+    ],
+    "rationale": "Use the Three.js projection primitive already loaded by the universe renderer and the existing Canvas pointer surface. This solves the actual WebGL-to-screen mapping with no new dependency, preserves YEIS as spatial authority, and leaves touch/coarse-pointer interaction on the existing direct-picking path.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "r3f-pointer-events",
+        "reason": "R3F is the broader host framework but its declarative raycast event path would require adapting imperative YEIS points into separate interactive objects; direct projection is narrower and reuses the same authoritative signal positions without a parallel hit scene."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If hover cards become interactive, require collision-aware placement, or multiple overlay surfaces compete, re-evaluate Floating UI virtual elements before extending custom positioning logic."
+  }
+}
