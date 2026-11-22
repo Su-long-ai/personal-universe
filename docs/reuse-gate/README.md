@@ -126,12 +126,26 @@ For every protected changed file the gate finds at least one valid approval whos
 For schema-3 approvals it also verifies:
 
 - the approval baseline is an ancestor of the evaluated head;
-- the task record existed unchanged at the baseline;
-- referenced registry entries match the approved versions;
+- the task record is frozen at the approval-metadata commit;
+- referenced registry entries are frozen at that same approval-metadata commit;
 - policy files use an architecture-level `policy_change: true` task;
 - the approval-token commit precedes the first implementation commit for the covered file.
 
 A protected change without coverage blocks CI.
+
+## Merge-history requirement
+
+Schema-3 approvals intentionally use Git history as machine evidence that approval preceded implementation. Until the gate gains a provenance mode that survives history rewriting, PRs containing schema-3 work must use **merge commits**.
+
+Do not use squash merge or rebase merge for schema-3 task PRs. Squash collapses the approval and implementation commits; rebase rewrites their commit IDs. Either destroys the ancestry evidence stored in the approval token.
+
+## Current GitHub plan boundary
+
+This repository is private and its current GitHub plan does not expose repository Rulesets/required-status-check enforcement. The API returns an upgrade/public-repository requirement.
+
+As a result, v3 can machine-block every downstream CI/build/preview/artifact path when the gate fails, but GitHub itself cannot currently make the Merge button unavailable. Contributors and agents must treat a successful `Machine Reuse Gate` as a mandatory merge precondition.
+
+If the repository becomes public or GitHub Pro is enabled, configure `Machine Reuse Gate` as a required status check so even repository UI/API merges cannot bypass it.
 
 ## Protected implementation
 
