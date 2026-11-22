@@ -1,3 +1,4 @@
+import exoplanetSnapshot from "../../../data/exoplanet-hosts.json";
 import type { GalaxyMarker, SystemDefinition } from "../types";
 import type {
   UniverseContentKind,
@@ -16,6 +17,7 @@ export type UniverseNavigationKind =
   | "hero"
   | "body"
   | "observed"
+  | "exoplanet"
   | "star"
   | "blackhole"
   | "landmark"
@@ -31,6 +33,7 @@ export type UniverseNavigationGroup =
   | "notes"
   | "hero"
   | "observed-hosts"
+  | "exoplanets"
   | "bodies"
   | "stars"
   | "black-holes"
@@ -41,6 +44,7 @@ export type UniverseNavigationTarget =
   | { kind: "star"; nativeId: string }
   | { kind: "marker"; markerId: string }
   | { kind: "body"; starId: string; bodyId: string; markerId?: string }
+  | { kind: "observed-body"; markerId: string; bodyId: string }
   | {
       kind: "content";
       nativeId: string;
@@ -94,6 +98,7 @@ const GROUP_TITLES: Record<UniverseNavigationGroup, string> = {
   notes: "Notes",
   hero: "Hero World",
   "observed-hosts": "Observed Exoplanet Hosts",
+  exoplanets: "Observed Exoplanets",
   bodies: "Planets & Bodies",
   stars: "Stars",
   "black-holes": "Black Holes",
@@ -110,6 +115,7 @@ const SEARCH_GROUP_ORDER: UniverseNavigationGroup[] = [
   "notes",
   "hero",
   "observed-hosts",
+  "exoplanets",
   "bodies",
   "stars",
   "black-holes",
@@ -132,6 +138,28 @@ type CuratedRef = {
   note?: string;
   fallbackRefs?: string[];
 };
+
+type ObservedPlanetRecord = {
+  name: string;
+  orbitAU: number | null;
+  radiusEarth: number | null;
+  massEarth: number | null;
+  equilibriumTempK: number | null;
+};
+
+type ObservedSystemRecord = {
+  hostname: string;
+  hipName: string | null;
+  hdName: string | null;
+  gaiaDr3Id: string | null;
+  planets: ObservedPlanetRecord[];
+};
+
+type ObservedSnapshot = {
+  systems: ObservedSystemRecord[];
+};
+
+const OBSERVED_SYSTEMS = (exoplanetSnapshot as ObservedSnapshot).systems;
 
 const CURATED_BODIES: CuratedRef[] = [
   ["Earth", "earth", "Home world"],
@@ -414,7 +442,10 @@ export async function navigationMarker(
   destination: UniverseNavigationDestination,
   markers: GalaxyMarker[],
 ): Promise<GalaxyMarker> {
-  if (destination.target.kind === "marker") {
+  if (
+    destination.target.kind === "marker" ||
+    destination.target.kind === "observed-body"
+  ) {
     const marker = markers.find(
       (candidate) => candidate.id === destination.target.markerId,
     );
@@ -518,6 +549,14 @@ export async function resolveUniverseNavigationDestination(
       (candidate) => candidate.id === key.slice("observed:".length),
     );
     return marker ? navigationDestinationForMarker(marker, placements) : null;
+  }
+
+  if (key.startsWith("exoplanet:")) {
+    return (
+      observedExoplanetDestinations(markers).find(
+        (destination) => destination.id === key,
+      ) ?? null
+    );
   }
 
   if (key.startsWith("star:")) {
@@ -671,6 +710,9 @@ function buildPlaces(
   const observed = observedDestinations(markers).slice(0, 16);
   if (observed.length) sections.push(section("observed-hosts", observed));
 
+  const exoplanets = observedExoplanetDestinations(markers).slice(0, 24);
+  if (exoplanets.length) sections.push(section("exoplanets", exoplanets));
+
   const bodies = curatedBodies(runtime);
   if (bodies.length) sections.push(section("bodies", bodies));
 
@@ -749,6 +791,17 @@ function searchDestinations(
       [destination.title, destination.detail, ...(destination.keywords ?? [])].join(
         " ",
       ),
+    );
+    if (matchesAny(haystack, queries)) out.push(destination);
+  }
+
+  for (const destination of observedExoplanetDestinations(markers)) {
+    const haystack = normalize(
+      [
+        destination.title,
+        destination.detail,
+        ...(destination.keywords ?? []),
+      ].join(" "),
     );
     if (matchesAny(haystack, queries)) out.push(destination);
   }
@@ -890,6 +943,70 @@ function observedDestinations(
     )
     .map(observedDestination);
 }
+
+function observedExoplanetDestinations(
+  markers: GalaxyMarker[],
+): UniverseNavigationDestination[] {
+  const systemByHost = new Map(
+    OBSERVED_SYSTEMS.map((system) => [system.hostname, system]),
+  );
+
+  return markers
+    .filter(
+      (marker) =>
+        marker.source === "catalog" &&
+        marker.engine === "v2" &&
+        Boolean(marker.catalogId),
+    )
+    .flatMap((marker) => {
+      const system = marker.catalogId
+        ? systemByHost.get(marker.catalogId)
+        : undefined;
+      if (!system) return [];
+
+      return system.planets.map((planet) => {
+        const bodyId =
+          "catalog:" + system.hostname + ":" + planet.name;
+        const metrics = [
+          planet.orbitAU !== null
+            ? formatDecimal(planet.orbitAU) + " AU"
+            : null,
+          planet.radiusEarth !== null
+            ? formatDecimal(planet.radiusEarth) + " R⊕"
+            : null,
+          planet.massEarth !== null
+            ? formatDecimal(planet.massEarth) + " M⊕"
+            : null,
+        ].filter((value): value is string => Boolean(value));
+
+        return {
+          id: "exoplanet:" + marker.id + ":" + planet.name,
+          kind: "exoplanet" as const,
+          group: "exoplanets" as const,
+          title: planet.name,
+          detail:
+            "OBSERVED EXOPLANET · " +
+            system.hostname +
+            (metrics.length ? " · " + metrics.join(" · ") : ""),
+          target: {
+            kind: "observed-body" as const,
+            markerId: marker.id,
+            bodyId,
+          },
+          markerId: marker.id,
+          keywords: [
+            system.hostname,
+            system.hipName ?? "",
+            system.hdName ?? "",
+            system.gaiaDr3Id ?? "",
+            "NASA Exoplanet Archive",
+            "exoplanet",
+          ],
+        };
+      });
+    });
+}
+
 
 function observedDestination(
   marker: GalaxyMarker,
@@ -1202,6 +1319,9 @@ function targetKey(target: UniverseNavigationTarget): string {
   if (target.kind === "marker") return "marker:" + target.markerId;
   if (target.kind === "body") return `body:${target.starId}/${target.bodyId}`;
   if (target.kind === "content") return "content:" + target.entryId;
+  if (target.kind === "observed-body") {
+    return "observed-body:" + target.markerId + "/" + target.bodyId;
+  }
   if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
 }
@@ -1226,6 +1346,12 @@ function queryVariants(
 
 function matchesAny(haystack: string, queries: string[]): boolean {
   return queries.some((query) => haystack.includes(query));
+}
+
+function formatDecimal(value: number): string {
+  if (Math.abs(value) >= 1000) return value.toFixed(0);
+  if (Math.abs(value) >= 10) return value.toFixed(1);
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatDistanceLy(distancePc: number): string {
