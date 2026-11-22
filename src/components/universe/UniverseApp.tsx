@@ -827,6 +827,13 @@ export default function UniverseApp({
     delete document.documentElement.dataset.universeJourneyComplete;
   }, []);
 
+  const handleCinematicUserControlStart = useCallback(() => {
+    setCameraSettledPhase(null);
+    if (!journeyRef.current) return;
+    handleStopJourney();
+    console.info("[UNIVERSE-JOURNEY] interrupted by manual camera control");
+  }, [handleStopJourney]);
+
   useEffect(() => {
     journeyRef.current = journey;
   }, [journey]);
@@ -1181,6 +1188,7 @@ export default function UniverseApp({
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           onCinematicPhaseComplete={handleCinematicPhaseComplete}
+          onCinematicUserControlStart={handleCinematicUserControlStart}
         />
       </div>
 
