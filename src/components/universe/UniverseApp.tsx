@@ -111,6 +111,12 @@ export default function UniverseApp({
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
+  const [signalHover, setSignalHover] = useState<{
+    title: string;
+    kind: string;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const [navigationRequest, setNavigationRequest] =
     useState<UniverseNavigationCameraRequest | null>(null);
   const [navigationStatus, setNavigationStatus] = useState<
@@ -740,6 +746,7 @@ export default function UniverseApp({
           contentPlacements={contentPlacements}
           navigationRequest={navigationRequest}
           onNavigationComplete={handleNavigationComplete}
+          onSignalHover={setSignalHover}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleCanvasSelectSystem}
@@ -752,6 +759,23 @@ export default function UniverseApp({
       </div>
 
       <div className="cinematic-wash" aria-hidden="true" />
+
+      {phase === "galaxy" &&
+        activeEngine === "yeis" &&
+        signalHover &&
+        !navigatorOpen && (
+          <aside
+            className="personal-signal-hover"
+            aria-hidden="true"
+            style={{
+              left: Math.min(signalHover.clientX + 16, window.innerWidth - 240),
+              top: Math.min(signalHover.clientY + 16, window.innerHeight - 92),
+            }}
+          >
+            <span>PERSONAL SIGNAL · {signalHover.kind.toUpperCase()}</span>
+            <strong>{signalHover.title}</strong>
+          </aside>
+        )}
 
       {coreDiagnostic && (
         <aside
