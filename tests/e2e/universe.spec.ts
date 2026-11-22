@@ -420,6 +420,53 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Guided Journey auto advance starts only after the destination settles", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  const controls = page.locator(".universe-journey-controls");
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeVisible();
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+  await expect(controls).toContainText(
+    "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL",
+  );
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 15_000 },
+  );
+  await expect(controls).toContainText(
+    "DWELLING · AUTO ADVANCE AFTER ARRIVAL",
+  );
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+
+  // Dwell is measured from actual camera settlement, not from the earlier
+  // React phase handoff. Keep most of the 6.5 s dwell observable before the
+  // single-stop Journey is allowed to enter its finished state.
+  await page.waitForTimeout(6_000);
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+  await expect(controls).toContainText("JOURNEY COMPLETE", {
+    timeout: 2_500,
+  });
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-complete",
+    "Featured Journey",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Guided Journey completes visibly and competing navigation interrupts", async ({
   page,
 }, testInfo) => {
@@ -454,7 +501,9 @@ test("Guided Journey completes visibly and competing navigation interrupts", asy
 
   await controls.getByRole("button", { name: "DONE" }).click();
   await expect(controls).toContainText("JOURNEY COMPLETE");
-  await expect(controls).toContainText("COMPLETE · CAMERA REMAINS FREE");
+  await expect(controls).toContainText(
+    "COMPLETE · NAVIGATION REMAINS AVAILABLE",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-journey-complete",
     "Featured Journey",
