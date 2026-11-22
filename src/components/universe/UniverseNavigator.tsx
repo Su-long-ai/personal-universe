@@ -69,7 +69,7 @@ export function UniverseNavigator({
       {
         id: "featured",
         title: "Featured Journey",
-        destinations: featured.length ? featured : personal.slice(0, 3),
+        destinations: featured,
       },
       {
         id: "projects",
