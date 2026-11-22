@@ -296,6 +296,13 @@ const QUERY_ALIASES: Record<string, string> = {
   "蟹狀星雲": "crab nebula m1",
   "人马座a*": "sagittarius a*",
   "人馬座a*": "sagittarius a*",
+  "系外行星": "exoplanet",
+  "黑洞": "black hole",
+  "星云": "nebula",
+  "星雲": "nebula",
+  "星团": "cluster",
+  "星團": "cluster",
+  "星系": "galaxy",
 };
 
 export async function loadUniverseNavigation(
@@ -917,6 +924,23 @@ function searchDestinations(
     for (const index of runtime.universe.galaxies.search(query, 10)) {
       out.push(galaxyDestination(runtime, index));
     }
+  }
+
+  if (queries.includes(normalize("black hole"))) {
+    out.push(
+      ...curatedBlackHoles(runtime, CURATED_BLACK_HOLES, "blackhole"),
+    );
+  }
+  if (
+    queries.includes(normalize("nebula")) ||
+    queries.includes(normalize("cluster"))
+  ) {
+    out.push(
+      ...curatedLandmarks(runtime, CURATED_LANDMARKS, "landmark"),
+    );
+  }
+  if (queries.includes(normalize("galaxy"))) {
+    out.push(...curatedGalaxies(runtime, CURATED_GALAXIES, "galaxy"));
   }
 
   return dedupe(out).slice(0, 80);
