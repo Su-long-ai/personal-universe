@@ -1,0 +1,29 @@
+{
+  "schema": 3,
+  "task_id": "GIT-DATA-BATCHED-PUBLISH-001",
+  "approved_at": "2026-11-22T20:56:00.000Z",
+  "baseline_commit": "cbaab65842b31bcbabb174b470e6bccc158ff270",
+  "record_path": "docs/reuse-gate/tasks/GIT-DATA-BATCHED-PUBLISH-001.json",
+  "record_sha256": "f3164c0f2cd286c4c60a9fe23d5e500f5f6c21bb7b9964d3519c35977536441f",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-git-database-batched-writes": "6f0d2f6f8bc9fca66fc3e12c2e270341ba940212197265780305a2e610ba88c1"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Cloud write topology for preserving Reuse Gate provenance while reducing redundant branch-push CI triggers"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "AGENTS.md",
+    "docs/reuse-gate/README.md"
+  ],
+  "selected_ids": [
+    "github-git-data-batched-publish"
+  ],
+  "candidate_scores": {
+    "github-git-data-batched-publish": 57,
+    "local-git-single-push": 51,
+    "contents-api-sequential-writes": 44
+  }
+}
