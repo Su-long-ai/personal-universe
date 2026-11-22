@@ -99,6 +99,10 @@ export function UniverseNavigator({
     }
 
     document.documentElement.dataset.universeNavigator = "open";
+    const debugQuery = new URLSearchParams(window.location.search).get("navq");
+    if (debugQuery) {
+      setQuery(debugQuery);
+    }
     window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => {
       delete document.documentElement.dataset.universeNavigator;
