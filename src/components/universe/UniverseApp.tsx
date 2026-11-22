@@ -67,6 +67,23 @@ function nativeSystemId(system: SystemDefinition | null): string | null {
   return system.id.slice("yeis-system:".length);
 }
 
+function routeStarIdentityForSystem(
+  system: SystemDefinition,
+  markers: GalaxyMarker[],
+): string | null {
+  const nativeId = nativeSystemId(system);
+  if (nativeId) return nativeId;
+
+  const [x, y, z] = system.galaxyPosition;
+  const marker = markers.find(
+    (candidate) =>
+      Math.abs(candidate.position[0] - x) < 1e-9 &&
+      Math.abs(candidate.position[1] - y) < 1e-9 &&
+      Math.abs(candidate.position[2] - z) < 1e-9,
+  );
+  return marker?.nativeId ?? marker?.id ?? null;
+}
+
 function replaceNavigationUrl({
   phase,
   starId,
@@ -899,6 +916,10 @@ export default function UniverseApp({
       setPhase(nextPhase);
 
       if (nextPhase === "galaxy") {
+        setActiveDestinationId(null);
+        delete document.documentElement.dataset.universeActiveDestination;
+        document.documentElement.dataset.universeNavigationPhase = "galaxy";
+        delete document.documentElement.dataset.universeNavigationTarget;
         replaceNavigationUrl({
           phase: "galaxy",
           destinationId: null,
@@ -924,11 +945,16 @@ export default function UniverseApp({
     journeyRef.current = null;
     setJourney(null);
     delete document.documentElement.dataset.universeJourney;
+
     if (phase === "system") {
       setSelectedSystem(null);
       setSelectedPlanet(null);
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      delete document.documentElement.dataset.universeNavigationTarget;
       setPhase(activeEngine === "yeis" ? "galaxy" : "returning");
       if (activeEngine === "yeis") {
+        document.documentElement.dataset.universeNavigationPhase = "galaxy";
         replaceNavigationUrl({
           phase: "galaxy",
           destinationId: null,
@@ -942,16 +968,36 @@ export default function UniverseApp({
 
     setSelectedPlanet(null);
     if (selectedSystem) {
+      const starId = routeStarIdentityForSystem(selectedSystem, galaxy.markers);
       setPhase("system");
-      const starId = nativeSystemId(selectedSystem);
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      document.documentElement.dataset.universeNavigationPhase = "system";
+
       if (starId) {
+        document.documentElement.dataset.universeNavigationTarget = starId;
         replaceNavigationUrl({
           phase: "system",
           starId,
           bodyId: null,
+          destinationId: null,
+          navigationMode: null,
+        });
+      } else {
+        delete document.documentElement.dataset.universeNavigationTarget;
+        replaceNavigationUrl({
+          phase: "system",
+          starId: null,
+          bodyId: null,
+          destinationId: null,
+          navigationMode: null,
         });
       }
     } else {
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      delete document.documentElement.dataset.universeNavigationTarget;
+      document.documentElement.dataset.universeNavigationPhase = "galaxy";
       setPhase("galaxy");
       replaceNavigationUrl({
         phase: "galaxy",
@@ -959,7 +1005,7 @@ export default function UniverseApp({
         navigationMode: null,
       });
     }
-  }, [activeEngine, phase, selectedSystem]);
+  }, [activeEngine, galaxy.markers, phase, selectedSystem]);
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
