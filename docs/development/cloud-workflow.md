@@ -46,3 +46,26 @@ Use a local machine only for Windows-specific behavior, local-GPU work, local-on
 ## Tooling policy
 
 Playwright Test is pinned by CI and installed after the product's deterministic `npm ci` so the application lockfile remains unchanged. The project reuses Playwright's browser lifecycle, tracing, screenshots, HTML reporting, waiting, and request interception instead of maintaining a custom CDP/WebSocket harness.
+
+## Sharded browser validation
+
+The first fully validated Playwright run executed all eight tests on one CI worker.
+The browser-test step alone took 9m40s; the three WebGL visual viewport tests
+accounted for roughly 7m47s of that time.
+
+Task `PLAYWRIGHT-SHARDING-V1-001` keeps Playwright's CI stability rule of one
+worker per machine, but distributes the suite across four GitHub-hosted runners:
+
+1. Machine Reuse Gate runs once.
+2. Astro build + bundle guard run once.
+3. The validated `dist` artifact is uploaded once.
+4. Four Playwright shards download the same `dist` and run concurrently.
+5. Each shard retains its own HTML report, trace, screenshots and metrics.
+
+`fullyParallel: true` is used for shard balancing only; each shard still has
+`workers: 1`, so multiple SwiftShader/WebGL browsers do not contend inside the
+same runner.
+
+This follows Playwright's native CI sharding model rather than weakening visual
+coverage or adding another browser-test service.
+
