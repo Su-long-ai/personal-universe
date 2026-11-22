@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-22",
+  "updated_at": "2026-11-23",
   "status_model": "adopt|trial|assess|hold",
   "entries": [
     {
@@ -434,6 +434,23 @@
       ],
       "notes": "Useful later for article/document search, but not a replacement for YEIS spatial destination search.",
       "last_checked": "2026-11-22"
+    },
+    {
+      "id": "github-actions-pr-diff-gate",
+      "name": "GitHub Actions PR-diff gate with required status checks",
+      "url": "https://docs.github.com/en/actions",
+      "level": "subsystem",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "trial",
+      "covers": [
+        "clean-runner PR diff enforcement",
+        "required status checks",
+        "changed-file policy coverage",
+        "cloud CI gating",
+        "parallel task validation"
+      ],
+      "notes": "Use the repository-local Node policy engine inside GitHub Actions, but evaluate the PR commit range instead of only a dirty working tree. Pair with a required status check so changing or deleting the workflow cannot silently bypass merge gating.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
