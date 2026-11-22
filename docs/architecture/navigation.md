@@ -409,8 +409,9 @@ independent immutable task approvals, including
 `PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
 `NAVIGATOR-INTERACTION-LIFECYCLE-001`,
 `PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
-`NAVIGATION-FAILURE-RECOVERY-001`, and
-`JOURNEY-SETTLED-ORCHESTRATION-001`.
+`NAVIGATION-FAILURE-RECOVERY-001`,
+`JOURNEY-SETTLED-ORCHESTRATION-001`, and
+`NATIVE-BODY-ACCEPTANCE-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -424,7 +425,8 @@ against a production build:
 
 - Search groups, title/summary/tag matching and keyboard behavior;
 - Personal Signal Open reaches the exact attached planet;
-- Places product Open, observed exoplanet Open, and native body fallback;
+- Places product Open, observed exoplanet Open, and native body fallback,
+  including `月球` → `body:c0/moon` → native `c0/moon` travel;
 - observed-host/exoplanet Locate, including a HIP-less physical point;
 - star/system, body, black-hole, landmark and galaxy navigation;
 - Canvas picks route through the same destinations;
@@ -498,3 +500,9 @@ reference frames or native body identity.
 
 If a stale/invalid body id is ever requested, the runtime records a diagnostic
 fallback/error instead of silently substituting a different celestial body.
+
+Browser acceptance now keeps this asymmetric contract explicit with the Moon:
+the Chinese alias `月球` resolves through the real Navigator to
+`body:c0/moon`; because moons are intentionally not mapped into
+`PlanetDefinition`, the shared executor must retain native target `c0/moon`
+through YEIS autopilot completion instead of opening a React product planet.
