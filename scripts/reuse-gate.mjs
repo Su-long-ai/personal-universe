@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 
 const ROOT = process.cwd();
-const APPROVAL_PATH = resolve(ROOT, "docs/reuse-gate/approval.json");
+const LEGACY_APPROVAL_PATH = resolve(ROOT, "docs/reuse-gate/approval.json");
+const APPROVAL_DIR = resolve(ROOT, "docs/reuse-gate/approvals");
+const TASK_DIR = resolve(ROOT, "docs/reuse-gate/tasks");
 const DEFAULT_RECORD = resolve(ROOT, "docs/reuse-gate/current.json");
 const REGISTRY_PATH = resolve(ROOT, "docs/reuse-gate/registry.json");
 
@@ -39,12 +41,41 @@ function git(args) {
   }
 }
 
+function gitRaw(args) {
+  try {
+    return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" });
+  } catch (error) {
+    die("git " + args.join(" ") + " failed: " + error.message);
+  }
+}
+
+function gitOk(args) {
+  try {
+    execFileSync("git", args, { cwd: ROOT, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalize(path) {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
 function sha256(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function sha256Text(text) {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+function safeTaskFileName(taskId) {
+  requiredText(taskId, "task_id");
+  if (!/^[A-Za-z0-9._-]+$/.test(taskId)) {
+    die("task_id may contain only letters, digits, dot, underscore and hyphen.");
+  }
+  return taskId + ".json";
 }
 
 function readJson(path, label) {
@@ -62,18 +93,32 @@ function requiredText(value, label, minLength = 1) {
   }
 }
 
-function protectedImplementation(path) {
+function isGateMetadata(path) {
   const p = normalize(path);
-  if (
+  return (
     p === "docs/reuse-gate/current.json" ||
     p === "docs/reuse-gate/approval.json" ||
-    p === "docs/reuse-gate/registry.json"
-  ) {
-    return false;
-  }
+    p === "docs/reuse-gate/registry.json" ||
+    p.startsWith("docs/reuse-gate/tasks/") ||
+    p.startsWith("docs/reuse-gate/approvals/")
+  );
+}
+
+function isPolicyFile(path) {
+  const p = normalize(path);
   return (
     POLICY_FILES.has(p) ||
     p.startsWith(".githooks/") ||
+    p.startsWith(".github/workflows/") ||
+    p.startsWith(".github/actions/")
+  );
+}
+
+function protectedImplementation(path) {
+  const p = normalize(path);
+  if (isGateMetadata(p)) return false;
+  return (
+    isPolicyFile(p) ||
     p.startsWith("src/") ||
     p.startsWith("public/") ||
     p.startsWith("scripts/") ||
@@ -82,11 +127,6 @@ function protectedImplementation(path) {
     p === "astro.config.mjs" ||
     p === "tsconfig.json"
   );
-}
-
-function isPolicyFile(path) {
-  const p = normalize(path);
-  return POLICY_FILES.has(p) || p.startsWith(".githooks/");
 }
 
 function matchPlanned(path, pattern) {
@@ -411,11 +451,25 @@ function validateRecord(record, registryIndex) {
   };
 }
 
-function changedFiles(mode) {
+function changedFiles(mode, baseArg, headArg) {
   if (mode === "staged") {
     const out = git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]);
     return out ? out.split(/\r?\n/).map(normalize) : [];
   }
+
+  if (mode === "range" || mode === "ci") {
+    const head = headArg || process.env.REUSE_GATE_HEAD_SHA || "HEAD";
+    let base = baseArg || process.env.REUSE_GATE_BASE_SHA || "";
+    if (!base || /^0+$/.test(base)) {
+      base = gitOk(["rev-parse", head + "^"]) ? git(["rev-parse", head + "^"]) : git(["rev-list", "--max-parents=0", head]);
+    }
+    if (!gitOk(["merge-base", "--is-ancestor", base, head])) {
+      die("reuse gate base " + base.slice(0, 12) + " is not an ancestor of " + head.slice(0, 12) + ".");
+    }
+    const out = git(["diff", "--name-only", "--diff-filter=ACMR", base + "..."+ head]);
+    return out ? out.split(/\r?\n/).map(normalize).filter(Boolean) : [];
+  }
+
   const tracked = git(["diff", "HEAD", "--name-only", "--diff-filter=ACMR"]);
   const untracked = git(["ls-files", "--others", "--exclude-standard"]);
   return [...new Set(
@@ -425,6 +479,27 @@ function changedFiles(mode) {
       .map(normalize)
       .filter(Boolean)
   )];
+}
+
+function referencedRegistryIds(record) {
+  const ids = new Set();
+  for (const candidate of record.candidates || []) {
+    if (candidate.registry_id) ids.add(candidate.registry_id);
+  }
+  for (const step of record.search_ladder || []) {
+    for (const id of step.registry_refs || []) ids.add(id);
+  }
+  return [...ids].sort();
+}
+
+function registryEntryHashes(record, registryIndex) {
+  return Object.fromEntries(
+    referencedRegistryIds(record).map((id) => {
+      const entry = registryIndex.get(id);
+      if (!entry) die("approval references missing registry entry: " + id);
+      return [id, sha256Text(JSON.stringify(entry))];
+    })
+  );
 }
 
 function loadValidated(recordPathArg) {
@@ -480,35 +555,23 @@ function approve(recordPathArg) {
 
   const dirtyImplementation = changedFiles("working").filter(protectedImplementation);
   if (dirtyImplementation.length > 0) {
-    const policyUpgradeAllowed =
-      record.policy_change === true &&
-      record.scope.level === "architecture" &&
-      dirtyImplementation.every(
-        (path) =>
-          isPolicyFile(path) &&
-          record.planned_files.some((pattern) => matchPlanned(path, pattern))
-      );
-
-    if (!policyUpgradeAllowed) {
-      die(
-        "reuse research must be approved BEFORE implementation changes.\n" +
-        "Protected files are already dirty:\n  - " +
-        dirtyImplementation.join("\n  - ") +
-        "\nRevert/stash them, approve the research, then implement. " +
-        "Policy changes require scope.level=architecture and policy_change=true."
-      );
-    }
+    die(
+      "reuse research must be approved BEFORE implementation changes.\n" +
+      "Protected files are already dirty:\n  - " +
+      dirtyImplementation.join("\n  - ") +
+      "\nRevert/stash them, approve the research, commit the task + approval metadata, then implement."
+    );
   }
 
   const approval = {
-    schema: 2,
+    schema: 3,
     task_id: record.task_id,
     approved_at: new Date().toISOString(),
     baseline_commit: git(["rev-parse", "HEAD"]),
     record_path: normalize(relative(ROOT, recordPath)),
     record_sha256: sha256(recordPath),
     registry_path: normalize(relative(ROOT, REGISTRY_PATH)),
-    registry_sha256: sha256(REGISTRY_PATH),
+    registry_entry_hashes: registryEntryHashes(record, registryIndex),
     scope: record.scope,
     policy_change: record.policy_change === true,
     planned_files: record.planned_files,
@@ -516,77 +579,173 @@ function approve(recordPathArg) {
     candidate_scores: validation.scores,
   };
 
-  writeFileSync(APPROVAL_PATH, JSON.stringify(approval, null, 2) + "\n", "utf8");
+  mkdirSync(APPROVAL_DIR, { recursive: true });
+  const approvalPath = resolve(APPROVAL_DIR, safeTaskFileName(record.task_id));
+  writeFileSync(approvalPath, JSON.stringify(approval, null, 2) + "\n", "utf8");
   console.log("[REUSE-GATE] APPROVED " + record.task_id);
   console.log("[REUSE-GATE] baseline " + approval.baseline_commit.slice(0, 12));
-  console.log("[REUSE-GATE] registry " + approval.registry_sha256.slice(0, 12));
-  console.log("[REUSE-GATE] implementation may begin.");
+  console.log("[REUSE-GATE] token " + normalize(relative(ROOT, approvalPath)));
+  console.log("[REUSE-GATE] commit the task/approval metadata BEFORE protected implementation.");
   printSummary(record, registryIndex, validation);
 }
 
-function check(mode) {
-  const files = changedFiles(mode);
+function approvalSources() {
+  const paths = [];
+  if (existsSync(APPROVAL_DIR)) {
+    for (const name of readdirSync(APPROVAL_DIR).filter((name) => name.endsWith(".json")).sort()) {
+      paths.push(resolve(APPROVAL_DIR, name));
+    }
+  }
+  if (existsSync(LEGACY_APPROVAL_PATH)) paths.push(LEGACY_APPROVAL_PATH);
+  return paths;
+}
+
+function validateApprovalToken(approvalPath, registry, registryIndex, head) {
+  const approval = readJson(approvalPath, "approval token");
+  if (approval.schema !== 2 && approval.schema !== 3) {
+    die("approval token must use schema 2 or 3: " + normalize(relative(ROOT, approvalPath)));
+  }
+
+  const recordPath = resolve(ROOT, approval.record_path || "");
+  const record = readJson(recordPath, "approved research record");
+  const validation = validateRecord(record, registryIndex);
+
+  if (approval.task_id !== record.task_id) {
+    die("approval task_id does not match research record: " + approval.task_id);
+  }
+  if (approval.record_sha256 !== sha256(recordPath)) {
+    die("research record changed after approval: " + approval.task_id);
+  }
+  if (!gitOk(["merge-base", "--is-ancestor", approval.baseline_commit, head])) {
+    die("approval baseline is not an ancestor of HEAD: " + approval.task_id);
+  }
+
+  const baselineRecord = gitRaw(["show", approval.baseline_commit + ":" + normalize(approval.record_path)]);
+  if (sha256Text(baselineRecord) !== approval.record_sha256) {
+    die("approved research record did not exist unchanged at its baseline: " + approval.task_id);
+  }
+
+  if (approval.schema === 2) {
+    if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
+      die("legacy approval registry changed after approval: " + approval.task_id);
+    }
+  } else {
+    const expected = approval.registry_entry_hashes || {};
+    const actual = registryEntryHashes(record, registryIndex);
+    for (const id of Object.keys(actual)) {
+      if (expected[id] !== actual[id]) {
+        die("registry entry changed after approval: " + approval.task_id + " -> " + id);
+      }
+    }
+    const baselineRegistry = JSON.parse(
+      gitRaw(["show", approval.baseline_commit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
+    );
+    const baselineIndex = validateRegistry(baselineRegistry);
+    const baselineHashes = registryEntryHashes(record, baselineIndex);
+    for (const id of Object.keys(actual)) {
+      if (baselineHashes[id] !== expected[id]) {
+        die("registry entry was not frozen at approval baseline: " + approval.task_id + " -> " + id);
+      }
+    }
+  }
+
+  if (JSON.stringify(approval.planned_files) !== JSON.stringify(record.planned_files)) {
+    die("approval planned_files do not match research record: " + approval.task_id);
+  }
+  if (JSON.stringify(approval.selected_ids) !== JSON.stringify(validation.selectedIds)) {
+    die("approval selected_ids do not match research record: " + approval.task_id);
+  }
+  if (Boolean(approval.policy_change) !== Boolean(record.policy_change)) {
+    die("approval policy_change does not match research record: " + approval.task_id);
+  }
+
+  return {
+    approvalPath,
+    approval,
+    record,
+    validation,
+  };
+}
+
+function firstChangeCommit(base, head, path) {
+  const out = git(["log", "--reverse", "--format=%H", base + ".." + head, "--", path]);
+  return out ? out.split(/\r?\n/)[0] : null;
+}
+
+function approvalCommit(head, path) {
+  const rel = normalize(relative(ROOT, path));
+  const out = git(["log", "-1", "--format=%H", head, "--", rel]);
+  return out || null;
+}
+
+function check(mode, baseArg, headArg) {
+  const files = changedFiles(mode, baseArg, headArg);
   const implementation = files.filter(protectedImplementation);
   if (implementation.length === 0) {
     console.log("[REUSE-GATE] PASS: no " + mode + " protected implementation changes.");
     return;
   }
 
-  const approval = readJson(APPROVAL_PATH, "approval token");
-  if (approval.schema !== 2) {
-    die("approval token is from reuse-gate v1. Run reuse:approve with the v2 record before implementation.");
+  const head = headArg || process.env.REUSE_GATE_HEAD_SHA || git(["rev-parse", "HEAD"]);
+  let rangeBase = baseArg || process.env.REUSE_GATE_BASE_SHA || "";
+  if ((mode === "range" || mode === "ci") && (!rangeBase || /^0+$/.test(rangeBase))) {
+    rangeBase = gitOk(["rev-parse", head + "^"]) ? git(["rev-parse", head + "^"]) : git(["rev-list", "--max-parents=0", head]);
   }
 
-  const recordPath = resolve(ROOT, approval.record_path || "");
-  const record = readJson(recordPath, "approved research record");
   const registry = readJson(REGISTRY_PATH, "reuse registry");
   const registryIndex = validateRegistry(registry);
-  const validation = validateRecord(record, registryIndex);
-
-  if (approval.task_id !== record.task_id) {
-    die("approval task_id does not match research record.");
-  }
-  if (approval.record_sha256 !== sha256(recordPath)) {
-    die("research record changed after approval. Run reuse:approve again BEFORE implementation.");
-  }
-  if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
-    die("reuse registry changed after approval. Re-run research/approval before implementation.");
+  const approvals = approvalSources().map((path) => validateApprovalToken(path, registry, registryIndex, head));
+  if (approvals.length === 0) {
+    die("protected implementation changed but no reuse approval tokens exist.");
   }
 
-  const head = git(["rev-parse", "HEAD"]);
-  if (approval.baseline_commit !== head) {
-    die(
-      "approval was issued from baseline " + approval.baseline_commit.slice(0, 12) +
-      ", but HEAD is " + head.slice(0, 12) + ". Start/approve a fresh implementation task."
-    );
+  const uncovered = [];
+  const coverage = new Map();
+
+  for (const path of implementation) {
+    const candidates = approvals.filter(({ record }) => {
+      if (!record.planned_files.some((pattern) => matchPlanned(path, pattern))) return false;
+      if (isPolicyFile(path) && !(record.policy_change && record.scope.level === "architecture")) return false;
+      return true;
+    });
+
+    const valid = candidates.filter(({ approvalPath, approval }) => {
+      if (mode !== "range" && mode !== "ci") return true;
+      if (approval.schema < 3) return true;
+      const changedAt = firstChangeCommit(rangeBase, head, path);
+      if (!changedAt) return false;
+      const approvedAt = approvalCommit(head, approvalPath);
+      if (!approvedAt || approvedAt === changedAt) return false;
+      return gitOk(["merge-base", "--is-ancestor", approvedAt, changedAt]);
+    });
+
+    if (valid.length === 0) {
+      uncovered.push(path);
+    } else {
+      coverage.set(path, valid.map(({ record }) => record.task_id));
+    }
   }
 
-  const uncovered = implementation.filter(
-    (path) => !record.planned_files.some((pattern) => matchPlanned(path, pattern))
-  );
   if (uncovered.length > 0) {
     die(
-      "implementation changed files outside researched planned_files:\n  - " +
-      uncovered.join("\n  - ")
+      "protected changes are not covered by a prior machine approval:\n  - " +
+      uncovered.join("\n  - ") +
+      "\nFor schema-3 tasks, commit task + approval metadata in an earlier commit before implementation."
     );
   }
 
-  const policyChanges = implementation.filter(isPolicyFile);
-  if (policyChanges.length > 0 && !(record.policy_change && record.scope.level === "architecture")) {
-    die(
-      "gate/policy files changed without an architecture-level policy_change approval:\n  - " +
-      policyChanges.join("\n  - ")
-    );
-  }
-
+  const taskIds = [...new Set([...coverage.values()].flat())].sort();
   console.log(
     "[REUSE-GATE] PASS " +
-    record.task_id +
-    ": " +
     implementation.length +
-    " protected file(s) covered; selected=" +
-    validation.selectedIds.join(",")
+    " protected file(s) covered by " +
+    taskIds.length +
+    " task approval(s): " +
+    taskIds.join(",")
   );
+  for (const [path, ids] of coverage) {
+    console.log("[REUSE-GATE] COVER " + path + " <- " + ids.join(","));
+  }
 }
 
 const args = process.argv.slice(2);
@@ -595,10 +754,12 @@ const arg = args[1];
 
 if (command === "approve") approve(arg);
 else if (command === "lint") lint(arg);
-else if (command === "check") check(arg === "staged" ? "staged" : "working");
-else {
+else if (command === "check") {
+  const mode = ["working", "staged", "range", "ci"].includes(arg) ? arg : "working";
+  check(mode, args[2], args[3]);
+} else {
   die(
     "usage: node scripts/reuse-gate.mjs " +
-    "lint [record.json] | approve [record.json] | check [working|staged]"
+    "lint [record.json] | approve [record.json] | check [working|staged|range <base> [head]|ci]"
   );
 }
