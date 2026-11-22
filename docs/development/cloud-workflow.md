@@ -27,9 +27,9 @@ The bundle guard reports `dist` size, JS/CSS/image totals, the largest JS file, 
 
 ## Reports and artifacts
 
-The production `dist` artifact is uploaded before browser E2E, so a browser failure still leaves a deployable/reproducible build. Dist is retained for seven days. Playwright HTML reports, success screenshots, failure screenshots/traces, and CI metrics are retained for fourteen days.
+The production `dist` artifact is uploaded before browser E2E, so a browser failure still leaves a deployable/reproducible build. Dist is retained for seven days. Playwright HTML reports, success screenshots, failure screenshots/traces, and CI metrics are retained for fourteen days. Each shard emits Playwright's native blob report as well; a lightweight final CI job merges those blobs into one `personal-universe-playwright-report-<run_id>` HTML-report artifact even when a shard failed.
 
-Start CI diagnosis from the HTML report and trace rather than reproducing on the user's computer.
+Start CI diagnosis from the combined HTML report and the failing shard trace rather than reproducing on the user's computer.
 
 ## Preview deployment
 
