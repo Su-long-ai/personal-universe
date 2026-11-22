@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "RELEASE-BROWSER-GATE-V1-001",
+  "approved_at": "2026-11-22T20:52:00.000Z",
+  "baseline_commit": "1818b985344b47ddbf5067f1314187f88526a10e",
+  "record_path": "docs/reuse-gate/tasks/RELEASE-BROWSER-GATE-V1-001.json",
+  "record_sha256": "98d14a0579ac07de9173f95b109e3a2d17ac882f7ce85254cea2481bdfc33261",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-actions-matrix": "6686d9fcb00d4643c27f293fb2237c655d8f6d1eaa34c15435d444e592ee65fe",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "webgl-context-loss-api": "a45251980adfd9d57c8b12d69893587dbd7a30f754c06091169068aaa3d1c740"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Release-level browser acceptance for navigation, journeys, responsive behavior and WebGL/runtime failure conditions"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/support/runtime.ts"
+  ],
+  "selected_ids": [
+    "playwright-release-scenarios",
+    "playwright-native-failure-emulation",
+    "webgl-native-context-loss"
+  ],
+  "candidate_scores": {
+    "playwright-release-scenarios": 57,
+    "playwright-native-failure-emulation": 57,
+    "webgl-native-context-loss": 57
+  }
+}
