@@ -213,8 +213,23 @@ Destination deep links use the same resolver and executor:
 
 Appending `&navigation=locate` requests Locate rather than Open/Travel.
 
-The old `?phase=&star=` route remains a debug/rollback-compatible path; when
-`destination` exists, the destination path wins.
+Normal product navigation also mirrors the currently open cinematic world into
+the existing native YEIS query identity:
+
+```text
+phase=<system|approach|orbit|atmosphere|surface>
+star=<native-star-id>
+body=<native-body-id>   # when a world is selected
+```
+
+This is supplementary state, not a second router. `destination` remains the
+cross-scale identity for Personal Signals, observed hosts/exoplanets, galaxies,
+landmarks and black holes, and wins when both contracts are present. The
+`phase/star/body` form remains reloadable for native YEIS stars/worlds and is
+kept in sync as the cinematic phase advances. Returning to Galaxy clears the
+spatial world identity. URL mutation uses `URLSearchParams` plus the browser
+History API, preserving unrelated parameters such as `engine`, diagnostics and
+feature flags without introducing a client router.
 
 ## Landmarks and assets
 
