@@ -4,6 +4,8 @@ type Problem = {
   kind:
     | "pageerror"
     | "unhandledrejection"
+    | "webglcontextlost"
+    | "webglcontextcreationerror"
     | "console"
     | "requestfailed"
     | "http";
@@ -38,6 +40,15 @@ export async function observeRuntime(
   await page.exposeFunction("__puRecordUnhandledRejection", (detail: string) => {
     problems.push({ kind: "unhandledrejection", detail });
   });
+  await page.exposeFunction(
+    "__puRecordWebglProblem",
+    (
+      kind: "webglcontextlost" | "webglcontextcreationerror",
+      detail: string,
+    ) => {
+      problems.push({ kind, detail });
+    },
+  );
   await page.addInitScript(() => {
     window.addEventListener("unhandledrejection", (event) => {
       const reason = event.reason;
@@ -53,6 +64,33 @@ export async function observeRuntime(
         }
       ).__puRecordUnhandledRejection(detail || "Unhandled promise rejection");
     });
+
+    const recordWebgl = (event: Event) => {
+      const kind = event.type as
+        | "webglcontextlost"
+        | "webglcontextcreationerror";
+      const status =
+        "statusMessage" in event
+          ? String((event as WebGLContextEvent).statusMessage || "")
+          : "";
+      void (
+        window as typeof window & {
+          __puRecordWebglProblem: (
+            value: "webglcontextlost" | "webglcontextcreationerror",
+            detail: string,
+          ) => Promise<void>;
+        }
+      ).__puRecordWebglProblem(
+        kind,
+        status ? `${kind}: ${status}` : kind,
+      );
+    };
+    document.addEventListener("webglcontextlost", recordWebgl, true);
+    document.addEventListener(
+      "webglcontextcreationerror",
+      recordWebgl,
+      true,
+    );
   });
 
   page.on("pageerror", (error) => {
@@ -100,6 +138,23 @@ export async function observeRuntime(
         });
       }
       expect(problems, "fatal browser/runtime problems").toEqual([]);
+    },
+    async assertDetected(
+      testInfo: TestInfo,
+      expectedKind: Problem["kind"],
+    ) {
+      await testInfo.attach("runtime-problems.json", {
+        body: Buffer.from(JSON.stringify(problems, null, 2)),
+        contentType: "application/json",
+      });
+      expect(
+        problems.some((problem) => problem.kind === expectedKind),
+        `expected runtime guard to detect ${expectedKind}`,
+      ).toBeTruthy();
+      expect(
+        problems.filter((problem) => problem.kind !== expectedKind),
+        `unexpected runtime problems while probing ${expectedKind}`,
+      ).toEqual([]);
     },
   };
 }
