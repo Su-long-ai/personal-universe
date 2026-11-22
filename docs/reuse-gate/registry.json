@@ -792,6 +792,54 @@
       ],
       "notes": "Mature root-hosted static deployment fallback. Stronger automatic branch/PR preview ergonomics than GitHub Pages, but requires an external Cloudflare account and GitHub App integration.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "web-performance-entry-api",
+      "name": "Web Performance Navigation and Resource Timing",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Navigation_and_resource_timings",
+      "level": "component_asset",
+      "license": "Web platform API",
+      "status": "adopt",
+      "covers": [
+        "navigation timing",
+        "resource timing",
+        "transfer and encoded body sizes",
+        "browser startup evidence"
+      ],
+      "notes": "Use PerformanceNavigationTiming and PerformanceResourceTiming from the real Chromium page under Playwright. Prefer this for product-specific YEIS readiness and resource evidence before adding a second browser audit stack.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "lighthouse-ci",
+      "name": "Lighthouse CI",
+      "url": "https://github.com/GoogleChrome/lighthouse-ci",
+      "level": "full_solution",
+      "license": "Apache-2.0",
+      "status": "assess",
+      "covers": [
+        "Lighthouse reports",
+        "performance budgets",
+        "accessibility/SEO/best-practices audits",
+        "historical comparisons"
+      ],
+      "notes": "Mature page-level performance audit and budget tooling. Hold until browser-standard timing plus existing Playwright evidence proves insufficient; adding it now would duplicate Chromium execution and lengthen the release path.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "astro-image-pipeline",
+      "name": "Astro Image and Picture components",
+      "url": "https://docs.astro.build/en/guides/images/",
+      "level": "framework_engine",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "build-time image optimization",
+        "responsive image srcset",
+        "format conversion",
+        "CLS-safe image dimensions"
+      ],
+      "notes": "Astro can optimize imported src images, but public/ assets are copied as-is and are not automatically optimized. Measure nebula/public asset cost before moving renderer assets into an image pipeline.",
+      "last_checked": "2026-11-23"
     }
   ]
 }

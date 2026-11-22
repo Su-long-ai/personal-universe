@@ -1,0 +1,223 @@
+{
+  "schema": 2,
+  "task_id": "PERFORMANCE-EVIDENCE-V1-001",
+  "title": "Add release-level bundle, startup and navigation performance evidence",
+  "scope": {
+    "level": "architecture",
+    "subject": "Performance regression evidence and broad release budgets for Personal Universe"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "Extend the existing bundle guard and Playwright metrics rather than introducing another browser pipeline. Use the browser-standard Performance Entry API for document/resource timing and product-specific YEIS readiness, and use existing Playwright navigation flows for travel timing. Expand the Node bundle guard with high-value asset categories and exact duplicate detection. Lighthouse CI is mature and supports budgets/reports, but is held because the current need is obvious-regression prevention, not a second generalized page audit. Astro image optimization is also mature, but public renderer assets are copied as-is, so measure nebula cost before migrating assets.",
+  "planned_files": [
+    "tests/ci/bundle-guard.mjs",
+    "tests/e2e/performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/Performance/Guides/Navigation_and_resource_timings",
+      "finding": "PerformanceNavigationTiming and PerformanceResourceTiming expose browser-standard navigation and resource timing data."
+    },
+    {
+      "url": "https://playwright.dev/docs/evaluating",
+      "finding": "Playwright can evaluate browser-side Performance API data in the tested page without another instrumentation framework."
+    },
+    {
+      "url": "https://github.com/GoogleChrome/lighthouse-ci",
+      "finding": "Lighthouse CI provides reports, performance budgets and historical/comparative page audits, but requires another Lighthouse/Chromium audit pass."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/images/",
+      "finding": "Astro Image/Picture can optimize imported images, while public-folder assets are not processed or optimized."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Lighthouse CI is mature, but duplicates a browser audit at this stage; keep as assess rather than adding it before product-specific Playwright timings prove insufficient.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "lighthouse-ci"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Existing Playwright already runs production Chromium and can collect standard Performance API data while preserving current release traces and reports.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "The existing Node bundle guard is the right subsystem for dist, asset-category and exact-duplicate regression checks; no package is required because Node crypto/filesystem cover exact hashes and sizes.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Browser Performance Entry API supplies navigation/resource timing. Astro image pipeline remains a later optimization option after measurement.",
+      "source_refs": [
+        0,
+        3
+      ],
+      "registry_refs": [
+        "web-performance-entry-api",
+        "astro-image-pipeline"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "playwright-performance-entry-evidence",
+      "name": "Playwright + Performance Entry API",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright with browser Performance API",
+      "license": "Apache-2.0 / Web standard",
+      "decision": "reuse",
+      "reason": "Measures the actual production build in the existing Chromium release gate and can attach startup/resource/navigation evidence without a second browser process.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-bundle-guard-extension",
+      "name": "Extend existing Node bundle guard",
+      "level": "subsystem",
+      "source": "Repository bundle guard + Node built-ins",
+      "license": "Project code / Node built-ins",
+      "decision": "reuse",
+      "reason": "Adds vendor/nebula/media/duplicate evidence where dist is already scanned, avoiding another analyzer dependency.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "lighthouse-ci",
+      "name": "Lighthouse CI",
+      "level": "full_solution",
+      "registry_id": "lighthouse-ci",
+      "source": "GoogleChrome/lighthouse-ci",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Excellent generalized audits and budgets, but currently duplicates browser startup and does not replace YEIS/native-galaxy/navigation-specific timings.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "astro-image-pipeline",
+      "name": "Astro Image/Picture pipeline",
+      "level": "framework_engine",
+      "registry_id": "astro-image-pipeline",
+      "source": "Astro assets",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Potential optimization, not a measurement/gate solution; public renderer assets are not automatically optimized, so measure first and migrate only if evidence justifies it.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Dist/JS/CSS/vendor/nebula/media/duplicate regression evidence",
+      "importance": "high",
+      "coverage": {
+        "playwright-performance-entry-evidence": "partial",
+        "existing-bundle-guard-extension": "full",
+        "lighthouse-ci": "partial",
+        "astro-image-pipeline": "partial"
+      },
+      "decision": "Extend the existing bundle guard with broad, explainable asset budgets and exact duplicate waste reporting."
+    },
+    {
+      "capability": "YEIS/native galaxy startup timing",
+      "importance": "high",
+      "coverage": {
+        "playwright-performance-entry-evidence": "full",
+        "existing-bundle-guard-extension": "none",
+        "lighthouse-ci": "partial",
+        "astro-image-pipeline": "none"
+      },
+      "decision": "Measure engine-ready and native-galaxy-ready wall time in the current production Playwright path."
+    },
+    {
+      "capability": "Critical initial resources and transfer evidence",
+      "importance": "high",
+      "coverage": {
+        "playwright-performance-entry-evidence": "full",
+        "existing-bundle-guard-extension": "partial",
+        "lighthouse-ci": "full",
+        "astro-image-pipeline": "partial"
+      },
+      "decision": "Record PerformanceResourceTiming counts and transfer/encoded sizes; retain current broad request-count guard."
+    },
+    {
+      "capability": "Product navigation timing",
+      "importance": "high",
+      "coverage": {
+        "playwright-performance-entry-evidence": "full",
+        "existing-bundle-guard-extension": "none",
+        "lighthouse-ci": "none",
+        "astro-image-pipeline": "none"
+      },
+      "decision": "Time a real native black-hole travel completion using the same dataset contract as the release gate."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-performance-entry-evidence",
+      "existing-bundle-guard-extension"
+    ],
+    "rationale": "Measure the product-specific paths in the browser already used for release validation and extend the dist scan already used for bundle evidence. Keep budgets broad enough to catch obvious regressions rather than optimizing every metric downward.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "lighthouse-ci",
+        "reason": "Useful later for generalized Core Web Vitals/accessibility/SEO budgets, but redundant for the immediate YEIS-specific release evidence."
+      },
+      {
+        "candidate_id": "astro-image-pipeline",
+        "reason": "Optimization path only; public renderer assets need measurement before any migration."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If browser-standard metrics cannot explain a performance regression or page-level Core Web Vitals become a release requirement, add Lighthouse CI under a separate approved task."
+  }
+}
