@@ -1,9 +1,6 @@
 name: Pages Preview
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -33,12 +30,11 @@ jobs:
       - name: Checkout selected ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Ensure main ref is available
-        if: github.event_name == 'workflow_dispatch'
         run: git fetch origin main --no-tags
 
       - name: Setup Node
@@ -54,7 +50,7 @@ jobs:
       - name: Machine Reuse Gate for selected ref
         run: npm run gate:reuse:ci
         env:
-          REUSE_GATE_BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && 'origin/main' || github.event.before }}
+          REUSE_GATE_BASE_SHA: origin/main
           REUSE_GATE_HEAD_SHA: HEAD
 
       - name: Build repository-subpath site
