@@ -41,7 +41,7 @@ export function UniverseNavigator({
   ) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultRefs = useRef(new Map<string, HTMLDivElement>());
+  const resultRefs = useRef(new Map<number, HTMLDivElement>());
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -152,9 +152,8 @@ export function UniverseNavigator({
   }, [currentSystem, markers, open, placements, query]);
 
   useEffect(() => {
-    const active = results[activeIndex];
-    if (!active) return;
-    resultRefs.current.get(active.id)?.scrollIntoView({
+    if (!results[activeIndex]) return;
+    resultRefs.current.get(activeIndex)?.scrollIntoView({
       block: "nearest",
       behavior: "auto",
     });
@@ -311,8 +310,8 @@ export function UniverseNavigator({
                   <div
                     key={section.id + ":" + result.id}
                     ref={(node) => {
-                      if (node) resultRefs.current.set(result.id, node);
-                      else resultRefs.current.delete(result.id);
+                      if (node) resultRefs.current.set(index, node);
+                      else resultRefs.current.delete(index);
                     }}
                     className={
                       "navigator-result-row" +
