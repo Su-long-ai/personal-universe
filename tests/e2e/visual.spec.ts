@@ -113,7 +113,7 @@ test("visual: desktop search open", async ({ page }, testInfo) => {
 
     const dialog = page.getByRole("dialog", { name: "Universe navigator" });
     await expect(dialog).toBeVisible();
-    const search = page.getByRole("textbox", { name: "Search universe" });
+    const search = page.getByRole("combobox", { name: "Search universe" });
     await search.fill("Personal Universe");
     await expect
       .poll(async () =>
