@@ -55,6 +55,14 @@ jobs:
       - name: Bundle and asset regression guard
         run: node tests/ci/bundle-guard.mjs
 
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Install pinned Playwright test runner
         run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
 
@@ -80,15 +88,6 @@ jobs:
           if [ -f test-results/runtime-metrics.md ]; then
             cat test-results/runtime-metrics.md >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Upload dist artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: personal-universe-dist-${{ github.sha }}
-          path: dist
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Upload Playwright report, traces, screenshots, and metrics
         if: always()

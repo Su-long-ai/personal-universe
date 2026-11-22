@@ -25,6 +25,13 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "off",
     viewport: { width: 1440, height: 900 },
+    launchOptions: {
+      args: [
+        "--disable-dev-shm-usage",
+        "--use-gl=angle",
+        "--use-angle=swiftshader",
+      ],
+    },
   },
   webServer: {
     command: "npm run preview -- --host 127.0.0.1 --port 4321",

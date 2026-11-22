@@ -24,12 +24,12 @@ async function shot(
   });
 }
 
-test("capture stable UI and WebGL visual artifacts at key viewports", async ({
-  page,
-}, testInfo) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-
-  for (const viewport of VIEWPORTS) {
+for (const viewport of VIEWPORTS) {
+  test(`capture stable UI and WebGL artifacts: ${viewport.name}`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(90_000);
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({
       width: viewport.width,
       height: viewport.height,
@@ -63,7 +63,9 @@ test("capture stable UI and WebGL visual artifacts at key viewports", async ({
 
     await page.goto("/?navigator=1&navq=Personal%20Universe&freeze=1");
     await waitForYeis(page);
-    await expect(page.getByRole("dialog", { name: "Universe navigator" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Universe navigator" }),
+    ).toBeVisible();
     await expect
       .poll(async () =>
         Number(
@@ -77,12 +79,14 @@ test("capture stable UI and WebGL visual artifacts at key viewports", async ({
 
     await page.goto("/?navigator=1&freeze=1");
     await waitForYeis(page);
-    await expect(page.getByRole("dialog", { name: "Universe navigator" })).toBeVisible();
+    await expect(
+      page.getByRole("dialog", { name: "Universe navigator" }),
+    ).toBeVisible();
     await expect(page.locator(".kind-featured").first()).toBeVisible();
     await shot(page, testInfo, viewport.name, "places-open");
 
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await shot(page, testInfo, viewport.name, "hero-world");
-  }
-});
+  });
+}
