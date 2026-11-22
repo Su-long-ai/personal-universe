@@ -612,6 +612,89 @@
       ],
       "notes": "Already present through the project React dependency. Suitable for the small local journey coordinator without introducing a second state framework.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "playwright-test",
+      "name": "Playwright Test",
+      "url": "https://playwright.dev/docs/intro",
+      "level": "framework_engine",
+      "license": "Apache-2.0",
+      "status": "adopt",
+      "covers": [
+        "browser E2E",
+        "Chromium lifecycle",
+        "request interception",
+        "trace viewer",
+        "screenshots",
+        "HTML reports",
+        "CI browser installation"
+      ],
+      "notes": "Preferred browser-validation framework for Personal Universe. Reuse Playwright Test for browser lifecycle, assertions, request interception, traces, screenshots and HTML reports instead of maintaining custom CDP/WebSocket smoke tooling.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "github-pages-actions",
+      "name": "GitHub Pages custom Actions deployment",
+      "url": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+      "level": "subsystem",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "trial",
+      "covers": [
+        "static-site deployment",
+        "Actions-native artifact upload",
+        "OIDC Pages deployment",
+        "no third-party deployment token"
+      ],
+      "notes": "Preferred no-extra-credential deployment module when repository Pages is enabled for GitHub Actions. Keep deployment independent from PR validation so Pages availability or plan settings do not block CI.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "vercel-preview-deployments",
+      "name": "Vercel Preview Deployments",
+      "url": "https://vercel.com/products/previews",
+      "level": "full_solution",
+      "license": "Commercial hosted service",
+      "status": "assess",
+      "covers": [
+        "per-branch preview deployments",
+        "pull-request preview URLs",
+        "deployment checks",
+        "hosted static-site delivery"
+      ],
+      "notes": "Strong per-PR preview product, but requires an external Vercel project/account integration. Keep as a future option if GitHub Pages cannot provide the desired preview ergonomics.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "playwright-ci-sharding",
+      "name": "Playwright CI sharding across GitHub Actions jobs",
+      "url": "https://playwright.dev/docs/test-sharding",
+      "level": "subsystem",
+      "license": "Apache-2.0 Playwright tooling / documentation",
+      "status": "adopt",
+      "covers": [
+        "test-level sharding across CI machines",
+        "parallel wall-clock reduction",
+        "one-worker-per-runner stability",
+        "independent shard diagnostics"
+      ],
+      "notes": "Preferred scaling path for the WebGL-heavy suite: keep workers=1 inside each runner, enable fullyParallel for shard balancing, and distribute shards across separate GitHub Actions jobs. This follows Playwright's CI guidance instead of contending multiple SwiftShader browsers on one runner.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "github-actions-matrix",
+      "name": "GitHub Actions matrix strategy",
+      "url": "https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs",
+      "level": "subsystem",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "adopt",
+      "covers": [
+        "parallel CI jobs",
+        "parameterized shard jobs",
+        "fail-fast control",
+        "independent artifacts"
+      ],
+      "notes": "Use matrix jobs to execute Playwright shards on separate hosted runners. This is the CI distribution primitive shown by Playwright's official GitHub Actions sharding example.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
