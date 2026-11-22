@@ -70,6 +70,17 @@ const navigationPoint = new Vector3();
 const navigationNormal = new Vector3();
 const navigationOrigin = new Vector3();
 
+function cameraTargetKey(
+  target: UniverseNavigationCameraRequest["target"],
+): string {
+  if (target.kind === "star") return "star:" + target.nativeId;
+  if (target.kind === "body") {
+    return "body:" + target.nativeId + ":" + target.bodyId;
+  }
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
+  return target.kind + ":" + target.index;
+}
+
 export function YeisGalaxyScene({
   markers,
   contentPlacements,
@@ -467,10 +478,9 @@ export function YeisGalaxyScene({
       request &&
       request.requestId !== lastNavigationRequestRef.current
     ) {
-      const targetKey =
-        request.target.kind === "star"
-          ? request.target.nativeId
-          : request.target.kind + ":" + request.target.index;
+      const targetKey = cameraTargetKey(request.target);
+      delete document.documentElement.dataset.universeNavigationFallback;
+      delete document.documentElement.dataset.universeNavigationError;
 
       navigationStartQuaternionRef.current =
         state.controller.quaternion.toArray() as [
@@ -490,6 +500,23 @@ export function YeisGalaxyScene({
             request.target.nativeId,
           );
           navigationDirection.copy(targetPc).sub(state.cameraPc);
+        } else if (request.target.kind === "body") {
+          const targetPc = runtime.universe.starPositionPc(
+            request.target.nativeId,
+          );
+          navigationDirection.copy(targetPc).sub(state.cameraPc);
+        } else if (request.target.kind === "blackhole") {
+          const blackHole = runtime.universe.blackHole(request.target.id);
+          if (blackHole) {
+            const targetPc = runtime.universe.starPositionPc(
+              blackHole.systemStarId,
+            );
+            navigationDirection.copy(targetPc).sub(state.cameraPc);
+          } else {
+            navigationDirection.set(0, 0, 0);
+            document.documentElement.dataset.universeNavigationError =
+              targetKey;
+          }
         } else if (request.target.kind === "galaxy") {
           runtime.universe.galaxyRelative(
             request.target.index,
@@ -524,6 +551,74 @@ export function YeisGalaxyScene({
               " -> " +
               targetKey,
           );
+        }
+      } else if (request.target.kind === "body") {
+        const nativeId = request.target.nativeId;
+        if (runtime.universe.current.starId !== nativeId) {
+          const frameDelta = runtime.universe.switchTo(
+            nativeId,
+            2451545.0,
+            performance.now() / 1000,
+          );
+          state.controller.shiftFrame(frameDelta, runtime.universe.star);
+        }
+
+        const body = runtime.universe.get(request.target.bodyId);
+        if (body) {
+          state.controller.goTo(body, runtime.universe.star.position);
+          document.documentElement.dataset.universeTraveling = targetKey;
+          console.info(
+            "[YEIS-NATIVE-BODY] " +
+              request.title +
+              " -> " +
+              targetKey,
+          );
+        } else {
+          runtime.universe.toParsecs(
+            state.controller.position,
+            state.cameraPc,
+          );
+          const targetPc = runtime.universe.starPositionPc(nativeId);
+          navigationDirection.copy(targetPc).sub(state.cameraPc);
+          if (navigationDirection.lengthSq() > 1e-12) {
+            state.controller.centerOnDirection(navigationDirection);
+          }
+          document.documentElement.dataset.universeNavigationFallback =
+            "host:" + nativeId;
+          console.warn("[YEIS-NATIVE-BODY] unavailable " + targetKey);
+        }
+      } else if (request.target.kind === "blackhole") {
+        const blackHole = runtime.universe.blackHole(request.target.id);
+        if (blackHole) {
+          if (runtime.universe.current.starId !== blackHole.systemStarId) {
+            const frameDelta = runtime.universe.switchTo(
+              blackHole.systemStarId,
+              2451545.0,
+              performance.now() / 1000,
+            );
+            state.controller.shiftFrame(frameDelta, runtime.universe.star);
+          }
+          const body = runtime.universe.get(blackHole.entry.bodyId);
+          if (body) {
+            state.controller.goTo(body, runtime.universe.star.position);
+            document.documentElement.dataset.universeTraveling = targetKey;
+            console.info(
+              "[YEIS-NATIVE-BLACKHOLE] " +
+                request.title +
+                " -> " +
+                targetKey,
+            );
+          } else {
+            document.documentElement.dataset.universeNavigationError =
+              targetKey;
+            console.warn(
+              "[YEIS-NATIVE-BLACKHOLE] body unavailable " + targetKey,
+            );
+          }
+        } else {
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          console.warn("[YEIS-NATIVE-BLACKHOLE] unavailable " + targetKey);
         }
       } else if (request.target.kind === "galaxy") {
         const index = request.target.index;
@@ -611,12 +706,9 @@ export function YeisGalaxyScene({
       pendingNavigation.requestId === lastNavigationRequestRef.current &&
       !state.controller.autopilot
     ) {
-      const targetKey =
-        pendingNavigation.target.kind === "star"
-          ? pendingNavigation.target.nativeId
-          : pendingNavigation.target.kind +
-            ":" +
-            pendingNavigation.target.index;
+      const targetKey = cameraTargetKey(
+        pendingNavigation.target,
+      );
 
       if (pendingNavigation.mode === "locate" && startQuaternion) {
         const current = state.controller.quaternion.toArray();
