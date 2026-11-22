@@ -317,6 +317,19 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
   await expect(dialog).toBeVisible();
   await search.fill("Earth");
+
+  // Query edits synchronously invalidate the previous Places rows instead of
+  // leaving them clickable during the async search debounce window.
+  expect(
+    await dialog
+      .locator(".navigator-result-row")
+      .filter({ has: page.locator(".kind-featured") })
+      .count(),
+  ).toBe(0);
+  expect(
+    await dialog.locator(".navigator-results").getAttribute("aria-busy"),
+  ).toBe("true");
+
   const earth = page
     .locator(".navigator-result-row")
     .filter({ has: page.locator(".kind-body") })
