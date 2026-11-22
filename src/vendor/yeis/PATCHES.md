@@ -72,3 +72,23 @@ from the same pinned snapshot. Upstream metadata records the photographs as
 NASA/ESA/STScI public-domain material or ESO / ESA-Hubble CC BY 4.0 assets.
 The exact per-image credit lines are retained in `landmarkImages.ts` and in
 `public/THIRD_PARTY_ASSETS.md`.
+
+## Native system renderer closure
+
+Vendored verbatim from the fixed MIT boundary
+`e52056897364e060fbd6d00951628f163b57d7a1`:
+
+- `src/render/BodyRenderer.ts` → `render/BodyRenderer.ts`
+- `src/render/BodyPoints.ts` → `render/BodyPoints.ts`
+- `src/render/OrbitLines.ts` → `render/OrbitLines.ts`
+- `src/render/RingParticles.ts` → `render/RingParticles.ts`
+- `src/render/TileGlobe.ts` → `render/TileGlobe.ts`
+- `src/render/ProceduralShips.ts` → `render/ProceduralShips.ts`
+- `src/data/imagery.ts` → `data/imagery.ts`
+
+These files are the pinned-MIT renderer closure selected by
+`YEIS-NATIVE-SYSTEM-RENDERER-V3-001`. No code from the current AGPL
+upstream main is included. Project-specific host adaptation must remain
+outside this closure where possible; any necessary vendor patch must be
+listed below before release.
+
