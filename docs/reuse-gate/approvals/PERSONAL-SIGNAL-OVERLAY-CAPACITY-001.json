@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "task_id": "PERSONAL-SIGNAL-OVERLAY-CAPACITY-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "f1b9e83ef1a2c51a6f6ff10ec4ed139a01fb9ef3",
+  "record_path": "docs/reuse-gate/tasks/PERSONAL-SIGNAL-OVERLAY-CAPACITY-001.json",
+  "record_sha256": "c27e87f9e217c5a7eed9767b5e12445cd4a46ff3d56be6c260f9e3ac5bac0f3f",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "three-buffer-geometry-capacity": "e9be25b2a95815ccee9ff6b2d369282651e8f34cff0ca4fcad71f51acc4471ba"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Dynamic Three.js point-buffer capacity for Personal Signal galaxy overlays"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/content-layer.md"
+  ],
+  "selected_ids": [
+    "geometric-buffer-growth"
+  ],
+  "candidate_scores": {
+    "geometric-buffer-growth": 57,
+    "exact-fit-buffer-rebuild": 54.5,
+    "fixed-large-preallocation": 42.5
+  }
+}
