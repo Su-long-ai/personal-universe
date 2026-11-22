@@ -78,6 +78,12 @@ export default function UniverseApp({
   const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
     null,
   );
+  const [signalHover, setSignalHover] = useState<{
+    title: string;
+    kind: string;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
@@ -599,6 +605,7 @@ export default function UniverseApp({
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
+          onSignalHover={setSignalHover}
           onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}
@@ -608,6 +615,22 @@ export default function UniverseApp({
       </div>
 
       <div className="cinematic-wash" aria-hidden="true" />
+
+      {phase === "galaxy" &&
+        activeEngine === "yeis" &&
+        signalHover &&
+        !navigatorOpen && (
+          <aside
+            className="personal-signal-hover"
+            style={{
+              left: Math.min(signalHover.clientX + 16, window.innerWidth - 240),
+              top: Math.min(signalHover.clientY + 16, window.innerHeight - 92),
+            }}
+          >
+            <span>PERSONAL SIGNAL · {signalHover.kind.toUpperCase()}</span>
+            <strong>{signalHover.title}</strong>
+          </aside>
+        )}
 
       {coreDiagnostic && (
         <aside
