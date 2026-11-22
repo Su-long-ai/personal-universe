@@ -43,7 +43,8 @@ Close-world runtime exposes the actual active path:
 
 - live: `data-universe-world-renderer="procedural-planets-live"` and `data-universe-world-pipeline="procedural-planets-pass"`;
 - adaptive fallback: `data-universe-world-renderer="procedural-planets-fallback-<reason>"` and `data-universe-world-pipeline="fallback-<reason>"`;
-- capture readiness: `data-universe-world-ready="true"` only once the active live or fallback path is ready.
+- scene commit: `data-universe-world-scene-ready="true"` only after the lazy close-world scene has actually mounted;
+- capture readiness: `data-universe-world-ready="true"` only once that scene plus the active live or fallback path is ready.
 
 Normal visual screenshots accept either a ready live path or the renderer-capability fallback. A separate HIGH-quality Playwright case forces the live path and requires `PlanetPass` readiness without taking the expensive software-WebGL screenshot. This preserves real live-renderer coverage without using larger timeouts to hide GPU stalls.
 
