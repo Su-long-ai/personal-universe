@@ -128,7 +128,7 @@ test("guided Journey stays manual under reduced motion", async ({
     .first();
   await expect(journey).toBeVisible();
   const journeyText = (await journey.textContent()) ?? "";
-  const stopMatch = /(\\d+)\\s+STOPS\\b/.exec(journeyText);
+  const stopMatch = /(\d+)\s+STOPS\b/.exec(journeyText);
   expect(
     stopMatch,
     "enabled Journey should expose a positive stop count",
