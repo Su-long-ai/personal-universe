@@ -1,36 +1,28 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NATIVE-GALAXY-PARITY-001",
-  "approved_at": "2026-11-22T14:37:38.400Z",
-  "baseline_commit": "6e56f18755f8a8fe64fe354f90b3e871d98c6ada",
+  "task_id": "YEIS-DEFAULT-CUTOVER-001",
+  "approved_at": "2026-11-22T14:46:30.538Z",
+  "baseline_commit": "876ef6d66a9285a55d5e24bc2b49c8735e5c9a49",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "f0a9a33e9a4670ad628f9998a44ef1bbf7a113e08fc1e6edb7005dd1dcd3fa16",
+  "record_sha256": "2ca7bb136022a3c8cde8041865802c727e2d7c3bb9aad254f324c2920ad4ff46",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "93e9fcda8e53101752e0161e1bf50683784d7f9cffc04defa3b6c1beef22824a",
   "scope": {
     "level": "subsystem",
-    "subject": "Native YEIS galaxy observed-host completeness and return-state persistence"
+    "subject": "Default universe-engine selection and rollback/fallback semantics"
   },
   "policy_change": false,
   "planned_files": [
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/catalog.ts",
-    "src/components/universe/YeisGalaxyScene.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "docs/architecture/universe-backbone.md"
+    "src/components/universe/UniverseApp.tsx",
+    "docs/architecture/universe-backbone.md",
+    "README.md"
   ],
   "selected_ids": [
-    "nasa-physical-overlay",
-    "parent-view-ref"
+    "yeis-default-v2-rollback"
   ],
   "candidate_scores": {
-    "nasa-physical-overlay": 55.5,
-    "fuzzy-hyg-match": 37,
-    "v2-visual-overlay": 49.5,
-    "drop-hipless": 40,
-    "parent-view-ref": 57,
-    "module-global-view": 47.5,
-    "reset-opening-view": 38,
-    "url-camera-state": 46
+    "yeis-default-v2-rollback": 55,
+    "keep-v2-default": 49,
+    "permanent-dual-engine": 43
   }
 }

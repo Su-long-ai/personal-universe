@@ -55,11 +55,12 @@ export default function UniverseApp() {
     detail: string;
   } | null>(null);
   const yeisResolverRef = useRef<((marker: GalaxyMarker) => SystemDefinition) | null>(null);
-  const engineMode: UniverseEngine =
+  const requestedEngine: UniverseEngine =
     typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("engine") === "yeis"
-      ? "yeis"
-      : "v2";
+    new URLSearchParams(window.location.search).get("engine") === "v2"
+      ? "v2"
+      : "yeis";
+  const [activeEngine, setActiveEngine] = useState<UniverseEngine>(requestedEngine);
   const reducedMotion = useReducedMotion();
   const ambient = useAmbientAudio(muted, phase);
   const debugFreeze =
@@ -67,9 +68,16 @@ export default function UniverseApp() {
     new URLSearchParams(window.location.search).get("freeze") === "1";
 
   useEffect(() => {
-    if (engineMode !== "yeis") return;
+    if (requestedEngine !== "yeis") {
+      yeisResolverRef.current = null;
+      setGalaxy(v2Galaxy);
+      setActiveEngine("v2");
+      document.documentElement.dataset.universeEngine = "v2";
+      return;
+    }
 
     let cancelled = false;
+    setActiveEngine("yeis");
     void import("../../lib/universe/yeis")
       .then(async ({ loadYeisCore, buildYeisGalaxyIndex, resolveYeisSystem }) => {
         const runtime = await loadYeisCore();
@@ -81,6 +89,7 @@ export default function UniverseApp() {
         if (cancelled) return;
         yeisResolverRef.current = (marker) => resolveYeisSystem(runtime, marker);
         document.documentElement.dataset.universeEngine = "yeis";
+        setActiveEngine("yeis");
         const yeisSample = nextGalaxy.markers.find(
           (marker) =>
             marker.engine === "yeis" &&
@@ -103,13 +112,14 @@ export default function UniverseApp() {
         console.error("[YEIS-BRIDGE] FAILED; retaining V2 fallback", error);
         document.documentElement.dataset.universeEngine = "v2-fallback";
         yeisResolverRef.current = null;
+        setActiveEngine("v2");
         setGalaxy(v2Galaxy);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [engineMode, v2Galaxy]);
+  }, [requestedEngine, v2Galaxy]);
 
   const resolveMarker = useCallback((marker: GalaxyMarker): SystemDefinition => {
     if (marker.engine === "yeis" && yeisResolverRef.current) {
@@ -243,7 +253,7 @@ export default function UniverseApp() {
     if (phase === "system") {
       setSelectedSystem(null);
       setSelectedPlanet(null);
-      setPhase(engineMode === "yeis" ? "galaxy" : "returning");
+      setPhase(activeEngine === "yeis" ? "galaxy" : "returning");
       return;
     }
 
@@ -255,7 +265,7 @@ export default function UniverseApp() {
     } else {
       setPhase("galaxy");
     }
-  }, [engineMode, phase, selectedSystem]);
+  }, [activeEngine, phase, selectedSystem]);
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
@@ -267,7 +277,7 @@ export default function UniverseApp() {
     <main
       className={`universe-root ${transitionClass}`}
       onWheel={(event) => {
-        if (phase !== "galaxy" || engineMode === "yeis") return;
+        if (phase !== "galaxy" || activeEngine === "yeis") return;
         setScrollDepth((value) =>
           Math.max(-3.5, Math.min(4.5, value + Math.sign(event.deltaY) * 0.42)),
         );
@@ -276,7 +286,7 @@ export default function UniverseApp() {
       <div className="universe-canvas">
         <UniverseCanvas
           phase={phase}
-          engineMode={engineMode}
+          engineMode={activeEngine}
           markers={galaxy.markers}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}

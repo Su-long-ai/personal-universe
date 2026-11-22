@@ -2,13 +2,16 @@
 
 A desktop-first cinematic personal-universe prototype built with Astro, React, Three.js and React Three Fiber.
 
-## V0 vertical slice
+## Current vertical slice
 
 The current milestone proves one complete experience chain:
 
-`Galaxy -> Approach -> Orbit -> Atmosphere -> Surface -> Return`
+`Galaxy -> System -> Approach -> Orbit -> Atmosphere -> Surface -> Return`
 
-V0 intentionally contains no real portfolio content and no remote astronomy data. It focuses on scale, continuity, interaction and performance before the universe is expanded.
+The default astronomical backbone is the pinned MIT YEIS core with the local
+NASA Exoplanet Archive snapshot layered observation-first. Personal content is
+still intentionally sparse while navigation, scale continuity and performance
+are stabilized.
 
 ## Run
 
@@ -22,6 +25,12 @@ Build check:
 ```bash
 npm run build
 ```
+
+### Engine rollback
+
+YEIS is the default engine. For regression comparison or emergency rollback,
+open the site with `?engine=v2`. If YEIS initialization fails at runtime, the
+app automatically switches the active renderer to V2.
 
 Regenerate the lightweight local test assets:
 

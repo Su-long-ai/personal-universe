@@ -1,37 +1,31 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NATIVE-GALAXY-PARITY-001",
-  "title": "Close native-galaxy parity with physical HIP-less observation overlays and parent-owned camera persistence",
+  "task_id": "YEIS-DEFAULT-CUTOVER-001",
+  "title": "Make the verified YEIS path the default while retaining an explicit V2 rollback and automatic runtime fallback",
   "scope": {
     "level": "subsystem",
-    "subject": "Native YEIS galaxy observed-host completeness and return-state persistence"
+    "subject": "Default universe-engine selection and rollback/fallback semantics"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The native YEIS renderer is viable and committed, but two product-semantic gaps still block default cutover. First, the current NASA bridge exposes 32 observed hosts; 27 have exact HIP鈫扝YG matches and route through native StarPoints, while five HIP-less hosts have no native physical star representation and disappear from the native galaxy. Reusing the old V2 visual coordinates is invalid: comparing 27 HIP-matched hosts against the native HYG positions produced ~24.7 pc median error because V2 uses a deliberately remapped galactic presentation frame. The pinned MIT build-stars.mjs provides the exact authoritative conversion: HYG equatorial pc 鈫?J2000 ecliptic math by -obliquity 鈫?scene (x,z,-y). Recomputing NASA RA/Dec/distance in that frame reduced the matched-host position disagreement to 0.86 pc median; remaining disagreement is catalogue distance/astrometry variance, not a frame error. Therefore store the NASA-derived physical scene-frame position explicitly on observed markers and render only HIP-less hosts as a lightweight native sky overlay; never fuzzy-match names. Second, YeisGalaxyScene currently owns CameraController locally, so entering a system unmounts it and returning recreates the opening view. Preserve only camera position/quaternion in a ref owned by the persistent UniverseCanvas, then restore them when the native galaxy remounts. This reuses the existing native controller and React/R3F lifecycle rather than building a second navigation state system.",
+  "research_summary": "Native YEIS now has model, observed-host, Hero, renderer, picking and return-state parity, so keeping V2 as the implicit default preserves migration debt without adding user value. The safest cutover reuses the already-selected YEIS full solution as the default, keeps the existing V2 composite reachable only through an explicit ?engine=v2 rollback, and separates requested engine from active engine so a YEIS initialization failure can fail open to the proven V2 renderer. A permanent dual-engine feature system or external flag service would broaden state and deployment complexity for a single local rollback condition.",
   "policy_change": false,
   "planned_files": [
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/catalog.ts",
-    "src/components/universe/YeisGalaxyScene.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "docs/architecture/universe-backbone.md"
+    "src/components/universe/UniverseApp.tsx",
+    "docs/architecture/universe-backbone.md",
+    "README.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/scripts/build-stars.mjs",
-      "finding": "The pinned MIT catalogue builder defines the exact HYG equatorial-pc 鈫?ecliptic-J2000 鈫?scene-frame transform used by stars.bin: rotate about x by -23.439291掳, then store scene (x,z,-y)."
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The pinned MIT YEIS snapshot is already the selected and locally validated mother engine; the cutover should change selection semantics rather than introduce another engine."
     },
     {
-      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "finding": "NASA Exoplanet Archive pscomppars supplies RA, Dec and system distance independently of HIP, so HIP-less confirmed hosts still have sufficient physical coordinates for an explicit overlay."
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams",
+      "finding": "URLSearchParams is a native browser API suitable for a zero-dependency explicit developer rollback query such as ?engine=v2."
     },
     {
-      "url": "https://react.dev/reference/react/useRef",
-      "finding": "A ref preserves mutable state across renders without causing rerenders; owning the native camera snapshot in the persistent parent lets an unmounted/remounted scene restore view state without module-global state."
-    },
-    {
-      "url": "https://r3f.docs.pmnd.rs/api/hooks",
-      "finding": "R3F scene components can own imperative Three objects while parent React components retain lifecycle state; this fits a parent view-state ref plus native renderer guest component."
+      "url": "https://react.dev/reference/react/useState",
+      "finding": "React state can represent the active runtime engine independently from the requested URL mode, allowing initialization failure to switch rendering to V2 without a page reload."
     }
   ],
   "search_ladder": [
@@ -44,277 +38,151 @@
       "source_refs": [
         0
       ],
-      "conclusion": "The complete YEIS product already solves its own camera lifecycle but importing the whole app would undo the one-shell architecture; parity should be completed inside the current R3F host."
+      "conclusion": "The verified YEIS full solution already covers the default path; no new full product should be introduced for cutover."
     },
     {
       "level": "framework_engine",
-      "status": "found",
-      "registry_refs": [
-        "react-three-fiber",
-        "your-eyes-in-space-mit-e520568"
-      ],
-      "source_refs": [
-        0,
-        2,
-        3
-      ],
-      "conclusion": "The current R3F host and native CameraController already contain the needed rendering/navigation machinery; only explicit overlay data and parent-owned snapshot state are missing."
-    },
-    {
-      "level": "subsystem",
-      "status": "found",
-      "registry_refs": [
-        "nasa-exoplanet-archive",
-        "your-eyes-in-space-mit-e520568"
-      ],
-      "source_refs": [
-        0,
-        1
-      ],
-      "conclusion": "Use NASA RA/Dec/distance for HIP-less observed positions, transformed by the exact pinned HYG scene-frame convention. Keep exact HIP identity when available and never substitute fuzzy names."
-    },
-    {
-      "level": "component_asset",
       "status": "found",
       "registry_refs": [
         "react-three-fiber"
       ],
       "source_refs": [
-        2,
-        3
+        2
       ],
-      "conclusion": "Use the existing Three Points/BufferGeometry pattern already present in YeisGalaxyScene and a React ref for persistence; no new package or renderer component is required."
+      "conclusion": "The existing React/R3F shell can switch the active engine as ordinary component state and already hosts both rendering paths."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "galaxy-explorer",
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "The existing V2 composite is sufficient as a rollback/fallback subsystem; requested versus active engine state closes failure handling without a new flag framework."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "No component package is needed because the browser already supplies URLSearchParams and the project already owns the engine state boundary."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "HIP-less confirmed hosts remain visible/selectable",
+      "capability": "YEIS becomes the normal visitor path",
       "importance": "high",
       "coverage": {
-        "nasa-physical-overlay": "full",
-        "fuzzy-hyg-match": "partial",
-        "drop-hipless": "none",
-        "v2-visual-overlay": "partial"
+        "yeis-default-v2-rollback": "full",
+        "keep-v2-default": "none",
+        "permanent-dual-engine": "partial"
       },
-      "decision": "Use explicit NASA physical coordinates in the authoritative YEIS scene frame."
+      "decision": "Select YEIS default now that native parity and runtime validation are complete."
     },
     {
-      "capability": "identity correctness",
+      "capability": "one-step rollback when a regression appears",
       "importance": "high",
       "coverage": {
-        "nasa-physical-overlay": "full",
-        "fuzzy-hyg-match": "none",
-        "drop-hipless": "full",
-        "v2-visual-overlay": "full"
+        "yeis-default-v2-rollback": "full",
+        "keep-v2-default": "full",
+        "permanent-dual-engine": "full"
       },
-      "decision": "Overlay preserves the NASA marker identity directly and does not invent a HYG identity."
+      "decision": "Keep ?engine=v2 as an explicit rollback without exposing engine choice as product UI."
     },
     {
-      "capability": "physical placement correctness",
+      "capability": "automatic fail-open if YEIS initialization fails",
       "importance": "high",
       "coverage": {
-        "nasa-physical-overlay": "full",
-        "fuzzy-hyg-match": "partial",
-        "drop-hipless": "none",
-        "v2-visual-overlay": "none"
+        "yeis-default-v2-rollback": "full",
+        "keep-v2-default": "full",
+        "permanent-dual-engine": "partial"
       },
-      "decision": "Follow pinned build-stars transform; reject legacy V2 presentation coordinates."
+      "decision": "Track active engine separately and switch to V2 in the existing YEIS load error path."
     },
     {
-      "capability": "return to previous native galaxy view",
-      "importance": "high",
-      "coverage": {
-        "parent-view-ref": "full",
-        "module-global-view": "full",
-        "reset-opening-view": "none",
-        "url-camera-state": "full"
-      },
-      "decision": "Persist controller position/quaternion in UniverseCanvas-owned ref."
-    },
-    {
-      "capability": "low coupling and reversible migration",
+      "capability": "minimal long-term migration debt",
       "importance": "medium",
       "coverage": {
-        "parent-view-ref": "full",
-        "module-global-view": "partial",
-        "reset-opening-view": "full",
-        "url-camera-state": "partial"
+        "yeis-default-v2-rollback": "full",
+        "keep-v2-default": "none",
+        "permanent-dual-engine": "none"
       },
-      "decision": "Keep snapshot local to the persistent canvas and pass it to the native scene."
+      "decision": "Use one default plus a temporary rollback instead of preserving two first-class product engines."
     }
   ],
   "candidates": [
     {
-      "id": "nasa-physical-overlay",
-      "name": "NASA RA/Dec/distance overlay in the exact YEIS/HYG scene frame",
-      "level": "subsystem",
-      "registry_id": "nasa-exoplanet-archive",
-      "source": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "license": "NASA public scientific data / archive terms; attribution retained",
-      "decision": "reuse",
-      "reason": "Preserves every observed host without fuzzy identity and uses the pinned upstream coordinate convention already authoritative for the native renderer.",
-      "evaluation": {
-        "coverage": 5,
-        "integration_cost": 1.5,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "fuzzy-hyg-match",
-      "name": "Name-match HIP-less NASA hosts to HYG stars",
-      "level": "subsystem",
+      "id": "yeis-default-v2-rollback",
+      "name": "Default to pinned YEIS; retain ?engine=v2 rollback plus automatic V2 fallback",
+      "level": "full_solution",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "local name normalization over HYG/NASA",
-      "license": "existing data licences",
-      "decision": "reject",
-      "reason": "A display-name similarity must not become astronomical identity authority; false matches are worse than a small explicit overlay.",
-      "evaluation": {
-        "coverage": 3.5,
-        "integration_cost": 2,
-        "license_fit": 5,
-        "maintenance_health": 2,
-        "performance_fit": 5,
-        "customization_fit": 4,
-        "maturity": 2
-      }
-    },
-    {
-      "id": "v2-visual-overlay",
-      "name": "Reuse existing V2 marker positions directly in native scene",
-      "level": "component_asset",
-      "registry_id": "react-three-fiber",
-      "source": "local V2 marker coordinates",
-      "license": "project code",
-      "decision": "reject",
-      "reason": "Measured HIP-matched error (~24.7 pc median) proves the V2 presentation coordinate system is not the native physical scene frame.",
-      "evaluation": {
-        "coverage": 4,
-        "integration_cost": 0.5,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 2
-      }
-    },
-    {
-      "id": "drop-hipless",
-      "name": "Show only HIP-crossmatched observed hosts",
-      "level": "component_asset",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "current native renderer",
-      "license": "existing",
-      "decision": "reject",
-      "reason": "Would silently remove confirmed systems solely because their identity cannot be joined to HYG by HIP.",
-      "evaluation": {
-        "coverage": 1,
-        "integration_cost": 0,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 5,
-        "customization_fit": 3,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "parent-view-ref",
-      "name": "Persist native camera snapshot in UniverseCanvas-owned React ref",
-      "level": "framework_engine",
-      "registry_id": "react-three-fiber",
-      "source": "https://react.dev/reference/react/useRef",
-      "license": "MIT ecosystem",
+      "source": "existing validated YEIS integration + native browser URL parameter",
+      "license": "MIT pinned YEIS source; existing project code and data notices unchanged",
       "decision": "reuse",
-      "reason": "Preserves native controller position/quaternion across scene unmounts without global state or URL churn and keeps ownership inside the existing React tree.",
+      "reason": "Promotes the already-selected mother engine with the smallest reversible change while preserving recovery from both discovered regressions and initialization failure.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 1,
         "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4,
         "customization_fit": 5,
         "maturity": 5
       }
     },
     {
-      "id": "module-global-view",
-      "name": "Store last native camera state in a module singleton",
-      "level": "component_asset",
-      "registry_id": "react-three-fiber",
-      "source": "local module state",
-      "license": "project code",
-      "decision": "reject",
-      "reason": "Works mechanically but leaks view state across component/app instances and makes lifecycle ownership implicit.",
-      "evaluation": {
-        "coverage": 5,
-        "integration_cost": 0.5,
-        "license_fit": 5,
-        "maintenance_health": 2.5,
-        "performance_fit": 5,
-        "customization_fit": 3,
-        "maturity": 3
-      }
-    },
-    {
-      "id": "reset-opening-view",
-      "name": "Reset native galaxy to the opening overview after every system visit",
-      "level": "component_asset",
-      "registry_id": "react-three-fiber",
-      "source": "current remount behavior",
-      "license": "project behavior",
-      "decision": "reject",
-      "reason": "Simple and low-coupling, but loses visitor spatial context on every return and therefore fails navigation parity.",
-      "evaluation": {
-        "coverage": 1,
-        "integration_cost": 0,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 5,
-        "customization_fit": 2,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "url-camera-state",
-      "name": "Serialize camera position/quaternion into query parameters",
+      "id": "keep-v2-default",
+      "name": "Keep the local V2 composite as default and require ?engine=yeis to opt in",
       "level": "subsystem",
-      "registry_id": "react-three-fiber",
-      "source": "browser URL state",
-      "license": "n/a",
+      "registry_id": "galaxy-explorer",
+      "source": "current pre-cutover behavior",
+      "license": "project code plus existing donor licences",
       "decision": "reject",
-      "reason": "Useful for shareable deep links later, but excessive for simple in-session return persistence and would broaden URL/state semantics unnecessarily.",
+      "reason": "Safe locally but leaves the selected mother engine behind an opt-in after its known parity blockers have been closed, extending duplicate-engine debt.",
       "evaluation": {
-        "coverage": 5,
-        "integration_cost": 3,
+        "coverage": 3.5,
+        "integration_cost": 0,
         "license_fit": 5,
         "maintenance_health": 3,
         "performance_fit": 5,
         "customization_fit": 5,
         "maturity": 4
       }
+    },
+    {
+      "id": "permanent-dual-engine",
+      "name": "Treat V2 and YEIS as permanent first-class engines with a feature-switch layer",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "existing dual renderer boundary plus new engine-selection state",
+      "license": "project code / MIT ecosystem",
+      "decision": "reject",
+      "reason": "Adds durable state, testing matrix and product semantics to solve a temporary migration rollback need; the global maintenance cost outweighs flexibility.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 2.5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 3
+      }
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "nasa-physical-overlay",
-      "parent-view-ref"
+      "yeis-default-v2-rollback"
     ],
-    "rationale": "Complete native parity with two narrow adapters around already-selected assets: derive HIP-less observed physical positions directly from NASA using the exact pinned YEIS/HYG scene transform, and retain native camera position/quaternion in the persistent R3F parent. This preserves astronomical identity, avoids duplicate render/navigation systems and removes the final known semantic blockers before default cutover.",
-    "higher_level_tradeoffs": [
-      {
-        "candidate_id": "fuzzy-hyg-match",
-        "reason": "It would reduce overlay count but makes name similarity an identity authority, which is globally worse than keeping five explicit confirmed-host points."
-      },
-      {
-        "candidate_id": "url-camera-state",
-        "reason": "Shareable camera URLs are a separate product feature; adding them now would expand the cutover surface for no parity benefit."
-      }
-    ],
+    "rationale": "Make the already-verified YEIS full solution the default and preserve V2 strictly as an explicit URL rollback plus automatic initialization fallback. This moves the architecture toward one mother engine without deleting recovery capacity in the same change.",
+    "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If a HIP-less host lacks finite NASA RA/Dec/distance, omit only that malformed overlay and keep it resolvable from content/search; do not fabricate a HYG match. If camera snapshot restoration fails, keep the native renderer but reset to overview rather than reintroducing V2 camera logic."
+    "fallback": "If the default path shows a production regression, use ?engine=v2 immediately; if YEIS initialization throws, activeEngine switches to V2 automatically and the existing V2 galaxy remains available."
   }
 }

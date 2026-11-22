@@ -224,3 +224,31 @@ migration step is the default-engine cutover plus a rollback switch; removal of
 duplicated V2 infrastructure remains a later cleanup after the default path has
 soaked.
 
+## Default engine cutover
+
+**Status:** completed on 2026-11-22.
+
+YEIS is now the default visitor path. V2 is retained as a temporary recovery
+path rather than a second first-class engine:
+
+- no engine query parameter -> YEIS;
+- `?engine=v2` -> explicit V2 rollback;
+- YEIS model/catalog initialization failure -> automatic active-engine fallback
+  to V2 with `data-universe-engine="v2-fallback"`.
+
+Requested engine and active engine are intentionally separate. This allows the
+page to fail open to the already-proven V2 renderer when YEIS cannot initialize,
+without reloading the page or adding a permanent feature-flag subsystem.
+
+Production-preview validation on 2026-11-22:
+
+- default route: `data-universe-engine="yeis"`,
+  `data-yeis-native-galaxy="ready"`, HIP-less observed overlay = 5;
+- rollback route: `?engine=v2` reports `data-universe-engine="v2"`;
+- fault injection: removing the built `stars.bin` produced a real HTTP 404 and
+  the page reported `data-universe-engine="v2-fallback"`.
+
+The next cleanup is **not** immediate V2 deletion. Keep the rollback until the
+YEIS default path has accumulated enough normal usage/regression evidence, then
+remove duplicated V2 generation/rendering code in a separate gated change.
+
