@@ -679,6 +679,7 @@ export default function UniverseApp({
         open={navigatorOpen && activeEngine === "yeis"}
         markers={galaxy.markers}
         placements={contentPlacements}
+        currentSystem={selectedSystem}
         activeDestinationId={activeDestinationId}
         onClose={() => setNavigatorOpen(false)}
         onNavigate={handleNavigateDestination}
