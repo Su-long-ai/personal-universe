@@ -91,6 +91,7 @@ export function YeisGalaxyScene({
   contentPlacements,
   navigationRequest,
   onNavigationComplete,
+  onNavigationFailed,
   onNavigateDestination,
   onSignalHover,
   quality,
@@ -100,6 +101,10 @@ export function YeisGalaxyScene({
   contentPlacements: UniverseContentPlacement[];
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
+  onNavigationFailed: (
+    request: UniverseNavigationCameraRequest,
+    reason: string,
+  ) => void;
   onNavigateDestination: (
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
@@ -123,6 +128,7 @@ export function YeisGalaxyScene({
   const pendingNavigationRef =
     useRef<UniverseNavigationCameraRequest | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
+  const navigationFailureRef = useRef(onNavigationFailed);
   const navigateRef = useRef(onNavigateDestination);
   const signalHoverRef = useRef(onSignalHover);
 
@@ -130,6 +136,7 @@ export function YeisGalaxyScene({
   contentPlacementsRef.current = contentPlacements;
   navigationRequestRef.current = navigationRequest;
   navigationCompleteRef.current = onNavigationComplete;
+  navigationFailureRef.current = onNavigationFailed;
   navigateRef.current = onNavigateDestination;
   signalHoverRef.current = onSignalHover;
 
@@ -659,7 +666,7 @@ export function YeisGalaxyScene({
         ];
       navigationStartPositionRef.current =
         state.controller.position.toArray() as [number, number, number];
-      pendingNavigationRef.current = request;
+      pendingNavigationRef.current = null;
       lastNavigationRequestRef.current = request.requestId;
 
       if (request.mode === "locate") {
@@ -719,11 +726,23 @@ export function YeisGalaxyScene({
           document.documentElement.dataset.universeLocateRequest = String(
             request.requestId,
           );
+          pendingNavigationRef.current = request;
           console.info(
             "[YEIS-NATIVE-LOCATE] " +
               request.title +
               " -> " +
               targetKey,
+          );
+        } else {
+          const reason = "locate target has no usable direction";
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-LOCATE] failed " +
+              targetKey +
+              " · " +
+              reason,
           );
         }
       } else if (request.target.kind === "body") {
@@ -740,6 +759,7 @@ export function YeisGalaxyScene({
         const body = runtime.universe.get(request.target.bodyId);
         if (body) {
           state.controller.goTo(body, runtime.universe.star.position);
+          pendingNavigationRef.current = request;
           document.documentElement.dataset.universeTraveling = targetKey;
           console.info(
             "[YEIS-NATIVE-BODY] " +
@@ -748,7 +768,11 @@ export function YeisGalaxyScene({
               targetKey,
           );
         } else {
-          console.warn(
+          const reason = "native body unavailable";
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
             "[YEIS-NATIVE-BODY] unavailable " + targetKey,
           );
         }
@@ -768,6 +792,7 @@ export function YeisGalaxyScene({
           const body = runtime.universe.get(blackHole.entry.bodyId);
           if (body) {
             state.controller.goTo(body, runtime.universe.star.position);
+            pendingNavigationRef.current = request;
             document.documentElement.dataset.universeTraveling = targetKey;
             console.info(
               "[YEIS-NATIVE-BLACKHOLE] " +
@@ -775,7 +800,23 @@ export function YeisGalaxyScene({
                 " -> " +
                 targetKey,
             );
+          } else {
+            const reason = "black-hole body unavailable";
+            document.documentElement.dataset.universeNavigationError =
+              targetKey;
+            navigationFailureRef.current(request, reason);
+            console.error(
+              "[YEIS-NATIVE-BLACKHOLE] missing body " + targetKey,
+            );
           }
+        } else {
+          const reason = "unknown black-hole target";
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-BLACKHOLE] unknown " + targetKey,
+          );
         }
       } else if (request.target.kind === "galaxy") {
         const index = request.target.index;
@@ -808,6 +849,7 @@ export function YeisGalaxyScene({
             name: galaxies.name(index),
           },
         );
+        pendingNavigationRef.current = request;
         document.documentElement.dataset.universeTraveling = targetKey;
         console.info(
           "[YEIS-NATIVE-TRAVEL] " +
@@ -837,6 +879,7 @@ export function YeisGalaxyScene({
             name: landmark.def.name,
           },
         );
+        pendingNavigationRef.current = request;
         document.documentElement.dataset.universeTraveling = targetKey;
         console.info(
           "[YEIS-NATIVE-TRAVEL] " +
