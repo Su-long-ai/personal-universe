@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "NAVIGATION-FAILURE-RECOVERY-001",
+  "approved_at": "2026-11-22T20:49:00.000Z",
+  "baseline_commit": "34e8f32e99816a8e159f621396f92daa646691db",
+  "record_path": "docs/reuse-gate/tasks/NAVIGATION-FAILURE-RECOVERY-001.json",
+  "record_sha256": "adb969f7995d6fc4012383ea4b2e152c9e92b8f2a5e9ee5bb578ccb20682181c",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Turn YEIS camera-navigation failures into a visible persistent product notice with retry and dismiss while preserving the shared destination executor"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-single-notification-semantics",
+    "react-local-navigation-failure"
+  ],
+  "candidate_scores": {
+    "yeis-single-notification-semantics": 49,
+    "radix-toast": 45,
+    "react-aria-toast": 45,
+    "react-local-navigation-failure": 57
+  }
+}
