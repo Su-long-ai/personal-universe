@@ -69,6 +69,13 @@ export type YeisGalaxyViewState = {
   quaternion: [number, number, number, number];
 };
 
+export type YeisSignalHover = {
+  title: string;
+  kind: string;
+  clientX: number;
+  clientY: number;
+} | null;
+
 const heroProjection = new Vector3();
 const contentProjection = new Vector3();
 const observedProjection = new Vector3();
@@ -85,6 +92,7 @@ export function YeisGalaxyScene({
   navigationRequest,
   onNavigationComplete,
   onNavigateDestination,
+  onSignalHover,
   quality,
   viewStateRef,
 }: {
@@ -95,6 +103,7 @@ export function YeisGalaxyScene({
   onNavigateDestination: (
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
+  onSignalHover: (hover: YeisSignalHover) => void;
   quality: QualityMode;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
@@ -115,15 +124,18 @@ export function YeisGalaxyScene({
     useRef<UniverseNavigationCameraRequest | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
   const navigateRef = useRef(onNavigateDestination);
+  const signalHoverRef = useRef(onSignalHover);
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
   navigationRequestRef.current = navigationRequest;
   navigationCompleteRef.current = onNavigationComplete;
   navigateRef.current = onNavigateDestination;
+  signalHoverRef.current = onSignalHover;
 
   useEffect(() => {
     let cancelled = false;
+    let removeHoverListeners: (() => void) | null = null;
     const previousNear = perspective.near;
     const previousFar = perspective.far;
     const previousPosition = perspective.position.clone();
@@ -464,6 +476,72 @@ export function YeisGalaxyScene({
           if (proceduralId) navigateNativeStar(proceduralId);
         };
 
+        const clearSignalHover = () => {
+          gl.domElement.style.cursor = "";
+          delete document.documentElement.dataset.personalSignalHover;
+          signalHoverRef.current(null);
+        };
+
+        const onSignalPointerMove = (event: PointerEvent) => {
+          if (state.disposed || state.input.coarse || state.input.dragging) {
+            clearSignalHover();
+            return;
+          }
+
+          const rect = gl.domElement.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          let best:
+            | { placement: UniverseContentPlacement; distance: number }
+            | null = null;
+          const markerById = new Map(
+            markersRef.current.map((marker) => [marker.id, marker]),
+          );
+
+          for (const placement of contentPlacementsRef.current) {
+            const marker = markerById.get(placement.markerId);
+            const nativeId = placement.nativeId ?? marker?.nativeId;
+            if (!nativeId) continue;
+            const starPc = runtime.universe.starPositionPc(nativeId);
+            contentDirection.copy(starPc).sub(state.cameraPc);
+            if (contentDirection.lengthSq() <= 1e-12) continue;
+            contentDirection
+              .normalize()
+              .multiplyScalar(SKY_RADIUS_KM * 0.992);
+            contentProjection.copy(contentDirection).project(perspective);
+            if (contentProjection.z < -1 || contentProjection.z > 1) continue;
+            const sx = (contentProjection.x * 0.5 + 0.5) * rect.width;
+            const sy = (-contentProjection.y * 0.5 + 0.5) * rect.height;
+            const distance = Math.hypot(sx - x, sy - y);
+            if (distance <= 20 && (!best || distance < best.distance)) {
+              best = { placement, distance };
+            }
+          }
+
+          if (!best) {
+            clearSignalHover();
+            return;
+          }
+
+          gl.domElement.style.cursor = "pointer";
+          document.documentElement.dataset.personalSignalHover =
+            best.placement.entry.id;
+          signalHoverRef.current({
+            title: best.placement.entry.title,
+            kind: best.placement.entry.kind,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          });
+        };
+
+        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
+        gl.domElement.addEventListener("pointerleave", clearSignalHover);
+        removeHoverListeners = () => {
+          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
+          gl.domElement.removeEventListener("pointerleave", clearSignalHover);
+          clearSignalHover();
+        };
+
         document.documentElement.dataset.yeisNativeGalaxy = "ready";
         document.documentElement.dataset.yeisLandmarks = String(
           runtime.universe.landmarks.length,
@@ -484,6 +562,7 @@ export function YeisGalaxyScene({
 
     return () => {
       cancelled = true;
+      removeHoverListeners?.();
       const state = stateRef.current;
       if (state) {
         viewStateRef.current = {
@@ -950,6 +1029,12 @@ export function YeisGalaxyScene({
         `[YEIS-OBSERVED-OVERLAY] HIP-less physical hosts=${observedCount}`,
       );
     }
+
+    const contentMaterial = state.contentSky.material as PointsMaterial;
+    const signalPulse = 1 + Math.sin(performance.now() * 0.0032) * 0.12;
+    contentMaterial.size = (quality === "low" ? 8 : 11) * signalPulse;
+    contentMaterial.opacity =
+      0.9 + Math.sin(performance.now() * 0.0026) * 0.08;
 
     const contentPosition = state.contentSky.geometry.getAttribute(
       "position",
