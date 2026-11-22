@@ -318,3 +318,28 @@ against a production build:
 - Journey interruption and reduced-motion manual mode;
 - native galaxy camera persistence after returning from a product scene.
 
+### Cloud acceptance evidence — 2026-11-23
+
+PR #24 / GitHub Actions run `45051078091` exercised the production artifact
+without a Windows workstation:
+
+- Machine Reuse Gate: PASS;
+- Astro production build: PASS;
+- headless Chromium runtime smoke: PASS;
+- default boot reached `data-universe-engine="yeis"`,
+  `data-yeis-native-galaxy="ready"` and one generated Personal Signal;
+- `?navigator=1&navq=Earth` opened the product Navigator and produced a
+  non-empty Earth result set after the smoke deep-link compatibility regression
+  was fixed;
+- the uploaded dist artifact digest was
+  `sha256:973d5a6f392dc9a6fee7996ec6148bfd28fb27c52fb88745ded37ff7f44f9855`.
+
+The exact uploaded dist was then extracted into an independent container and
+served over HTTP. Every one of the 15 pinned deep-sky atlas sources under
+`/nebulae/*.jpg` returned HTTP 200, decoded as `image/jpeg`, and had a
+non-zero payload; the built YEIS scene bundle also contains the
+requested/loaded/failed/complete atlas diagnostics. Browser-side atlas
+completion remains observable through those diagnostics rather than being
+coupled to core galaxy readiness, because the photographs are intentionally a
+progressive enhancement.
+
