@@ -61,8 +61,16 @@ export type YeisGalaxyViewState = {
   quaternion: [number, number, number, number];
 };
 
+export type YeisSignalHover = {
+  title: string;
+  kind: string;
+  clientX: number;
+  clientY: number;
+} | null;
+
 const heroProjection = new Vector3();
 const observedProjection = new Vector3();
+const contentProjection = new Vector3();
 const observedDirection = new Vector3();
 const contentDirection = new Vector3();
 const navigationDirection = new Vector3();
@@ -76,6 +84,7 @@ export function YeisGalaxyScene({
   navigationRequest,
   onNavigationComplete,
   onSelectSystem,
+  onSignalHover,
   quality,
   viewStateRef,
 }: {
@@ -84,6 +93,7 @@ export function YeisGalaxyScene({
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
   onSelectSystem: (marker: GalaxyMarker) => void;
+  onSignalHover: (hover: YeisSignalHover) => void;
   quality: QualityMode;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
@@ -104,15 +114,18 @@ export function YeisGalaxyScene({
     useRef<UniverseNavigationCameraRequest | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
   const selectRef = useRef(onSelectSystem);
+  const signalHoverRef = useRef(onSignalHover);
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
   navigationRequestRef.current = navigationRequest;
   navigationCompleteRef.current = onNavigationComplete;
   selectRef.current = onSelectSystem;
+  signalHoverRef.current = onSignalHover;
 
   useEffect(() => {
     let cancelled = false;
+    let removeHoverListeners: (() => void) | null = null;
     const previousNear = perspective.near;
     const previousFar = perspective.far;
     const previousPosition = perspective.position.clone();
@@ -375,6 +388,95 @@ export function YeisGalaxyScene({
           if (proceduralId) selectNativeStar(proceduralId);
         };
 
+        const clearSignalHover = () => {
+          gl.domElement.style.cursor = "";
+          delete document.documentElement.dataset.personalSignalHover;
+          signalHoverRef.current(null);
+        };
+
+        let hoverFrame = 0;
+        let hoverEvent: PointerEvent | null = null;
+
+        const resolveSignalHover = () => {
+          hoverFrame = 0;
+          const event = hoverEvent;
+          hoverEvent = null;
+          if (
+            !event ||
+            state.disposed ||
+            state.input.coarse ||
+            state.input.dragging
+          ) {
+            clearSignalHover();
+            return;
+          }
+
+          const rect = gl.domElement.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          const markerById = new Map(
+            markersRef.current.map((marker) => [marker.id, marker]),
+          );
+          let best:
+            | { placement: UniverseContentPlacement; distance: number }
+            | null = null;
+
+          for (const placement of contentPlacementsRef.current) {
+            const marker = markerById.get(placement.markerId);
+            const nativeId = placement.nativeId ?? marker?.nativeId;
+            if (!nativeId) continue;
+
+            const starPc = runtime.universe.starPositionPc(nativeId);
+            contentDirection.copy(starPc).sub(state.cameraPc);
+            if (contentDirection.lengthSq() <= 1e-12) continue;
+            contentDirection
+              .normalize()
+              .multiplyScalar(SKY_RADIUS_KM * 0.992);
+            contentProjection.copy(contentDirection).project(perspective);
+            if (contentProjection.z < -1 || contentProjection.z > 1) continue;
+
+            const sx = (contentProjection.x * 0.5 + 0.5) * rect.width;
+            const sy = (-contentProjection.y * 0.5 + 0.5) * rect.height;
+            const distance = Math.hypot(sx - x, sy - y);
+            if (distance <= 20 && (!best || distance < best.distance)) {
+              best = { placement, distance };
+            }
+          }
+
+          if (!best) {
+            clearSignalHover();
+            return;
+          }
+
+          gl.domElement.style.cursor = "pointer";
+          document.documentElement.dataset.personalSignalHover =
+            best.placement.entry.id;
+          signalHoverRef.current({
+            title: best.placement.entry.title,
+            kind: best.placement.entry.kind,
+            clientX: event.clientX,
+            clientY: event.clientY,
+          });
+        };
+
+        const onSignalPointerMove = (event: PointerEvent) => {
+          hoverEvent = event;
+          if (!hoverFrame) {
+            hoverFrame = window.requestAnimationFrame(resolveSignalHover);
+          }
+        };
+
+        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
+        gl.domElement.addEventListener("pointerleave", clearSignalHover);
+        removeHoverListeners = () => {
+          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
+          gl.domElement.removeEventListener("pointerleave", clearSignalHover);
+          if (hoverFrame) window.cancelAnimationFrame(hoverFrame);
+          hoverFrame = 0;
+          hoverEvent = null;
+          clearSignalHover();
+        };
+
         document.documentElement.dataset.yeisNativeGalaxy = "ready";
         console.info(
           `[YEIS-NATIVE-GALAXY] READY stars=${runtime.catalog.count} cloud=${quality === "low" ? 90_000 : 180_000}`,
@@ -389,6 +491,7 @@ export function YeisGalaxyScene({
 
     return () => {
       cancelled = true;
+      removeHoverListeners?.();
       const state = stateRef.current;
       if (state) {
         viewStateRef.current = {
@@ -430,6 +533,7 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisHiplessObserved;
       delete document.documentElement.dataset.personalSignalOverlay;
       delete document.documentElement.dataset.personalSignalCapacity;
+      delete document.documentElement.dataset.personalSignalHover;
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.universeTraveling;
