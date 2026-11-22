@@ -194,6 +194,8 @@ export default function UniverseApp({
     clientY: number;
   } | null>(null);
   const [journey, setJourney] = useState<UniverseJourneyState | null>(null);
+  const [cameraSettledPhase, setCameraSettledPhase] =
+    useState<UniversePhase | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
   const openedWorldDestinationRef = useRef<string | null>(null);
@@ -221,6 +223,10 @@ export default function UniverseApp({
   const debugFreeze =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("freeze") === "1";
+  const journeyDestinationSettled =
+    phase === "galaxy"
+      ? navigationStatus === "arrived" || navigationStatus === "located"
+      : phase !== "returning" && cameraSettledPhase === phase;
 
   useEffect(() => {
     if (activeEngine !== "yeis") {
@@ -483,6 +489,7 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeJourneyComplete;
       }
       if (activeEngine !== "yeis") return;
+      setCameraSettledPhase(null);
       setNavigationFailure(null);
       delete document.documentElement.dataset.universeNavigationError;
       openedWorldDestinationRef.current = null;
@@ -697,6 +704,7 @@ export default function UniverseApp({
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       if (activeEngine !== "yeis") return;
+      setCameraSettledPhase(null);
       setNavigationFailure(null);
       delete document.documentElement.dataset.universeNavigationError;
       const cameraTarget = navigationCameraTarget(destination, galaxy.markers);
@@ -830,10 +838,10 @@ export default function UniverseApp({
       journey.completed ||
       navigatorOpen ||
       reducedMotion ||
-      journey.destinations.length < 2 ||
       navigationStatus === "traveling" ||
       navigationStatus === "locating" ||
-      !["system", "approach", "orbit", "surface"].includes(phase)
+      navigationFailure !== null ||
+      !journeyDestinationSettled
     ) {
       return;
     }
@@ -848,6 +856,8 @@ export default function UniverseApp({
   }, [
     handleJourneyStep,
     journey,
+    journeyDestinationSettled,
+    navigationFailure,
     navigationStatus,
     navigatorOpen,
     phase,
@@ -1009,6 +1019,7 @@ export default function UniverseApp({
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
+      setCameraSettledPhase(null);
       setSelectedPlanet(planet);
       ambient.ensurePlaying();
       setPhase("approach");
@@ -1025,7 +1036,9 @@ export default function UniverseApp({
 
   const handleCinematicPhaseComplete = useCallback(
     (completed: UniversePhase) => {
-      if (debugFreeze || phase !== completed) return;
+      if (phase !== completed) return;
+      setCameraSettledPhase(completed);
+      if (debugFreeze) return;
 
       let nextPhase = completed;
       if (completed === "approach") nextPhase = "orbit";
@@ -1065,6 +1078,7 @@ export default function UniverseApp({
   );
 
   const handleReturn = useCallback(() => {
+    setCameraSettledPhase(null);
     journeyNavigationRef.current = false;
     journeyRef.current = null;
     setJourney(null);
@@ -1279,12 +1293,14 @@ export default function UniverseApp({
           </div>
           <small className="journey-mode">
             {journey.completed
-              ? "COMPLETE · CAMERA REMAINS FREE"
+              ? "COMPLETE · NAVIGATION REMAINS AVAILABLE"
               : reducedMotion
                 ? "REDUCED MOTION · MANUAL ADVANCE"
                 : journey.paused
-                  ? "PAUSED · CAMERA REMAINS FREE"
-                  : "AUTO ADVANCE · CAMERA REMAINS FREE"}
+                  ? "PAUSED · NAVIGATION REMAINS AVAILABLE"
+                  : journeyDestinationSettled
+                    ? "DWELLING · AUTO ADVANCE AFTER ARRIVAL"
+                    : "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL"}
           </small>
         </aside>
       )}
