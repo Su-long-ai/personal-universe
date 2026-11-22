@@ -300,10 +300,13 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await expect(dialog).toBeHidden();
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-navigation-phase",
-    "approach",
+    "system",
   );
-  const featuredWorld = page.locator(".world-content-card");
-  await expect(featuredWorld).toBeVisible();
+  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+  const activeFeatured = await page
+    .locator("html")
+    .getAttribute("data-universe-active-destination");
+  expect(activeFeatured).toMatch(/^featured:star:/);
   const placeTarget = await page
     .locator("html")
     .getAttribute("data-universe-navigation-target");
