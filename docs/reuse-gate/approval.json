@@ -1,32 +1,32 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NAVIGATION-RESTORE-001",
-  "approved_at": "2026-11-22T15:18:06.827Z",
-  "baseline_commit": "a276d164f6d0a76568a5e7ef4b34d73cccf5eecc",
+  "task_id": "YEIS-NATIVE-LOCATE-001",
+  "approved_at": "2026-11-22T15:24:47.190Z",
+  "baseline_commit": "8619d45b1fea14fbcae0a3e2890de698dbb2cf7f",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "2ab2f9712bb8d0b91b4cf0ac5fb32d9c17a7a1b62c4dc319d93ef4adf98ca3df",
+  "record_sha256": "c37cc7832f94513088df6bb5887f00587ca4544b1bf596ee8f758f2ccf261b0b",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "4041a3ab6511cb220709b4e9b6279b8e2f32b9b91dfbf55ae13bfae6378bd6a5",
   "scope": {
     "level": "subsystem",
-    "subject": "Universe search, curated places, personal-signal discovery, and direct system navigation"
+    "subject": "Search-result spatial focus inside the native YEIS galaxy view"
   },
   "policy_change": false,
   "planned_files": [
     "src/lib/universe/yeis/navigation.ts",
     "src/components/universe/UniverseNavigator.tsx",
     "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
     "src/components/universe/universe.css",
-    "docs/architecture/navigation.md",
-    "README.md"
+    "docs/architecture/navigation.md"
   ],
   "selected_ids": [
-    "yeis-react-navigation"
+    "yeis-native-locate"
   ],
   "candidate_scores": {
-    "yeis-react-navigation": 55.5,
-    "cmdk-fuse": 49,
-    "pagefind-navigation": 41.5
+    "yeis-native-locate": 57,
+    "custom-r3f-camera": 43.5,
+    "open-only": 44
   }
 }

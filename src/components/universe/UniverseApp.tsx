@@ -21,7 +21,11 @@ import {
   placementsForMarker,
   type UniverseContentEntry,
 } from "../../lib/universe/content";
-import type { UniverseNavigationDestination } from "../../lib/universe/yeis/navigation";
+import {
+  navigationMarker,
+  type UniverseNavigationDestination,
+  type UniverseNavigationFocusRequest,
+} from "../../lib/universe/yeis/navigation";
 import "./universe.css";
 
 function useReducedMotion() {
@@ -63,6 +67,9 @@ export default function UniverseApp({
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
+  const [navigationFocus, setNavigationFocus] =
+    useState<UniverseNavigationFocusRequest | null>(null);
+  const navigationFocusSeq = useRef(0);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -294,10 +301,9 @@ export default function UniverseApp({
   const handleNavigateDestination = useCallback(
     async (destination: UniverseNavigationDestination) => {
       if (activeEngine !== "yeis") return;
-      const { navigationMarker } = await import(
-        "../../lib/universe/yeis/navigation"
-      );
       const marker = await navigationMarker(destination, galaxy.markers);
+      setNavigationFocus(null);
+      delete document.documentElement.dataset.universeLocated;
       handleSelectSystem(marker);
       document.documentElement.dataset.universeNavigationTarget =
         destination.nativeId;
@@ -311,6 +317,30 @@ export default function UniverseApp({
       );
     },
     [activeEngine, galaxy.markers, handleSelectSystem],
+  );
+
+  const handleLocateDestination = useCallback(
+    (destination: UniverseNavigationDestination) => {
+      if (activeEngine !== "yeis") return;
+      navigationFocusSeq.current += 1;
+      setSelectedSystem(null);
+      setSelectedPlanet(null);
+      setPhase("galaxy");
+      setNavigationFocus({
+        requestId: navigationFocusSeq.current,
+        nativeId: destination.nativeId,
+        title: destination.title,
+      });
+      console.info(
+        "[UNIVERSE-NAV] locate " +
+          destination.kind +
+          ":" +
+          destination.title +
+          " -> " +
+          destination.nativeId,
+      );
+    },
+    [activeEngine],
   );
 
   const handleSelectPlanet = useCallback(
@@ -381,6 +411,7 @@ export default function UniverseApp({
           engineMode={activeEngine}
           markers={galaxy.markers}
           contentPlacements={contentPlacements}
+          navigationFocus={navigationFocus}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleSelectSystem}
@@ -443,7 +474,14 @@ export default function UniverseApp({
         placements={contentPlacements}
         onClose={() => setNavigatorOpen(false)}
         onNavigate={handleNavigateDestination}
+        onLocate={handleLocateDestination}
       />
+
+      {phase === "galaxy" && navigationFocus && (
+        <div className="galaxy-locate-caption">
+          LOCATED // {navigationFocus.title}
+        </div>
+      )}
 
       {phase === "galaxy" && (
         <section className="hero-copy">

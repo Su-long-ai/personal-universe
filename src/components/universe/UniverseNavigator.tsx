@@ -12,12 +12,16 @@ export function UniverseNavigator({
   placements,
   onClose,
   onNavigate,
+  onLocate,
 }: {
   open: boolean;
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
   onClose: () => void;
   onNavigate: (
+    destination: UniverseNavigationDestination,
+  ) => Promise<void> | void;
+  onLocate: (
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
 }) {
@@ -76,6 +80,10 @@ export function UniverseNavigator({
     void Promise.resolve(onNavigate(destination)).then(onClose);
   };
 
+  const locate = (destination: UniverseNavigationDestination) => {
+    void Promise.resolve(onLocate(destination)).then(onClose);
+  };
+
   return (
     <div
       className="universe-navigator-backdrop"
@@ -127,6 +135,13 @@ export function UniverseNavigator({
                 event.preventDefault();
                 const result = results[activeIndex] ?? results[0];
                 if (result) activate(result);
+                return;
+              }
+
+              if (event.key.toLowerCase() === "l") {
+                event.preventDefault();
+                const result = results[activeIndex] ?? results[0];
+                if (result) locate(result);
               }
             }}
             placeholder="Search projects, stars, black holes, landmarks…"
@@ -162,30 +177,46 @@ export function UniverseNavigator({
               </div>
             )}
           {results.map((result, index) => (
-            <button
-              type="button"
+            <div
               key={result.id}
-              className={index === activeIndex ? "is-active" : ""}
+              className={
+                "navigator-result-row" +
+                (index === activeIndex ? " is-active" : "")
+              }
               role="option"
               aria-selected={index === activeIndex}
               onPointerEnter={() => setActiveIndex(index)}
-              onClick={() => activate(result)}
             >
-              <span className={"navigator-kind kind-" + result.kind}>
-                {result.kind}
-              </span>
-              <span className="navigator-result-main">
-                <strong>{result.title}</strong>
-                <small>{result.detail}</small>
-              </span>
-              <span className="navigator-open">OPEN →</span>
-            </button>
+              <button
+                type="button"
+                className="navigator-result-open"
+                onClick={() => activate(result)}
+              >
+                <span className={"navigator-kind kind-" + result.kind}>
+                  {result.kind}
+                </span>
+                <span className="navigator-result-main">
+                  <strong>{result.title}</strong>
+                  <small>{result.detail}</small>
+                </span>
+                <span className="navigator-open">OPEN →</span>
+              </button>
+              <button
+                type="button"
+                className="navigator-locate"
+                onClick={() => locate(result)}
+                aria-label={"Locate " + result.title + " in galaxy"}
+              >
+                LOCATE
+              </button>
+            </div>
           ))}
         </div>
 
         <footer className="navigator-footer">
           <span>↑↓ SELECT</span>
           <span>ENTER OPEN</span>
+          <span>L LOCATE</span>
           <span>ESC CLOSE</span>
         </footer>
       </section>

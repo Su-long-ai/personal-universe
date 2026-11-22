@@ -11,6 +11,7 @@ import {
 } from "three";
 import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
+import type { UniverseNavigationFocusRequest } from "../../lib/universe/yeis/navigation";
 import {
   loadYeisCore,
   HERO_SYSTEM_ID,
@@ -60,16 +61,19 @@ const heroProjection = new Vector3();
 const observedProjection = new Vector3();
 const observedDirection = new Vector3();
 const contentDirection = new Vector3();
+const focusDirection = new Vector3();
 
 export function YeisGalaxyScene({
   markers,
   contentPlacements,
+  focusRequest,
   onSelectSystem,
   quality,
   viewStateRef,
 }: {
   markers: GalaxyMarker[];
   contentPlacements: UniverseContentPlacement[];
+  focusRequest: UniverseNavigationFocusRequest | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
   quality: QualityMode;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -79,10 +83,17 @@ export function YeisGalaxyScene({
   const stateRef = useRef<NativeGalaxyState | null>(null);
   const markersRef = useRef(markers);
   const contentPlacementsRef = useRef(contentPlacements);
+  const focusRequestRef = useRef(focusRequest);
+  const lastFocusRequestRef = useRef(0);
+  const focusStartQuaternionRef = useRef<
+    [number, number, number, number] | null
+  >(null);
+  const pendingFocusRef = useRef<UniverseNavigationFocusRequest | null>(null);
   const selectRef = useRef(onSelectSystem);
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
+  focusRequestRef.current = focusRequest;
   selectRef.current = onSelectSystem;
 
   useEffect(() => {
@@ -416,6 +427,70 @@ export function YeisGalaxyScene({
       state.controller.position,
       state.cameraPc,
     );
+
+    const focus = focusRequestRef.current;
+    if (
+      focus &&
+      focus.requestId !== lastFocusRequestRef.current
+    ) {
+      const targetPc = runtime.universe.starPositionPc(focus.nativeId);
+      focusDirection.copy(targetPc).sub(state.cameraPc);
+      if (focusDirection.lengthSq() > 1e-12) {
+        focusStartQuaternionRef.current =
+          state.controller.quaternion.toArray() as [
+            number,
+            number,
+            number,
+            number,
+          ];
+        pendingFocusRef.current = focus;
+        state.controller.centerOnDirection(focusDirection);
+        lastFocusRequestRef.current = focus.requestId;
+        document.documentElement.dataset.universeLocated = focus.nativeId;
+        document.documentElement.dataset.universeLocateRequest = String(
+          focus.requestId,
+        );
+        console.info(
+          "[YEIS-NATIVE-LOCATE] " +
+            focus.title +
+            " -> " +
+            focus.nativeId,
+        );
+      }
+    }
+
+    const pendingFocus = pendingFocusRef.current;
+    const startQuaternion = focusStartQuaternionRef.current;
+    if (
+      pendingFocus &&
+      startQuaternion &&
+      pendingFocus.requestId === lastFocusRequestRef.current &&
+      !state.controller.autopilot
+    ) {
+      const current = state.controller.quaternion.toArray();
+      const dot = Math.min(
+        1,
+        Math.abs(
+          startQuaternion[0] * current[0] +
+            startQuaternion[1] * current[1] +
+            startQuaternion[2] * current[2] +
+            startQuaternion[3] * current[3],
+        ),
+      );
+      const deltaRad = 2 * Math.acos(dot);
+      document.documentElement.dataset.universeLocateComplete =
+        pendingFocus.nativeId;
+      document.documentElement.dataset.universeLocateDeltaRad =
+        deltaRad.toFixed(6);
+      console.info(
+        "[YEIS-NATIVE-LOCATE] complete " +
+          pendingFocus.nativeId +
+          " deltaRad=" +
+          deltaRad.toFixed(6),
+      );
+      pendingFocusRef.current = null;
+      focusStartQuaternionRef.current = null;
+    }
 
     state.galaxyAcc += delta;
     if (state.galaxyAcc >= 0.12) {

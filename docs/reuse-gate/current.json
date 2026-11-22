@@ -1,47 +1,31 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NAVIGATION-RESTORE-001",
-  "title": "Restore the pinned MIT YEIS Search/Places navigation semantics inside the current React shell and add Personal Signals as destinations",
+  "task_id": "YEIS-NATIVE-LOCATE-001",
+  "title": "Add spatial Locate to universe navigation by reusing the pinned MIT YEIS CameraController center autopilot",
   "scope": {
     "level": "subsystem",
-    "subject": "Universe search, curated places, personal-signal discovery, and direct system navigation"
+    "subject": "Search-result spatial focus inside the native YEIS galaxy view"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The pinned MIT YEIS commit already contains a complete search UI and a curated Places model. More importantly, the vendored core already retains StarCatalog.search(), Universe.searchForeignBodies(), searchBlackHoles(), searchLandmarks(), galaxy search, and CameraController autopilot primitives. Rebuilding a separate site-search/index stack would duplicate these domain APIs. The selected approach reuses the MIT navigation semantics and existing search methods, adds only a thin React command-style shell, and treats Personal Signals as another destination class. cmdk/Fuse/Pagefind remain optional supplements if scale later exceeds the built-in search behavior.",
+  "research_summary": "The restored navigator can already open systems directly. The pinned MIT CameraController still includes centerOnDirection(), goToPoint() and autopilot interpolation. A Locate action therefore does not need a new camera animation system. The safest first spatial enhancement is centerOnDirection: keep the visitor in galaxy mode, rotate smoothly toward the resolved YEIS star, preserve the existing galaxy orbit state, and leave Open as the separate action for entering the system. Full goToPoint flight can remain a later scale-transition experiment because it requires additional frame-switch semantics.",
   "policy_change": false,
   "planned_files": [
     "src/lib/universe/yeis/navigation.ts",
     "src/components/universe/UniverseNavigator.tsx",
     "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
     "src/components/universe/universe.css",
-    "docs/architecture/navigation.md",
-    "README.md"
+    "docs/architecture/navigation.md"
   ],
   "sources": [
     {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
+      "finding": "Pinned MIT CameraController provides centerOnDirection() using its built-in 0.9-second autopilot quaternion interpolation and goToPoint() for later physical flight."
+    },
+    {
       "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
-      "finding": "Pinned MIT UI implements keyboard search across current/foreign bodies, catalogue stars, black holes, landmarks and galaxies, then navigates directly to the resolved astronomical target."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/places.ts",
-      "finding": "Pinned MIT UI provides grouped curated Places with typed destination kinds and stable refs instead of inventing a separate navigation database."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
-      "finding": "Vendored StarCatalog.search() already handles name/HIP/Gliese lookup and ranking."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
-      "finding": "Vendored Universe retains domain search helpers for foreign bodies, black holes and landmarks."
-    },
-    {
-      "url": "https://github.com/pacocoursey/cmdk",
-      "finding": "cmdk is a polished command-menu UI option, but adopting it now would add a UI dependency while YEIS already supplies the domain search semantics and the current shell needs only a small result surface."
-    },
-    {
-      "url": "https://pagefind.app/docs/",
-      "finding": "Pagefind is optimized for generated document/site full-text search, not direct astronomical destination navigation."
+      "finding": "Pinned MIT UI separates center/focus actions from go-to actions, supporting the product decision to keep Locate and Open distinct."
     }
   ],
   "search_ladder": [
@@ -55,7 +39,7 @@
         0,
         1
       ],
-      "conclusion": "The selected mother engine already had Search and Places in its MIT UI. Restore those semantics instead of building an unrelated index product."
+      "conclusion": "The mother engine already contains the spatial focus behavior and UI semantics."
     },
     {
       "level": "framework_engine",
@@ -66,7 +50,7 @@
       "source_refs": [
         0
       ],
-      "conclusion": "The current React/R3F shell can host the search surface while leaving search/routing semantics in the YEIS adapter."
+      "conclusion": "R3F only needs to pass a focus request into the hosted YEIS scene; it should not own a parallel camera animation."
     },
     {
       "level": "subsystem",
@@ -75,87 +59,75 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        2,
-        3
+        0
       ],
-      "conclusion": "StarCatalog and Universe already expose the actual search indexes needed by the navigator; reuse them directly."
+      "conclusion": "CameraController.centerOnDirection is the complete subsystem primitive for this locate step."
     },
     {
       "level": "component_asset",
-      "status": "found",
+      "status": "none",
       "registry_refs": [],
       "source_refs": [
-        4,
-        5
+        0
       ],
-      "conclusion": "cmdk/Pagefind can provide generic UI/indexing, but neither improves the current domain search enough to justify replacing the built-in YEIS behavior."
+      "conclusion": "No third-party component is needed."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "search personal projects and experiences",
+      "capability": "smoothly orient galaxy view toward a search result",
       "importance": "high",
       "coverage": {
-        "yeis-react-navigation": "full",
-        "cmdk-fuse": "full",
-        "pagefind-navigation": "full"
+        "yeis-native-locate": "full",
+        "custom-r3f-camera": "full",
+        "open-only": "none"
       },
-      "decision": "Personal signals are injected as a destination class above the same result model."
+      "decision": "Use YEIS centerOnDirection rather than animating the R3F camera separately."
     },
     {
-      "capability": "search astronomical stars using existing universe data",
+      "capability": "preserve native galaxy camera/orbit semantics",
       "importance": "high",
       "coverage": {
-        "yeis-react-navigation": "full",
-        "cmdk-fuse": "partial",
-        "pagefind-navigation": "none"
+        "yeis-native-locate": "full",
+        "custom-r3f-camera": "partial",
+        "open-only": "full"
       },
-      "decision": "Use StarCatalog.search() directly; do not build another star index."
+      "decision": "The controller remains the single camera authority."
     },
     {
-      "capability": "curated browseable places when query is empty",
+      "capability": "keep direct Open behavior available",
       "importance": "high",
       "coverage": {
-        "yeis-react-navigation": "full",
-        "cmdk-fuse": "partial",
-        "pagefind-navigation": "partial"
+        "yeis-native-locate": "full",
+        "custom-r3f-camera": "full",
+        "open-only": "full"
       },
-      "decision": "Reuse the Places pattern and stable astronomical refs from the MIT UI."
+      "decision": "Locate is additive; Enter/Open still enters the system."
     },
     {
-      "capability": "keyboard-first search and direct navigation",
+      "capability": "avoid premature cross-frame flight complexity",
       "importance": "medium",
       "coverage": {
-        "yeis-react-navigation": "full",
-        "cmdk-fuse": "full",
-        "pagefind-navigation": "partial"
+        "yeis-native-locate": "full",
+        "custom-r3f-camera": "partial",
+        "open-only": "full"
       },
-      "decision": "Implement the small React interaction shell around reused YEIS results; no dependency is needed for the current scale."
-    },
-    {
-      "capability": "future native camera fly-to",
-      "importance": "medium",
-      "coverage": {
-        "yeis-react-navigation": "full",
-        "cmdk-fuse": "partial",
-        "pagefind-navigation": "none"
-      },
-      "decision": "Keep destination IDs compatible with CameraController centerOnDirection/goToPoint so spatial flight can be layered on without changing the navigator model."
+      "decision": "Center direction now; defer goToPoint until frame switching and arrival semantics are explicitly validated."
     }
   ],
   "candidates": [
     {
-      "id": "yeis-react-navigation",
-      "name": "Pinned MIT YEIS Search/Places semantics + thin React navigation shell",
+      "id": "yeis-native-locate",
+      "name": "YEIS CameraController.centerOnDirection Locate",
       "level": "subsystem",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "pinned MIT UI.ts/places.ts plus already-vendored StarCatalog/Universe APIs",
-      "license": "MIT at e520568; existing upstream attribution retained",
+      "source": "pinned MIT CameraController + existing hosted controller instance",
+      "license": "MIT at e520568",
       "decision": "reuse",
-      "reason": "Highest global reuse: keeps one astronomical index and one destination model, adds Personal Signals cleanly, and remains compatible with native YEIS camera autopilot later.",
+      "reason": "Reuses the camera authority already running the native galaxy view, provides built-in smooth interpolation, and adds no duplicate camera state.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1.5,
+        "integration_cost": 1,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
@@ -164,52 +136,57 @@
       }
     },
     {
-      "id": "cmdk-fuse",
-      "name": "cmdk UI plus Fuse.js independent search index",
-      "level": "component_asset",
-      "source": "cmdk + Fuse.js",
-      "license": "MIT",
+      "id": "custom-r3f-camera",
+      "name": "Animate the R3F PerspectiveCamera directly for search focus",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "local custom animation",
+      "license": "project code / MIT framework",
       "decision": "reject",
-      "reason": "Strong generic UI/fuzzy search, but duplicates the astronomical search indexes already supplied by YEIS and adds dependencies without solving spatial destination semantics.",
+      "reason": "Would create a second camera authority alongside CameraController and risks state drift on the next native input/update.",
       "evaluation": {
         "coverage": 4.5,
         "integration_cost": 2.5,
         "license_fit": 5,
-        "maintenance_health": 4.5,
-        "performance_fit": 4.5,
+        "maintenance_health": 2.5,
+        "performance_fit": 5,
         "customization_fit": 5,
-        "maturity": 5
-      },
-      "registry_id": "cmdk-fuse-navigation"
+        "maturity": 3
+      }
     },
     {
-      "id": "pagefind-navigation",
-      "name": "Pagefind-generated site index as primary navigator",
+      "id": "open-only",
+      "name": "Keep navigator as direct system-open only",
       "level": "subsystem",
-      "source": "Pagefind",
-      "license": "MIT",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "current navigation behavior",
+      "license": "existing project",
       "decision": "reject",
-      "reason": "Excellent for static document search but mismatched to direct star/system destinations and would require a second mapping layer back into YEIS IDs.",
+      "reason": "Stable but misses the exploratory spatial-navigation value already available in the pinned engine.",
       "evaluation": {
-        "coverage": 3,
-        "integration_cost": 2.5,
+        "coverage": 2.5,
+        "integration_cost": 0,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
-        "customization_fit": 3.5,
+        "customization_fit": 2,
         "maturity": 5
-      },
-      "registry_id": "pagefind"
+      }
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "yeis-react-navigation"
+      "yeis-native-locate"
     ],
-    "rationale": "Restore the navigation semantics that already exist in the pinned MIT mother engine. Reuse StarCatalog/Universe search directly, expose curated Places and Personal Signals through one destination model, and keep the React layer limited to presentation and keyboard interaction.",
-    "higher_level_tradeoffs": [],
+    "rationale": "Add Locate as a thin request into the existing YEIS CameraController. Keep Open separate and postpone full physical goToPoint flight until system-frame switching is explicitly integrated.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "custom-r3f-camera",
+        "reason": "R3F is the broader framework, but using it directly for locate would bypass the hosted YEIS CameraController that already owns native galaxy orientation and input. That creates duplicate camera authority and worse global state coherence despite broader customization."
+      }
+    ],
     "score_overrides": [],
-    "fallback": "If result scale or fuzzy matching later becomes insufficient, layer Fuse.js or cmdk over the same destination API. If document/article search becomes a separate need, add Pagefind for documents without replacing universe navigation."
+    "fallback": "If locate requests arrive before the native galaxy scene is ready, queue the latest request and consume it on the first frame after initialization. Direct Open remains unaffected."
   }
 }

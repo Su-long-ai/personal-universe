@@ -25,6 +25,12 @@ export interface UniverseNavigationDestination {
   entryId?: string;
 }
 
+export interface UniverseNavigationFocusRequest {
+  requestId: number;
+  nativeId: string;
+  title: string;
+}
+
 /**
  * Small English-facing subset of the pinned MIT YEIS Places list.
  * The stable refs come from src/ui/places.ts at e520568; the current product
