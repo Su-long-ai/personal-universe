@@ -189,12 +189,23 @@ export function YeisGalaxyScene({
         observedSky.renderOrder = -7;
         scene.add(observedSky);
 
+        const initialSignalCapacity = Math.max(
+          32,
+          2 ** Math.ceil(
+            Math.log2(contentPlacementsRef.current.length + 1),
+          ),
+        );
         const contentGeometry = new BufferGeometry();
         contentGeometry.setAttribute(
           "position",
-          new BufferAttribute(new Float32Array(256 * 3), 3),
+          new BufferAttribute(
+            new Float32Array(initialSignalCapacity * 3),
+            3,
+          ),
         );
         contentGeometry.setDrawRange(0, 0);
+        document.documentElement.dataset.personalSignalCapacity =
+          String(initialSignalCapacity);
         const contentMaterial = new PointsMaterial({
           color: 0x73f4ff,
           size: quality === "low" ? 8 : 11,
@@ -418,6 +429,7 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisNativeGalaxy;
       delete document.documentElement.dataset.yeisHiplessObserved;
       delete document.documentElement.dataset.personalSignalOverlay;
+      delete document.documentElement.dataset.personalSignalCapacity;
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.universeTraveling;
@@ -842,9 +854,30 @@ export function YeisGalaxyScene({
       );
     }
 
-    const contentPosition = state.contentSky.geometry.getAttribute(
+    let contentPosition = state.contentSky.geometry.getAttribute(
       "position",
     ) as BufferAttribute;
+    const requiredSignalCapacity = contentPlacementsRef.current.length;
+    if (requiredSignalCapacity > contentPosition.count) {
+      const nextCapacity = Math.max(
+        32,
+        2 ** Math.ceil(Math.log2(requiredSignalCapacity + 1)),
+      );
+      const previousGeometry = state.contentSky.geometry;
+      const nextGeometry = new BufferGeometry();
+      contentPosition = new BufferAttribute(
+        new Float32Array(nextCapacity * 3),
+        3,
+      );
+      nextGeometry.setAttribute("position", contentPosition);
+      nextGeometry.setDrawRange(0, 0);
+      state.contentSky.geometry = nextGeometry;
+      previousGeometry.dispose();
+      document.documentElement.dataset.personalSignalCapacity =
+        String(nextCapacity);
+      console.info(`[PERSONAL-SIGNALS] capacity=${nextCapacity}`);
+    }
+
     const markerById = new Map(
       markersRef.current.map((marker) => [marker.id, marker]),
     );
