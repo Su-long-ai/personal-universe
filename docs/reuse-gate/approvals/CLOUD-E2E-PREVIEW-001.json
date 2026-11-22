@@ -1,0 +1,38 @@
+{
+  "schema": 3,
+  "task_id": "CLOUD-E2E-PREVIEW-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "6cc1670659e7bb5580a38bfcf4bd1134fd12f537",
+  "record_path": "docs/reuse-gate/tasks/CLOUD-E2E-PREVIEW-001.json",
+  "record_sha256": "b9594f96281a4606e8db188ab4287b0b1ce0c3f7d1d96f5eb5b2c25a45f46c3f",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "vercel-preview-deployments": "b3b24d36808806186022cb0f5e5467a3500bdfe2ba9ae62a7ef7b878d8a02111",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "github-actions-pr-diff-gate": "3765dfd501ff4aaa27d657f4dda850f6f6f0ea8bb212ba95fe78bcab487fcf5d",
+    "github-pages-actions": "cdda04a1d8bbcd91288c70dbb72efa9b7ed8627216f901cd1060f3a16be77918",
+    "npm-lifecycle": "709f848efc41e8290f78f23a643f1da77a5931314f3ae6a01ac907ce0cef6bf0"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Cloud-first validation, browser regression, artifact diagnostics and static preview workflows"
+  },
+  "policy_change": true,
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/pages-preview.yml",
+    "src/components/universe/UniverseApp.tsx"
+  ],
+  "selected_ids": [
+    "playwright-test",
+    "github-actions-cloud-validation",
+    "github-pages-actions"
+  ],
+  "candidate_scores": {
+    "vercel-preview-deployments": 43,
+    "playwright-test": 56.5,
+    "github-actions-cloud-validation": 57,
+    "github-pages-actions": 51,
+    "npm-lifecycle": 41
+  }
+}

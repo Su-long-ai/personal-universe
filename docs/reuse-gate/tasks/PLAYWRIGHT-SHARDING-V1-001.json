@@ -1,0 +1,223 @@
+{
+  "schema": 2,
+  "task_id": "PLAYWRIGHT-SHARDING-V1-001",
+  "title": "Shard the WebGL-heavy Playwright suite across GitHub Actions runners",
+  "scope": {
+    "level": "architecture",
+    "subject": "CI wall-clock reduction for Playwright functional and visual regression without same-runner WebGL contention"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "The validated cloud E2E baseline passes 8/8 tests but spends 9m40s inside one single-worker Playwright step. Three visual viewport tests alone consume about 7m47s serially. Keep Playwright's recommended one worker per CI runner for stability, but reuse Playwright sharding and GitHub Actions matrix jobs to distribute independent tests across hosted runners. This preserves coverage and diagnostics while reducing wall-clock time instead of weakening assertions or running several SwiftShader/WebGL browsers on one machine.",
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    "playwright.config.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-sharding",
+      "finding": "Playwright officially supports --shard=x/y and documents GitHub Actions matrix jobs as the way to distribute tests across multiple machines and reduce test-suite wall-clock time."
+    },
+    {
+      "url": "https://playwright.dev/docs/ci",
+      "finding": "Playwright recommends workers=1 on CI for stability and explicitly points to sharding across multiple CI jobs for wider parallelization."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs",
+      "finding": "GitHub Actions matrix strategies create parameterized parallel jobs and can keep fail-fast disabled so each shard produces independent evidence."
+    },
+    {
+      "url": "https://vercel.com/products/previews",
+      "finding": "Vercel provides hosted preview deployments but does not replace the repository's browser regression execution or reduce the current Playwright test runtime."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Hosted preview platforms such as Vercel improve deployment ergonomics but do not replace or accelerate the browser regression suite, so they are not the execution solution for this bottleneck.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "vercel-preview-deployments"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "The already-selected Playwright Test framework natively supports CI sharding while preserving one worker per runner, so no second test framework or cloud browser product is required.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Playwright sharding combined with GitHub Actions matrix jobs directly distributes independent tests across separate hosted runners and retains per-shard artifacts.",
+      "source_refs": [
+        0,
+        2
+      ],
+      "registry_refs": [
+        "playwright-ci-sharding",
+        "github-actions-matrix"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "conclusion": "No smaller component or helper package addresses CI-machine distribution better than the native Playwright and GitHub Actions primitives already selected.",
+      "source_refs": [
+        0,
+        2
+      ],
+      "registry_refs": []
+    }
+  ],
+  "candidates": [
+    {
+      "id": "playwright-native-sharding",
+      "name": "Playwright native sharding with one worker per runner",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright Test --shard support and CI guidance",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Preserves the already-proven browser framework and its stability recommendation while splitting independent tests across machines rather than contending SwiftShader browsers inside one runner.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "github-actions-matrix-shards",
+      "name": "GitHub Actions matrix-distributed Playwright shards",
+      "level": "subsystem",
+      "registry_id": "github-actions-matrix",
+      "source": "GitHub Actions matrix strategy",
+      "license": "GitHub hosted service / documentation terms",
+      "decision": "reuse",
+      "reason": "Uses the existing CI platform to place shards on separate hosted runners, reducing wall-clock time without introducing a new vendor or same-runner resource contention.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "same-runner-multiworker",
+      "name": "Increase Playwright workers on one GitHub runner",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright worker parallelism",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Cheaper to configure but conflicts with Playwright's CI stability guidance and would make multiple SwiftShader/WebGL browser processes compete for the same runner CPU and memory.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "vercel-preview-runtime",
+      "name": "Vercel Preview Deployments",
+      "level": "full_solution",
+      "registry_id": "vercel-preview-deployments",
+      "source": "Vercel hosted preview product",
+      "license": "Commercial hosted service",
+      "decision": "reject",
+      "reason": "A broader preview product can improve manual review URLs but does not distribute the Playwright regression workload or replace its test evidence.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 3,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Reduce browser regression wall-clock time",
+      "importance": "high",
+      "coverage": {
+        "playwright-native-sharding": "full",
+        "github-actions-matrix-shards": "full",
+        "same-runner-multiworker": "partial",
+        "vercel-preview-runtime": "none"
+      },
+      "decision": "Use native Playwright shards distributed by a GitHub matrix so slow visual tests execute concurrently on separate runners."
+    },
+    {
+      "capability": "Preserve one-worker WebGL stability per machine",
+      "importance": "high",
+      "coverage": {
+        "playwright-native-sharding": "full",
+        "github-actions-matrix-shards": "full",
+        "same-runner-multiworker": "none",
+        "vercel-preview-runtime": "none"
+      },
+      "decision": "Keep workers=1 within every shard, matching Playwright CI guidance and avoiding same-runner SwiftShader contention."
+    },
+    {
+      "capability": "Preserve diagnostics and failure isolation",
+      "importance": "high",
+      "coverage": {
+        "playwright-native-sharding": "full",
+        "github-actions-matrix-shards": "full",
+        "same-runner-multiworker": "partial",
+        "vercel-preview-runtime": "partial"
+      },
+      "decision": "Each shard uploads its own Playwright report, traces, screenshots and metrics so a single failure remains reproducible."
+    },
+    {
+      "capability": "Avoid a new external CI/browser vendor",
+      "importance": "medium",
+      "coverage": {
+        "playwright-native-sharding": "full",
+        "github-actions-matrix-shards": "full",
+        "same-runner-multiworker": "full",
+        "vercel-preview-runtime": "none"
+      },
+      "decision": "Stay on the already-adopted Playwright + GitHub Actions stack."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-native-sharding",
+      "github-actions-matrix-shards"
+    ],
+    "rationale": "Retain workers=1 for each Playwright process but distribute the suite across multiple GitHub-hosted runners using native sharding and a matrix. This targets the measured 9m40s browser bottleneck directly, preserves all existing tests and artifacts, and follows the upstream CI scaling path instead of adding a new service.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "vercel-preview-runtime",
+        "reason": "Vercel is a broader product but it solves preview delivery rather than browser-test execution; adopting it would not reduce the measured Playwright regression wall-clock time."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If sharding overhead outweighs gains for the small functional suite, keep functional tests in one shard and shard only visual viewport tests while retaining the same one-worker-per-runner rule."
+  }
+}

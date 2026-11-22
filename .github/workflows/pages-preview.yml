@@ -1,0 +1,99 @@
+name: Pages Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to build and deploy
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-preview
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Ensure main ref is available
+        run: git fetch origin main --no-tags
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Machine Reuse Gate for selected ref
+        run: npm run gate:reuse:ci
+        env:
+          REUSE_GATE_BASE_SHA: origin/main
+          REUSE_GATE_HEAD_SHA: HEAD
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle guard
+        run: node tests/ci/bundle-guard.mjs
+
+      - name: Preserve build even when Pages is unavailable
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-preview-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Refuse a broken repository-subpath deployment
+        shell: bash
+        run: |
+          if [ -n "${{ steps.pages.outputs.base_path }}" ]; then
+            {
+              echo "## Pages preview not deployed"
+              echo
+              echo "This Astro/YEIS build currently assumes root-relative runtime assets."
+              echo "GitHub Pages reports base_path=`${{ steps.pages.outputs.base_path }}`, so deploying it unchanged would create a broken preview."
+              echo "The validated dist artifact above remains available. Use a root/custom-domain Pages site, or add a separate base-path compatibility change before enabling deployment."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -269,3 +269,15 @@ This keeps astronomical names, descriptions and facts tied to the same pinned
 source/dictionaries as the universe model and avoids a second local alias map or
 generic i18n runtime.
 
+### Runtime translation at the host bridge
+
+Pinned YEIS Solar System data intentionally stores Turkish source keys such as
+`Dünya`, `Güneş` and `Ay`. Its i18n module also explicitly requires
+`_()` to run at runtime rather than module top level.
+
+The R3F bridge therefore translates static planet and moon names while mapping
+YEIS `BodyData` into Personal Universe definitions. This keeps the vendored
+astronomical source untouched, reuses the pinned English dictionary, and avoids
+a second alias table. A Playwright regression covers the concrete Earth path:
+search result, approach HUD and reloaded body deep link must all remain English.
+
