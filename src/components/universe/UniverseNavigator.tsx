@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GalaxyMarker } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
   loadUniverseNavigation,
+  loadUniversePlaces,
+  navigationSectionsForResults,
   type UniverseNavigationDestination,
+  type UniverseNavigationSection,
 } from "../../lib/universe/yeis/navigation";
 
 export function UniverseNavigator({
   open,
   markers,
   placements,
+  activeDestinationId,
   onClose,
   onNavigate,
   onLocate,
@@ -17,6 +21,7 @@ export function UniverseNavigator({
   open: boolean;
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
+  activeDestinationId?: string | null;
   onClose: () => void;
   onNavigate: (
     destination: UniverseNavigationDestination,
@@ -26,10 +31,16 @@ export function UniverseNavigator({
   ) => Promise<void> | void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultRefs = useRef(new Map<string, HTMLDivElement>());
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<UniverseNavigationDestination[]>([]);
+  const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+
+  const results = useMemo(
+    () => sections.flatMap((section) => section.destinations),
+    [sections],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -43,6 +54,7 @@ export function UniverseNavigator({
     return () => {
       delete document.documentElement.dataset.universeNavigator;
       delete document.documentElement.dataset.universeNavigatorResults;
+      delete document.documentElement.dataset.universeNavigatorMode;
     };
   }, [open]);
 
@@ -50,21 +62,34 @@ export function UniverseNavigator({
     if (!open) return;
     let cancelled = false;
     setStatus("loading");
+    const trimmed = query.trim();
+    document.documentElement.dataset.universeNavigatorMode = trimmed
+      ? "search"
+      : "places";
 
-    void loadUniverseNavigation(query, placements, markers)
+    const request = trimmed
+      ? loadUniverseNavigation(trimmed, placements, markers).then(
+          navigationSectionsForResults,
+        )
+      : loadUniversePlaces(placements, markers);
+
+    void request
       .then((next) => {
         if (cancelled) return;
-        setResults(next);
+        setSections(next);
         setActiveIndex(0);
         setStatus("idle");
-        document.documentElement.dataset.universeNavigatorResults = String(
-          next.length,
+        const count = next.reduce(
+          (sum, section) => sum + section.destinations.length,
+          0,
         );
+        document.documentElement.dataset.universeNavigatorResults =
+          String(count);
       })
       .catch((error) => {
         if (cancelled) return;
-        console.error("[UNIVERSE-NAV] search failed", error);
-        setResults([]);
+        console.error("[UNIVERSE-NAV] navigator index failed", error);
+        setSections([]);
         setStatus("error");
         document.documentElement.dataset.universeNavigatorResults = "error";
       });
@@ -73,6 +98,15 @@ export function UniverseNavigator({
       cancelled = true;
     };
   }, [markers, open, placements, query]);
+
+  useEffect(() => {
+    const active = results[activeIndex];
+    if (!active) return;
+    resultRefs.current.get(active.id)?.scrollIntoView({
+      block: "nearest",
+      behavior: "instant",
+    });
+  }, [activeIndex, results]);
 
   if (!open) return null;
 
@@ -83,6 +117,8 @@ export function UniverseNavigator({
   const locate = (destination: UniverseNavigationDestination) => {
     void Promise.resolve(onLocate(destination)).then(onClose);
   };
+
+  let flatIndex = -1;
 
   return (
     <div
@@ -139,18 +175,16 @@ export function UniverseNavigator({
                 else activate(result);
               }
             }}
-            placeholder="Search projects, stars, galaxies, black holes, landmarks…"
+            placeholder="Search personal signals, planets, stars, landmarks, galaxies…"
             aria-label="Search universe"
+            autoComplete="off"
+            spellCheck={false}
           />
           <kbd>CTRL K</kbd>
         </div>
 
         <div className="navigator-section-label">
-          <span>
-            {query.trim()
-              ? "SEARCH RESULTS"
-              : "PERSONAL SIGNALS + FEATURED PLACES"}
-          </span>
+          <span>{query.trim() ? "SEARCH RESULTS" : "PLACES / DESTINATIONS"}</span>
           <small>
             {status === "loading"
               ? "SCANNING…"
@@ -164,6 +198,7 @@ export function UniverseNavigator({
               YEIS navigation index unavailable.
             </div>
           )}
+
           {status !== "error" &&
             status !== "loading" &&
             results.length === 0 && (
@@ -171,42 +206,72 @@ export function UniverseNavigator({
                 No destination matched this signal.
               </div>
             )}
-          {results.map((result, index) => (
-            <div
-              key={result.id}
-              className={
-                "navigator-result-row" +
-                (index === activeIndex ? " is-active" : "")
-              }
-              role="option"
-              aria-selected={index === activeIndex}
-              onPointerEnter={() => setActiveIndex(index)}
+
+          {sections.map((section) => (
+            <section
+              className="navigator-result-group"
+              key={section.id}
+              aria-label={section.title}
             >
-              <button
-                type="button"
-                className="navigator-result-open"
-                onClick={() => activate(result)}
-              >
-                <span className={"navigator-kind kind-" + result.kind}>
-                  {result.kind}
-                </span>
-                <span className="navigator-result-main">
-                  <strong>{result.title}</strong>
-                  <small>{result.detail}</small>
-                </span>
-                <span className="navigator-open">
-                  {result.target.kind === "star" ? "OPEN →" : "TRAVEL →"}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="navigator-locate"
-                onClick={() => locate(result)}
-                aria-label={"Locate " + result.title + " in galaxy"}
-              >
-                LOCATE
-              </button>
-            </div>
+              <header className="navigator-result-group-title">
+                <span>{section.title}</span>
+                <small>{section.destinations.length}</small>
+              </header>
+
+              {section.destinations.map((result) => {
+                flatIndex += 1;
+                const index = flatIndex;
+                const isKeyboardActive = index === activeIndex;
+                const isCurrent = result.id === activeDestinationId;
+                const spatial =
+                  result.target.kind === "galaxy" ||
+                  result.target.kind === "landmark";
+
+                return (
+                  <div
+                    key={section.id + ":" + result.id}
+                    ref={(node) => {
+                      if (node) resultRefs.current.set(result.id, node);
+                      else resultRefs.current.delete(result.id);
+                    }}
+                    className={
+                      "navigator-result-row" +
+                      (isKeyboardActive ? " is-active" : "") +
+                      (isCurrent ? " is-current" : "")
+                    }
+                    role="option"
+                    aria-selected={isKeyboardActive}
+                    aria-current={isCurrent ? "location" : undefined}
+                    onPointerEnter={() => setActiveIndex(index)}
+                  >
+                    <button
+                      type="button"
+                      className="navigator-result-open"
+                      onClick={() => activate(result)}
+                    >
+                      <span className={"navigator-kind kind-" + result.kind}>
+                        {result.kind}
+                      </span>
+                      <span className="navigator-result-main">
+                        <strong>{result.title}</strong>
+                        <small>{result.detail}</small>
+                      </span>
+                      <span className="navigator-open">
+                        {isCurrent ? "ACTIVE" : spatial ? "TRAVEL →" : "OPEN →"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="navigator-locate"
+                      onClick={() => locate(result)}
+                      aria-label={"Locate " + result.title + " in galaxy"}
+                    >
+                      LOCATE
+                    </button>
+                  </div>
+                );
+              })}
+            </section>
           ))}
         </div>
 
