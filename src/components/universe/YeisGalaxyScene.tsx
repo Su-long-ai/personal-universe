@@ -671,7 +671,80 @@ export function YeisGalaxyScene({
               request.target.positionPc[2],
             )
             .sub(state.cameraPc);
-        } else if (request.target.kind === "galaxy") {
+        } else if (request.target.kind === "body") {
+          const targetPc = runtime.universe.starPositionPc(
+            request.target.starId,
+          );
+          navigationDirection.copy(targetPc).sub(state.cameraPc);
+        } else if (request.target.kind === "blackhole") {
+          const blackHole = runtime.universe.blackHole(request.target.id);
+          if (blackHole) {
+            const targetPc = runtime.universe.starPositionPc(
+              blackHole.systemStarId,
+            );
+            navigationDirection.copy(targetPc).sub(state.cameraPc);
+          } else {
+            navigationDirection.set(0, 0, 0);
+          }
+        } else if (request.target.kind === "body") {
+        const starId = request.target.starId;
+        if (runtime.universe.current.starId !== starId) {
+          const deltaPc = runtime.universe.switchTo(
+            starId,
+            2451545.0,
+            performance.now() / 1000,
+          );
+          state.controller.shiftFrame(deltaPc, runtime.universe.star);
+        }
+        const body = runtime.universe.get(request.target.bodyId);
+        if (body) {
+          state.controller.goTo(body, runtime.universe.star.position);
+          document.documentElement.dataset.universeTraveling = targetKey;
+          console.info(
+            "[YEIS-NATIVE-BODY] " +
+              request.title +
+              " -> " +
+              targetKey,
+          );
+        } else {
+          const targetPc = runtime.universe.starPositionPc(starId);
+          runtime.universe.toParsecs(
+            state.controller.position,
+            state.cameraPc,
+          );
+          navigationDirection.copy(targetPc).sub(state.cameraPc);
+          state.controller.centerOnDirection(navigationDirection);
+          console.warn(
+            "[YEIS-NATIVE-BODY] body unavailable; centered host " +
+              targetKey,
+          );
+        }
+      } else if (request.target.kind === "blackhole") {
+        const blackHole = runtime.universe.blackHole(request.target.id);
+        if (blackHole) {
+          if (
+            runtime.universe.current.starId !== blackHole.systemStarId
+          ) {
+            const deltaPc = runtime.universe.switchTo(
+              blackHole.systemStarId,
+              2451545.0,
+              performance.now() / 1000,
+            );
+            state.controller.shiftFrame(deltaPc, runtime.universe.star);
+          }
+          const body = runtime.universe.get(blackHole.entry.bodyId);
+          if (body) {
+            state.controller.goTo(body, runtime.universe.star.position);
+            document.documentElement.dataset.universeTraveling = targetKey;
+            console.info(
+              "[YEIS-NATIVE-BLACKHOLE] " +
+                request.title +
+                " -> " +
+                targetKey,
+            );
+          }
+        }
+      } else if (request.target.kind === "galaxy") {
           runtime.universe.galaxyRelative(
             request.target.index,
             state.controller.position,
@@ -1084,6 +1157,10 @@ function cameraTargetKey(
 ): string {
   if (target.kind === "star") return target.nativeId;
   if (target.kind === "point") return "point:" + target.id;
+  if (target.kind === "body") {
+    return "body:" + target.starId + "/" + target.bodyId;
+  }
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
 }
 
