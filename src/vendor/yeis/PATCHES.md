@@ -11,8 +11,8 @@ source boundary.
 
 ## Host patches
 
-The vendored code is kept structurally close to upstream. There are three
-intentional Personal Universe adaptations:
+The vendored code is kept structurally close to upstream. There are six
+intentional Personal Universe host adaptations:
 
 1. `core/Universe.ts`
    - Adds `registerExtraSystem(system)`.
@@ -30,8 +30,10 @@ intentional Personal Universe adaptations:
      model closure.
    - This avoids importing YEIS product UI/locales into Personal Universe.
 
-No model, orbital, catalogue, procedural-generation, galaxy, black-hole, or
-stellar algorithms were rewritten in this migration.
+No model, orbital, catalogue, procedural-generation, galaxy, black-hole,
+landmark-navigation, picking, or stellar algorithms were rewritten in this
+migration. Product Search/Places/Journey orchestration lives outside the
+vendored tree in `src/lib/universe/yeis/navigation.ts` and React host code.
 
 ## Data
 
