@@ -33,6 +33,29 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Runtime smoke
+        shell: bash
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4321 >/tmp/personal-universe-preview.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4321/ >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "No headless Chrome-compatible browser found on runner" >&2
+            exit 1
+          fi
+
+          "$CHROME"             --headless=new             --no-sandbox             --disable-gpu             --disable-background-networking             --virtual-time-budget=12000             --dump-dom             http://127.0.0.1:4321/             > /tmp/personal-universe-dom.html
+
+          grep -q 'data-universe-engine="yeis"' /tmp/personal-universe-dom.html
+          grep -q 'data-yeis-native-galaxy="ready"' /tmp/personal-universe-dom.html
+          grep -q 'data-personal-signals="1"' /tmp/personal-universe-dom.html
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
