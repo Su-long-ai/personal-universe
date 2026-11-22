@@ -855,6 +855,9 @@ export default function UniverseApp({
         setPhase(restorableWorldPhase);
         document.documentElement.dataset.universeNavigationPhase =
           restorableWorldPhase;
+        replaceNavigationUrl({
+          phase: restorableWorldPhase,
+        });
       })
       .catch((error) => {
         if (cancelled) return;
