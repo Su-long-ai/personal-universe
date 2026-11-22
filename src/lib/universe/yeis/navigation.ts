@@ -576,8 +576,6 @@ export async function navigationMarker(
     );
   }
 
-  const { loadYeisCore } = await import("./index");
-  const runtime = await loadYeisCore();
   const targetMarkerId =
     destination.markerId ??
     (destination.target.kind === "body"
@@ -585,13 +583,16 @@ export async function navigationMarker(
       : destination.target.kind === "content"
         ? destination.target.markerId
         : undefined);
-  return (
+  const existingMarker =
     (targetMarkerId
       ? markers.find((marker) => marker.id === targetMarkerId)
       : undefined) ??
-    markers.find((marker) => marker.nativeId === nativeId) ??
-    markerForYeisStarId(runtime, markers, nativeId)
-  );
+    markers.find((marker) => marker.nativeId === nativeId);
+  if (existingMarker) return existingMarker;
+
+  const { loadYeisCore } = await import("./index");
+  const runtime = await loadYeisCore();
+  return markerForYeisStarId(runtime, markers, nativeId);
 }
 
 export function navigationCameraTarget(
