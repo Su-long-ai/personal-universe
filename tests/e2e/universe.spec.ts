@@ -248,6 +248,10 @@ test("black-hole Search preserves exact native travel identity", async ({
   const url = new URL(page.url());
   expect(url.searchParams.get("destination")).toMatch(/^blackhole:/);
   expect(url.searchParams.get("phase")).toBeNull();
+  await expect(page.locator(".navigation-failure-notice")).toHaveCount(0);
+  expect(
+    await html.getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
 
   await runtime.assertClean(testInfo);
 });
