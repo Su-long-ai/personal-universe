@@ -1,79 +1,56 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { Stars, useTexture } from "@react-three/drei";
-import { bakePlanet } from "procedural-planets";
-import * as THREE from "three";
-import {
-  PLANET_ANCHOR,
-  type PlanetArchetype,
-  type PlanetDefinition,
-  type QualityMode,
-} from "../../lib/universe/types";
-import { hashSeed } from "../../lib/universe/generation";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { Planet } from "procedural-planets";
+import { AdditiveBlending, Color, Group, Vector3 } from "three";
+import { PLANET_ANCHOR, type PlanetDefinition, type QualityMode } from "../../lib/universe/types";
+import { DeepSky } from "./DeepSky";
+
+const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
+const LIVE_PLANET_RADIUS = 2000;
+const LIVE_WORLD_RADIUS = 3.65;
+const FALLBACK_WORLD_RADIUS = 3.48;
+
+function hashSeed(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
 
 function presetFor(planet: PlanetDefinition) {
-  switch (planet.archetype) {
-    case "ocean": return "ocean";
-    case "temperate": return "terran";
-    case "desert": return "desert";
-    case "ice":
-    case "frozen": return "ice";
-    case "lava": return "lava";
-    case "volcanic": return "ashen";
-    case "gas_giant": return planet.hasRings ? "ringed" : "gasGiant";
-    case "ice_giant": return "iceGiant";
-    case "alien": return "alien";
-    case "rocky":
-    default: return "mars";
+  if (planet.id === "hero-aurelia") return "ocean" as const;
+  const palette = ["terran", "desert", "ice", "moon", "lava", "ocean", "mars"] as const;
+  return palette[hashSeed(planet.id) % palette.length];
+}
+
+function liveQuality(quality: QualityMode) {
+  if (quality === "low") {
+    return {
+      cloudQuality: 32,
+      cloudResolution: 0.35,
+      chunkRes: 16,
+      maxDepth: 4,
+      splitFactor: 2.1,
+    } as const;
   }
-}
-
-function fallbackColor(archetype: PlanetArchetype) {
-  switch (archetype) {
-    case "ocean": return "#2d79a6";
-    case "temperate": return "#71896d";
-    case "desert": return "#b58b61";
-    case "ice":
-    case "frozen": return "#bad6df";
-    case "lava": return "#bc4a28";
-    case "volcanic": return "#725045";
-    case "gas_giant": return "#c0a07f";
-    case "ice_giant": return "#77abc8";
-    case "alien": return "#8571b0";
-    default: return "#77736f";
+  if (quality === "high") {
+    return {
+      cloudQuality: 72,
+      cloudResolution: 0.6,
+      chunkRes: 32,
+      maxDepth: 6,
+      splitFactor: 2.7,
+    } as const;
   }
-}
-
-function DeepSky() {
-  const texture = useTexture(`${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-
-  return (
-    <mesh rotation={[0.18, -0.72, -0.1]} frustumCulled={false}>
-      <sphereGeometry args={[92, 64, 64]} />
-      <meshBasicMaterial
-        map={texture}
-        side={THREE.BackSide}
-        color="#26354a"
-        toneMapped={false}
-        transparent
-        opacity={0.48}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-}
-
-function disposeBaked(root: THREE.Object3D) {
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.geometry?.dispose();
-    const materials = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-    for (const material of materials) material?.dispose();
-  });
+  return {
+    cloudQuality: 56,
+    cloudResolution: 0.5,
+    chunkRes: 24,
+    maxDepth: 5,
+    splitFactor: 2.4,
+  } as const;
 }
 
 export function PlanetScene({
@@ -83,98 +60,111 @@ export function PlanetScene({
   planet: PlanetDefinition;
   quality: QualityMode;
 }) {
-  const { gl } = useThree();
-  const [baked, setBaked] = useState<THREE.Group | null>(null);
-  const fallback = useRef<THREE.Mesh>(null);
-  const radius = 2000;
-
-  const bakeOptions = useMemo(
-    () => ({
-      preset: presetFor(planet),
-      seed: hashSeed(planet.seed),
-      radius,
-      textureSize: quality === "low" ? 512 : quality === "high" ? 1024 : 768,
-    }),
-    [planet, quality],
+  const planetRef = useRef<Group>(null);
+  const preset = presetFor(planet);
+  const seed = useMemo(() => hashSeed(planet.id) || 1, [planet.id]);
+  const sunDirection = useMemo(
+    () =>
+      new Vector3(
+        STAR_POSITION[0] - PLANET_ANCHOR[0],
+        STAR_POSITION[1] - PLANET_ANCHOR[1],
+        STAR_POSITION[2] - PLANET_ANCHOR[2],
+      ).normalize(),
+    [],
+  );
+  const livePlanet = useMemo(
+    () =>
+      new Planet({
+        preset,
+        seed,
+        radius: LIVE_PLANET_RADIUS,
+        lightSource: sunDirection,
+        name: planet.name,
+        ...liveQuality(quality),
+      }),
+    [planet.name, preset, quality, seed, sunDirection],
   );
 
   useEffect(() => {
-    let cancelled = false;
-    let created: THREE.Group | null = null;
-
-    void bakePlanet(gl, bakeOptions).then((group) => {
-      created = group;
-      if (cancelled) {
-        disposeBaked(group);
-        return;
-      }
-      group.position.set(...PLANET_ANCHOR);
-      group.scale.setScalar(3.65 / radius);
-      group.rotation.set(0.08, -0.65, -0.16);
-      group.name = planet.name;
-      setBaked(group);
-    }).catch((error) => {
-      console.warn("[planet-bake]", planet.name, error);
-    });
-
+    document.documentElement.dataset.universeWorldRenderer =
+      "procedural-planets-live";
     return () => {
-      cancelled = true;
-      setBaked(null);
-      if (created) disposeBaked(created);
+      if (
+        document.documentElement.dataset.universeWorldRenderer ===
+        "procedural-planets-live"
+      ) {
+        delete document.documentElement.dataset.universeWorldRenderer;
+      }
+      livePlanet.dispose();
     };
-  }, [bakeOptions, gl, planet.name]);
+  }, [livePlanet]);
 
-  useFrame((_, delta) => {
-    if (baked) baked.rotation.y += delta * 0.014;
-    if (fallback.current) fallback.current.rotation.y += delta * 0.014;
+  useFrame((state, delta) => {
+    if (planetRef.current) {
+      planetRef.current.rotation.y = state.clock.elapsedTime * 0.015;
+    }
+    livePlanet.rotation.y += delta * 0.006;
   });
+
+  const fallback = new Color(planet.accent).multiplyScalar(0.46);
 
   return (
     <>
-      <color attach="background" args={["#000106"]} />
-      <DeepSky />
-      <Stars
-        radius={78}
-        depth={30}
-        count={quality === "low" ? 600 : 1400}
-        factor={1.6}
-        saturation={0.16}
-        fade
-        speed={0.08}
-      />
-
-      <ambientLight intensity={0.34} />
+      <DeepSky quality={quality} />
+      <ambientLight intensity={0.16} color="#7a91bd" />
       <directionalLight
-        position={[-8, 5, 8]}
-        intensity={3.8}
-        color="#ffe0aa"
+        position={STAR_POSITION}
+        intensity={3.2}
+        color="#ffe3b3"
       />
 
-      <group position={[-12.5, 5.5, -18]}>
+      <group
+        ref={planetRef}
+        position={PLANET_ANCHOR}
+        rotation={[0.08, -0.34, 0.03]}
+      >
+        <primitive
+          object={livePlanet}
+          scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
+        />
         <mesh>
-          <sphereGeometry args={[1.25, 48, 48]} />
-          <meshBasicMaterial toneMapped={false}>
-            <color attach="color" args={[5.0, 3.5, 1.65]} />
-          </meshBasicMaterial>
-        </mesh>
-      </group>
-
-      {baked ? (
-        <primitive object={baked} />
-      ) : (
-        <mesh
-          ref={fallback}
-          position={PLANET_ANCHOR}
-          scale={3.65}
-        >
-          <sphereGeometry args={[1, 64, 64]} />
+          <sphereGeometry args={[FALLBACK_WORLD_RADIUS, 64, 64]} />
           <meshStandardMaterial
-            color={fallbackColor(planet.archetype)}
-            roughness={0.76}
+            color={fallback}
+            roughness={0.82}
             metalness={0.02}
           />
         </mesh>
-      )}
+        <mesh scale={1.075}>
+          <sphereGeometry args={[FALLBACK_WORLD_RADIUS, 48, 48]} />
+          <meshBasicMaterial
+            color={planet.accent}
+            transparent
+            opacity={0.035}
+            blending={AdditiveBlending}
+            depthWrite={false}
+            side={2}
+          />
+        </mesh>
+      </group>
+
+      <group position={STAR_POSITION}>
+        <pointLight intensity={95} distance={110} color="#ffd6a1" />
+        <mesh>
+          <sphereGeometry args={[0.55, 24, 24]} />
+          <meshBasicMaterial color="#ffe2b8" />
+        </mesh>
+        <mesh scale={2.6}>
+          <sphereGeometry args={[0.55, 24, 24]} />
+          <meshBasicMaterial
+            color="#ffc47a"
+            transparent
+            opacity={0.1}
+            blending={AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
     </>
   );
 }
