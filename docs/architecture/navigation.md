@@ -249,6 +249,32 @@ the shot tolerances before the root publishes
 captured. This prevents a transition command from being mistaken for a settled
 camera simply because camera-controls has already stored its destination.
 
+## Manual product-world camera takeover
+
+Product-world exploration reuses the same `camera-controls` instance that owns
+cinematic shots. No `OrbitControls`, second camera, or parallel navigation
+authority is mounted.
+
+Manual input is intentionally available only after the visitor reaches a stable
+`system`, `orbit`, or `surface` phase:
+
+- left-drag rotates around the current destination target;
+- mouse wheel / middle drag dollies within phase-specific distance bounds;
+- one-finger touch rotates;
+- two-finger touch dollies and rotates;
+- right drag and truck/pan remain disabled, so manual exploration cannot drift
+  the authoritative destination target away from the selected world/system.
+
+`approach`, `atmosphere`, and `returning` remain cinematic transitions.
+When manual control starts, the current shot is marked overridden, settled
+evidence is cleared, and the root publishes
+`data-universe-camera-mode="manual"`. The current destination, phase and deep
+link stay unchanged.
+
+If a Guided Journey is active, direct camera takeover stops that Journey
+immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
+intent wins, and orchestration must not fight the visitor for the same camera.
+
 ## Canvas picking
 
 Both galaxy-scale and system-scale canvas interactions route back into the
@@ -411,8 +437,9 @@ independent immutable task approvals, including
 `PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
 `NAVIGATION-FAILURE-RECOVERY-001`,
 `JOURNEY-SETTLED-ORCHESTRATION-001`,
-`NATIVE-BODY-ACCEPTANCE-001`, and
-`NAVIGATION-ENTRY-COVERAGE-001`.
+`NATIVE-BODY-ACCEPTANCE-001`,
+`NAVIGATION-ENTRY-COVERAGE-001`, and
+`WORLD-CAMERA-MANUAL-OVERRIDE-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -440,6 +467,8 @@ against a production build:
 - mobile navigator/Journey layout;
 - Journey interruption, settled-before-dwell auto advance, visible completion,
   and reduced-motion manual mode;
+- stable System/Orbit/Surface manual camera takeover preserves destination and
+  deep-link identity while interrupting an active Journey;
 - native galaxy camera persistence after returning from a product scene.
 
 ### Cloud acceptance evidence — 2026-11-23
