@@ -1,0 +1,177 @@
+{
+  "schema": 2,
+  "task_id": "JOURNEY-SETTLED-ORCHESTRATION-001",
+  "title": "Advance Guided Journeys only after the current destination has actually settled",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse pinned-MIT TourPlayer arrival-before-dwell semantics and existing camera-controls settlement so Journey auto-advance never starts from an intermediate Approach/System frame"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Personal Universe already has a deliberately small Journey orchestrator over the shared UniverseNavigationDestination model. Its auto-advance effect currently starts a 6.5s dwell as soon as React phase becomes system/approach/orbit/surface and navigationStatus is not traveling, which is not equivalent to physical camera arrival. Pinned MIT YEIS TourPlayer explicitly keeps a flying/dwell distinction and only advances after narration is done, camera autopilot has actually arrived, and dwell has elapsed. Reuse that semantic primitive without porting the legacy TourPlayer UI/state machine: extend the existing camera-controls settled signal to System/Surface, track the currently settled product phase in UniverseApp, clear it on each destination change, and start Journey dwell only when the current phase is genuinely settled. Reduced-motion remains manual. Search/Places/Canvas/deep-link interruption continues through the same destination executor.",
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "finding": "Pinned MIT TourPlayer models flying versus dwell and advances only when narration is complete, camera autopilot has arrived, and dwell has elapsed; it also treats competing camera navigation as interruption."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/TourPanel.ts",
+      "finding": "Pinned MIT TourPanel exposes Prev, Next, Pause and Stop independently of navigation internals, supporting Personal Universe's existing lightweight controls without copying the legacy UI."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The already-installed camera-controls API exposes current versus end position/target values, which Personal Universe now uses for real settled acceptance rather than merely observing a commanded destination."
+    },
+    {
+      "url": "https://react.dev/reference/react",
+      "finding": "Existing React state/effect primitives are sufficient to gate a single dwell timer on current settled phase; a second workflow/state-machine runtime is unnecessary."
+    },
+    {
+      "url": "https://stately.ai/docs/xstate",
+      "finding": "XState remains a mature state-machine/actor option, but importing it for the small Journey phase/settled/dwell surface would duplicate orchestration authority already held by UniverseApp."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse pinned MIT YEIS TourPlayer's arrival-before-dwell and interruption semantics, while retaining Personal Universe's own small product UI and shared destination model."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "xstate-v5"
+      ],
+      "source_refs": [
+        4
+      ],
+      "conclusion": "XState could model the sequence but would add an unnecessary second orchestration runtime for a Journey state already represented by a few React fields."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse the existing camera-controls instance and its true current-position settlement as the product-world arrival authority."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Use existing React state/effects for a single settled-phase latch and cancellable dwell timer; no new tour component or timer framework is needed."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-tourplayer-settled-semantics",
+      "name": "Pinned MIT YEIS TourPlayer arrival-before-dwell semantics",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned src/core/TourPlayer.ts and src/ui/TourPanel.ts",
+      "license": "MIT at e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "partial",
+      "reason": "Its sequencing and interruption semantics are the right product primitive, but Personal Universe intentionally does not need narration/cues/time overrides or the legacy TourPanel DOM implementation.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-journey-settlement",
+      "name": "Existing camera-controls true settled signal",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Current CinematicCamera over camera-controls v3.1.2",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already owns product-world camera motion and can expose System/Surface settled states with the same position/target acceptance used for Approach/Orbit.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "xstate-journey-machine",
+      "name": "XState Journey machine",
+      "level": "framework_engine",
+      "registry_id": "xstate-v5",
+      "source": "XState v5",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Adds a second actor/state-machine runtime and migration cost without replacing the destination executor, camera authority or existing Journey controls.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-local-journey-orchestration",
+      "name": "Existing React Journey orchestration",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "UniverseApp Journey state/effects",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "A settled-phase latch and existing cancellable effect timer are sufficient to reproduce the useful TourPlayer sequencing semantics without another navigation authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-tourplayer-settled-semantics",
+      "camera-controls-journey-settlement",
+      "react-local-journey-orchestration"
+    ],
+    "rationale": "Keep the current shared destination model and lightweight Journey UI. Reuse pinned MIT TourPlayer's settled-before-dwell sequencing concept, existing camera-controls as the physical arrival signal, and React for the small latch/timer glue. System and Surface become real settled phases through the same camera authority. Reduced-motion remains manual and any competing destination navigation still interrupts the Journey.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If Journey later gains narration, timed visual cues, time-rate overrides or many concurrent actors, reassess a larger TourPlayer/XState-style subsystem then; do not introduce it for the current destination-only journeys."
+  }
+}
