@@ -182,12 +182,21 @@ When a destination resolves to a product `PlanetDefinition`, the app enters
 existing lightweight planet fallback immediately.
 
 The adopted `procedural-planets` `bakePlanet()` representation remains the
-ordinary-world visual layer, but its own documentation notes that baking blocks
-the GPU and should be treated as loading work. `PlanetScene` therefore lets two
-browser frames commit first, then starts the deterministic bake in an idle slot
-(with a bounded fallback scheduler for browsers without `requestIdleCallback`).
-Auto quality uses a 512px bake, low uses 256px, and explicit high quality retains
-1024px.
+hardware-world refinement layer, but its own documentation notes that baking
+blocks the GPU and should be treated as loading work. `PlanetScene` therefore
+renders the lightweight world first, leaves an intentional 1.8s interaction
+window in which quick travel/return can cancel the refinement entirely, and only
+then starts the deterministic bake in an idle slot. Auto quality uses a 512px
+bake and explicit high quality retains 1024px.
+
+Software WebGL renderers (SwiftShader/llvmpipe/softpipe) and explicit low-quality
+mode keep the interactive fallback instead of invoking `bakePlanet()`. Cloud
+traces showed software baking could block the page for roughly 20+ seconds,
+including preventing an in-flight navigation/reload from being aborted. This is
+a renderer capability fallback, not a different navigation or world identity.
+The root element exposes `data-planet-render-mode` for runtime evidence
+(`fallback-software-renderer`, `fallback-low-quality`, `fallback-warmup`,
+`baking`, `baked`, or `fallback-error`).
 
 This is a rendering/lifecycle optimization only. It does not change destination
 identity, Search/Places semantics, the native-body fallback rule, or the
