@@ -65,6 +65,29 @@ function DeepSky() {
   );
 }
 
+function rendererLabel(gl: THREE.WebGLRenderer) {
+  const context = gl.getContext();
+  try {
+    const debug = context.getExtension("WEBGL_debug_renderer_info");
+    if (debug) {
+      return String(
+        context.getParameter(debug.UNMASKED_RENDERER_WEBGL) ?? "",
+      );
+    }
+  } catch {
+    // Some privacy-hardened browsers intentionally deny unmasked renderer info.
+  }
+  return String(context.getParameter(context.RENDERER) ?? "");
+}
+
+function shouldKeepFallback(gl: THREE.WebGLRenderer, quality: QualityMode) {
+  if (quality === "low") return "low-quality";
+  const renderer = rendererLabel(gl);
+  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(renderer)
+    ? "software-renderer"
+    : null;
+}
+
 function disposeBaked(root: THREE.Object3D) {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -113,11 +136,29 @@ export function PlanetScene({
     let secondFrame = 0;
     let idleHandle: number | null = null;
     let fallbackTimer: number | null = null;
+    let warmupTimer: number | null = null;
     const idleWindow = window as IdleWindow;
+    const fallbackReason = shouldKeepFallback(gl, quality);
+
+    if (fallbackReason) {
+      document.documentElement.dataset.planetRenderMode =
+        "fallback-" + fallbackReason;
+      return () => {
+        if (
+          document.documentElement.dataset.planetRenderMode ===
+          "fallback-" + fallbackReason
+        ) {
+          delete document.documentElement.dataset.planetRenderMode;
+        }
+      };
+    }
+
+    document.documentElement.dataset.planetRenderMode = "fallback-warmup";
 
     const bake = () => {
       if (cancelled) return;
 
+      document.documentElement.dataset.planetRenderMode = "baking";
       void bakePlanet(gl, bakeOptions).then((group) => {
         created = group;
         if (cancelled) {
@@ -129,25 +170,32 @@ export function PlanetScene({
         group.rotation.set(0.08, -0.65, -0.16);
         group.name = planet.name;
         setBaked(group);
+        document.documentElement.dataset.planetRenderMode = "baked";
       }).catch((error) => {
+        document.documentElement.dataset.planetRenderMode = "fallback-error";
         console.warn("[planet-bake]", planet.name, error);
       });
     };
 
     // bakePlanet is deliberately not started in the first arrival commit.
-    // ProceduralPlanets documents baking as GPU-blocking work. Two frames give
-    // the lightweight fallback, HUD and navigation contract a chance to paint;
-    // then an idle slot warms in the deterministic baked representation.
+    // ProceduralPlanets documents baking as GPU-blocking work. Two frames make
+    // the fallback/HUD observable, and a short warmup window lets quick travel
+    // or return actions cancel the expensive work entirely. Software WebGL
+    // renderers never bake: SwiftShader/llvmpipe can block navigation for tens
+    // of seconds, while the fallback remains a complete interactive world.
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
         if (cancelled) return;
-        if (idleWindow.requestIdleCallback) {
-          idleHandle = idleWindow.requestIdleCallback(() => bake(), {
-            timeout: 900,
-          });
-        } else {
-          fallbackTimer = window.setTimeout(bake, 120);
-        }
+        warmupTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          if (idleWindow.requestIdleCallback) {
+            idleHandle = idleWindow.requestIdleCallback(() => bake(), {
+              timeout: 1200,
+            });
+          } else {
+            fallbackTimer = window.setTimeout(bake, 120);
+          }
+        }, 1800);
       });
     });
 
@@ -158,11 +206,13 @@ export function PlanetScene({
       if (idleHandle !== null && idleWindow.cancelIdleCallback) {
         idleWindow.cancelIdleCallback(idleHandle);
       }
+      if (warmupTimer !== null) window.clearTimeout(warmupTimer);
       if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
       setBaked(null);
       if (created) disposeBaked(created);
+      delete document.documentElement.dataset.planetRenderMode;
     };
-  }, [bakeOptions, gl, planet.name]);
+  }, [bakeOptions, gl, planet.name, quality]);
 
   useFrame((_, delta) => {
     if (baked) baked.rotation.y += delta * 0.014;
