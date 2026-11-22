@@ -75,6 +75,21 @@ test("adding one star minimally remaps existing automatic signals", () => {
   assert.equal(moved.length, 1);
 });
 
+test("100 automatic signals stay fully placed without a fixed-capacity ceiling", () => {
+  const markers = Array.from({ length: 128 }, (_, index) => marker(index + 1));
+  const entries = Array.from({ length: 100 }, (_, index) =>
+    entry(`scale-${String(index).padStart(3, "0")}`),
+  );
+
+  const placements = placeUniverseContent(entries, markers);
+  const destinations = new Set(
+    placements.map((placement) => placement.nativeId),
+  );
+
+  assert.equal(placements.length, 100);
+  assert.equal(destinations.size, 100);
+});
+
 test("placementKey survives content file/id renames", () => {
   const markers = Array.from({ length: 32 }, (_, index) => marker(index + 1));
   const before = placeUniverseContent(
