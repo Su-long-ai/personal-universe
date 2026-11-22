@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
+import { UniverseNavigator } from "./UniverseNavigator";
 import type {
   GalaxyMarker,
   PlanetDefinition,
@@ -20,6 +21,7 @@ import {
   placementsForMarker,
   type UniverseContentEntry,
 } from "../../lib/universe/content";
+import type { UniverseNavigationDestination } from "../../lib/universe/yeis/navigation";
 import "./universe.css";
 
 function useReducedMotion() {
@@ -60,6 +62,7 @@ export default function UniverseApp({
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
+  const [navigatorOpen, setNavigatorOpen] = useState(false);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -80,6 +83,31 @@ export default function UniverseApp({
   const debugFreeze =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("freeze") === "1";
+
+  useEffect(() => {
+    if (activeEngine !== "yeis") {
+      setNavigatorOpen(false);
+      return;
+    }
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const editing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      const commandK =
+        (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k";
+      const slash = event.key === "/" && !editing;
+
+      if (!commandK && !slash) return;
+      event.preventDefault();
+      setNavigatorOpen(true);
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [activeEngine]);
 
   useEffect(() => {
     if (requestedEngine !== "yeis") {
@@ -263,6 +291,28 @@ export default function UniverseApp({
     [ambient, resolveMarker],
   );
 
+  const handleNavigateDestination = useCallback(
+    async (destination: UniverseNavigationDestination) => {
+      if (activeEngine !== "yeis") return;
+      const { navigationMarker } = await import(
+        "../../lib/universe/yeis/navigation"
+      );
+      const marker = await navigationMarker(destination, galaxy.markers);
+      handleSelectSystem(marker);
+      document.documentElement.dataset.universeNavigationTarget =
+        destination.nativeId;
+      console.info(
+        "[UNIVERSE-NAV] open " +
+          destination.kind +
+          ":" +
+          destination.title +
+          " -> " +
+          destination.nativeId,
+      );
+    },
+    [activeEngine, galaxy.markers, handleSelectSystem],
+  );
+
   const handleSelectPlanet = useCallback(
     (planet: PlanetDefinition) => {
       setSelectedPlanet(planet);
@@ -382,7 +432,17 @@ export default function UniverseApp({
         }}
         quality={quality}
         onQualityChange={setQuality}
+        onOpenNavigator={() => setNavigatorOpen(true)}
+        navigatorAvailable={activeEngine === "yeis"}
         onReturn={handleReturn}
+      />
+
+      <UniverseNavigator
+        open={navigatorOpen && activeEngine === "yeis"}
+        markers={galaxy.markers}
+        placements={contentPlacements}
+        onClose={() => setNavigatorOpen(false)}
+        onNavigate={handleNavigateDestination}
       />
 
       {phase === "galaxy" && (

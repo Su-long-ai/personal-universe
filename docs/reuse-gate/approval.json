@@ -1,38 +1,32 @@
 {
   "schema": 2,
-  "task_id": "UNIVERSE-CONTENT-LAYER-001",
-  "approved_at": "2026-11-22T14:58:23.001Z",
-  "baseline_commit": "5660447452fe135691708338944399f282b1da7c",
+  "task_id": "YEIS-NAVIGATION-RESTORE-001",
+  "approved_at": "2026-11-22T15:18:06.827Z",
+  "baseline_commit": "a276d164f6d0a76568a5e7ef4b34d73cccf5eecc",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "9f0d301eb5079dcf19c7dbb29103788840ecb1e90e21c51ea1dbc92553b97c03",
+  "record_sha256": "2ab2f9712bb8d0b91b4cf0ac5fb32d9c17a7a1b62c4dc319d93ef4adf98ca3df",
   "registry_path": "docs/reuse-gate/registry.json",
-  "registry_sha256": "62037cdb3b4caa287275dca7780249147b6cb3b5344e52e124d1c1dca97ee036",
+  "registry_sha256": "4041a3ab6511cb220709b4e9b6279b8e2f32b9b91dfbf55ae13bfae6378bd6a5",
   "scope": {
     "level": "subsystem",
-    "subject": "Personal content ingestion, validation, automatic galaxy placement, and world-level signal presentation"
+    "subject": "Universe search, curated places, personal-signal discovery, and direct system navigation"
   },
   "policy_change": false,
   "planned_files": [
-    "src/content.config.ts",
-    "src/content/portfolio/**",
-    "src/pages/index.astro",
-    "src/lib/universe/content/**",
-    "src/lib/universe/types.ts",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseNavigator.tsx",
     "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/YeisGalaxyScene.tsx",
-    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/UniverseHud.tsx",
     "src/components/universe/universe.css",
-    "docs/architecture/content-layer.md",
+    "docs/architecture/navigation.md",
     "README.md"
   ],
   "selected_ids": [
-    "astro-native-signals"
+    "yeis-react-navigation"
   ],
   "candidate_scores": {
-    "astro-native-signals": 57,
-    "keystatic-first": 47.5,
-    "tinacms-first": 45,
-    "decap-first": 42.5
+    "yeis-react-navigation": 55.5,
+    "cmdk-fuse": 49,
+    "pagefind-navigation": 41.5
   }
 }

@@ -404,6 +404,36 @@
       ],
       "notes": "Mature Git-based admin UI, but requires an admin surface and backend/auth configuration while still leaving frontend content modeling/placement to the site. Keep as an editor option, not the current foundation.",
       "last_checked": "2026-11-22"
+    },
+    {
+      "id": "cmdk-fuse-navigation",
+      "name": "cmdk + Fuse.js navigation/search stack",
+      "url": "https://github.com/pacocoursey/cmdk",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "command palette UI",
+        "keyboard result navigation",
+        "generic fuzzy search"
+      ],
+      "notes": "Candidate supplement only. It would duplicate YEIS astronomical indexes if used as the primary universe navigator.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "pagefind",
+      "name": "Pagefind",
+      "url": "https://pagefind.app/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "static-site full-text indexing",
+        "client-side document search",
+        "generated search index"
+      ],
+      "notes": "Useful later for article/document search, but not a replacement for YEIS spatial destination search.",
+      "last_checked": "2026-11-22"
     }
   ]
 }

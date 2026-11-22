@@ -1,44 +1,47 @@
 {
   "schema": 2,
-  "task_id": "UNIVERSE-CONTENT-LAYER-001",
-  "title": "Establish a typed portfolio content layer and deterministic universe-signal placement without adding a CMS runtime",
+  "task_id": "YEIS-NAVIGATION-RESTORE-001",
+  "title": "Restore the pinned MIT YEIS Search/Places navigation semantics inside the current React shell and add Personal Signals as destinations",
   "scope": {
     "level": "subsystem",
-    "subject": "Personal content ingestion, validation, automatic galaxy placement, and world-level signal presentation"
+    "subject": "Universe search, curated places, personal-signal discovery, and direct system navigation"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The universe backbone is now stable enough to accept real portfolio content. Astro 7 already includes build-time Content Collections with glob/file loaders, Zod 4 schemas and typed queries, so local content can be validated and serialized into the existing React island without another runtime. Keystatic, TinaCMS and Decap provide useful editing UIs, but each adds admin/config/auth or rendering integration that does not improve the visitor experience yet. Select Astro Content Collections as the canonical storage/query layer, keep Keystatic compatible as a later editor, and attach sparse personal content as deterministic signal overlays to existing YEIS stars/worlds rather than fabricating content for every procedural planet.",
+  "research_summary": "The pinned MIT YEIS commit already contains a complete search UI and a curated Places model. More importantly, the vendored core already retains StarCatalog.search(), Universe.searchForeignBodies(), searchBlackHoles(), searchLandmarks(), galaxy search, and CameraController autopilot primitives. Rebuilding a separate site-search/index stack would duplicate these domain APIs. The selected approach reuses the MIT navigation semantics and existing search methods, adds only a thin React command-style shell, and treats Personal Signals as another destination class. cmdk/Fuse/Pagefind remain optional supplements if scale later exceeds the built-in search behavior.",
   "policy_change": false,
   "planned_files": [
-    "src/content.config.ts",
-    "src/content/portfolio/**",
-    "src/pages/index.astro",
-    "src/lib/universe/content/**",
-    "src/lib/universe/types.ts",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseNavigator.tsx",
     "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/YeisGalaxyScene.tsx",
-    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/UniverseHud.tsx",
     "src/components/universe/universe.css",
-    "docs/architecture/content-layer.md",
+    "docs/architecture/navigation.md",
     "README.md"
   ],
   "sources": [
     {
-      "url": "https://docs.astro.build/en/guides/content-collections/",
-      "finding": "Astro 7 Content Collections provide built-in glob() and file() loaders, Zod schema validation, typed getCollection/getEntry queries, and support custom/remote loaders."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "Pinned MIT UI implements keyboard search across current/foreign bodies, catalogue stars, black holes, landmarks and galaxies, then navigates directly to the resolved astronomical target."
     },
     {
-      "url": "https://keystatic.com/docs/installation-astro",
-      "finding": "Keystatic integrates with Astro and can manage Markdown/Markdoc content files while examples query them through Astro Content Collections, making it a compatible optional editor later."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/places.ts",
+      "finding": "Pinned MIT UI provides grouped curated Places with typed destination kinds and stable refs instead of inventing a separate navigation database."
     },
     {
-      "url": "https://tina.io/docs/frameworks/astro",
-      "finding": "TinaCMS provides first-class Astro visual editing but existing-site setup adds Tina packages and commonly SSR adapter/island plumbing, broader than needed for the current static content substrate."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
+      "finding": "Vendored StarCatalog.search() already handles name/HIP/Gliese lookup and ranking."
     },
     {
-      "url": "https://decapcms.org/docs/",
-      "finding": "Decap CMS provides a Git-backed browser editor but requires an admin surface and backend/auth configuration while frontend content usage remains the site's responsibility."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
+      "finding": "Vendored Universe retains domain search helpers for foreign bodies, black holes and landmarks."
+    },
+    {
+      "url": "https://github.com/pacocoursey/cmdk",
+      "finding": "cmdk is a polished command-menu UI option, but adopting it now would add a UI dependency while YEIS already supplies the domain search semantics and the current shell needs only a small result surface."
+    },
+    {
+      "url": "https://pagefind.app/docs/",
+      "finding": "Pagefind is optimized for generated document/site full-text search, not direct astronomical destination navigation."
     }
   ],
   "search_ladder": [
@@ -46,16 +49,13 @@
       "level": "full_solution",
       "status": "found",
       "registry_refs": [
-        "keystatic",
-        "tinacms",
-        "decap-cms"
+        "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        1,
-        2,
-        3
+        0,
+        1
       ],
-      "conclusion": "Multiple full CMS/editor solutions exist, but their extra admin/runtime/auth surfaces solve authoring convenience rather than the immediate visitor-facing content substrate."
+      "conclusion": "The selected mother engine already had Search and Places in its MIT UI. Restore those semantics instead of building an unrelated index product."
     },
     {
       "level": "framework_engine",
@@ -66,102 +66,96 @@
       "source_refs": [
         0
       ],
-      "conclusion": "The existing Astro + React/R3F shell can receive serialized content as island props and render signals without a second frontend framework."
+      "conclusion": "The current React/R3F shell can host the search surface while leaving search/routing semantics in the YEIS adapter."
     },
     {
       "level": "subsystem",
       "status": "found",
       "registry_refs": [
-        "astro-content-collections",
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0
+        2,
+        3
       ],
-      "conclusion": "Astro Content Collections cover typed ingestion while the selected YEIS backbone already supplies stable astronomical anchors for deterministic content signals."
+      "conclusion": "StarCatalog and Universe already expose the actual search indexes needed by the navigator; reuse them directly."
     },
     {
       "level": "component_asset",
       "status": "found",
-      "registry_refs": [
-        "astro-content-collections"
-      ],
+      "registry_refs": [],
       "source_refs": [
-        0
+        4,
+        5
       ],
-      "conclusion": "Built-in glob loader, Zod schema and getCollection query primitives cover the individual loading/validation pieces without custom parsing packages."
+      "conclusion": "cmdk/Pagefind can provide generic UI/indexing, but neither improves the current domain search enough to justify replacing the built-in YEIS behavior."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "typed local content schema and build-time validation",
+      "capability": "search personal projects and experiences",
       "importance": "high",
       "coverage": {
-        "astro-native-signals": "full",
-        "keystatic-first": "full",
-        "tinacms-first": "full",
-        "decap-first": "partial"
+        "yeis-react-navigation": "full",
+        "cmdk-fuse": "full",
+        "pagefind-navigation": "full"
       },
-      "decision": "Use Astro's already-installed content layer as the canonical schema/query substrate."
+      "decision": "Personal signals are injected as a destination class above the same result model."
     },
     {
-      "capability": "zero additional visitor runtime and static deployment",
+      "capability": "search astronomical stars using existing universe data",
       "importance": "high",
       "coverage": {
-        "astro-native-signals": "full",
-        "keystatic-first": "partial",
-        "tinacms-first": "partial",
-        "decap-first": "partial"
+        "yeis-react-navigation": "full",
+        "cmdk-fuse": "partial",
+        "pagefind-navigation": "none"
       },
-      "decision": "The content substrate should compile to plain serialized island props; editing UI is not part of the visitor bundle."
+      "decision": "Use StarCatalog.search() directly; do not build another star index."
     },
     {
-      "capability": "future browser editing without migration",
+      "capability": "curated browseable places when query is empty",
+      "importance": "high",
+      "coverage": {
+        "yeis-react-navigation": "full",
+        "cmdk-fuse": "partial",
+        "pagefind-navigation": "partial"
+      },
+      "decision": "Reuse the Places pattern and stable astronomical refs from the MIT UI."
+    },
+    {
+      "capability": "keyboard-first search and direct navigation",
       "importance": "medium",
       "coverage": {
-        "astro-native-signals": "partial",
-        "keystatic-first": "full",
-        "tinacms-first": "full",
-        "decap-first": "full"
+        "yeis-react-navigation": "full",
+        "cmdk-fuse": "full",
+        "pagefind-navigation": "partial"
       },
-      "decision": "Keep content as ordinary repository files so Keystatic or another editor can be layered on later if authoring friction warrants it."
+      "decision": "Implement the small React interaction shell around reused YEIS results; no dependency is needed for the current scale."
     },
     {
-      "capability": "deterministic automatic placement onto existing universe",
-      "importance": "high",
+      "capability": "future native camera fly-to",
+      "importance": "medium",
       "coverage": {
-        "astro-native-signals": "full",
-        "keystatic-first": "partial",
-        "tinacms-first": "partial",
-        "decap-first": "partial"
+        "yeis-react-navigation": "full",
+        "cmdk-fuse": "partial",
+        "pagefind-navigation": "none"
       },
-      "decision": "Placement belongs to the product adapter because CMS products manage content, not the semantics of YEIS stars and worlds."
-    },
-    {
-      "capability": "avoid fabricated personal history while scaling the universe",
-      "importance": "high",
-      "coverage": {
-        "astro-native-signals": "full",
-        "keystatic-first": "full",
-        "tinacms-first": "full",
-        "decap-first": "full"
-      },
-      "decision": "Store only real authored entries; all unassigned worlds remain astronomical/procedural rather than receiving synthetic biography text."
+      "decision": "Keep destination IDs compatible with CameraController centerOnDirection/goToPoint so spatial flight can be layered on without changing the navigator model."
     }
   ],
   "candidates": [
     {
-      "id": "astro-native-signals",
-      "name": "Astro Content Collections + deterministic YEIS signal placement",
+      "id": "yeis-react-navigation",
+      "name": "Pinned MIT YEIS Search/Places semantics + thin React navigation shell",
       "level": "subsystem",
-      "registry_id": "astro-content-collections",
-      "source": "Astro built-in content layer plus the existing YEIS adapter",
-      "license": "MIT Astro; project-owned content; existing YEIS data/source notices unchanged",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "pinned MIT UI.ts/places.ts plus already-vendored StarCatalog/Universe APIs",
+      "license": "MIT at e520568; existing upstream attribution retained",
       "decision": "reuse",
-      "reason": "Uses capabilities already shipped in the installed framework, adds no visitor runtime or CMS service, preserves static deployment, and leaves content files compatible with a later Git editor.",
+      "reason": "Highest global reuse: keeps one astronomical index and one destination model, adds Personal Signals cleanly, and remains compatible with native YEIS camera autopilot later.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1,
+        "integration_cost": 1.5,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
@@ -170,84 +164,52 @@
       }
     },
     {
-      "id": "keystatic-first",
-      "name": "Install Keystatic now as the canonical content authoring layer",
-      "level": "full_solution",
-      "registry_id": "keystatic",
-      "source": "https://keystatic.com/docs/installation-astro",
+      "id": "cmdk-fuse",
+      "name": "cmdk UI plus Fuse.js independent search index",
+      "level": "component_asset",
+      "source": "cmdk + Fuse.js",
       "license": "MIT",
       "decision": "reject",
-      "reason": "Good future editor and compatible with file-based Astro content, but adds packages/config/admin UI before there is evidence that direct file authoring is a bottleneck.",
+      "reason": "Strong generic UI/fuzzy search, but duplicates the astronomical search indexes already supplied by YEIS and adds dependencies without solving spatial destination semantics.",
       "evaluation": {
-        "coverage": 5,
+        "coverage": 4.5,
         "integration_cost": 2.5,
         "license_fit": 5,
-        "maintenance_health": 3.5,
+        "maintenance_health": 4.5,
         "performance_fit": 4.5,
         "customization_fit": 5,
-        "maturity": 3.5
-      }
+        "maturity": 5
+      },
+      "registry_id": "cmdk-fuse-navigation"
     },
     {
-      "id": "tinacms-first",
-      "name": "Install TinaCMS and visual editing as the content foundation",
-      "level": "full_solution",
-      "registry_id": "tinacms",
-      "source": "https://tina.io/docs/frameworks/astro",
-      "license": "Apache-2.0",
-      "decision": "reject",
-      "reason": "Visual editing is powerful but the required integration surface is much larger than the single-owner static portfolio currently needs and would couple deployment choices to authoring.",
-      "evaluation": {
-        "coverage": 5,
-        "integration_cost": 4,
-        "license_fit": 5,
-        "maintenance_health": 4.5,
-        "performance_fit": 3.5,
-        "customization_fit": 5,
-        "maturity": 4.5
-      }
-    },
-    {
-      "id": "decap-first",
-      "name": "Add Decap CMS admin and Git backend before content modeling",
-      "level": "full_solution",
-      "registry_id": "decap-cms",
-      "source": "https://decapcms.org/docs/",
+      "id": "pagefind-navigation",
+      "name": "Pagefind-generated site index as primary navigator",
+      "level": "subsystem",
+      "source": "Pagefind",
       "license": "MIT",
       "decision": "reject",
-      "reason": "Mature and lightweight for editors, but still adds an exposed admin/auth/backend workflow and does not solve universe placement; that is negative global value for the current single-owner phase.",
+      "reason": "Excellent for static document search but mismatched to direct star/system destinations and would require a second mapping layer back into YEIS IDs.",
       "evaluation": {
-        "coverage": 4,
-        "integration_cost": 3,
+        "coverage": 3,
+        "integration_cost": 2.5,
         "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 4.5,
-        "customization_fit": 4,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3.5,
         "maturity": 5
-      }
+      },
+      "registry_id": "pagefind"
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "astro-native-signals"
+      "yeis-react-navigation"
     ],
-    "rationale": "Use Astro's built-in typed content layer as the canonical source and add only a narrow deterministic placement adapter that maps real entries to existing YEIS stars/worlds. Keep editing products optional and future-compatible instead of introducing a CMS runtime before it provides measurable value.",
-    "higher_level_tradeoffs": [
-      {
-        "candidate_id": "keystatic-first",
-        "reason": "Keystatic is broader because it adds a full editor, but current value is lower: the repository has one owner and Astro already handles storage/query/schema. Its file compatibility means postponing it does not create migration debt."
-      },
-      {
-        "candidate_id": "tinacms-first",
-        "reason": "TinaCMS offers broader visual editing, but its extra packages, admin surface and server/island integration increase deployment and runtime complexity without improving current visitor-facing content placement."
-      },
-      {
-        "candidate_id": "decap-first",
-        "reason": "Decap adds a complete Git-based admin workflow, but authentication/backend setup and an exposed admin surface are unnecessary now, while universe placement still must be implemented locally."
-      }
-    ],
+    "rationale": "Restore the navigation semantics that already exist in the pinned MIT mother engine. Reuse StarCatalog/Universe search directly, expose curated Places and Personal Signals through one destination model, and keep the React layer limited to presentation and keyboard interaction.",
+    "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If file authoring becomes painful, add Keystatic on top of the same content directory/schema without changing the runtime placement API. If remote sources are later useful, Astro custom loaders can feed the same collection interface."
+    "fallback": "If result scale or fuzzy matching later becomes insufficient, layer Fuse.js or cmdk over the same destination API. If document/article search becomes a separate need, add Pagefind for documents without replacing universe navigation."
   }
 }

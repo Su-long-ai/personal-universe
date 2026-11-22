@@ -26,6 +26,8 @@ export function UniverseHud({
   onToggleMuted,
   quality,
   onQualityChange,
+  onOpenNavigator,
+  navigatorAvailable,
   onReturn,
 }: {
   phase: UniversePhase;
@@ -38,6 +40,8 @@ export function UniverseHud({
   onToggleMuted: () => void;
   quality: QualityMode;
   onQualityChange: (mode: QualityMode) => void;
+  onOpenNavigator: () => void;
+  navigatorAvailable: boolean;
   onReturn: () => void;
 }) {
   const destination =
@@ -104,6 +108,12 @@ export function UniverseHud({
               </select>
             </label>
           </div>
+
+          {navigatorAvailable && (
+            <button className="hud-navigate" onClick={onOpenNavigator}>
+              SEARCH / PLACES <span>CTRL K</span>
+            </button>
+          )}
 
           {phase !== "galaxy" && (
             <button

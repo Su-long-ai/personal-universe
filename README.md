@@ -69,3 +69,12 @@ astronomical/procedural instead of receiving fabricated personal content.
 
 See `docs/architecture/content-layer.md` for the placement model and future CMS
 extension path.
+
+## Navigation
+
+The default YEIS path exposes a shared universe navigator for Personal Signals
+and astronomical destinations. Use `SEARCH / PLACES`, `Ctrl+K` / `Cmd+K`, or
+`/` to open it. Personal content is searched alongside the pinned MIT YEIS star,
+black-hole and landmark indexes rather than through a duplicate catalogue.
+
+See `docs/architecture/navigation.md`.
