@@ -46,6 +46,16 @@ async function shot(
   });
 }
 
+async function waitForCameraSettled(
+  page: Page,
+  phase: "approach" | "orbit" | "atmosphere" | "returning",
+) {
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-camera-settled",
+    phase,
+  );
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -169,6 +179,7 @@ test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
       );
       await waitForYeisEngine(page);
       await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+      await waitForCameraSettled(page, "orbit");
       await expect(page.locator(".world-content-card")).toBeVisible();
     },
   );
@@ -179,6 +190,7 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+    await waitForCameraSettled(page, "orbit");
   });
 });
 
@@ -206,6 +218,7 @@ for (const viewport of [TABLET, MOBILE]) {
           );
           await waitForYeisEngine(page);
           await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+          await waitForCameraSettled(page, "orbit");
           await expect(page.locator(".world-content-card")).toBeVisible();
         },
       );
