@@ -1,56 +1,48 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NATIVE-LOCATE-001",
-  "title": "Add spatial Locate to universe navigation by reusing the pinned MIT YEIS CameraController center autopilot",
+  "task_id": "NAVIGATOR-LOCATE-SHORTCUT-FIX-001",
+  "title": "Prevent Locate shortcut from stealing normal search text entry",
   "scope": {
-    "level": "subsystem",
-    "subject": "Search-result spatial focus inside the native YEIS galaxy view"
+    "level": "implementation",
+    "subject": "Keyboard interaction for the restored Search/Places navigator"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The restored navigator can already open systems directly. The pinned MIT CameraController still includes centerOnDirection(), goToPoint() and autopilot interpolation. A Locate action therefore does not need a new camera animation system. The safest first spatial enhancement is centerOnDirection: keep the visitor in galaxy mode, rotate smoothly toward the resolved YEIS star, preserve the existing galaxy orbit state, and leave Open as the separate action for entering the system. Full goToPoint flight can remain a later scale-transition experiment because it requires additional frame-switch semantics.",
+  "research_summary": "The committed Locate implementation binds the plain letter L inside the search input, which conflicts with ordinary query entry. The existing navigator already uses Enter to activate the current result, so the smallest coherent fix is Shift+Enter for Locate and Enter for Open. This preserves native text entry, requires no new keybinding framework, and leaves the explicit LOCATE button available for pointer users.",
   "policy_change": false,
   "planned_files": [
-    "src/lib/universe/yeis/navigation.ts",
     "src/components/universe/UniverseNavigator.tsx",
-    "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/YeisGalaxyScene.tsx",
-    "src/components/universe/universe.css",
     "docs/architecture/navigation.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
-      "finding": "Pinned MIT CameraController provides centerOnDirection() using its built-in 0.9-second autopilot quaternion interpolation and goToPoint() for later physical flight."
+      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/combobox/",
+      "finding": "Editable combobox patterns reserve printable characters for text editing; action keys should not steal ordinary character input."
     },
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
-      "finding": "Pinned MIT UI separates center/focus actions from go-to actions, supporting the product decision to keep Locate and Open distinct."
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/shiftKey",
+      "finding": "KeyboardEvent.shiftKey exposes the Shift modifier without taking over printable text keys."
     }
   ],
   "search_ladder": [
     {
       "level": "full_solution",
-      "status": "found",
-      "registry_refs": [
-        "your-eyes-in-space-mit-e520568"
-      ],
+      "status": "none",
+      "registry_refs": [],
       "source_refs": [
-        0,
-        1
+        0
       ],
-      "conclusion": "The mother engine already contains the spatial focus behavior and UI semantics."
+      "conclusion": "No navigation product change is needed for a local keybinding conflict."
     },
     {
       "level": "framework_engine",
-      "status": "found",
+      "status": "none",
       "registry_refs": [
         "react-three-fiber"
       ],
       "source_refs": [
         0
       ],
-      "conclusion": "R3F only needs to pass a focus request into the hosted YEIS scene; it should not own a parallel camera animation."
+      "conclusion": "Rendering framework is unrelated to keyboard semantics."
     },
     {
       "level": "subsystem",
@@ -61,132 +53,118 @@
       "source_refs": [
         0
       ],
-      "conclusion": "CameraController.centerOnDirection is the complete subsystem primitive for this locate step."
+      "conclusion": "Keep the restored YEIS-style navigator and change only the conflicting activation gesture."
     },
     {
       "level": "component_asset",
       "status": "none",
       "registry_refs": [],
       "source_refs": [
-        0
+        0,
+        1
       ],
-      "conclusion": "No third-party component is needed."
+      "conclusion": "Native KeyboardEvent modifier state fully covers the fix; no shortcut package is needed."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "smoothly orient galaxy view toward a search result",
+      "capability": "allow arbitrary search text including the letter l",
       "importance": "high",
       "coverage": {
-        "yeis-native-locate": "full",
-        "custom-r3f-camera": "full",
-        "open-only": "none"
+        "shift-enter-locate": "full",
+        "plain-l-locate": "none",
+        "alt-l-locate": "full"
       },
-      "decision": "Use YEIS centerOnDirection rather than animating the R3F camera separately."
+      "decision": "Printable letters must remain text input."
     },
     {
-      "capability": "preserve native galaxy camera/orbit semantics",
+      "capability": "keyboard-only Locate action",
       "importance": "high",
       "coverage": {
-        "yeis-native-locate": "full",
-        "custom-r3f-camera": "partial",
-        "open-only": "full"
+        "shift-enter-locate": "full",
+        "plain-l-locate": "full",
+        "alt-l-locate": "full"
       },
-      "decision": "The controller remains the single camera authority."
+      "decision": "Shift+Enter reuses the selected-result activation key without adding a second unrelated mnemonic."
     },
     {
-      "capability": "keep direct Open behavior available",
-      "importance": "high",
-      "coverage": {
-        "yeis-native-locate": "full",
-        "custom-r3f-camera": "full",
-        "open-only": "full"
-      },
-      "decision": "Locate is additive; Enter/Open still enters the system."
-    },
-    {
-      "capability": "avoid premature cross-frame flight complexity",
+      "capability": "avoid browser/global shortcut conflicts",
       "importance": "medium",
       "coverage": {
-        "yeis-native-locate": "full",
-        "custom-r3f-camera": "partial",
-        "open-only": "full"
+        "shift-enter-locate": "full",
+        "plain-l-locate": "full",
+        "alt-l-locate": "partial"
       },
-      "decision": "Center direction now; defer goToPoint until frame switching and arrival semantics are explicitly validated."
+      "decision": "Prefer a modifier on the existing Enter action over another letter chord."
     }
   ],
   "candidates": [
     {
-      "id": "yeis-native-locate",
-      "name": "YEIS CameraController.centerOnDirection Locate",
-      "level": "subsystem",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "pinned MIT CameraController + existing hosted controller instance",
-      "license": "MIT at e520568",
+      "id": "shift-enter-locate",
+      "name": "Enter opens; Shift+Enter locates",
+      "level": "component_asset",
+      "source": "native KeyboardEvent.shiftKey on existing navigator input",
+      "license": "browser API / project code",
       "decision": "reuse",
-      "reason": "Reuses the camera authority already running the native galaxy view, provides built-in smooth interpolation, and adds no duplicate camera state.",
+      "reason": "Preserves all printable text, aligns Locate with the existing selected-result activation gesture, and adds no dependency.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1,
+        "integration_cost": 0.5,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
         "customization_fit": 5,
         "maturity": 5
-      }
+      },
+      "registry_id": "your-eyes-in-space-mit-e520568"
     },
     {
-      "id": "custom-r3f-camera",
-      "name": "Animate the R3F PerspectiveCamera directly for search focus",
-      "level": "framework_engine",
-      "registry_id": "react-three-fiber",
-      "source": "local custom animation",
-      "license": "project code / MIT framework",
+      "id": "plain-l-locate",
+      "name": "Keep plain L as Locate",
+      "level": "component_asset",
+      "source": "current committed behavior",
+      "license": "project code",
       "decision": "reject",
-      "reason": "Would create a second camera authority alongside CameraController and risks state drift on the next native input/update.",
+      "reason": "Conflicts directly with normal search entry for any query containing l/L.",
       "evaluation": {
-        "coverage": 4.5,
-        "integration_cost": 2.5,
-        "license_fit": 5,
-        "maintenance_health": 2.5,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 3
-      }
-    },
-    {
-      "id": "open-only",
-      "name": "Keep navigator as direct system-open only",
-      "level": "subsystem",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "current navigation behavior",
-      "license": "existing project",
-      "decision": "reject",
-      "reason": "Stable but misses the exploratory spatial-navigation value already available in the pinned engine.",
-      "evaluation": {
-        "coverage": 2.5,
+        "coverage": 2,
         "integration_cost": 0,
         "license_fit": 5,
-        "maintenance_health": 5,
+        "maintenance_health": 2,
         "performance_fit": 5,
         "customization_fit": 2,
-        "maturity": 5
-      }
+        "maturity": 2
+      },
+      "registry_id": "your-eyes-in-space-mit-e520568"
+    },
+    {
+      "id": "alt-l-locate",
+      "name": "Use Alt+L for Locate",
+      "level": "component_asset",
+      "source": "native keyboard modifiers",
+      "license": "browser API / project code",
+      "decision": "reject",
+      "reason": "Avoids text theft but introduces a new mnemonic chord and can collide with browser/platform menu behaviors; Shift+Enter is more local to result activation.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 4
+      },
+      "registry_id": "your-eyes-in-space-mit-e520568"
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "yeis-native-locate"
+      "shift-enter-locate"
     ],
-    "rationale": "Add Locate as a thin request into the existing YEIS CameraController. Keep Open separate and postpone full physical goToPoint flight until system-frame switching is explicitly integrated.",
-    "higher_level_tradeoffs": [
-      {
-        "candidate_id": "custom-r3f-camera",
-        "reason": "R3F is the broader framework, but using it directly for locate would bypass the hosted YEIS CameraController that already owns native galaxy orientation and input. That creates duplicate camera authority and worse global state coherence despite broader customization."
-      }
-    ],
+    "rationale": "Use native Shift+Enter on the existing Enter activation path. Keep Enter=Open, Shift+Enter=Locate, and the visible LOCATE button for pointer users.",
+    "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If locate requests arrive before the native galaxy scene is ready, queue the latest request and consume it on the first frame after initialization. Direct Open remains unaffected."
+    "fallback": "If later accessibility testing prefers a different gesture, keep pointer LOCATE and expose the keyboard mapping through the same activation handler."
   }
 }

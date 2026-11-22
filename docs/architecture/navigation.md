@@ -38,6 +38,7 @@ enters star systems rather than arbitrary points in space.
 - keyboard: `Ctrl+K` / `Cmd+K`, or `/` when not typing;
 - arrow keys select results;
 - Enter opens the selected destination;
+- Shift+Enter locates the selected destination in the native galaxy view;
 - Escape closes the navigator.
 
 When no query is present, Personal Signals are listed first followed by featured
@@ -65,6 +66,15 @@ search index.
 The existing `CameraController.centerOnDirection()` and `goToPoint()` methods
 can provide a spatial **Locate** action before entering a system. That should be
 added as a separate navigation enhancement rather than replacing direct Open.
+
+
+Browser regression after the correction:
+
+- typing the literal letter `l` in the focused search input produced `Pol` and did
+  not create a locate request;
+- `Shift+Enter` on Sirius still completed native Locate at `c29786` with the
+  measured `0.269212 rad` quaternion change;
+- reopening the navigator and pressing plain Enter still opened Sirius System.
 
 Generic search packages remain fallback tools:
 
@@ -98,3 +108,12 @@ Production-preview/CDP validation:
 
 Full physical `goToPoint()` flight remains deliberately deferred until
 cross-frame arrival/switch semantics are integrated and validated.
+
+### Locate keyboard correction
+
+The initial Locate slice briefly used the plain `L` key while focus remained in
+the editable search input. That conflicts with ordinary queries containing the
+letter `l`. The binding is corrected to `Shift+Enter` for Locate while plain
+`Enter` remains Open. Printable search characters are never intercepted by
+result actions, and the explicit LOCATE button remains available for pointer
+users.

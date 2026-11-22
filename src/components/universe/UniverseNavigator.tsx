@@ -134,14 +134,9 @@ export function UniverseNavigator({
               if (event.key === "Enter") {
                 event.preventDefault();
                 const result = results[activeIndex] ?? results[0];
-                if (result) activate(result);
-                return;
-              }
-
-              if (event.key.toLowerCase() === "l") {
-                event.preventDefault();
-                const result = results[activeIndex] ?? results[0];
-                if (result) locate(result);
+                if (!result) return;
+                if (event.shiftKey) locate(result);
+                else activate(result);
               }
             }}
             placeholder="Search projects, stars, black holes, landmarks…"
@@ -216,7 +211,7 @@ export function UniverseNavigator({
         <footer className="navigator-footer">
           <span>↑↓ SELECT</span>
           <span>ENTER OPEN</span>
-          <span>L LOCATE</span>
+          <span>SHIFT+ENTER LOCATE</span>
           <span>ESC CLOSE</span>
         </footer>
       </section>
