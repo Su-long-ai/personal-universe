@@ -628,18 +628,24 @@ export default function UniverseApp({
       journey.paused ||
       reducedMotion ||
       journey.destinations.length < 2 ||
+      navigationStatus === "traveling" ||
+      navigationStatus === "locating" ||
       !["system", "approach", "orbit", "surface"].includes(phase)
     ) {
       return;
     }
 
+    // Reuse the pinned MIT TourPlayer's core sequencing idea without its
+    // narration/cue state machine: only advance after navigation has settled,
+    // then give the visitor an intentional dwell at the destination.
     const timer = window.setTimeout(() => {
       handleJourneyStep(1);
-    }, 9000);
+    }, 6500);
     return () => window.clearTimeout(timer);
   }, [
     handleJourneyStep,
     journey,
+    navigationStatus,
     phase,
     reducedMotion,
   ]);
