@@ -1,5 +1,9 @@
 import exoplanetSnapshot from "../../../data/exoplanet-hosts.json";
-import type { GalaxyMarker, SystemDefinition } from "../types";
+import type {
+  GalaxyMarker,
+  PlanetDefinition,
+  SystemDefinition,
+} from "../types";
 import type {
   UniverseContentKind,
   UniverseContentPlacement,
@@ -430,6 +434,100 @@ export function navigationDestinationForMarker(
 
   return observedDestination(marker);
 }
+
+export function navigationDestinationForPlanet(
+  system: SystemDefinition,
+  planet: PlanetDefinition,
+  markers: GalaxyMarker[],
+  placements: UniverseContentPlacement[] = [],
+): UniverseNavigationDestination | null {
+  const contentEntries = planet.content ?? [];
+  if (contentEntries.length === 1) {
+    const placement = placements.find(
+      (candidate) => candidate.entry.id === contentEntries[0].id,
+    );
+    if (placement) {
+      const personal = navigationDestinationForPlacement(
+        placement,
+        markers,
+      );
+      if (personal) return personal;
+    }
+  }
+
+  if (system.id.startsWith("yeis-system:")) {
+    const nativeId = system.id.slice("yeis-system:".length);
+    const marker = markers.find(
+      (candidate) => candidate.nativeId === nativeId,
+    );
+
+    if (
+      marker?.source === "hero" ||
+      (nativeId === HERO_SYSTEM_ID && planet.id === HERO_PLANET_ID)
+    ) {
+      return marker ? heroDestination(marker) : null;
+    }
+
+    const bodyId = planet.id.startsWith("yeis-planet:")
+      ? planet.id.slice("yeis-planet:".length)
+      : planet.id;
+    return {
+      id: "body:" + nativeId + "/" + bodyId,
+      kind: "body",
+      group: "bodies",
+      title: planet.name,
+      detail: "BODY · " + system.name,
+      target: {
+        kind: "body",
+        starId: nativeId,
+        bodyId,
+        markerId: marker?.id,
+      },
+      markerId: marker?.id,
+      keywords: [planet.archetype, system.name],
+    };
+  }
+
+  const observedMarker =
+    markers.find(
+      (candidate) =>
+        candidate.id === system.id &&
+        candidate.engine === "v2" &&
+        candidate.source === "catalog",
+    ) ??
+    markers.find(
+      (candidate) =>
+        Boolean(system.catalogId) &&
+        candidate.catalogId === system.catalogId &&
+        candidate.engine === "v2",
+    );
+
+  if (observedMarker) {
+    return (
+      observedExoplanetDestinations([observedMarker]).find(
+        (destination) =>
+          destination.target.kind === "observed-body" &&
+          destination.target.bodyId === planet.id,
+      ) ?? {
+        id: "exoplanet:" + observedMarker.id + ":" + planet.name,
+        kind: "exoplanet",
+        group: "exoplanets",
+        title: planet.name,
+        detail: "OBSERVED EXOPLANET · " + system.name,
+        target: {
+          kind: "observed-body",
+          markerId: observedMarker.id,
+          bodyId: planet.id,
+        },
+        markerId: observedMarker.id,
+        keywords: [system.name, planet.archetype],
+      }
+    );
+  }
+
+  return null;
+}
+
 
 export function navigationDestinationForGalaxy(
   runtime: YeisCoreRuntime,
