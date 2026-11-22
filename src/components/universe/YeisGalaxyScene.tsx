@@ -603,6 +603,10 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisNativeGalaxy;
       delete document.documentElement.dataset.yeisLandmarks;
       delete document.documentElement.dataset.yeisLandmarkPhotos;
+      delete document.documentElement.dataset.yeisLandmarkPhotosRequested;
+      delete document.documentElement.dataset.yeisLandmarkPhotosLoaded;
+      delete document.documentElement.dataset.yeisLandmarkPhotosFailed;
+      delete document.documentElement.dataset.yeisLandmarkPhotosComplete;
       delete document.documentElement.dataset.yeisPickedTarget;
       delete document.documentElement.dataset.yeisHiplessObserved;
       delete document.documentElement.dataset.personalSignalOverlay;
@@ -1024,6 +1028,16 @@ export function YeisGalaxyScene({
       runtime.universe.current.starId,
       (index) => state.galaxySprites.apparent(index).ratio,
     );
+
+    const photoStatus = state.landmarkSprites.photoLoadStatus;
+    document.documentElement.dataset.yeisLandmarkPhotosRequested =
+      String(photoStatus.requested);
+    document.documentElement.dataset.yeisLandmarkPhotosLoaded =
+      String(photoStatus.loaded);
+    document.documentElement.dataset.yeisLandmarkPhotosFailed =
+      String(photoStatus.failed);
+    document.documentElement.dataset.yeisLandmarkPhotosComplete =
+      photoStatus.complete ? "1" : "0";
 
     const heroPc = runtime.universe.starPositionPc(HERO_SYSTEM_ID);
     state.heroSkyPosition
