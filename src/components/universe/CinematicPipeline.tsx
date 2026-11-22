@@ -69,6 +69,7 @@ export function CinematicPipeline({
       ) {
         delete document.documentElement.dataset.universeWorldPipeline;
       }
+      delete document.documentElement.dataset.universeWorldReady;
     };
   }, [composer, liveWorld]);
 
@@ -88,6 +89,17 @@ export function CinematicPipeline({
 
   useFrame((_, delta) => {
     composer.composer.render(delta);
+    const renderer = composer.planetPass?.planetRenderer;
+    if (
+      liveWorld &&
+      renderer &&
+      renderer.info.planets > 0 &&
+      renderer.info.pending === 0
+    ) {
+      document.documentElement.dataset.universeWorldReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldReady;
+    }
   }, 1);
 
   return null;
