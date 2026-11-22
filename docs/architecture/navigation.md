@@ -410,8 +410,9 @@ independent immutable task approvals, including
 `NAVIGATOR-INTERACTION-LIFECYCLE-001`,
 `PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
 `NAVIGATION-FAILURE-RECOVERY-001`,
-`JOURNEY-SETTLED-ORCHESTRATION-001`, and
-`NATIVE-BODY-ACCEPTANCE-001`.
+`JOURNEY-SETTLED-ORCHESTRATION-001`,
+`NATIVE-BODY-ACCEPTANCE-001`, and
+`NAVIGATION-ENTRY-COVERAGE-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -428,9 +429,12 @@ against a production build:
 - Places product Open, observed exoplanet Open, and native body fallback,
   including `月球` → `body:c0/moon` → native `c0/moon` travel;
 - observed-host/exoplanet Locate, including a HIP-less physical point;
-- star/system, body, black-hole, landmark and galaxy navigation;
-- Canvas picks route through the same destinations;
-- destination deep links;
+- star/system, body, black-hole, landmark and galaxy navigation,
+  including Chinese `仙女座` → exact galaxy native travel;
+- real WebGL Canvas picks route through the same destinations after native
+  Locate, without a test-only picking API;
+- destination deep links, including Search → `hero:aurora-01` → exact Hero
+  world → cold reload of the same world identity;
 - galaxy → system → planet → approach → orbit → return → galaxy;
 - landmark sprite/photo counts and all 15 photograph requests;
 - mobile navigator/Journey layout;
@@ -506,3 +510,10 @@ the Chinese alias `月球` resolves through the real Navigator to
 `body:c0/moon`; because moons are intentionally not mapped into
 `PlanetDefinition`, the shared executor must retain native target `c0/moon`
 through YEIS autopilot completion instead of opening a React product planet.
+
+A companion entry-point acceptance unit also exercises the real WebGL surface:
+Orion Nebula is first centered through the existing Locate action, then an
+actual pointer click at the canvas center must be resolved by the native
+landmark picker as `landmark:l-m42` and continue through the same shared
+destination executor. Hero and galaxy coverage likewise use the real Navigator
+and deep-link/native-travel paths rather than calling internal resolvers.
