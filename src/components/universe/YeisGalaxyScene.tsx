@@ -610,6 +610,7 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisPickedTarget;
       delete document.documentElement.dataset.yeisHiplessObserved;
       delete document.documentElement.dataset.personalSignalOverlay;
+      delete document.documentElement.dataset.personalSignalCapacity;
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.universeTraveling;
@@ -1108,9 +1109,27 @@ export function YeisGalaxyScene({
     contentMaterial.opacity =
       0.9 + Math.sin(performance.now() * 0.0026) * 0.08;
 
-    const contentPosition = state.contentSky.geometry.getAttribute(
+    let contentPosition = state.contentSky.geometry.getAttribute(
       "position",
     ) as BufferAttribute;
+    const requiredSignalCapacity = contentPlacementsRef.current.length;
+    if (requiredSignalCapacity > contentPosition.count) {
+      const nextCapacity = Math.max(
+        32,
+        2 ** Math.ceil(Math.log2(requiredSignalCapacity + 1)),
+      );
+      contentPosition = new BufferAttribute(
+        new Float32Array(nextCapacity * 3),
+        3,
+      );
+      state.contentSky.geometry.setAttribute("position", contentPosition);
+      document.documentElement.dataset.personalSignalCapacity =
+        String(nextCapacity);
+      console.info(
+        `[PERSONAL-SIGNALS] capacity=${nextCapacity}`,
+      );
+    }
+
     const markerById = new Map(
       markersRef.current.map((marker) => [marker.id, marker]),
     );
