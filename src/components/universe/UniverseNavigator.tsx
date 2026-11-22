@@ -114,44 +114,54 @@ export function UniverseNavigator({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let debounceTimer = 0;
     setStatus("loading");
     const trimmed = query.trim();
     document.documentElement.dataset.universeNavigatorMode = trimmed
       ? "search"
       : "places";
 
-    const request = trimmed
-      ? loadUniverseNavigation(
-          trimmed,
-          placements,
-          markers,
-          currentSystem ?? null,
-        ).then(navigationSectionsForResults)
-      : loadUniversePlaces(placements, markers);
+    const run = () => {
+      const request = trimmed
+        ? loadUniverseNavigation(
+            trimmed,
+            placements,
+            markers,
+            currentSystem ?? null,
+          ).then(navigationSectionsForResults)
+        : loadUniversePlaces(placements, markers);
 
-    void request
-      .then((next) => {
-        if (cancelled) return;
-        setSections(next);
-        setActiveIndex(0);
-        setStatus("idle");
-        const count = next.reduce(
-          (sum, section) => sum + section.destinations.length,
-          0,
-        );
-        document.documentElement.dataset.universeNavigatorResults =
-          String(count);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("[UNIVERSE-NAV] navigator index failed", error);
-        setSections([]);
-        setStatus("error");
-        document.documentElement.dataset.universeNavigatorResults = "error";
-      });
+      void request
+        .then((next) => {
+          if (cancelled) return;
+          setSections(next);
+          setActiveIndex(0);
+          setStatus("idle");
+          const count = next.reduce(
+            (sum, section) => sum + section.destinations.length,
+            0,
+          );
+          document.documentElement.dataset.universeNavigatorResults =
+            String(count);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("[UNIVERSE-NAV] navigator index failed", error);
+          setSections([]);
+          setStatus("error");
+          document.documentElement.dataset.universeNavigatorResults = "error";
+        });
+    };
+
+    if (trimmed) {
+      debounceTimer = window.setTimeout(run, 90);
+    } else {
+      run();
+    }
 
     return () => {
       cancelled = true;
+      if (debounceTimer) window.clearTimeout(debounceTimer);
     };
   }, [currentSystem, markers, open, placements, query]);
 
