@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "REUSE-GATE-MACHINE-V3-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "dc063ed83897f0a6044a3d453dae1f4c005364dd",
+  "record_path": "docs/reuse-gate/tasks/REUSE-GATE-MACHINE-V3-001.json",
+  "record_sha256": "2fd7db89cd55ca28c94bba31f57c137d63054e0a72cbc3cb1b7f8a9179578305",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "backstage-catalog": "dfb85f48072da4bc24da6d385618b9039c863b71b08b29b9ffab4b24ec27b213",
+    "git-hooks": "38e92e0cf551070b1ba2f565d193e71d2be7951d8281898010bdcc0b21c6a2d0",
+    "github-actions-pr-diff-gate": "3765dfd501ff4aaa27d657f4dda850f6f6f0ea8bb212ba95fe78bcab487fcf5d",
+    "npm-lifecycle": "709f848efc41e8290f78f23a643f1da77a5931314f3ae6a01ac907ce0cef6bf0",
+    "opa-conftest": "f2b6f73af6d2f54b7283bb006c433641e187e07bcf25d92e37ad456a366d443c"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Repository-wide reuse policy enforcement across GitHub PRs and parallel agents"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "scripts/reuse-gate.mjs",
+    ".github/workflows/ci.yml",
+    "package.json",
+    "AGENTS.md",
+    "docs/reuse-gate/README.md",
+    "docs/reuse-gate/tasks/**",
+    "docs/reuse-gate/approvals/**"
+  ],
+  "selected_ids": [
+    "github-actions-pr-diff-gate"
+  ],
+  "candidate_scores": {
+    "github-actions-pr-diff-gate": 57,
+    "opa-conftest": 45.5,
+    "backstage-catalog": 33,
+    "git-hooks-only": 41
+  }
+}
