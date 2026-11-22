@@ -1,0 +1,123 @@
+{
+  "schema": 2,
+  "task_id": "YEIS-ENGLISH-I18N-002",
+  "title": "Restore pinned-MIT YEIS English translations before universe runtime construction",
+  "scope": {
+    "level": "implementation",
+    "subject": "English translation of YEIS astronomical names, descriptions and system labels"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "GitHub visual smoke exposed Turkish source labels such as Dünya and Güneş inside the otherwise-English Personal Universe UI. The pinned MIT YEIS commit already contains the matching runtime i18n implementation plus complete English data and UI dictionaries. The earlier minimal-core vendoring replaced that subsystem with an identity shim, creating the leak. Restore the exact pinned MIT i18n runtime and only its English dictionaries, then initialize English before constructing Universe. This fixes the source globally instead of maintaining a parallel alias table or generic translation stack.",
+  "planned_files": [
+    "src/vendor/yeis/i18n/index.ts",
+    "src/vendor/yeis/i18n/locales/en/data.json",
+    "src/vendor/yeis/i18n/locales/en/ui.json",
+    "src/lib/universe/yeis/index.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "docs/architecture/universe-backbone.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/index.ts",
+      "finding": "Pinned MIT YEIS already implements runtime translation lookup and code-split locale loading for its own Turkish-source astronomical data."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/locales/en",
+      "finding": "The pinned English data/ui dictionaries contain translations for body and system labels such as Güneş, Dünya, Ay and Güneş Sistemi plus descriptions and facts."
+    },
+    {
+      "url": "https://www.i18next.com/",
+      "finding": "i18next is a mature generic runtime localization subsystem, but adopting it would still require importing or transforming the YEIS translation resources and would duplicate the upstream lookup layer."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse the localization subsystem that is version-matched to the selected YEIS mother engine and its exact source strings."
+    },
+    {
+      "level": "framework_engine",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No additional application framework is needed for this implementation-level restoration because Vite already supports the upstream locale module pattern."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "i18next"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "i18next is a viable generic subsystem but adds duplicate runtime semantics when YEIS already provides matching translation resources."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "A hand-maintained body-name map would be project-specific duplication rather than a reusable component and would not cover descriptions or future YEIS data."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "restore-pinned-yeis-i18n",
+      "name": "Pinned MIT YEIS i18n runtime with English data/UI dictionaries",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned MIT src/i18n/index.ts and locales/en dictionaries",
+      "license": "MIT source at e520568",
+      "decision": "reuse",
+      "reason": "Uses translation resources authored for the exact pinned YEIS source strings, fixes all consumers globally and preserves one semantic authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "i18next-generic",
+      "name": "i18next generic localization subsystem",
+      "level": "subsystem",
+      "registry_id": "i18next",
+      "source": "i18next",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Mature but redundant: it adds another runtime while the version-matched YEIS dictionaries and translation implementation already cover the domain data.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "restore-pinned-yeis-i18n"
+    ],
+    "rationale": "Restore the exact pinned MIT localization runtime and only the English dictionaries, initialize English before Universe construction, and keep YEIS as the sole owner of translations for its astronomical source data.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If dictionary transfer materially affects initial load, preserve the same YEIS i18n API and split English resources by data domain rather than replacing translations with local aliases."
+  }
+}
