@@ -565,15 +565,22 @@ export function YeisGalaxyScene({
           }
         };
 
-        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
-        gl.domElement.addEventListener("pointerleave", clearSignalHover);
-        removeHoverListeners = () => {
-          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
-          gl.domElement.removeEventListener("pointerleave", clearSignalHover);
+        const onSignalPointerLeave = () => {
+          hoverEvent = null;
           if (hoverFrame) window.cancelAnimationFrame(hoverFrame);
           hoverFrame = 0;
-          hoverEvent = null;
           clearSignalHover();
+        };
+
+        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
+        gl.domElement.addEventListener("pointerleave", onSignalPointerLeave);
+        removeHoverListeners = () => {
+          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
+          gl.domElement.removeEventListener(
+            "pointerleave",
+            onSignalPointerLeave,
+          );
+          onSignalPointerLeave();
         };
 
         document.documentElement.dataset.yeisNativeGalaxy = "ready";
