@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "task_id": "GATE-001",
+  "approved_at": "2026-11-22T09:44:00.726Z",
+  "baseline_commit": "8632e405819882559602da82ac815f9d7afe4d48",
+  "record_path": "docs/reuse-gate/current.json",
+  "record_sha256": "42b7dca39e04de929bd1231c685996f4c39390deeea001379671de7bebc96381",
+  "planned_files": [
+    "scripts/reuse-gate.mjs",
+    ".githooks/pre-commit",
+    "docs/reuse-gate/**",
+    "package.json",
+    "AGENTS.md"
+  ]
+}

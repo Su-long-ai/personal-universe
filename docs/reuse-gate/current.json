@@ -1,0 +1,54 @@
+{
+  "task_id": "GATE-001",
+  "title": "Mandatory reuse-first implementation gate",
+  "researched_at": "2026-11-22",
+  "research_summary": "Reuse Git native hooks and npm lifecycle pre-scripts instead of inventing a daemon. The only custom code is a small validator that freezes a research record before implementation and checks file coverage later.",
+  "planned_files": [
+    "scripts/reuse-gate.mjs",
+    ".githooks/pre-commit",
+    "docs/reuse-gate/**",
+    "package.json",
+    "AGENTS.md"
+  ],
+  "sources": [
+    {
+      "url": "https://git-scm.com/docs/githooks",
+      "finding": "Git natively runs pre-commit hooks and supports a repository-defined hooks directory via core.hooksPath."
+    },
+    {
+      "url": "https://docs.npmjs.com/using-npm/scripts.html/",
+      "finding": "npm supports pre<event> lifecycle scripts; a non-zero pre-script aborts the requested lifecycle command."
+    }
+  ],
+  "candidates": [
+    {
+      "name": "Git native pre-commit hook + core.hooksPath",
+      "source": "https://git-scm.com/docs/githooks",
+      "license": "Git built-in capability",
+      "decision": "reuse",
+      "reason": "Already installed, dependency-free, blocks commits at the machine layer."
+    },
+    {
+      "name": "npm predev/prebuild lifecycle",
+      "source": "https://docs.npmjs.com/using-npm/scripts.html/",
+      "license": "npm built-in capability",
+      "decision": "reuse",
+      "reason": "Blocks local run/build when implementation lacks an approved research token."
+    },
+    {
+      "name": "Custom background policy daemon/file watcher",
+      "source": "local design alternative",
+      "license": "N/A",
+      "decision": "reject",
+      "reason": "Duplicates Git/npm enforcement, adds process lifecycle failure modes, and is unnecessary."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected": [
+      "Git native hooks",
+      "npm lifecycle scripts"
+    ],
+    "custom_code": "Minimal validator only; no custom daemon."
+  }
+}

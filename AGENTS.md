@@ -1,3 +1,17 @@
+# Mandatory reuse-first gate
+
+Before editing any implementation path (src/**, public/**, ordinary scripts/**, or core project config):
+
+1. Search externally for existing reusable libraries, engines, shaders, assets, standards, or reference implementations.
+2. Update docs/reuse-gate/current.json with at least two sources and two compared candidates, including license and reuse/reject reasons.
+3. List the exact planned implementation files/patterns.
+4. Run `npm run reuse:approve` while implementation paths are still clean.
+5. Only after approval may implementation begin.
+
+Do not bypass or disable the gate. If reuse:approve refuses because implementation is already dirty, revert/stash the implementation, complete research, approve, then re-apply the implementation.
+
+`npm run dev`, `npm run build`, and Git pre-commit enforce this policy.
+
 ## Development
 
 When starting the dev server, use background mode:

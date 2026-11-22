@@ -6,7 +6,12 @@
     "node": ">=22.23.4"
   },
   "scripts": {
+    "reuse:approve": "node scripts/reuse-gate.mjs approve docs/reuse-gate/current.json",
+    "gate:reuse": "node scripts/reuse-gate.mjs check working",
+    "gate:reuse:staged": "node scripts/reuse-gate.mjs check staged",
+    "predev": "npm run gate:reuse",
     "dev": "astro dev",
+    "prebuild": "npm run gate:reuse",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
