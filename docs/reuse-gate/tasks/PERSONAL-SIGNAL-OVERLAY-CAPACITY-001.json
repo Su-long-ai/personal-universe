@@ -1,0 +1,140 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-SIGNAL-OVERLAY-CAPACITY-001",
+  "title": "Remove the fixed Personal Signal GPU overlay ceiling with geometric capacity growth",
+  "scope": {
+    "level": "implementation",
+    "subject": "Dynamic Three.js point-buffer capacity for Personal Signal galaxy overlays"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The current Personal Signal Points geometry preallocates exactly 256 positions, creating a silent long-term ceiling as authored content grows. Three.js documents that BufferGeometry attributes cannot be efficiently resized in place once rendered; capacity overflow should be handled by allocating replacement geometry/attributes. Reuse that native BufferGeometry contract with power-of-two geometric growth, so normal updates reuse the existing typed buffer and only capacity-boundary crossings allocate a larger attribute.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/content-layer.md"
+  ],
+  "sources": [
+    {
+      "url": "https://threejs.org/docs/pages/BufferAttribute.html",
+      "finding": "Three.js BufferAttribute storage is backed by a fixed-length TypedArray; count derives from that array and content updates use needsUpdate/update ranges."
+    },
+    {
+      "url": "https://threejs.org/manual/en/how-to-update-things.html",
+      "finding": "Three.js explicitly states rendered buffers cannot be resized in place; if growth exceeds preallocated capacity, create replacement geometry/buffers and release superseded GPU resources."
+    },
+    {
+      "url": "https://threejs.org/manual/en/custom-buffergeometry.html",
+      "finding": "The Three.js manual notes TypedArrays require their size up front, so dynamic geometry requires explicit bookkeeping rather than array push semantics."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "conclusion": "The universe product and renderer backbone are already selected; this task only removes a capacity ceiling inside one existing Points overlay.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "The existing React Three Fiber host already delegates GPU attribute storage to Three.js, so no new rendering framework is justified for a buffer-capacity concern.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "react-three-fiber"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "not_applicable",
+      "conclusion": "No separate particle subsystem is needed because the existing Personal Signal overlay already uses one Three.js Points object and only its attribute capacity must grow.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Three.js BufferGeometry and BufferAttribute provide the exact replacement/update primitives; the only project-specific choice is when to allocate a larger typed buffer.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "three-buffer-geometry-capacity"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "geometric-buffer-growth",
+      "name": "Three.js BufferAttribute replacement with power-of-two geometric growth",
+      "level": "component_asset",
+      "registry_id": "three-buffer-geometry-capacity",
+      "source": "Three.js BufferGeometry/BufferAttribute capacity semantics",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Removes the hard ceiling while preserving the same Points/material path. Power-of-two growth amortizes reallocations so normal content updates only rewrite the existing typed array.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "exact-fit-buffer-rebuild",
+      "name": "Reallocate the Three.js position buffer to exact signal count on every growth",
+      "level": "component_asset",
+      "registry_id": "three-buffer-geometry-capacity",
+      "source": "Three.js BufferGeometry attribute replacement",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Removes the ceiling but causes unnecessary GPU/TypedArray churn when signals are added incrementally; geometric capacity preserves the same correctness with fewer reallocations.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "fixed-large-preallocation",
+      "name": "Increase the fixed preallocated Personal Signal buffer",
+      "level": "component_asset",
+      "registry_id": "three-buffer-geometry-capacity",
+      "source": "Three.js preallocated BufferAttribute",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "A larger constant merely moves the hidden ceiling and wastes predictable GPU/CPU buffer memory for the common sparse-content case.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 4,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "geometric-buffer-growth"
+    ],
+    "rationale": "Keep the existing Three.js Points overlay and reuse BufferAttribute replacement only when the required signal count exceeds capacity. Grow to a power-of-two bucket so sparse sites stay small, larger portfolios have no arbitrary ceiling, and incremental content additions do not repeatedly reallocate GPU buffers.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If signal counts become large enough that a single Points draw itself is the bottleneck, retain this capacity contract while evaluating a dedicated instanced/clustered signal renderer as a separate subsystem task."
+  }
+}
