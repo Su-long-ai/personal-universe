@@ -394,6 +394,25 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
   expect(new URL(page.url()).searchParams.get("phase")).toBe("orbit");
 
+  await page.getByRole("button", { name: "← RETURN TO SYSTEM" }).click();
+  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  const returnedSystemUrl = new URL(page.url());
+  expect(returnedSystemUrl.searchParams.get("phase")).toBe("system");
+  expect(returnedSystemUrl.searchParams.get("body")).toBeNull();
+  expect(returnedSystemUrl.searchParams.get("destination")).toBeNull();
+
+  await page.getByRole("button", { name: "← RETURN TO GALAXY" }).click();
+  await waitForYeis(page);
+  const returnedGalaxyUrl = new URL(page.url());
+  expect(returnedGalaxyUrl.searchParams.get("phase")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("star")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("body")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("destination")).toBeNull();
+
   await runtime.assertClean(testInfo);
 });
 
