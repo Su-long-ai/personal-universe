@@ -380,13 +380,26 @@ Behavior:
 
 - manual Search/Places/Canvas navigation, Locate, Return or Stop interrupts the
   journey immediately;
-- camera controls remain available;
-- ordinary mode advances only after navigation has settled and the
-  current product phase remains stable for the journey dwell;
+- the Journey adds no extra navigation lock: Search/Places, Canvas and Return
+  remain available while it is active;
+- ordinary mode advances only after the current destination has physically
+  settled. Product System/Approach/Orbit/Atmosphere/Surface use the existing
+  camera-controls current-position/current-target acceptance; native YEIS
+  spatial travel uses its existing arrived/located callback;
+- the 6.5 s destination dwell begins only after that settled signal. A
+  single-stop Journey therefore enters its visible completion state
+  automatically after one settled dwell instead of requiring a special DONE
+  click in ordinary motion;
 - `prefers-reduced-motion` disables automatic advance and keeps Prev/Next
   manual controls;
 - a Journey never invents content: if the relevant Content Collection group is
   empty, the corresponding journey is disabled.
+
+This closes a former semantic mismatch where the React phase could switch to
+`approach` or `system` before the camera had actually arrived, allowing the
+dwell timer to start during flight. The implementation retains only a local
+`cameraSettledPhase` latch; it does not port TourPlayer's narration/cue state
+machine or create another destination executor.
 
 ## Reuse Gate
 
@@ -395,8 +408,9 @@ approval for its original protected closure. Later productization units use
 independent immutable task approvals, including
 `PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
 `NAVIGATOR-INTERACTION-LIFECYCLE-001`,
-`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`, and
-`NAVIGATION-FAILURE-RECOVERY-001`.
+`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
+`NAVIGATION-FAILURE-RECOVERY-001`, and
+`JOURNEY-SETTLED-ORCHESTRATION-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -418,7 +432,8 @@ against a production build:
 - galaxy → system → planet → approach → orbit → return → galaxy;
 - landmark sprite/photo counts and all 15 photograph requests;
 - mobile navigator/Journey layout;
-- Journey interruption and reduced-motion manual mode;
+- Journey interruption, settled-before-dwell auto advance, visible completion,
+  and reduced-motion manual mode;
 - native galaxy camera persistence after returning from a product scene.
 
 ### Cloud acceptance evidence — 2026-11-23
