@@ -150,6 +150,28 @@ Personal Universe does not animate a competing R3F camera.
 Native galaxy camera position/quaternion are retained across React phase
 changes.
 
+## World arrival and progressive planet bake
+
+Product arrival state is authoritative before high-cost visual refinement.
+When a destination resolves to a product `PlanetDefinition`, the app enters
+`approach`, updates the shared destination/deep-link identity, and renders the
+existing lightweight planet fallback immediately.
+
+The adopted `procedural-planets` `bakePlanet()` representation remains the
+ordinary-world visual layer, but its own documentation notes that baking blocks
+the GPU and should be treated as loading work. `PlanetScene` therefore lets two
+browser frames commit first, then starts the deterministic bake in an idle slot
+(with a bounded fallback scheduler for browsers without `requestIdleCallback`).
+Auto quality uses a 512px bake, low uses 256px, and explicit high quality retains
+1024px.
+
+This is a rendering/lifecycle optimization only. It does not change destination
+identity, Search/Places semantics, the native-body fallback rule, or the
+Galaxy → System → Planet → Approach contract. In particular Earth remains a
+product planet (`body:c0/earth` → `c0/earth` at `phase=approach`); moons or
+spacecraft absent from `PlanetDefinition` continue to use exact native YEIS
+travel.
+
 ## Canvas picking
 
 Both galaxy-scale and system-scale canvas interactions route back into the
