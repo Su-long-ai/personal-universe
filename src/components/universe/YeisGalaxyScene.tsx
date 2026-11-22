@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   AdditiveBlending,
@@ -43,19 +43,30 @@ type NativeGalaxyState = {
   heroSkyPosition: Vector3;
   currentGalaxy: number | null;
   galaxyAcc: number;
+  observedSky: Points;
+  observedCount: number;
   disposed: boolean;
 };
 
+export type YeisGalaxyViewState = {
+  positionKm: [number, number, number];
+  quaternion: [number, number, number, number];
+};
+
 const heroProjection = new Vector3();
+const observedProjection = new Vector3();
+const observedDirection = new Vector3();
 
 export function YeisGalaxyScene({
   markers,
   onSelectSystem,
   quality,
+  viewStateRef,
 }: {
   markers: GalaxyMarker[];
   onSelectSystem: (marker: GalaxyMarker) => void;
   quality: QualityMode;
+  viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
   const { gl, scene, camera, size } = useThree();
   const perspective = camera as PerspectiveCamera;
@@ -122,6 +133,30 @@ export function YeisGalaxyScene({
         heroSky.renderOrder = -8;
         scene.add(heroSky);
 
+        const observedGeometry = new BufferGeometry();
+        observedGeometry.setAttribute(
+          "position",
+          new BufferAttribute(
+            new Float32Array(Math.max(32, markersRef.current.length) * 3),
+            3,
+          ),
+        );
+        observedGeometry.setDrawRange(0, 0);
+        const observedMaterial = new PointsMaterial({
+          color: 0xffc978,
+          size: quality === "low" ? 5 : 7,
+          sizeAttenuation: false,
+          transparent: true,
+          opacity: 0.92,
+          depthWrite: false,
+          blending: AdditiveBlending,
+          toneMapped: false,
+        });
+        const observedSky = new Points(observedGeometry, observedMaterial);
+        observedSky.frustumCulled = false;
+        observedSky.renderOrder = -7;
+        scene.add(observedSky);
+
         const input = new Input(gl.domElement);
         const controller = new CameraController(runtime.universe);
 
@@ -131,11 +166,21 @@ export function YeisGalaxyScene({
           milkyWay.radius * 1.62,
         );
         const cameraPc = milkyWay.toScene(viewLocal, new Vector3());
-        controller.position.copy(cameraPc).multiplyScalar(PARSEC_KM);
-        controller.orbitPoint(
-          milkyWay.center.clone().multiplyScalar(PARSEC_KM),
-          milkyWay.radius * 0.045 * PARSEC_KM,
-          "Milky Way",
+        const orbitCenterKm = milkyWay.center.clone().multiplyScalar(PARSEC_KM);
+        const orbitRadiusKm = milkyWay.radius * 0.045 * PARSEC_KM;
+        const savedView = viewStateRef.current;
+        if (savedView) {
+          controller.position.fromArray(savedView.positionKm);
+          controller.orbitPoint(orbitCenterKm, orbitRadiusKm, "Milky Way");
+          controller.quaternion.fromArray(savedView.quaternion);
+          runtime.universe.toParsecs(controller.position, cameraPc);
+        } else {
+          controller.position.copy(cameraPc).multiplyScalar(PARSEC_KM);
+          controller.orbitPoint(orbitCenterKm, orbitRadiusKm, "Milky Way");
+        }
+        console.info(
+          `[YEIS-NATIVE-VIEW] restored=${savedView ? "1" : "0"} ` +
+            `distanceKm=${controller.position.length().toExponential(8)}`,
         );
 
         perspective.near = CAMERA_NEAR_KM;
@@ -156,6 +201,8 @@ export function YeisGalaxyScene({
           cameraPc,
           heroSky,
           heroSkyPosition: new Vector3(),
+          observedSky,
+          observedCount: 0,
           currentGalaxy: null,
           galaxyAcc: 1,
           disposed: false,
@@ -199,6 +246,35 @@ export function YeisGalaxyScene({
                 selectRef.current(hero);
                 return;
               }
+            }
+          }
+
+          for (const marker of markersRef.current) {
+            const physical = marker.physicalPositionPc;
+            if (
+              marker.source !== "catalog" ||
+              marker.engine !== "v2" ||
+              marker.nativeId ||
+              !physical
+            ) {
+              continue;
+            }
+
+            observedDirection
+              .set(physical[0], physical[1], physical[2])
+              .sub(state.cameraPc);
+            if (observedDirection.lengthSq() <= 1e-12) continue;
+            observedDirection
+              .normalize()
+              .multiplyScalar(SKY_RADIUS_KM * 0.985);
+            observedProjection.copy(observedDirection).project(perspective);
+            if (observedProjection.z < -1 || observedProjection.z > 1) continue;
+
+            const ox = (observedProjection.x * 0.5 + 0.5) * width;
+            const oy = (-observedProjection.y * 0.5 + 0.5) * height;
+            if (Math.hypot(ox - x, oy - y) <= 16) {
+              selectRef.current(marker);
+              return;
             }
           }
 
@@ -246,6 +322,15 @@ export function YeisGalaxyScene({
       cancelled = true;
       const state = stateRef.current;
       if (state) {
+        viewStateRef.current = {
+          positionKm: state.controller.position.toArray() as [number, number, number],
+          quaternion: state.controller.quaternion.toArray() as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        };
         state.disposed = true;
         state.input.dispose();
         state.starPoints.dispose(scene);
@@ -255,6 +340,9 @@ export function YeisGalaxyScene({
         scene.remove(state.heroSky);
         state.heroSky.geometry.dispose();
         (state.heroSky.material as PointsMaterial).dispose();
+        scene.remove(state.observedSky);
+        state.observedSky.geometry.dispose();
+        (state.observedSky.material as PointsMaterial).dispose();
         stateRef.current = null;
       }
 
@@ -265,8 +353,9 @@ export function YeisGalaxyScene({
       perspective.updateProjectionMatrix();
       perspective.updateMatrixWorld();
       delete document.documentElement.dataset.yeisNativeGalaxy;
+      delete document.documentElement.dataset.yeisHiplessObserved;
     };
-  }, [gl, perspective, quality, scene]);
+  }, [gl, perspective, quality, scene, viewStateRef]);
 
   useFrame((_, delta) => {
     const state = stateRef.current;
@@ -356,6 +445,48 @@ export function YeisGalaxyScene({
       state.heroSkyPosition.z,
     );
     position.needsUpdate = true;
+
+    const observedPosition = state.observedSky.geometry.getAttribute(
+      "position",
+    ) as BufferAttribute;
+    let observedCount = 0;
+    for (const marker of markersRef.current) {
+      const physical = marker.physicalPositionPc;
+      if (
+        marker.source !== "catalog" ||
+        marker.engine !== "v2" ||
+        marker.nativeId ||
+        !physical ||
+        observedCount >= observedPosition.count
+      ) {
+        continue;
+      }
+
+      observedDirection
+        .set(physical[0], physical[1], physical[2])
+        .sub(state.cameraPc);
+      if (observedDirection.lengthSq() <= 1e-12) continue;
+      observedDirection
+        .normalize()
+        .multiplyScalar(SKY_RADIUS_KM * 0.985);
+      observedPosition.setXYZ(
+        observedCount,
+        observedDirection.x,
+        observedDirection.y,
+        observedDirection.z,
+      );
+      observedCount += 1;
+    }
+    observedPosition.needsUpdate = true;
+    state.observedSky.geometry.setDrawRange(0, observedCount);
+    if (state.observedCount !== observedCount) {
+      state.observedCount = observedCount;
+      document.documentElement.dataset.yeisHiplessObserved =
+        String(observedCount);
+      console.info(
+        `[YEIS-OBSERVED-OVERLAY] HIP-less physical hosts=${observedCount}`,
+      );
+    }
   });
 
   return <color attach="background" args={["#000005"]} />;

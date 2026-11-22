@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import { CinematicCamera } from "./CinematicCamera";
+import type { YeisGalaxyViewState } from "./YeisGalaxyScene";
 import type {
   GalaxyMarker,
   PlanetDefinition,
@@ -50,6 +51,8 @@ export function UniverseCanvas({
   reducedMotion: boolean;
   onCinematicPhaseComplete: (phase: UniversePhase) => void;
 }) {
+  const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
+
   return (
     <Canvas
       dpr={quality === "low" ? [1, 1] : [1, 1.75]}
@@ -75,6 +78,7 @@ export function UniverseCanvas({
             markers={markers}
             onSelectSystem={onSelectSystem}
             quality={quality}
+            viewStateRef={yeisViewStateRef}
           />
         </Suspense>
       )}

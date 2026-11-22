@@ -41,6 +41,9 @@ type CatalogSnapshot = {
 const catalog = snapshot as CatalogSnapshot;
 const SUN_GALAXY_POSITION: [number, number, number] = [18, 0.05, -4];
 const LOCAL_PC_SCALE = 0.075;
+const J2000_OBLIQUITY_RAD = (23.439291 * Math.PI) / 180;
+const ECLIPTIC_COS = Math.cos(J2000_OBLIQUITY_RAD);
+const ECLIPTIC_SIN = Math.sin(J2000_OBLIQUITY_RAD);
 
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -74,6 +77,21 @@ function visualPosition(system: CatalogSystem): [number, number, number] {
     SUN_GALAXY_POSITION[1] + vertical * distance,
     SUN_GALAXY_POSITION[2] + alongPlane * distance,
   ];
+}
+
+function physicalScenePosition(system: CatalogSystem): [number, number, number] {
+  const ra = (system.raDeg * Math.PI) / 180;
+  const dec = (system.decDeg * Math.PI) / 180;
+  const distance = system.distancePc;
+  const xEq = distance * Math.cos(dec) * Math.cos(ra);
+  const yEq = distance * Math.cos(dec) * Math.sin(ra);
+  const zEq = distance * Math.sin(dec);
+
+  // Match pinned YEIS build-stars.mjs exactly:
+  // equatorial pc -> ecliptic J2000 -> scene (x, z_ecl, -y_ecl).
+  const yEcl = yEq * ECLIPTIC_COS + zEq * ECLIPTIC_SIN;
+  const zEcl = -yEq * ECLIPTIC_SIN + zEq * ECLIPTIC_COS;
+  return [xEq, zEcl, -yEcl];
 }
 
 function inferSpectralType(system: CatalogSystem): string {
@@ -153,6 +171,7 @@ export function catalogMarkers(limit = 18): GalaxyMarker[] {
     seed: `catalog:${system.hostname}`,
     source: "catalog",
     position: visualPosition(system),
+    physicalPositionPc: physicalScenePosition(system),
     spectralType: inferSpectralType(system),
     catalogId: system.hostname,
     catalogIdentity: {

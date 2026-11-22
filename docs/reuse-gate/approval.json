@@ -1,41 +1,36 @@
 {
   "schema": 2,
-  "task_id": "YEIS-NATIVE-GALAXY-RENDERER-001",
-  "approved_at": "2026-11-22T13:59:34.740Z",
-  "baseline_commit": "9744ac9ee71323748329f365580fd441669b52aa",
+  "task_id": "YEIS-NATIVE-GALAXY-PARITY-001",
+  "approved_at": "2026-11-22T14:37:38.400Z",
+  "baseline_commit": "6e56f18755f8a8fe64fe354f90b3e871d98c6ada",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "4221e873134f1d6a7b83f6854dc9a881177be8035fc58416d69cf02eed9b5336",
+  "record_sha256": "f0a9a33e9a4670ad628f9998a44ef1bbf7a113e08fc1e6edb7005dd1dcd3fa16",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "93e9fcda8e53101752e0161e1bf50683784d7f9cffc04defa3b6c1beef22824a",
   "scope": {
-    "level": "architecture",
-    "subject": "Galaxy renderer and cross-scale camera migration"
+    "level": "subsystem",
+    "subject": "Native YEIS galaxy observed-host completeness and return-state persistence"
   },
   "policy_change": false,
   "planned_files": [
-    "src/vendor/yeis/camera/CameraController.ts",
-    "src/vendor/yeis/input/Input.ts",
-    "src/vendor/yeis/render/StarPoints.ts",
-    "src/vendor/yeis/render/ProcStarPoints.ts",
-    "src/vendor/yeis/render/GalaxyCloud.ts",
-    "src/vendor/yeis/render/GalaxySprites.ts",
-    "src/vendor/yeis/render/shaders/**",
-    "src/vendor/yeis/PATCHES.md",
-    "src/lib/universe/yeis/bridge.ts",
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/catalog.ts",
     "src/components/universe/YeisGalaxyScene.tsx",
     "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/UniverseApp.tsx",
     "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "r3f-host-yeis-native",
-    "native-pick-methods"
+    "nasa-physical-overlay",
+    "parent-view-ref"
   ],
   "candidate_scores": {
-    "r3f-host-yeis-native": 52,
-    "full-yeis-app": 33,
-    "keep-v2-galaxy": 51.5,
-    "custom-r3f-port": 39,
-    "native-pick-methods": 52.5
+    "nasa-physical-overlay": 55.5,
+    "fuzzy-hyg-match": 37,
+    "v2-visual-overlay": 49.5,
+    "drop-hipless": 40,
+    "parent-view-ref": 57,
+    "module-global-view": 47.5,
+    "reset-opening-view": 38,
+    "url-camera-state": 46
   }
 }

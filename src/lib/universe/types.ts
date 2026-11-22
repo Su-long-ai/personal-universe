@@ -88,6 +88,8 @@ export interface GalaxyMarker {
   engine?: UniverseEngine;
   nativeId?: string;
   position: [number, number, number];
+  /** Physical position in YEIS scene frame: ecliptic J2000, parsecs from the Sun. */
+  physicalPositionPc?: [number, number, number];
   spectralType: string;
   heroKey?: string;
   catalogId?: string;

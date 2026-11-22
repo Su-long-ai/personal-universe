@@ -199,8 +199,28 @@ Laptop GPU:
   initial catalogue/renderer setup; steady frame pacing showed no regression
   in the same headless GPU test.
 
-The remaining cutover blockers are product semantics rather than renderer
-viability: HIP-less observed hosts need a native-overlay representation, and
-returning from a system should preserve the visitor's native galaxy camera
-state before V2 can be retired as the default.
+The two product-semantic cutover blockers are now closed.
+
+### Native parity completion
+
+Validated on 2026-11-22 against a clean production build:
+
+- all five observed hosts in the exposed bridge that lack HIP identity render
+  as a lightweight overlay at NASA RA/Dec/distance transformed into the exact
+  pinned YEIS/HYG scene frame;
+- the runtime reports data-yeis-hipless-observed=5 while the native galaxy
+  remains ready, so the overlay does not replace or duplicate HIP-matched stars;
+- native camera position/quaternion persist in a UniverseCanvas-owned ref
+  across renderer remounts;
+- an automated Chrome test changed native orbit distance, switched quality
+  (forcing the native renderer effect to clean up and rebuild), and observed
+  restored=1 with the post-input camera distance rather than the opening
+  overview distance;
+- Reuse Gate and a clean Astro production build both pass after the parity
+  changes.
+
+V2 is therefore no longer required for native-galaxy semantic parity. The next
+migration step is the default-engine cutover plus a rollback switch; removal of
+duplicated V2 infrastructure remains a later cleanup after the default path has
+soaked.
 
