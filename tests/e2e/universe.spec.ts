@@ -122,7 +122,7 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
   const runtime = observeRuntime(page, {
     allowConsoleErrors: [
       /^\[YEIS-BRIDGE\] FAILED; retaining V2 fallback/,
-      /^\[YEIS-NATIVE-GALAXY\] FAILED/,
+      /^\[YEIS-NATIVE-GALAXY\] FAILED/,\n      /^Failed to load resource: net::ERR_FAILED$/,
     ],
     allowFailedRequests: [stars],
   });

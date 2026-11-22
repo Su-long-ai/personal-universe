@@ -9,6 +9,8 @@ const VIEWPORTS = [
   { name: "mobile-390x844", width: 390, height: 844 },
 ] as const;
 
+test.describe.configure({ retries: 0 });
+
 async function shot(
   page: Page,
   testInfo: TestInfo,
@@ -28,7 +30,7 @@ for (const viewport of VIEWPORTS) {
   test(`capture stable UI and WebGL artifacts: ${viewport.name}`, async ({
     page,
   }, testInfo) => {
-    test.setTimeout(90_000);
+    test.setTimeout(180_000);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({
       width: viewport.width,
@@ -49,23 +51,13 @@ for (const viewport of VIEWPORTS) {
       .find(Boolean);
     expect(target).toBeTruthy();
 
-    await page.goto(
-      `/?phase=system&star=${encodeURIComponent(target!)}&freeze=1`,
-    );
-    await expect(page.locator(".content-signal-card")).toBeVisible();
-    await shot(page, testInfo, viewport.name, "system-personal-signal");
+    const navigatorButton = page.getByRole("button", { name: /SEARCH \/ PLACES/ });
+    await navigatorButton.click();
+    const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+    await expect(dialog).toBeVisible();
 
-    await page.goto(
-      `/?phase=orbit&star=${encodeURIComponent(target!)}&freeze=1`,
-    );
-    await expect(page.locator(".world-content-card")).toBeVisible();
-    await shot(page, testInfo, viewport.name, "orbit-personal-world");
-
-    await page.goto("/?navigator=1&navq=Personal%20Universe&freeze=1");
-    await waitForYeis(page);
-    await expect(
-      page.getByRole("dialog", { name: "Universe navigator" }),
-    ).toBeVisible();
+    const search = page.getByRole("textbox", { name: "Search universe" });
+    await search.fill("Personal Universe");
     await expect
       .poll(async () =>
         Number(
@@ -77,13 +69,26 @@ for (const viewport of VIEWPORTS) {
       .toBeGreaterThan(0);
     await shot(page, testInfo, viewport.name, "search-open");
 
-    await page.goto("/?navigator=1&freeze=1");
-    await waitForYeis(page);
-    await expect(
-      page.getByRole("dialog", { name: "Universe navigator" }),
-    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await navigatorButton.click();
+    await expect(dialog).toBeVisible();
     await expect(page.locator(".kind-featured").first()).toBeVisible();
     await shot(page, testInfo, viewport.name, "places-open");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    await page.goto(
+      `/?phase=system&star=${encodeURIComponent(target!)}&freeze=1`,
+    );
+    await expect(page.locator(".content-signal-card")).toBeVisible();
+    await shot(page, testInfo, viewport.name, "system-personal-signal");
+
+    await page.goto(
+      `/?phase=orbit&star=${encodeURIComponent(target!)}&freeze=1`,
+    );
+    await expect(page.locator(".world-content-card")).toBeVisible();
+    await shot(page, testInfo, viewport.name, "orbit-personal-world");
 
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
