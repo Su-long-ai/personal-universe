@@ -12,6 +12,14 @@ export type UniverseNavigationKind =
   | "landmark"
   | "galaxy";
 
+export type UniverseNavigationGroup =
+  | "personal"
+  | "worlds"
+  | "stars"
+  | "blackholes"
+  | "landmarks"
+  | "galaxies";
+
 export type UniverseNavigationTarget =
   | { kind: "star"; nativeId: string }
   | { kind: "body"; nativeId: string; bodyId: string }
@@ -21,6 +29,7 @@ export type UniverseNavigationTarget =
 export interface UniverseNavigationDestination {
   id: string;
   kind: UniverseNavigationKind;
+  group: UniverseNavigationGroup;
   title: string;
   detail: string;
   target: UniverseNavigationTarget;
@@ -115,9 +124,11 @@ export async function loadUniverseNavigation(
   ]);
   const runtime = await loadYeisCore();
   const q = normalizeQuery(query);
-  return q
+  const destinations = q
     ? searchDestinations(runtime, q, placements, markers, normalizeQuery)
     : browseDestinations(runtime, placements, markers);
+
+  return orderDestinations(destinations, q, normalizeQuery);
 }
 
 export async function navigationMarker(
@@ -160,6 +171,7 @@ function browseDestinations(
     out.push({
       id: "featured:" + nativeId,
       kind: "featured",
+      group: "stars",
       title: runtime.catalog.nameOf(hit),
       detail:
         "FEATURED STAR · " +
@@ -174,6 +186,7 @@ function browseDestinations(
     out.push({
       id: "featured:blackhole:" + ref,
       kind: "featured",
+      group: "blackholes",
       title: blackHole.entry.name,
       detail: "FEATURED PLACE · BLACK HOLE",
       target: { kind: "star", nativeId: blackHole.systemStarId },
@@ -197,7 +210,7 @@ function browseDestinations(
     out.push(galaxyDestination(runtime, index, "featured", item.title));
   }
 
-  return dedupe(out).slice(0, 72);
+  return out;
 }
 
 function searchDestinations(
@@ -231,6 +244,7 @@ function searchDestinations(
     out.push({
       id: "featured:aurora",
       kind: "featured",
+      group: "stars",
       title: "AURORA",
       detail: "HERO SYSTEM · PERSONAL UNIVERSE",
       target: { kind: "star", nativeId: runtime.heroSystem.id },
@@ -249,6 +263,7 @@ function searchDestinations(
     out.push({
       id: `body:${currentStarId}:${body.id}`,
       kind: "body",
+      group: "worlds",
       title: body.name,
       detail: body.data.type.toUpperCase() + " · " + currentSystemName,
       target: {
@@ -266,6 +281,7 @@ function searchDestinations(
     out.push({
       id: `body:${foreign.starId}:${foreign.body.id}`,
       kind: "body",
+      group: "worlds",
       title: foreign.name,
       detail:
         foreign.body.type.toUpperCase() +
@@ -285,6 +301,7 @@ function searchDestinations(
     out.push({
       id: "star:" + nativeId,
       kind: "star",
+      group: "stars",
       title: info.name,
       detail:
         (info.catalogSpectral || info.spectral || "STAR") +
@@ -298,6 +315,7 @@ function searchDestinations(
     out.push({
       id: "blackhole:" + blackHole.entry.id,
       kind: "blackhole",
+      group: "blackholes",
       title: blackHole.entry.name,
       detail: "BLACK HOLE · YEIS PLACE",
       target: { kind: "star", nativeId: blackHole.systemStarId },
@@ -312,7 +330,7 @@ function searchDestinations(
     out.push(galaxyDestination(runtime, index));
   }
 
-  return dedupe(out).slice(0, 20);
+  return out;
 }
 
 function galaxyDestination(
@@ -330,6 +348,7 @@ function galaxyDestination(
   return {
     id: "galaxy:" + index,
     kind,
+    group: "galaxies",
     title: title ?? galaxies.name(index),
     detail:
       "GALAXY · " +
@@ -348,6 +367,7 @@ function landmarkDestination(
     return {
       id: "landmark:" + landmark.def.id,
       kind,
+      group: "landmarks",
       title: landmark.def.name,
       detail: landmark.def.kind.toUpperCase() + " · YEIS LANDMARK",
       target: { kind: "star", nativeId: landmark.systemId },
@@ -357,6 +377,7 @@ function landmarkDestination(
   return {
     id: "landmark:" + landmark.def.id,
     kind,
+    group: "landmarks",
     title: landmark.def.name,
     detail: landmark.def.kind.toUpperCase() + " · DEEP-SKY PLACE",
     target: { kind: "landmark", index },
@@ -378,6 +399,7 @@ function personalDestinations(
       {
         id: "personal:" + placement.entry.id,
         kind: "personal" as const,
+        group: "personal" as const,
         title: placement.entry.title,
         detail:
           placement.entry.kind.toUpperCase() +
@@ -389,6 +411,56 @@ function personalDestinations(
       },
     ];
   });
+}
+
+const GROUP_ORDER: Record<UniverseNavigationGroup, number> = {
+  personal: 0,
+  worlds: 1,
+  stars: 2,
+  blackholes: 3,
+  landmarks: 4,
+  galaxies: 5,
+};
+
+function orderDestinations(
+  destinations: UniverseNavigationDestination[],
+  query: string,
+  normalize: (value: string) => string,
+): UniverseNavigationDestination[] {
+  const ranked = dedupe(destinations).map((destination, sourceIndex) => ({
+    destination,
+    sourceIndex,
+    matchRank: query ? destinationMatchRank(destination, query, normalize) : 0,
+  }));
+
+  ranked.sort((a, b) => {
+    const groupDelta =
+      GROUP_ORDER[a.destination.group] - GROUP_ORDER[b.destination.group];
+    if (groupDelta !== 0) return groupDelta;
+
+    const rankDelta = a.matchRank - b.matchRank;
+    if (rankDelta !== 0) return rankDelta;
+
+    return a.sourceIndex - b.sourceIndex;
+  });
+
+  return ranked.map(({ destination }) => destination).slice(0, query ? 24 : 72);
+}
+
+function destinationMatchRank(
+  destination: UniverseNavigationDestination,
+  query: string,
+  normalize: (value: string) => string,
+): number {
+  const title = normalize(destination.title);
+  const detail = normalize(destination.detail);
+  if (title === query) return 0;
+  if (title.startsWith(query)) return 1;
+  if (title.split(/\s+/).some((token) => token.startsWith(query))) return 2;
+  if (title.includes(query)) return 3;
+  if (detail.startsWith(query)) return 4;
+  if (detail.includes(query)) return 5;
+  return 6;
 }
 
 function dedupe(
