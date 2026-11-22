@@ -48,6 +48,10 @@ export default function UniverseApp() {
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
+  const [coreDiagnostic, setCoreDiagnostic] = useState<{
+    status: "loading" | "ready" | "error";
+    detail: string;
+  } | null>(null);
   const reducedMotion = useReducedMotion();
   const ambient = useAmbientAudio(muted, phase);
   const debugFreeze =
@@ -82,6 +86,43 @@ export default function UniverseApp() {
     setSelectedPlanet(heroPlanet);
     setPhase(requestedPhase);
   }, [galaxy.markers]);
+
+  useEffect(() => {
+    const diagnostic = new URLSearchParams(window.location.search).get("diagnostic");
+    if (diagnostic !== "yeis-core") return;
+
+    let cancelled = false;
+    setCoreDiagnostic({
+      status: "loading",
+      detail: "Loading vendored universe model and 109,401-star catalogue…",
+    });
+
+    void import("../../lib/universe/yeis")
+      .then(async ({ loadYeisCore, HERO_PLANET_ID }) => {
+        const runtime = await loadYeisCore();
+        const hero = runtime.heroSystem.get(HERO_PLANET_ID);
+        const detail =
+          `stars=${runtime.catalog.count} heroSystem=${runtime.heroSystem.id} ` +
+          `bodies=${runtime.heroSystem.bodies.length} hero=${hero?.name ?? "missing"}`;
+
+        if (cancelled) return;
+        document.documentElement.dataset.yeisCore = "ready";
+        document.documentElement.dataset.yeisStars = String(runtime.catalog.count);
+        console.info(`[YEIS-CORE] READY ${detail}`);
+        setCoreDiagnostic({ status: "ready", detail });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        document.documentElement.dataset.yeisCore = "error";
+        console.error("[YEIS-CORE] FAILED", error);
+        setCoreDiagnostic({ status: "error", detail });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSelectSystem = useCallback(
     (marker: GalaxyMarker) => {
@@ -173,6 +214,30 @@ export default function UniverseApp() {
       </div>
 
       <div className="cinematic-wash" aria-hidden="true" />
+
+      {coreDiagnostic && (
+        <aside
+          data-yeis-core-diagnostic={coreDiagnostic.status}
+          style={{
+            position: "fixed",
+            left: 16,
+            bottom: 16,
+            zIndex: 20,
+            maxWidth: 520,
+            padding: "10px 12px",
+            border: "1px solid rgba(126, 235, 255, 0.35)",
+            background: "rgba(1, 7, 14, 0.88)",
+            color: "#dffaff",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 11,
+            lineHeight: 1.5,
+            pointerEvents: "none",
+          }}
+        >
+          <strong>YEIS CORE // {coreDiagnostic.status.toUpperCase()}</strong>
+          <div>{coreDiagnostic.detail}</div>
+        </aside>
+      )}
 
       <UniverseHud
         phase={phase}

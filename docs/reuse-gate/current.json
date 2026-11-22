@@ -1,44 +1,45 @@
 {
   "schema": 2,
-  "task_id": "UNIVERSE-BACKBONE-DECISION-001",
-  "title": "Choose the mother universe backbone before further visual or subsystem implementation",
+  "task_id": "YEIS-CORE-MIGRATION-001",
+  "title": "Vendor the minimal verified MIT YEIS universe-model closure behind a Personal Universe adapter",
   "scope": {
-    "level": "architecture",
-    "subject": "Personal Universe galaxy-to-surface mother engine"
+    "level": "subsystem",
+    "subject": "Universe data/model layer migration from local V2 generators to the selected YEIS MIT core"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "Code-level and runtime comparison of the verified MIT Your Eyes In Space commit e520568, current MIT Cosmos, and the current Personal Universe V2 composite. YEIS e520568 clean-builds, boots headlessly, covers hierarchical real+procedural universe navigation, floating origin/log depth, real HYG stars, deterministic systems, procedural planets, Earth/Moon/Mars imagery, Milky Way/deep universe and hand-made ExtraSystem exceptions. A research-copy patch exposing registerExtraSystem successfully injected HELION + AURORA-01 and rendered the Hero planet without modifying camera/render/system-generation internals. Its apparent 449 MB distribution is mostly optional lessons/tours media (~389 MB), which the personal site does not need. Cosmos has cleaner modular subsystems and stronger tests, but current main has SearchPanel type errors, relies on backend tile manifests for full data, and lacks an existing hand-made system override API. Current V2 has excellent customization and low local complexity but would require us to continue rebuilding cross-scale coordinates, real catalogs, surface streaming, deep-universe rendering and several mature subsystems already present in YEIS. Select a hybrid: reuse the exact MIT YEIS core as the universe/navigation/data/render backbone, preserve the current Astro/React personal-content shell and Hero-world override boundary, and retain ProceduralPlanets only as an optional renderer/fallback rather than the global engine.",
+  "research_summary": "Phase 1 of the accepted mother-backbone decision will not import the full YEIS application. A dependency-closure scan from Universe, StarSystem, CelestialBody and StarCatalog found only 22 TypeScript files. A clean-room compatibility copy of that closure compiles with this project's Three 0.185.1 after two intentional host adaptations: replace the upstream UI i18n module with an identity/Intl compatibility shim and replace the Vite-injected __BUILD_ID__ cache key with the pinned upstream SHA. The HYG-derived binary is only 2.63 MB plus 201 KB names and contains 109,401 stars. Choose exact vendoring of the minimal closure plus a narrow Personal Universe adapter and optional diagnostic loader. Reject a full app fork/iframe, a Git submodule of the entire repository, and rewriting the algorithms into local V2 code because those options either preserve unnecessary product coupling or forfeit the main reuse benefit.",
   "planned_files": [
-    "docs/architecture/universe-backbone.md"
+    "src/vendor/yeis/**",
+    "src/lib/universe/yeis/**",
+    "public/vendor/yeis/data/stars.bin",
+    "public/vendor/yeis/data/star-names.json",
+    "public/THIRD_PARTY_ASSETS.md",
+    "src/components/universe/UniverseApp.tsx"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/LICENSE",
-      "finding": "Commit e520568 carries an MIT LICENSE and predates the later AGPL switch; it is a concrete reproducible permissive source boundary even though the advertised mit-final tag is not currently exposed."
-    },
-    {
       "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "finding": "The verified MIT snapshot contains hierarchical Universe/StarSystem models, deterministic procedural systems, HYG stars, galaxy/deep-universe renderers, floating-origin camera behavior, log-depth rendering, planetary imagery and ExtraSystem hand-made exceptions."
+      "finding": "The selected reproducible MIT snapshot contains the exact Universe/StarSystem/StarCatalog/SystemGenerator source used by the minimal closure and is the only permitted upstream source boundary for this migration."
     },
     {
-      "url": "https://github.com/beevr-labs/Cosmos",
-      "finding": "Cosmos is MIT and provides a modular browser universe engine with camera-relative coordinates, scale regimes, tile streaming, ephemerides, procedural materials, black-hole lensing and extensive tests, but its current data/backend integration is still in active development."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/NOTICE.md",
+      "finding": "The snapshot documents the HYG-derived stars.bin as CC BY-SA 4.0 and distinguishes NASA/JPL and other third-party material, so vendoring must preserve notices and avoid copying unrelated branded/media assets."
     },
     {
-      "url": "https://hysenlabs.com/projects/hyqzz-solar-wanderer",
-      "finding": "Solar Wanderer is a narrower MIT universe-scale travel implementation covering floating origin, log depth, JPL ephemerides and atmosphere, useful as a gap donor rather than a broader mother engine."
+      "url": "https://git-scm.com/docs/git-submodule",
+      "finding": "Git submodules pin an external repository commit in a superproject, but require explicit submodule initialization/update and would bring repository-level coupling when this task only needs a 22-file closure."
     },
     {
-      "url": "https://github.com/typpo/spacekit",
-      "finding": "SpaceKit is an MIT astronomy/Three.js subsystem for ephemerides, Keplerian objects and orbital visualization; it is useful for isolated gaps but does not cover the whole personal-universe target."
+      "url": "https://docs.astro.build/en/guides/framework-components/",
+      "finding": "Astro supports framework islands, so the selected core can remain behind the existing React client shell rather than replacing the site application."
     },
     {
       "url": "https://github.com/ZyFou/ProceduralPlanets",
-      "finding": "ProceduralPlanets remains a strong MIT procedural-planet renderer already integrated locally, but its scope is planetary rendering rather than the cross-scale universe backbone."
+      "finding": "ProceduralPlanets remains an optional renderer/fallback; its scope does not replace the selected universe-model closure."
     },
     {
-      "url": "https://github.com/creativelifeform/three-nebula",
-      "finding": "three-nebula is a reusable MIT particle system for localized dust/nebula/effects, representative of component-level reuse that should only be considered after the mother engine decision."
+      "url": "https://github.com/astronexus/HYG-Database",
+      "finding": "HYG is a compact astronomical star catalogue with share-alike data licensing; the selected YEIS snapshot already includes a derived compact binary and its required attribution."
     }
   ],
   "search_ladder": [
@@ -46,365 +47,235 @@
       "level": "full_solution",
       "status": "found",
       "registry_refs": [
-        "your-eyes-in-space-mit-e520568",
-        "cosmos-web-universe",
-        "galaxy-explorer"
+        "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
         0,
-        1,
-        2
+        1
       ],
-      "conclusion": "Two genuine browser-scale mother-engine candidates exist. YEIS e520568 is the only one that both clean-builds today and already implements the real+procedural+hand-made-exception model required by this site."
+      "conclusion": "The whole YEIS product exists and is already selected as the source mother, but importing the complete application would retain simulator UI, tours, missions and hundreds of MB of unrelated media."
     },
     {
       "level": "framework_engine",
       "status": "found",
       "registry_refs": [
-        "solar-wanderer"
+        "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
+        0,
         3
       ],
-      "conclusion": "Solar Wanderer can donate cross-scale travel techniques if the chosen full solution has a gap, but adopting it as mother would still leave galaxy/catalog/deep-universe work."
+      "conclusion": "The reusable engine/model subset can live under the existing Astro/React shell; a dependency scan proves the model closure is small enough to vendor directly without the full product runtime."
     },
     {
       "level": "subsystem",
       "status": "found",
       "registry_refs": [
-        "spacekit",
-        "procedural-planets",
-        "helios-procedural-system"
+        "your-eyes-in-space-mit-e520568",
+        "procedural-planets"
       ],
       "source_refs": [
-        4,
-        5
+        0,
+        4
       ],
-      "conclusion": "Strong orbital and planet-generation subsystems exist, but continuing to compose them would reproduce a smaller version of capabilities already integrated in the verified YEIS mother candidate."
+      "conclusion": "Universe/StarSystem/StarCatalog/SystemGenerator form the required subsystem; ProceduralPlanets stays separate as an optional renderer rather than duplicating the model layer."
     },
     {
       "level": "component_asset",
       "status": "found",
       "registry_refs": [
-        "three-nebula"
+        "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        6
+        1,
+        5
       ],
-      "conclusion": "Particle/effect components remain available for future Hero-world or visual gaps, but they are downstream of the mother-engine choice."
+      "conclusion": "The 109,401-star compact HYG-derived binary and name table are reusable data assets when copied with their CC BY-SA notice."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "real nearby star catalogue",
+      "capability": "exact reproducible upstream source boundary",
       "importance": "high",
       "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "partial"
+        "vendor-minimal-core": "full",
+        "full-submodule": "full",
+        "iframe-full-app": "full",
+        "rewrite-into-v2": "partial"
       },
-      "decision": "YEIS already ships a compact HYG-derived catalogue; Cosmos has the ingestion/tile architecture but current full catalogue ingestion is not the same ready-to-use path."
+      "decision": "Vendoring records the exact source SHA beside copied files while avoiding runtime dependence on the changing upstream repository."
     },
     {
-      "capability": "deterministic procedural star/system fill",
+      "capability": "small migration surface",
       "importance": "high",
       "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "full"
+        "vendor-minimal-core": "full",
+        "full-submodule": "none",
+        "iframe-full-app": "partial",
+        "rewrite-into-v2": "partial"
       },
-      "decision": "YEIS and current V2 both have deterministic generation; YEIS additionally connects it to the larger real/deep universe hierarchy."
+      "decision": "The measured closure is 22 TypeScript files plus ~2.83 MB catalog data, far smaller than the full application."
     },
     {
-      "capability": "solar-system ephemerides and real bodies",
+      "capability": "preserve current Astro/React personal shell",
+      "importance": "high",
+      "coverage": {
+        "vendor-minimal-core": "full",
+        "full-submodule": "partial",
+        "iframe-full-app": "partial",
+        "rewrite-into-v2": "full"
+      },
+      "decision": "A local adapter keeps the existing product shell and allows later renderer migration independently."
+    },
+    {
+      "capability": "Hero system registration",
+      "importance": "high",
+      "coverage": {
+        "vendor-minimal-core": "full",
+        "full-submodule": "full",
+        "iframe-full-app": "partial",
+        "rewrite-into-v2": "full"
+      },
+      "decision": "Keep the already-proven one-method registerExtraSystem patch in the vendored Universe class and put Personal Universe Hero definitions outside vendor code."
+    },
+    {
+      "capability": "upstream algorithms remain recognizable for future audit",
       "importance": "medium",
       "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "none"
+        "vendor-minimal-core": "full",
+        "full-submodule": "full",
+        "iframe-full-app": "full",
+        "rewrite-into-v2": "none"
       },
-      "decision": "Both external mothers materially exceed V2 here; this is not worth rebuilding locally."
+      "decision": "Copy source mostly verbatim and isolate three host patches in a PATCHES.md rather than translating algorithms into new local code."
     },
     {
-      "capability": "floating origin / camera-relative precision",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "none"
-      },
-      "decision": "Both external engines solve the multi-order-of-magnitude precision problem already; keeping V2 would require a new subsystem."
-    },
-    {
-      "capability": "log-depth and cross-scale travel",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "partial"
-      },
-      "decision": "YEIS has this operating in a runnable complete product, while current V2 still uses discrete phase scenes."
-    },
-    {
-      "capability": "real planetary surface imagery / streaming",
+      "capability": "no extra runtime/deployment mechanism",
       "importance": "medium",
       "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "none"
+        "vendor-minimal-core": "full",
+        "full-submodule": "partial",
+        "iframe-full-app": "partial",
+        "rewrite-into-v2": "full"
       },
-      "decision": "YEIS already streams NASA Earth/Moon/Mars imagery and therefore removes another major future implementation branch."
-    },
-    {
-      "capability": "procedural planets / atmospheres / clouds",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "full"
-      },
-      "decision": "All routes can cover procedural planets; this capability no longer differentiates the mother choice."
-    },
-    {
-      "capability": "Milky Way, galaxies and deep universe",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "partial"
-      },
-      "decision": "Both external mothers already extend beyond the local Milky Way prototype; V2 would need multiple new render/data layers."
-    },
-    {
-      "capability": "Hero hand-made system override",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "full"
-      },
-      "decision": "A runtime PoC proved YEIS ExtraSystem can host HELION + AURORA-01 with one small public registration API; Cosmos needs a new plugin/entity abstraction."
-    },
-    {
-      "capability": "personal Astro/React content and custom Hero worlds",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "partial",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "full"
-      },
-      "decision": "Hybrid adoption deliberately keeps our shell/content/Hero boundary; a full YEIS fork would unnecessarily inherit simulator UI/branding."
-    },
-    {
-      "capability": "clean source build today",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "full"
-      },
-      "decision": "YEIS e520568 and V2 clean-build. Cosmos packages and Vite bundle run, but current repo-wide TypeScript build fails on SearchPanel ApiEntity fields."
-    },
-    {
-      "capability": "standalone runtime without project backend",
-      "importance": "medium",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "full",
-        "cosmos-v2-hybrid": "partial",
-        "v2-composite": "full"
-      },
-      "decision": "Cosmos visibly falls back when its star-tile manifest backend is absent; YEIS and V2 are static-site friendly."
-    },
-    {
-      "capability": "license reproducibility / fit",
-      "importance": "high",
-      "coverage": {
-        "yeis-v2-hybrid": "partial",
-        "yeis-full-fork": "partial",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "full"
-      },
-      "decision": "YEIS exact commit is verified MIT, but the advertised mit-final tag is missing and HYG binary remains CC BY-SA; pin SHA and notices. Cosmos and local V2 are simpler license-wise."
-    },
-    {
-      "capability": "ongoing upstream maintenance",
-      "importance": "medium",
-      "coverage": {
-        "yeis-v2-hybrid": "partial",
-        "yeis-full-fork": "partial",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "full"
-      },
-      "decision": "The permissive YEIS snapshot is frozen because later upstream is AGPL; accept that cost only because its coverage substantially reduces our own implementation burden."
-    },
-    {
-      "capability": "payload can be trimmed for personal-homepage use",
-      "importance": "medium",
-      "coverage": {
-        "yeis-v2-hybrid": "full",
-        "yeis-full-fork": "partial",
-        "cosmos-v2-hybrid": "full",
-        "v2-composite": "full"
-      },
-      "decision": "YEIS apparent 449 MB dist is mostly optional lessons/tours; removing those leaves a much smaller astronomy/core payload while preserving notices and needed models/data."
+      "decision": "Vendored TypeScript is handled by the existing Astro/Vite build and requires no submodule bootstrap or nested web app."
     }
   ],
   "candidates": [
     {
-      "id": "yeis-v2-hybrid",
-      "name": "Verified MIT YEIS core + current Astro/React personal shell + Hero override boundary",
-      "level": "full_solution",
+      "id": "vendor-minimal-core",
+      "name": "Vendor exact 22-file YEIS core closure + data assets + adapter",
+      "level": "framework_engine",
       "registry_id": "your-eyes-in-space-mit-e520568",
       "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "license": "MIT source pinned to e520568; third-party data/assets retain NOTICE terms",
+      "license": "MIT source; HYG-derived catalog CC BY-SA 4.0; notices retained",
       "decision": "reuse",
-      "reason": "Highest whole-project leverage. Runtime PoC proves the existing ExtraSystem architecture can host our Hero world while the mother supplies the expensive astronomy, cross-scale coordinate, camera, rendering and data layers. Preserve our personal shell rather than its product UI.",
-      "evaluation": {
-        "coverage": 5,
-        "integration_cost": 2.5,
-        "license_fit": 4,
-        "maintenance_health": 3,
-        "performance_fit": 4,
-        "customization_fit": 5,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "yeis-full-fork",
-      "name": "Fork the entire verified MIT YEIS application and reskin it",
-      "level": "full_solution",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "license": "MIT source pinned to e520568; third-party notices retained",
-      "decision": "reject",
-      "reason": "Technically viable and lowest migration effort, but it inherits simulator UI, lessons/tours/mission concepts and branding structure that conflict with the personal-universe product; stripping those after the fact is worse than reusing its core under our shell.",
+      "reason": "Maximizes verified reuse while preserving the personal shell, keeps the dependency boundary small, and has already passed a Three 0.185.1 compatibility compile with only explicit host shims.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 1.5,
         "license_fit": 4,
-        "maintenance_health": 3,
-        "performance_fit": 3.5,
-        "customization_fit": 2.5,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "cosmos-v2-hybrid",
-      "name": "Cosmos engine under the current personal shell",
-      "level": "full_solution",
-      "registry_id": "cosmos-web-universe",
-      "source": "https://github.com/beevr-labs/Cosmos",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "Excellent modular donor and likely future source for coordinate/tile/render techniques, but today it needs backend/data plumbing, has current TypeScript UI errors, and requires a new Hero-system plugin abstraction before it can replace V2 cleanly.",
-      "evaluation": {
-        "coverage": 4.5,
-        "integration_cost": 4,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 4,
-        "customization_fit": 5,
-        "maturity": 3.5
-      }
-    },
-    {
-      "id": "v2-composite",
-      "name": "Continue the current V2 Galaxy Explorer + Helios + ProceduralPlanets composition as mother",
-      "level": "full_solution",
-      "registry_id": "galaxy-explorer",
-      "source": "local baseline 0b3be2a / composite of adopted registry subsystems",
-      "license": "Project code plus MIT/ISC reused components",
-      "decision": "reject",
-      "reason": "Best immediate control but worst remaining-work profile. It would force us to build cross-scale precision, real surfaces, deeper catalog ingestion, ephemerides and deep-universe systems that the verified YEIS snapshot already has.",
-      "evaluation": {
-        "coverage": 2.5,
-        "integration_cost": 4,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 4,
-        "customization_fit": 5,
-        "maturity": 3.5
-      }
-    },
-    {
-      "id": "solar-wanderer-supplement",
-      "name": "Solar Wanderer as scale/travel backbone",
-      "level": "framework_engine",
-      "registry_id": "solar-wanderer",
-      "source": "https://hysenlabs.com/projects/hyqzz-solar-wanderer",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "Strong floating-origin/travel subsystem but narrower than the chosen mother; keep it as a future gap reference instead of layering another engine now.",
-      "evaluation": {
-        "coverage": 3,
-        "integration_cost": 3,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 4.5,
-        "customization_fit": 4,
-        "maturity": 4
-      }
-    },
-    {
-      "id": "spacekit-supplement",
-      "name": "SpaceKit orbital/ephemeris subsystem",
-      "level": "subsystem",
-      "registry_id": "spacekit",
-      "source": "https://github.com/typpo/spacekit",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "Useful isolated orbital tools but the selected mother already covers the immediate orbit/system need; adding it now would duplicate renderer/control responsibilities.",
-      "evaluation": {
-        "coverage": 1.5,
-        "integration_cost": 2,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 4,
-        "customization_fit": 4,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "procedural-planets-retain",
-      "name": "Retain ProceduralPlanets as optional Hero/fallback renderer",
-      "level": "subsystem",
-      "registry_id": "procedural-planets",
-      "source": "https://github.com/ZyFou/ProceduralPlanets",
-      "license": "MIT",
-      "decision": "partial",
-      "reason": "Already integrated and useful for special Hero worlds or fallback baked planets, but no longer responsible for the universe backbone.",
-      "evaluation": {
-        "coverage": 1.5,
-        "integration_cost": 1,
-        "license_fit": 5,
-        "maintenance_health": 5,
+        "maintenance_health": 3.5,
         "performance_fit": 5,
         "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "full-submodule",
+      "name": "Pin the complete YEIS repository as a Git submodule",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://git-scm.com/docs/git-submodule",
+      "license": "MIT source at pinned commit; third-party notices retained",
+      "decision": "reject",
+      "reason": "Pins provenance cleanly but carries the entire app/media/source tree and adds clone/deploy initialization complexity for code that is intentionally not part of the product.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 4,
+        "maintenance_health": 3.5,
+        "performance_fit": 3,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "iframe-full-app",
+      "name": "Embed a built YEIS application as an iframe/microfrontend",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://docs.astro.build/reference/directives-reference/",
+      "license": "MIT source at pinned commit; third-party notices retained",
+      "decision": "reject",
+      "reason": "Fast visual reuse but creates a second application/runtime, weakens shared navigation/Hero-state integration and keeps upstream simulator UI instead of the personal product shell.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 3,
+        "license_fit": 4,
+        "maintenance_health": 3,
+        "performance_fit": 2.5,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "rewrite-into-v2",
+      "name": "Translate YEIS model algorithms into the existing V2 generator types",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "local V2 plus upstream YEIS reference",
+      "license": "Project code derived from MIT algorithms",
+      "decision": "reject",
+      "reason": "Would recreate the exact model layer we selected YEIS to avoid rebuilding, increase diff/audit cost and make future upstream comparison harder.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4.5,
+        "license_fit": 4,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 3
+      }
+    },
+    {
+      "id": "catalog-assets",
+      "name": "Reuse the YEIS compact HYG-derived catalog assets unchanged",
+      "level": "component_asset",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/NOTICE.md",
+      "license": "CC BY-SA 4.0 data; attribution/share-alike notice retained",
+      "decision": "reuse",
+      "reason": "The binary is already the exact compact format StarCatalog expects, contains 109,401 stars and avoids creating another star-data preprocessing pipeline.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 0.5,
+        "license_fit": 3.5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
         "maturity": 5
       }
     }
   ],
   "decision": {
-    "mode": "partial",
+    "mode": "reuse",
     "selected_ids": [
-      "yeis-v2-hybrid",
-      "procedural-planets-retain"
+      "vendor-minimal-core",
+      "catalog-assets"
     ],
-    "rationale": "Adopt the exact verified MIT YEIS e520568 source as the reusable universe core, not as the product UI. Keep the current Astro/React personal-content shell, reuse gate, Hero-world architecture and optional ProceduralPlanets renderer. Vendor only the needed MIT core/data/render pieces, preserve the upstream LICENSE/NOTICE and HYG CC BY-SA attribution, remove YEIS branding and optional lesson/tour media, and expose a narrow Hero-system registration adapter. This delivers the largest coverage gain while preserving our custom identity and avoiding a rewrite of mature cross-scale astronomy infrastructure.",
-    "higher_level_tradeoffs": [],
+    "rationale": "Vendor only the proven model/data closure from the pinned MIT commit, keep upstream structure recognizable, isolate host-specific patches and expose it through a Personal Universe adapter. This gets the mature real/procedural universe model into the project now without committing to the upstream UI/render loop or duplicating algorithms.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "full-submodule",
+        "reason": "The complete repository is broader but its extra product UI, lessons, tours, missions and media provide negative global value for this site; the measured 22-file closure captures the needed engine capability with much less coupling."
+      },
+      {
+        "candidate_id": "iframe-full-app",
+        "reason": "Embedding the whole application gives broad immediate visuals but creates a second product runtime and blocks clean shared Hero/navigation state, so the narrower engine extraction has higher end-to-end value."
+      }
+    ],
     "score_overrides": [],
-    "fallback": "If the minimal YEIS-core extraction causes unacceptable coupling or bundle regressions, keep V2 as the shell/backbone and selectively port only YEIS Universe/StarSystem/Camera concepts under a fresh subsystem gate; Cosmos coordinate-utils remains the next donor."
+    "fallback": "If the vendored closure later proves too tightly coupled, retain it as a compatibility module and migrate only its public model interfaces behind the same adapter; do not fall back to copying current AGPL upstream code."
   }
 }

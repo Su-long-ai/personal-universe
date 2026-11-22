@@ -55,3 +55,17 @@
 - Access: TAP / `pscomppars`
 - Use: nearby observed host systems and confirmed-planet parameters.
 - Runtime dependency: none; the snapshot is refreshed during development with `npm run catalog:refresh`.
+
+
+## Your Eyes In Space — verified MIT core subset
+
+- Upstream: https://github.com/berkcomba/youreyesinspace
+- Pinned source commit: `e52056897364e060fbd6d00951628f163b57d7a1`
+- Source license at that commit: MIT
+- Vendored code: `src/vendor/yeis/**`
+- Vendored data: `/vendor/yeis/data/stars.bin`, `/vendor/yeis/data/star-names.json`
+- Use: universe/star-system/body model, orbital math, compact real-star catalogue, deterministic system generation, galaxy/landmark data, and Hero-system registration.
+- Important: later upstream revisions are AGPL-3.0-or-later and are **not** part of this vendored source boundary.
+- HYG-derived star catalogue: CC BY-SA 4.0. The binary contains 109,401 stars.
+- Full copied upstream attribution: `src/vendor/yeis/UPSTREAM_NOTICE.md`
+- Exact host patches: `src/vendor/yeis/PATCHES.md`

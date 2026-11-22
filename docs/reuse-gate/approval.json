@@ -1,31 +1,34 @@
 {
   "schema": 2,
-  "task_id": "UNIVERSE-BACKBONE-DECISION-001",
-  "approved_at": "2026-11-22T13:04:39.771Z",
-  "baseline_commit": "0b3be2ab2b113ceb3f32170b3422a36fc19ed1ba",
+  "task_id": "YEIS-CORE-MIGRATION-001",
+  "approved_at": "2026-11-22T13:12:09.232Z",
+  "baseline_commit": "4f9aed1e1e3ab051dcd4f8be966fe2c6daf5b267",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "d0dc9832b3f2380fa89da2fbbc28987c7e00f4d12283cad6b241dc2bdc3069bc",
+  "record_sha256": "d96ea1f873ea61f5c569c0840fb224bd6fa1b3968c688dada93302455e3d77a2",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "307e644f4bd7532ce04bf507389c3f43f995a5f4d72cf0a6ea94ee4e7e48e115",
   "scope": {
-    "level": "architecture",
-    "subject": "Personal Universe galaxy-to-surface mother engine"
+    "level": "subsystem",
+    "subject": "Universe data/model layer migration from local V2 generators to the selected YEIS MIT core"
   },
   "policy_change": false,
   "planned_files": [
-    "docs/architecture/universe-backbone.md"
+    "src/vendor/yeis/**",
+    "src/lib/universe/yeis/**",
+    "public/vendor/yeis/data/stars.bin",
+    "public/vendor/yeis/data/star-names.json",
+    "public/THIRD_PARTY_ASSETS.md",
+    "src/components/universe/UniverseApp.tsx"
   ],
   "selected_ids": [
-    "yeis-v2-hybrid",
-    "procedural-planets-retain"
+    "vendor-minimal-core",
+    "catalog-assets"
   ],
   "candidate_scores": {
-    "yeis-v2-hybrid": 45.5,
-    "yeis-full-fork": 43,
-    "cosmos-v2-hybrid": 41.5,
-    "v2-composite": 35.5,
-    "solar-wanderer-supplement": 37.5,
-    "spacekit-supplement": 37,
-    "procedural-planets-retain": 43
+    "vendor-minimal-core": 50.5,
+    "full-submodule": 37,
+    "iframe-full-app": 34.5,
+    "rewrite-into-v2": 36.5,
+    "catalog-assets": 43.5
   }
 }
