@@ -11,6 +11,7 @@ import type { StarCatalog } from "../../../vendor/yeis/data/StarCatalog";
 import type { BodyData, OrbitElements } from "../../../vendor/yeis/data/types";
 import type { StarSystem } from "../../../vendor/yeis/core/StarSystem";
 import { AU_KM } from "../../../vendor/yeis/core/constants";
+import { _ } from "../../../vendor/yeis/i18n";
 const HERO_SYSTEM_ID = "h-aurora";
 const HERO_PLANET_ID = "aurora-01";
 
@@ -187,7 +188,7 @@ function mapPlanet(
     )
     .map((moon) => ({
       id: `yeis-moon:${moon.id}`,
-      name: moon.name,
+      name: _(moon.name),
       seed: `yeis-moon:${moon.id}`,
       radiusEarth: Math.max(0.001, moon.radius / EARTH_RADIUS_KM),
       orbitRadius: moonOrbitRadius(moon.data.orbit, data.radius),
@@ -197,7 +198,7 @@ function mapPlanet(
 
   return {
     id: hero ? HERO_PLANET_ID : `yeis-planet:${data.id}`,
-    name: data.name,
+    name: _(data.name),
     seed: `yeis-planet:${data.id}:${appearanceSeed(data)}`,
     archetype: archetypeFor(data, temperature),
     radiusEarth: Math.max(0.01, data.radius / EARTH_RADIUS_KM),
