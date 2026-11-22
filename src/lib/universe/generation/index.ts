@@ -9,8 +9,8 @@ export { catalogMetadata } from "./catalog";
 export { hashSeed, SeededRng } from "./seededRng";
 
 export function buildGalaxyIndex(seed: string): GalaxyIndex {
-  const real = catalogMarkers(18);
-  const procedural = generateProceduralMarkers(seed, 30);
+  const real = catalogMarkers(32);
+  const procedural = generateProceduralMarkers(seed, 220);
 
   return {
     seed,

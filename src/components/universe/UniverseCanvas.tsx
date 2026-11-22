@@ -1,8 +1,7 @@
+import { lazy, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
-import { PlanetScene } from "./PlanetScene";
-import { SurfaceScene } from "./SurfaceScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import { CinematicCamera } from "./CinematicCamera";
 import type {
@@ -12,6 +11,13 @@ import type {
   SystemDefinition,
   UniversePhase,
 } from "../../lib/universe/types";
+
+const LazyPlanetScene = lazy(() =>
+  import("./PlanetScene").then((module) => ({ default: module.PlanetScene })),
+);
+const LazySurfaceScene = lazy(() =>
+  import("./SurfaceScene").then((module) => ({ default: module.SurfaceScene })),
+);
 
 export function UniverseCanvas({
   phase,
@@ -62,14 +68,17 @@ export function UniverseCanvas({
         <SystemScene system={selectedSystem} onSelectPlanet={onSelectPlanet} />
       )}
 
-      {phase === "surface" && <SurfaceScene />}
+      <Suspense fallback={null}>
+        {phase === "surface" && <LazySurfaceScene />}
 
-      {phase !== "galaxy" &&
-        phase !== "system" &&
-        phase !== "surface" &&
-        selectedPlanet && (
-          <PlanetScene planet={selectedPlanet} quality={quality} />
-        )}
+        {phase !== "galaxy" &&
+          phase !== "system" &&
+          phase !== "surface" &&
+          phase !== "returning" &&
+          selectedPlanet && (
+            <LazyPlanetScene planet={selectedPlanet} quality={quality} />
+          )}
+      </Suspense>
 
       <CinematicPipeline key={phase} quality={quality} />
     </Canvas>

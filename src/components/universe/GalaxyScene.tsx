@@ -1,5 +1,5 @@
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
@@ -141,19 +141,16 @@ function FarSky() {
   );
 }
 
-function Marker({
+function SurveyMarker({
   marker,
   onSelect,
 }: {
   marker: GalaxyMarker;
   onSelect: (marker: GalaxyMarker) => void;
 }) {
-  const color = marker.source === "hero"
-    ? "#7ff2ff"
-    : marker.source === "catalog"
-      ? "#d9e7ff"
-      : spectralColor(marker.spectralType);
-  const size = marker.source === "hero" ? 0.34 : marker.source === "catalog" ? 0.22 : 0.15;
+  const hero = marker.source === "hero";
+  const color = hero ? "#7ff2ff" : "#d9e7ff";
+  const size = hero ? 0.34 : 0.22;
 
   return (
     <group position={marker.position}>
@@ -168,19 +165,82 @@ function Marker({
         <sphereGeometry args={[size, 18, 18]} />
         <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
-      {marker.source === "hero" && (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.48, 0.51, 48]} />
-          <meshBasicMaterial color="#70dfea" transparent opacity={0.62} side={THREE.DoubleSide} />
-        </mesh>
-      )}
-      {marker.source === "catalog" && (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.3, 0.315, 32]} />
-          <meshBasicMaterial color="#a9c5ff" transparent opacity={0.3} side={THREE.DoubleSide} />
-        </mesh>
-      )}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={hero ? [0.48, 0.51, 48] : [0.3, 0.315, 32]} />
+        <meshBasicMaterial
+          color={hero ? "#70dfea" : "#a9c5ff"}
+          transparent
+          opacity={hero ? 0.62 : 0.3}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
     </group>
+  );
+}
+
+function ProceduralMarkerCloud({
+  markers,
+  onSelect,
+}: {
+  markers: GalaxyMarker[];
+  onSelect: (marker: GalaxyMarker) => void;
+}) {
+  const { positions, colors } = useMemo(() => {
+    const nextPositions = new Float32Array(markers.length * 3);
+    const nextColors = new Float32Array(markers.length * 3);
+    const color = new THREE.Color();
+
+    markers.forEach((marker, index) => {
+      const offset = index * 3;
+      nextPositions[offset] = marker.position[0];
+      nextPositions[offset + 1] = marker.position[1];
+      nextPositions[offset + 2] = marker.position[2];
+
+      color.set(spectralColor(marker.spectralType));
+      nextColors[offset] = color.r;
+      nextColors[offset + 1] = color.g;
+      nextColors[offset + 2] = color.b;
+    });
+
+    return { positions: nextPositions, colors: nextColors };
+  }, [markers]);
+
+  return (
+    <points
+      frustumCulled={false}
+      onClick={(event) => {
+        const index = event.index;
+        if (index == null || !markers[index]) return;
+        event.stopPropagation();
+        onSelect(markers[index]);
+      }}
+      onPointerOver={() => document.body.classList.add("planet-hover")}
+      onPointerOut={() => document.body.classList.remove("planet-hover")}
+    >
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          array={positions}
+          count={markers.length}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          array={colors}
+          count={markers.length}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.23}
+        sizeAttenuation
+        vertexColors
+        transparent
+        opacity={0.82}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </points>
   );
 }
 
@@ -196,6 +256,24 @@ export function GalaxyScene({
   seed: string;
 }) {
   const root = useRef<THREE.Group>(null);
+  const raycaster = useThree((state) => state.raycaster);
+  const surveyMarkers = useMemo(
+    () => markers.filter((marker) => marker.source !== "procedural"),
+    [markers],
+  );
+  const proceduralMarkers = useMemo(
+    () => markers.filter((marker) => marker.source === "procedural"),
+    [markers],
+  );
+
+  useEffect(() => {
+    const previous = raycaster.params.Points.threshold;
+    raycaster.params.Points.threshold = 0.62;
+    return () => {
+      raycaster.params.Points.threshold = previous;
+      document.body.classList.remove("planet-hover");
+    };
+  }, [raycaster]);
 
   useFrame((_, delta) => {
     if (root.current) root.current.rotation.y += delta * 0.0045;
@@ -208,8 +286,16 @@ export function GalaxyScene({
       <group ref={root}>
         <GalaxyDisc />
         <GalaxyStars quality={quality} seed={seed} />
-        {markers.map((marker) => (
-          <Marker key={marker.id} marker={marker} onSelect={onSelectSystem} />
+        <ProceduralMarkerCloud
+          markers={proceduralMarkers}
+          onSelect={onSelectSystem}
+        />
+        {surveyMarkers.map((marker) => (
+          <SurveyMarker
+            key={marker.id}
+            marker={marker}
+            onSelect={onSelectSystem}
+          />
         ))}
       </group>
     </>

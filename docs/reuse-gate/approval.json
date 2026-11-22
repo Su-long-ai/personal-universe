@@ -1,24 +1,14 @@
 {
   "schema": 1,
-  "task_id": "V2-UNIVERSE-AUTO-001",
-  "approved_at": "2026-11-22T11:59:11.078Z",
-  "baseline_commit": "7f5f3972bb7d2b415d370ee37ad30837e2261c9f",
+  "task_id": "V2-UNIVERSE-SCALE-001",
+  "approved_at": "2026-11-22T12:13:46.102Z",
+  "baseline_commit": "461d8a42e634b99f54fab7d0e12414f83cb4c00a",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "4f902f47d9eef511990b0054fb1e00f131114ded7148956710600454181a09f1",
+  "record_sha256": "4fdbdbca4b75dfd2e5265717ae25c1f09fe5c158a95d4137c65ca4ce7777fe4e",
   "planned_files": [
-    "package.json",
-    "scripts/fetch-astronomy-catalog.mjs",
-    "src/data/exoplanet-hosts.json",
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/**",
-    "src/components/universe/GalaxyScene.tsx",
-    "src/components/universe/SystemScene.tsx",
-    "src/components/universe/PlanetScene.tsx",
-    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
     "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseHud.tsx",
-    "src/components/universe/universe.css",
-    "public/THIRD_PARTY_ASSETS.md"
+    "src/components/universe/GalaxyScene.tsx",
+    "src/lib/universe/generation/index.ts"
   ]
 }

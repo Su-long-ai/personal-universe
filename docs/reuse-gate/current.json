@@ -1,113 +1,77 @@
 {
-  "task_id": "V2-UNIVERSE-AUTO-001",
-  "title": "Establish reusable Milky Way, deterministic star systems, procedural planets, real catalog snapshots, and Hero overrides",
+  "task_id": "V2-UNIVERSE-SCALE-001",
+  "title": "Scale interactive galaxy markers and defer heavy planet/surface code",
   "researched_at": "2026-11-22",
-  "research_summary": "Replace the single handcrafted test-world assumption with a layered universe architecture. Reuse Galaxy Explorer's MIT-licensed spiral-arm/GPU-points rendering patterns, Helios' ISC-licensed deterministic RNG and generator decomposition, the already-installed MIT ProceduralPlanets renderer, and a local NASA Exoplanet Archive TAP snapshot for observed host systems. Keep ordinary systems deterministic and lightweight; Hero systems override the default generator and may opt into custom surfaces. HYG/Gaia are not bundled in this slice: HYG is CC BY-SA and moved off the archived GitHub mirror, while a full Gaia catalogue is unnecessarily large for the browser. The current AGPL Your Eyes In Space project is architecture reference only and is not copied.",
+  "research_summary": "Scale the V2 universe without inventing a custom loader or picking engine. Use React.lazy + Suspense for PlanetScene and SurfaceScene so the heavy procedural-planet/terrain code is fetched only on first entry. Remove the now-unused live PlanetPass from the always-on cinematic composer because orbit planets use the package-supported bakePlanet path. Batch procedural system markers into one THREE.Points object and rely on Three Raycaster Points.threshold plus R3F pointer events for picking, increasing explorable deterministic systems without one mesh/draw-call per marker.",
   "planned_files": [
-    "package.json",
-    "scripts/fetch-astronomy-catalog.mjs",
-    "src/data/exoplanet-hosts.json",
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/**",
-    "src/components/universe/GalaxyScene.tsx",
-    "src/components/universe/SystemScene.tsx",
-    "src/components/universe/PlanetScene.tsx",
-    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
     "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/UniverseApp.tsx",
-    "src/components/universe/UniverseHud.tsx",
-    "src/components/universe/universe.css",
-    "public/THIRD_PARTY_ASSETS.md"
+    "src/components/universe/GalaxyScene.tsx",
+    "src/lib/universe/generation/index.ts"
   ],
   "sources": [
     {
-      "url": "https://github.com/zjoooooo/galaxy-explorer",
-      "finding": "MIT browser Milky Way implementation uses procedural spiral-arm star placement, a single THREE.Points draw call for the star disk, GPU point sizing/color, and a painted disk that fades as the camera approaches."
+      "url": "https://react.dev/reference/react/lazy",
+      "finding": "React.lazy defers a component's code until it is first rendered; Suspense provides the loading boundary and the dynamic import result is cached."
     },
     {
-      "url": "https://github.com/dhairyaozaa/procedural-star-system",
-      "finding": "ISC Helios decomposes deterministic generation into SeededRNG, SystemGenerator, StarGenerator, PlanetGenerator and MoonGenerator and uses Web Workers for non-blocking generation; its Three.js dependency is 0.185.1, matching this project."
+      "url": "https://threejs.org/docs/pages/Raycaster",
+      "finding": "THREE.Raycaster supports Points objects and exposes params.Points.threshold in world units for point-picking precision."
     },
     {
-      "url": "https://github.com/ZyFou/ProceduralPlanets",
-      "finding": "MIT ProceduralPlanets is already installed; same seed + parameters deterministically produce terrestrial planets, gas giants and stars, with live or baked rendering and Three.js >=0.160."
+      "url": "https://r3f.docs.pmnd.rs/api/events",
+      "finding": "React Three Fiber exposes pointer/click events for Three objects that implement raycast, forwarding Three intersection data through its event system."
     },
     {
-      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "finding": "NASA Exoplanet Archive provides TAP/API access to planetary systems, stellar hosts and confirmed-planet tables; a local snapshot avoids runtime API dependency."
-    },
-    {
-      "url": "https://github.com/astronexus/HYG-Database",
-      "finding": "HYG v4.1 is a useful ~120k-star compact catalogue but the GitHub mirror is archived and the data is CC BY-SA 4.0; defer bundling it until a dedicated catalogue/licensing task."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace",
-      "finding": "Current project demonstrates real catalogues plus deterministic procedural fill and on-demand systems, but current AGPL licensing makes it reference-only for this project."
-    },
-    {
-      "url": "https://docs.astropy.org/en/stable/coordinates/galactocentric.html",
-      "finding": "Astropy documents ICRS Cartesian conversion and Galactocentric transforms; use source-backed RA/Dec/distance values and keep the first snapshot as a local-neighborhood layer rather than pretending procedural disk coordinates are measured positions."
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/main/docs/baking.md",
+      "finding": "bakePlanet returns ordinary meshes and is explicitly recommended for distant planets, dozens of background bodies and mobile; live PlanetRenderer is reserved for close/live effects."
     }
   ],
   "candidates": [
     {
-      "name": "Galaxy Explorer spiral disk / GPU points",
-      "source": "https://github.com/zjoooooo/galaxy-explorer",
-      "license": "MIT",
+      "name": "React.lazy + Suspense",
+      "source": "https://react.dev/reference/react/lazy",
+      "license": "React MIT",
       "decision": "reuse",
-      "reason": "Port the spiral-arm density placement and one-Points-buffer rendering pattern into R3F instead of retaining the current uniform random star cloud."
+      "reason": "Native React solution for splitting heavy PlanetScene and SurfaceScene chunks; no custom loader required."
     },
     {
-      "name": "Helios deterministic generator decomposition",
-      "source": "https://github.com/dhairyaozaa/procedural-star-system",
-      "license": "ISC",
+      "name": "THREE.Points + Raycaster threshold + R3F events",
+      "source": "https://threejs.org/docs/pages/Raycaster",
+      "license": "Three.js MIT",
       "decision": "reuse",
-      "reason": "Adapt its seeded RNG and Star/System/Planet/Moon data decomposition to typed project data; do not reuse its visual shaders because ProceduralPlanets already covers that layer better."
+      "reason": "One GPU points object can carry hundreds of procedural system markers while remaining clickable through built-in raycasting and R3F events."
     },
     {
-      "name": "ProceduralPlanets",
+      "name": "One Mesh per procedural system",
+      "source": "current V2 implementation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Simple but scales draw calls linearly and is unnecessary because Points already supports picking."
+    },
+    {
+      "name": "Custom asset loader / manual chunk registry",
+      "source": "local design option",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "React.lazy and the bundler already solve component-level on-demand loading."
+    },
+    {
+      "name": "Always-on PlanetRenderer/PlanetPass",
       "source": "https://github.com/ZyFou/ProceduralPlanets",
       "license": "MIT",
-      "decision": "reuse",
-      "reason": "Already integrated and version-compatible; use it as the default visual renderer for generated planets and Hero orbit views."
-    },
-    {
-      "name": "NASA Exoplanet Archive TAP snapshot",
-      "source": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "license": "NASA public scientific data; attribution retained",
-      "decision": "reuse",
-      "reason": "Refresh a compact local JSON snapshot of observed nearby host systems during development; runtime stays static/offline."
-    },
-    {
-      "name": "HYG v4.1 bundled bright-star subset",
-      "source": "https://github.com/astronexus/HYG-Database",
-      "license": "CC BY-SA 4.0",
-      "decision": "partial",
-      "reason": "Technically ideal for a future measured local-star layer, but defer it from this slice to avoid mixing share-alike catalogue packaging into the first architecture migration."
-    },
-    {
-      "name": "procedural-galaxy by syakubson",
-      "source": "https://github.com/syakubson/procedural-galaxy",
-      "license": "No explicit license verified in research",
       "decision": "reject",
-      "reason": "Its deterministic galaxy→systems→planets→handcrafted capitals architecture is useful as a reference, but code is not copied without an explicit license."
-    },
-    {
-      "name": "Your Eyes In Space current code",
-      "source": "https://github.com/berkcomba/youreyesinspace",
-      "license": "AGPL-3.0-or-later",
-      "decision": "reject",
-      "reason": "Excellent architecture reference for real+procedural universe exploration, but current copyleft terms do not fit direct code reuse here."
+      "reason": "The current close-up path now uses bakePlanet; keeping live PlanetRenderer in the initial galaxy bundle adds shader/runtime cost with no active live Planet."
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected": [
-      "Galaxy Explorer MIT spiral-arm + one-draw-call starfield patterns",
-      "Helios ISC seeded generator architecture",
-      "procedural-planets@0.5.1 for planet rendering",
-      "NASA Exoplanet Archive local TAP snapshot"
+      "React.lazy + Suspense",
+      "THREE.Points raycast batching",
+      "R3F pointer events",
+      "procedural-planets bakePlanet as deferred planet renderer"
     ],
-    "fallback": "Keep the existing V1 hero planet and static Milky Way texture available behind Hero override if the new procedural galaxy renderer regresses."
+    "fallback": "Keep catalog and Hero markers as individual meshes for stronger visual affordance; only procedural markers are batched."
   }
 }
