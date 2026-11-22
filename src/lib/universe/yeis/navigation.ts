@@ -1,4 +1,4 @@
-import type { GalaxyMarker } from "../types";
+import type { GalaxyMarker, SystemDefinition } from "../types";
 import type {
   UniverseContentKind,
   UniverseContentPlacement,
@@ -271,6 +271,7 @@ export async function loadUniverseNavigation(
   query: string,
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
+  currentSystem: SystemDefinition | null = null,
 ): Promise<UniverseNavigationDestination[]> {
   const [{ loadYeisCore }, { normalizeQuery }] = await Promise.all([
     import("./index"),
@@ -289,6 +290,7 @@ export async function loadUniverseNavigation(
     query,
     placements,
     markers,
+    currentSystem,
     normalizeQuery,
   );
 }
@@ -677,6 +679,7 @@ function searchDestinations(
   rawQuery: string,
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
+  currentSystem: SystemDefinition | null,
   normalize: (value: string) => string,
 ): UniverseNavigationDestination[] {
   const queries = queryVariants(rawQuery, normalize);
@@ -725,6 +728,42 @@ function searchDestinations(
       ),
     );
     if (matchesAny(haystack, queries)) out.push(destination);
+  }
+
+  if (currentSystem) {
+    const currentStarId = currentSystem.id.startsWith("yeis-system:")
+      ? currentSystem.id.slice("yeis-system:".length)
+      : null;
+    if (currentStarId) {
+      for (const planet of currentSystem.planets) {
+        const haystack = normalize(
+          [
+            planet.name,
+            planet.id,
+            planet.archetype,
+            ...(planet.content?.flatMap((entry) => [
+              entry.title,
+              entry.summary,
+              ...entry.tags,
+            ]) ?? []),
+          ].join(" "),
+        );
+        if (!matchesAny(haystack, queries)) continue;
+        out.push({
+          id: `body:${currentStarId}/${planet.id}`,
+          kind: "body",
+          group: "bodies",
+          title: planet.name,
+          detail: "CURRENT SYSTEM · " + currentSystem.name,
+          target: {
+            kind: "body",
+            starId: currentStarId,
+            bodyId: planet.id,
+          },
+          keywords: [planet.archetype, currentSystem.name],
+        });
+      }
+    }
   }
 
   for (const body of runtime.universe.bodies) {
