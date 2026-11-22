@@ -46,6 +46,11 @@ export function UniverseNavigator({
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [pendingAction, setPendingAction] = useState<{
+    destinationId: string;
+    mode: "open" | "locate";
+  } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const results = useMemo(
     () => sections.flatMap((section) => section.destinations),
@@ -95,6 +100,8 @@ export function UniverseNavigator({
     if (!open) {
       setQuery("");
       setActiveIndex(0);
+      setPendingAction(null);
+      setActionError(null);
       return;
     }
 
@@ -178,18 +185,46 @@ export function UniverseNavigator({
 
   if (!open) return null;
 
-  const activate = (destination: UniverseNavigationDestination) => {
-    onClose();
-    void Promise.resolve(onNavigate(destination)).catch((error) => {
-      console.error("[UNIVERSE-NAV] destination activation failed", error);
-    });
+  const updateQuery = (value: string) => {
+    setQuery(value);
+    setStatus("loading");
+    setSections([]);
+    setActiveIndex(0);
+    setActionError(null);
+    document.documentElement.dataset.universeNavigatorResults = "0";
+    document.documentElement.dataset.universeNavigatorMode = value.trim()
+      ? "search"
+      : "places";
   };
 
-  const locate = (destination: UniverseNavigationDestination) => {
-    onClose();
-    void Promise.resolve(onLocate(destination)).catch((error) => {
+  const activate = async (destination: UniverseNavigationDestination) => {
+    if (pendingAction) return;
+    setPendingAction({ destinationId: destination.id, mode: "open" });
+    setActionError(null);
+    try {
+      await Promise.resolve(onNavigate(destination));
+      setPendingAction(null);
+      onClose();
+    } catch (error) {
+      console.error("[UNIVERSE-NAV] destination activation failed", error);
+      setPendingAction(null);
+      setActionError("Could not open " + destination.title + ". Try again.");
+    }
+  };
+
+  const locate = async (destination: UniverseNavigationDestination) => {
+    if (pendingAction) return;
+    setPendingAction({ destinationId: destination.id, mode: "locate" });
+    setActionError(null);
+    try {
+      await Promise.resolve(onLocate(destination));
+      setPendingAction(null);
+      onClose();
+    } catch (error) {
       console.error("[UNIVERSE-NAV] destination locate failed", error);
-    });
+      setPendingAction(null);
+      setActionError("Could not locate " + destination.title + ". Try again.");
+    }
   };
 
   let flatIndex = -1;
@@ -222,7 +257,7 @@ export function UniverseNavigator({
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -306,8 +341,20 @@ export function UniverseNavigator({
           id="universe-navigator-results"
           className="navigator-results"
           role="listbox"
-          aria-busy={status === "loading"}
+          aria-busy={status === "loading" || pendingAction !== null}
         >
+          {actionError && (
+            <div className="navigator-action-error" role="alert">
+              {actionError}
+            </div>
+          )}
+
+          {status === "loading" && (
+            <div className="navigator-empty is-loading" role="status">
+              Scanning destinations…
+            </div>
+          )}
+
           {status === "error" && (
             <div className="navigator-empty">
               YEIS navigation index unavailable.
@@ -342,6 +389,10 @@ export function UniverseNavigator({
                   result.target.kind === "galaxy" ||
                   result.target.kind === "landmark" ||
                   result.target.kind === "blackhole";
+                const pendingMode =
+                  pendingAction?.destinationId === result.id
+                    ? pendingAction.mode
+                    : null;
 
                 return (
                   <div
@@ -364,7 +415,8 @@ export function UniverseNavigator({
                     <button
                       type="button"
                       className="navigator-result-open"
-                      onClick={() => activate(result)}
+                      onClick={() => void activate(result)}
+                      disabled={pendingAction !== null}
                     >
                       <span className={"navigator-kind kind-" + result.kind}>
                         {result.kind}
@@ -374,16 +426,25 @@ export function UniverseNavigator({
                         <small>{result.detail}</small>
                       </span>
                       <span className="navigator-open">
-                        {isCurrent ? "ACTIVE" : spatial ? "TRAVEL →" : "OPEN →"}
+                        {pendingMode === "open"
+                          ? spatial
+                            ? "TRAVELING…"
+                            : "OPENING…"
+                          : isCurrent
+                            ? "ACTIVE"
+                            : spatial
+                              ? "TRAVEL →"
+                              : "OPEN →"}
                       </span>
                     </button>
                     <button
                       type="button"
                       className="navigator-locate"
-                      onClick={() => locate(result)}
+                      onClick={() => void locate(result)}
                       aria-label={"Locate " + result.title + " in galaxy"}
+                      disabled={pendingAction !== null}
                     >
-                      LOCATE
+                      {pendingMode === "locate" ? "LOCATING…" : "LOCATE"}
                     </button>
                   </div>
                 );
