@@ -252,3 +252,20 @@ The next cleanup is **not** immediate V2 deletion. Keep the rollback until the
 YEIS default path has accumulated enough normal usage/regression evidence, then
 remove duplicated V2 generation/rendering code in a separate gated change.
 
+## Pinned YEIS English localization
+
+**Status:** restored under `YEIS-ENGLISH-I18N-002`.
+
+The minimal-core migration originally replaced YEIS i18n with an identity shim.
+GitHub visual smoke later exposed the consequence: Turkish source strings such
+as `Dünya` and `Güneş` appeared inside the English Personal Universe UI.
+
+The fix restores the exact i18n runtime from pinned MIT commit `e520568` and
+vendors only its English `data.json` and `ui.json` dictionaries. The YEIS
+runtime now awaits `initI18n("en")` before loading the star catalogue and
+constructing `Universe`.
+
+This keeps astronomical names, descriptions and facts tied to the same pinned
+source/dictionaries as the universe model and avoids a second local alias map or
+generic i18n runtime.
+
