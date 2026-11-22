@@ -229,6 +229,6 @@ jobs:
             echo "## Playwright browser validation"
             echo
             echo "- Sharded E2E result: **${{ needs.e2e.result }}**"
-            echo "- Combined report artifact: `personal-universe-playwright-report-${{ github.run_id }}`"
+            echo '- Combined report artifact: `personal-universe-playwright-report-${{ github.run_id }}`'
             echo "- Per-shard artifacts retain screenshots, traces, raw reports, and runtime metrics."
           } >> "$GITHUB_STEP_SUMMARY"
