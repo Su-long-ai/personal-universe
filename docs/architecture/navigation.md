@@ -24,7 +24,9 @@ Destination targets are intentionally small:
 - `star(nativeId)`: open a YEIS star/system through the existing product
   resolver;
 - `marker(markerId)`: observed NASA host without a native YEIS star identity;
-- `body(starId, bodyId)`: exact system body;
+- `body(starId, bodyId)`: exact native YEIS system body;
+- `observed-body(markerId, bodyId)`: exact NASA observed planet in the
+  existing v2 host-system resolver;
 - `content(nativeId, markerId, entryId)`: exact Personal Signal;
 - `blackhole(id)`: exact pinned-YEIS black-hole body;
 - `landmark(index)`: non-stellar deep-sky target;
@@ -40,12 +42,13 @@ The single navigator input searches, in product-priority order:
 1. Content Collection entries / Personal Signals;
 2. Hero world;
 3. observed exoplanet hosts;
-4. bodies in the currently open product system;
-5. current/native YEIS bodies and bodies in other hand-authored systems;
-6. catalogue stars;
-7. black holes;
-8. landmarks, nebulae and clusters;
-9. galaxies.
+4. real observed exoplanets from the existing NASA Exoplanet Archive snapshot;
+5. bodies in the currently open product system;
+6. current/native YEIS bodies and bodies in other hand-authored systems;
+7. catalogue stars;
+8. black holes;
+9. landmarks, nebulae and clusters;
+10. galaxies.
 
 Personal content searches title, summary, tags, kind and status. Common Chinese
 astronomical aliases are translated into the same normalized YEIS query path
@@ -84,6 +87,8 @@ There is no second handwritten portfolio list.
 Astronomical groups reuse stable refs from pinned MIT `src/ui/places.ts`:
 
 - Observed Exoplanet Hosts
+- Observed Exoplanets generated from the same NASA snapshot already used by the
+  v2 observed-system resolver
 - Planets & Bodies, including the pinned Solar System / mission destinations
 - Stars
 - Black Holes
@@ -195,6 +200,7 @@ Destination deep links use the same resolver and executor:
 ?destination=personal:<content-entry-id>
 ?destination=star:<native-star-id>
 ?destination=body:<star-id>/<body-id>
+?destination=exoplanet:<marker-id>:<planet-name>
 ?destination=blackhole:<black-hole-id>
 ?destination=landmark:<landmark-id>
 ?destination=galaxy:<galaxy-index>
@@ -268,8 +274,8 @@ against a production build:
 
 - Search groups, title/summary/tag matching and keyboard behavior;
 - Personal Signal Open reaches the exact attached planet;
-- Places product Open and native body fallback;
-- observed-host Locate, including a HIP-less physical point;
+- Places product Open, observed exoplanet Open, and native body fallback;
+- observed-host/exoplanet Locate, including a HIP-less physical point;
 - star/system, body, black-hole, landmark and galaxy navigation;
 - Canvas picks route through the same destinations;
 - destination deep links;
