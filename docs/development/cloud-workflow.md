@@ -35,11 +35,11 @@ Start CI diagnosis from the combined HTML report and the failing shard trace rat
 
 ## Preview deployment
 
-`.github/workflows/pages-preview.yml` publishes the validated static build to the repository's GitHub Pages project site on every `main` push and can also deploy a manually selected ref. The deployment build injects `PUBLIC_SITE_URL=https://su-long-ai.github.io` and `PUBLIC_BASE_PATH=/personal-universe`; ordinary local development and the normal browser CI remain rooted at `/`.
+`.github/workflows/pages-preview.yml` is currently a manual deployment path for a selected ref. The first real `main` deployment attempt proved that this private repository does not yet have an enabled GitHub Pages site, so automatic `main` publication is intentionally disabled until hosting is available. The deployment build still injects `PUBLIC_SITE_URL=https://su-long-ai.github.io` and `PUBLIC_BASE_PATH=/personal-universe`; ordinary local development and normal browser CI remain rooted at `/`.
 
 Public runtime assets use Astro/Vite `import.meta.env.BASE_URL`, so the same code works at local root, the GitHub Pages repository subpath, and a future custom-domain root without maintaining a second URL layer. After `deploy-pages`, the workflow probes both the live homepage and the YEIS `stars.bin` catalogue before reporting the production URL.
 
-GitHub Pages must be configured to use GitHub Actions. PR CI remains independent from Pages, so a Pages account/enablement problem cannot hide browser or build regressions. Cloudflare Pages and Vercel remain mature fallbacks if Pages availability becomes a product constraint rather than a repository setting.
+GitHub Pages must be enabled and configured to use GitHub Actions before the manual deployment can succeed. Until that external repository/account prerequisite is satisfied, a failed Pages deployment is not treated as a product regression and does not run automatically on `main`. PR CI remains independent from hosting. Cloudflare Pages and Vercel remain the researched root-hosted fallbacks if Pages availability cannot be enabled for this private repository.
 
 ## When a local machine is justified
 
