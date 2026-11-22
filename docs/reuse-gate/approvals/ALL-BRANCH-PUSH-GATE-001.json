@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "ALL-BRANCH-PUSH-GATE-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "5905df91d3850a8fcbf3c1cb7de17a6da2a61aea",
+  "record_path": "docs/reuse-gate/tasks/ALL-BRANCH-PUSH-GATE-001.json",
+  "record_sha256": "6193c2160e28b83bb6df0def07a6279e1570aeed9f18051b27b43e0ab9d66fdf",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "backstage-catalog": "dfb85f48072da4bc24da6d385618b9039c863b71b08b29b9ffab4b24ec27b213",
+    "git-hooks": "38e92e0cf551070b1ba2f565d193e71d2be7951d8281898010bdcc0b21c6a2d0",
+    "github-actions-pr-diff-gate": "3765dfd501ff4aaa27d657f4dda850f6f6f0ea8bb212ba95fe78bcab487fcf5d",
+    "opa-conftest": "f2b6f73af6d2f54b7283bb006c433641e187e07bcf25d92e37ad456a366d443c"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Repository-wide push-time reuse enforcement without duplicating expensive browser CI"
+  },
+  "policy_change": true,
+  "planned_files": [
+    ".github/workflows/ci.yml"
+  ],
+  "selected_ids": [
+    "github-actions-all-branch-push-gate"
+  ],
+  "candidate_scores": {
+    "github-actions-all-branch-push-gate": 57,
+    "opa-push-policy": 45.5,
+    "backstage-push-governance": 33,
+    "git-hooks-push-feedback": 41
+  }
+}
