@@ -21,6 +21,7 @@ export function UniverseNavigator({
   onClose,
   onNavigate,
   onLocate,
+  onStartJourney,
 }: {
   open: boolean;
   markers: GalaxyMarker[];
@@ -34,6 +35,10 @@ export function UniverseNavigator({
   onLocate: (
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
+  onStartJourney?: (
+    title: string,
+    destinations: UniverseNavigationDestination[],
+  ) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef(new Map<string, HTMLDivElement>());
@@ -46,6 +51,45 @@ export function UniverseNavigator({
     () => sections.flatMap((section) => section.destinations),
     [sections],
   );
+
+  const journeyOptions = useMemo(() => {
+    const personal =
+      sections.find((section) => section.id === "personal-signals")
+        ?.destinations ?? [];
+    const featuredIds = new Set(
+      (sections.find((section) => section.id === "featured")
+        ?.destinations ?? [])
+        .filter((destination) => destination.entryId)
+        .map((destination) => destination.id),
+    );
+    const featured = personal.filter((destination) =>
+      featuredIds.has(destination.id),
+    );
+    const projects =
+      sections.find((section) => section.id === "projects")
+        ?.destinations ?? [];
+    const research =
+      sections.find((section) => section.id === "research")
+        ?.destinations ?? [];
+
+    return [
+      {
+        id: "featured",
+        title: "Featured Journey",
+        destinations: featured.length ? featured : personal.slice(0, 3),
+      },
+      {
+        id: "projects",
+        title: "Projects Journey",
+        destinations: projects,
+      },
+      {
+        id: "research",
+        title: "Research Journey",
+        destinations: research,
+      },
+    ];
+  }, [sections]);
 
   useEffect(() => {
     if (!open) {
@@ -199,6 +243,33 @@ export function UniverseNavigator({
               : String(results.length) + " DESTINATIONS"}
           </small>
         </div>
+
+        {!query.trim() && onStartJourney && (
+          <div className="navigator-journeys" aria-label="Guided journeys">
+            <span className="navigator-journeys-label">GUIDED JOURNEYS</span>
+            <div>
+              {journeyOptions.map((journey) => (
+                <button
+                  type="button"
+                  key={journey.id}
+                  disabled={journey.destinations.length === 0}
+                  onClick={() => {
+                    if (!journey.destinations.length) return;
+                    onStartJourney(journey.title, journey.destinations);
+                    onClose();
+                  }}
+                >
+                  <strong>{journey.title}</strong>
+                  <small>
+                    {journey.destinations.length
+                      ? journey.destinations.length + " STOPS"
+                      : "NO SIGNALS YET"}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="navigator-results" role="listbox">
           {status === "error" && (
