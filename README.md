@@ -56,3 +56,16 @@ World interiors are deliberately modular so each important planet can become a c
 ## Reuse policy
 
 Commodity infrastructure should be reused instead of rebuilt: Astro, R3F/Three.js, Drei, postprocessing, camera-controls, GSAP, Howler and Theatre.js are installed as the foundation. Experimental procedural-planet/nebula projects should only be introduced behind adapters after local benchmarking.
+
+
+## Personal content
+
+Real portfolio entries live in `src/content/portfolio/` and are validated by
+Astro Content Collections. The runtime maps them deterministically onto stable
+YEIS stellar addresses and then onto an existing world in that system.
+
+The galaxy is intentionally sparse: unassigned stars and planets stay
+astronomical/procedural instead of receiving fabricated personal content.
+
+See `docs/architecture/content-layer.md` for the placement model and future CMS
+extension path.

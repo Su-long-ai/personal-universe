@@ -14,6 +14,12 @@ import {
   resolveSystem,
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
+import {
+  attachContentToSystem,
+  placeUniverseContent,
+  placementsForMarker,
+  type UniverseContentEntry,
+} from "../../lib/universe/content";
 import "./universe.css";
 
 function useReducedMotion() {
@@ -40,7 +46,11 @@ const VALID_PHASES: UniversePhase[] = [
   "returning",
 ];
 
-export default function UniverseApp() {
+export default function UniverseApp({
+  contentEntries = [],
+}: {
+  contentEntries?: UniverseContentEntry[];
+}) {
   const v2Galaxy = useMemo(() => buildGalaxyIndex("personal-universe-v2"), []);
   const [galaxy, setGalaxy] = useState(v2Galaxy);
   const [phase, setPhase] = useState<UniversePhase>("galaxy");
@@ -61,6 +71,10 @@ export default function UniverseApp() {
       ? "v2"
       : "yeis";
   const [activeEngine, setActiveEngine] = useState<UniverseEngine>(requestedEngine);
+  const contentPlacements = useMemo(
+    () => placeUniverseContent(contentEntries, galaxy.markers),
+    [contentEntries, galaxy.markers],
+  );
   const reducedMotion = useReducedMotion();
   const ambient = useAmbientAudio(muted, phase);
   const debugFreeze =
@@ -121,12 +135,39 @@ export default function UniverseApp() {
     };
   }, [requestedEngine, v2Galaxy]);
 
-  const resolveMarker = useCallback((marker: GalaxyMarker): SystemDefinition => {
-    if (marker.engine === "yeis" && yeisResolverRef.current) {
-      return yeisResolverRef.current(marker);
+  const resolveMarker = useCallback(
+    (marker: GalaxyMarker): SystemDefinition => {
+      const base =
+        marker.engine === "yeis" && yeisResolverRef.current
+          ? yeisResolverRef.current(marker)
+          : resolveSystem(marker);
+      return attachContentToSystem(
+        base,
+        placementsForMarker(contentPlacements, marker.id),
+      );
+    },
+    [contentPlacements],
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.personalContent = String(contentEntries.length);
+    document.documentElement.dataset.personalSignals = String(contentPlacements.length);
+    document.documentElement.dataset.personalSignalTargets = contentPlacements
+      .map((placement) => placement.nativeId ?? placement.markerId)
+      .join(",");
+    if (contentPlacements.length > 0) {
+      console.info(
+        `[PERSONAL-CONTENT] entries=${contentEntries.length} placements=${contentPlacements
+          .map((placement) => `${placement.entry.id}->${placement.nativeId ?? placement.markerId}`)
+          .join(",")}`,
+      );
     }
-    return resolveSystem(marker);
-  }, []);
+    return () => {
+      delete document.documentElement.dataset.personalContent;
+      delete document.documentElement.dataset.personalSignals;
+      delete document.documentElement.dataset.personalSignalTargets;
+    };
+  }, [contentEntries.length, contentPlacements]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -164,6 +205,7 @@ export default function UniverseApp() {
     }
 
     const selected =
+      system.planets.find((planet) => planet.content?.length) ??
       system.planets.find((planet) => planet.heroKey === "home") ??
       system.planets[0] ??
       null;
@@ -288,6 +330,7 @@ export default function UniverseApp() {
           phase={phase}
           engineMode={activeEngine}
           markers={galaxy.markers}
+          contentPlacements={contentPlacements}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleSelectSystem}
@@ -347,8 +390,8 @@ export default function UniverseApp() {
           <span className="eyebrow">PERSONAL UNIVERSE // GALACTIC INDEX</span>
           <h1>A living map of observed and imagined worlds.</h1>
           <p>
-            Bright survey rings are observed systems. Cyan marks a handcrafted Hero world.
-            Everything else is deterministic procedural space.
+            {contentPlacements.length} personal {contentPlacements.length === 1 ? "signal is" : "signals are"} mapped onto stable stellar addresses.
+            Observed and procedural worlds remain astronomical until real content is attached.
           </p>
         </section>
       )}
@@ -360,11 +403,33 @@ export default function UniverseApp() {
           </span>
           <strong>{selectedSystem.name}</strong>
           <small>
-            {selectedSystem.planets.length} worlds. Select a planet to approach it.
-            Ordinary worlds remain orbital; Hero worlds may continue below the clouds.
+            {selectedSystem.planets.length} worlds.
+            {selectedSystem.content?.length
+              ? ` ${selectedSystem.content.length} personal signal${selectedSystem.content.length === 1 ? "" : "s"} detected; the linked world is highlighted.`
+              : " Select a planet to approach it. Ordinary worlds remain orbital; Hero worlds may continue below the clouds."}
           </small>
+          {selectedSystem.content?.map((entry) => (
+            <div className="content-signal-card" key={entry.id}>
+              <span>PERSONAL SIGNAL // {entry.kind.toUpperCase()}</span>
+              <b>{entry.title}</b>
+              <small>{entry.summary}</small>
+            </div>
+          ))}
         </section>
       )}
+
+      {phase !== "galaxy" &&
+        phase !== "system" &&
+        selectedPlanet?.content?.map((entry) => (
+          <section className="world-content-card" key={entry.id}>
+            <span>WORLD SIGNAL // {entry.kind.toUpperCase()}</span>
+            <strong>{entry.title}</strong>
+            <small>{entry.summary}</small>
+            {entry.tags.length > 0 && (
+              <em>{entry.tags.slice(0, 4).join(" · ")}</em>
+            )}
+          </section>
+        ))}
 
       {phase === "surface" && selectedPlanet && (
         <section className="surface-copy">

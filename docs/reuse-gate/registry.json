@@ -336,6 +336,74 @@
       ],
       "notes": "Current project host. Research PoC proved YEIS renderer classes can attach directly to R3F's existing scene/gl/camera instead of running a second WebGL application.",
       "last_checked": "2026-11-22"
+    },
+    {
+      "id": "astro-content-collections",
+      "name": "Astro Content Collections / Content Layer",
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "level": "subsystem",
+      "license": "MIT (Astro)",
+      "status": "adopt",
+      "covers": [
+        "build-time local Markdown/MDX/JSON/YAML/TOML loading",
+        "Zod content schema validation",
+        "typed getCollection/getEntry queries",
+        "custom and remote loaders",
+        "static-site compatible content data"
+      ],
+      "notes": "Already available through the installed Astro runtime. Astro 7 provides built-in glob() and file() loaders plus Zod 4 schemas; no new runtime dependency is required for local portfolio content.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "keystatic",
+      "name": "Keystatic",
+      "url": "https://keystatic.com/docs/installation-astro",
+      "level": "full_solution",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "local/Git content editing UI",
+        "TypeScript schema",
+        "Markdown/YAML/JSON storage",
+        "Astro integration",
+        "GitHub-backed editing"
+      ],
+      "notes": "Good optional authoring UI because it can manage files that Astro Content Collections already consume. Current project does not yet need an embedded editor, so avoid its extra packages/Markdoc/config until authoring friction appears.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "tinacms",
+      "name": "TinaCMS",
+      "url": "https://tina.io/docs/frameworks/astro",
+      "level": "full_solution",
+      "license": "Apache-2.0",
+      "status": "assess",
+      "covers": [
+        "visual editing",
+        "Git-backed content",
+        "Astro integration",
+        "content modeling",
+        "admin UI"
+      ],
+      "notes": "Strong visual-editing workflow but existing-site integration adds Tina packages and commonly SSR adapter/island plumbing. Too broad for a static single-owner portfolio content layer at this stage.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "decap-cms",
+      "name": "Decap CMS",
+      "url": "https://decapcms.org/docs/",
+      "level": "full_solution",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "Git-based web editor",
+        "editorial workflow",
+        "static-site generator integration",
+        "media uploads",
+        "repository-backed content"
+      ],
+      "notes": "Mature Git-based admin UI, but requires an admin surface and backend/auth configuration while still leaving frontend content modeling/placement to the site. Keep as an editor option, not the current foundation.",
+      "last_checked": "2026-11-22"
     }
   ]
 }

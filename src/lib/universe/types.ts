@@ -1,3 +1,5 @@
+import type { UniverseContentEntry } from "./content";
+
 export type UniversePhase =
   | "galaxy"
   | "system"
@@ -47,6 +49,7 @@ export interface PlanetDefinition {
   surfaceMode: PlanetSurfaceMode;
   heroKey?: string;
   observed?: boolean;
+  content?: UniverseContentEntry[];
 }
 
 export interface StarDefinition {
@@ -71,6 +74,7 @@ export interface SystemDefinition {
   planets: PlanetDefinition[];
   heroKey?: string;
   catalogId?: string;
+  content?: UniverseContentEntry[];
 }
 
 export interface CatalogIdentity {

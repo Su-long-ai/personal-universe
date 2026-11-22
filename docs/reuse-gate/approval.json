@@ -1,28 +1,38 @@
 {
   "schema": 2,
-  "task_id": "YEIS-DEFAULT-CUTOVER-001",
-  "approved_at": "2026-11-22T14:46:30.538Z",
-  "baseline_commit": "876ef6d66a9285a55d5e24bc2b49c8735e5c9a49",
+  "task_id": "UNIVERSE-CONTENT-LAYER-001",
+  "approved_at": "2026-11-22T14:58:23.001Z",
+  "baseline_commit": "5660447452fe135691708338944399f282b1da7c",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "2ca7bb136022a3c8cde8041865802c727e2d7c3bb9aad254f324c2920ad4ff46",
+  "record_sha256": "9f0d301eb5079dcf19c7dbb29103788840ecb1e90e21c51ea1dbc92553b97c03",
   "registry_path": "docs/reuse-gate/registry.json",
-  "registry_sha256": "93e9fcda8e53101752e0161e1bf50683784d7f9cffc04defa3b6c1beef22824a",
+  "registry_sha256": "62037cdb3b4caa287275dca7780249147b6cb3b5344e52e124d1c1dca97ee036",
   "scope": {
     "level": "subsystem",
-    "subject": "Default universe-engine selection and rollback/fallback semantics"
+    "subject": "Personal content ingestion, validation, automatic galaxy placement, and world-level signal presentation"
   },
   "policy_change": false,
   "planned_files": [
+    "src/content.config.ts",
+    "src/content/portfolio/**",
+    "src/pages/index.astro",
+    "src/lib/universe/content/**",
+    "src/lib/universe/types.ts",
     "src/components/universe/UniverseApp.tsx",
-    "docs/architecture/universe-backbone.md",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/universe.css",
+    "docs/architecture/content-layer.md",
     "README.md"
   ],
   "selected_ids": [
-    "yeis-default-v2-rollback"
+    "astro-native-signals"
   ],
   "candidate_scores": {
-    "yeis-default-v2-rollback": 55,
-    "keep-v2-default": 49,
-    "permanent-dual-engine": 43
+    "astro-native-signals": 57,
+    "keystatic-first": 47.5,
+    "tinacms-first": 45,
+    "decap-first": 42.5
   }
 }

@@ -1,5 +1,21 @@
 ---
+import { getCollection } from "astro:content";
 import UniverseApp from "../components/universe/UniverseApp";
+import type { UniverseContentEntry } from "../lib/universe/content";
+
+const portfolio = await getCollection("portfolio", ({ data }) => !data.draft);
+const contentEntries: UniverseContentEntry[] = portfolio.map(({ id, data }) => ({
+  id,
+  title: data.title,
+  summary: data.summary,
+  kind: data.kind,
+  status: data.status,
+  importance: data.importance,
+  tags: data.tags,
+  featured: data.featured,
+  placement: data.placement,
+  ...(data.href ? { href: data.href } : {}),
+}));
 ---
 
 <!doctype html>
@@ -9,12 +25,12 @@ import UniverseApp from "../components/universe/UniverseApp";
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Personal Universe vertical slice: a cinematic journey from galaxy to world surface."
+      content="Personal Universe: an explorable portfolio mapped onto observed and procedural worlds."
     />
     <meta name="theme-color" content="#010207" />
-    <title>Personal Universe // Prototype 00</title>
+    <title>Personal Universe</title>
   </head>
   <body>
-    <UniverseApp client:load />
+    <UniverseApp client:load contentEntries={contentEntries} />
   </body>
 </html>

@@ -77,10 +77,28 @@ function PlanetBody({
             color={planetColor(planet.archetype)}
             roughness={0.78}
             metalness={0.02}
-            emissive={planet.observed ? "#173044" : "#0b1118"}
-            emissiveIntensity={planet.observed ? 0.38 : 0.12}
+            emissive={
+              planet.content?.length
+                ? "#1b7d8f"
+                : planet.observed
+                  ? "#173044"
+                  : "#0b1118"
+            }
+            emissiveIntensity={planet.content?.length ? 0.82 : planet.observed ? 0.38 : 0.12}
           />
         </mesh>
+        {planet.content?.length ? (
+          <mesh position={[orbit, 0, 0]} scale={1.42}>
+            <sphereGeometry args={[size, 18, 18]} />
+            <meshBasicMaterial
+              color="#73f4ff"
+              transparent
+              opacity={0.2}
+              wireframe
+              depthWrite={false}
+            />
+          </mesh>
+        ) : null}
       </group>
     </>
   );

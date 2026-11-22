@@ -10,6 +10,7 @@ import {
   Vector3,
 } from "three";
 import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
+import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
   loadYeisCore,
   HERO_SYSTEM_ID,
@@ -45,6 +46,8 @@ type NativeGalaxyState = {
   galaxyAcc: number;
   observedSky: Points;
   observedCount: number;
+  contentSky: Points;
+  contentCount: number;
   disposed: boolean;
 };
 
@@ -56,14 +59,17 @@ export type YeisGalaxyViewState = {
 const heroProjection = new Vector3();
 const observedProjection = new Vector3();
 const observedDirection = new Vector3();
+const contentDirection = new Vector3();
 
 export function YeisGalaxyScene({
   markers,
+  contentPlacements,
   onSelectSystem,
   quality,
   viewStateRef,
 }: {
   markers: GalaxyMarker[];
+  contentPlacements: UniverseContentPlacement[];
   onSelectSystem: (marker: GalaxyMarker) => void;
   quality: QualityMode;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -72,9 +78,11 @@ export function YeisGalaxyScene({
   const perspective = camera as PerspectiveCamera;
   const stateRef = useRef<NativeGalaxyState | null>(null);
   const markersRef = useRef(markers);
+  const contentPlacementsRef = useRef(contentPlacements);
   const selectRef = useRef(onSelectSystem);
 
   markersRef.current = markers;
+  contentPlacementsRef.current = contentPlacements;
   selectRef.current = onSelectSystem;
 
   useEffect(() => {
@@ -157,6 +165,27 @@ export function YeisGalaxyScene({
         observedSky.renderOrder = -7;
         scene.add(observedSky);
 
+        const contentGeometry = new BufferGeometry();
+        contentGeometry.setAttribute(
+          "position",
+          new BufferAttribute(new Float32Array(256 * 3), 3),
+        );
+        contentGeometry.setDrawRange(0, 0);
+        const contentMaterial = new PointsMaterial({
+          color: 0x73f4ff,
+          size: quality === "low" ? 8 : 11,
+          sizeAttenuation: false,
+          transparent: true,
+          opacity: 0.98,
+          depthWrite: false,
+          blending: AdditiveBlending,
+          toneMapped: false,
+        });
+        const contentSky = new Points(contentGeometry, contentMaterial);
+        contentSky.frustumCulled = false;
+        contentSky.renderOrder = -6;
+        scene.add(contentSky);
+
         const input = new Input(gl.domElement);
         const controller = new CameraController(runtime.universe);
 
@@ -203,6 +232,8 @@ export function YeisGalaxyScene({
           heroSkyPosition: new Vector3(),
           observedSky,
           observedCount: 0,
+          contentSky,
+          contentCount: 0,
           currentGalaxy: null,
           galaxyAcc: 1,
           disposed: false,
@@ -343,6 +374,9 @@ export function YeisGalaxyScene({
         scene.remove(state.observedSky);
         state.observedSky.geometry.dispose();
         (state.observedSky.material as PointsMaterial).dispose();
+        scene.remove(state.contentSky);
+        state.contentSky.geometry.dispose();
+        (state.contentSky.material as PointsMaterial).dispose();
         stateRef.current = null;
       }
 
@@ -354,6 +388,7 @@ export function YeisGalaxyScene({
       perspective.updateMatrixWorld();
       delete document.documentElement.dataset.yeisNativeGalaxy;
       delete document.documentElement.dataset.yeisHiplessObserved;
+      delete document.documentElement.dataset.personalSignalOverlay;
     };
   }, [gl, perspective, quality, scene, viewStateRef]);
 
@@ -485,6 +520,44 @@ export function YeisGalaxyScene({
         String(observedCount);
       console.info(
         `[YEIS-OBSERVED-OVERLAY] HIP-less physical hosts=${observedCount}`,
+      );
+    }
+
+    const contentPosition = state.contentSky.geometry.getAttribute(
+      "position",
+    ) as BufferAttribute;
+    const markerById = new Map(
+      markersRef.current.map((marker) => [marker.id, marker]),
+    );
+    let contentCount = 0;
+    for (const placement of contentPlacementsRef.current) {
+      if (contentCount >= contentPosition.count) break;
+      const marker = markerById.get(placement.markerId);
+      const nativeId = marker?.nativeId ?? placement.nativeId;
+      if (!nativeId) continue;
+
+      const starPc = runtime.universe.starPositionPc(nativeId);
+      contentDirection.copy(starPc).sub(state.cameraPc);
+      if (contentDirection.lengthSq() <= 1e-12) continue;
+      contentDirection
+        .normalize()
+        .multiplyScalar(SKY_RADIUS_KM * 0.992);
+      contentPosition.setXYZ(
+        contentCount,
+        contentDirection.x,
+        contentDirection.y,
+        contentDirection.z,
+      );
+      contentCount += 1;
+    }
+    contentPosition.needsUpdate = true;
+    state.contentSky.geometry.setDrawRange(0, contentCount);
+    if (state.contentCount !== contentCount) {
+      state.contentCount = contentCount;
+      document.documentElement.dataset.personalSignalOverlay =
+        String(contentCount);
+      console.info(
+        `[PERSONAL-SIGNALS] overlay=${contentCount}`,
       );
     }
   });
