@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 const query = `
 select top 400
-  hostname,ra,dec,sy_dist,st_spectype,st_teff,st_mass,st_rad,
+  hostname,hip_name,hd_name,gaia_dr3_id,ra,dec,sy_dist,st_spectype,st_teff,st_mass,st_rad,
   pl_name,pl_orbsmax,pl_rade,pl_bmasse,pl_eqt
 from pscomppars
 where sy_dist is not null
@@ -38,6 +38,10 @@ for (const row of rows) {
   if (!host) {
     host = {
       hostname,
+      hip: parseHip(row.hip_name),
+      hipName: row.hip_name || null,
+      hdName: row.hd_name || null,
+      gaiaDr3Id: row.gaia_dr3_id || null,
       raDeg: Number(row.ra),
       decDeg: Number(row.dec),
       distancePc: Number(row.sy_dist),
@@ -77,6 +81,12 @@ const payload = {
 const output = resolve(process.cwd(), "src/data/exoplanet-hosts.json");
 await writeFile(output, JSON.stringify(payload, null, 2) + "\n", "utf8");
 console.log(`Wrote ${systems.length} nearby observed host systems to ${output}`);
+
+function parseHip(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const match = /HIP\s*(\d+)/i.exec(String(value));
+  return match ? Number(match[1]) : null;
+}
 
 function finiteOrNull(value) {
   if (value === null || value === undefined || value === "") return null;

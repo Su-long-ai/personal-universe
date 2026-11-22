@@ -1,32 +1,32 @@
 {
   "schema": 2,
-  "task_id": "YEIS-MODEL-BRIDGE-001",
-  "approved_at": "2026-11-22T13:19:26.149Z",
-  "baseline_commit": "3f0a9f9315894d6401764976d6fda0c5e90ea99a",
+  "task_id": "OBSERVED-HIP-CROSSWALK-001",
+  "approved_at": "2026-11-22T13:40:53.599Z",
+  "baseline_commit": "f2aaf2724122a54ea2475786b74f7a92f20adc6a",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "c03f543e0727b7fc5a0ca6da9297552c8f69af0f612639e7b0e7ad2a24ef81e0",
+  "record_sha256": "c1fa40a3ec13857ac082dd301d0756b32a09283c81e28c7d0391154187b02f88",
   "registry_path": "docs/reuse-gate/registry.json",
-  "registry_sha256": "307e644f4bd7532ce04bf507389c3f43f995a5f4d72cf0a6ea94ee4e7e48e115",
+  "registry_sha256": "3afba0e7961b018d74060856786e3ebff54040e222d222a682b1eea9b013ef55",
   "scope": {
     "level": "subsystem",
-    "subject": "Observation-first YEIS model bridge into current Galaxy/System UI"
+    "subject": "Observed-system identity bridge between NASA Exoplanet Archive and YEIS/HYG stars"
   },
   "policy_change": false,
   "planned_files": [
+    "scripts/fetch-astronomy-catalog.mjs",
+    "src/data/exoplanet-hosts.json",
     "src/lib/universe/types.ts",
-    "src/lib/universe/yeis/index.ts",
+    "src/lib/universe/generation/catalog.ts",
     "src/lib/universe/yeis/bridge.ts",
-    "src/components/universe/UniverseApp.tsx",
     "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "observation-first-bridge"
+    "hip-crosswalk"
   ],
   "candidate_scores": {
-    "observation-first-bridge": 50,
-    "yeis-only-bridge": 47.5,
-    "switch-full-renderer-now": 37.5,
-    "stay-v2-model": 49,
-    "all-hyg-interactive": 26
+    "hip-crosswalk": 57,
+    "name-fuzzy": 40,
+    "gaia-crossmatch": 42.5,
+    "separate-markers": 46
   }
 }

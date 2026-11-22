@@ -17,6 +17,10 @@ type CatalogPlanet = {
 
 type CatalogSystem = {
   hostname: string;
+  hip: number | null;
+  hipName: string | null;
+  hdName: string | null;
+  gaiaDr3Id: string | null;
   raDeg: number;
   decDeg: number;
   distancePc: number;
@@ -151,6 +155,12 @@ export function catalogMarkers(limit = 18): GalaxyMarker[] {
     position: visualPosition(system),
     spectralType: inferSpectralType(system),
     catalogId: system.hostname,
+    catalogIdentity: {
+      ...(system.hip ? { hip: system.hip } : {}),
+      ...(system.hipName ? { hipName: system.hipName } : {}),
+      ...(system.hdName ? { hdName: system.hdName } : {}),
+      ...(system.gaiaDr3Id ? { gaiaDr3Id: system.gaiaDr3Id } : {}),
+    },
   }));
 }
 

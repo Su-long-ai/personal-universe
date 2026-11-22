@@ -31,13 +31,23 @@ export function buildYeisGalaxyIndex(
   observedMarkers: GalaxyMarker[],
   maxNamedStars = 72,
 ): GalaxyIndex {
-  const observed = observedMarkers.map((marker) => ({
-    ...marker,
-    engine: "v2" as const,
-  }));
+  const hipToIndex = buildHipIndex(runtime.catalog);
+  const observed = observedMarkers.map((marker) => {
+    const hip = marker.catalogIdentity?.hip;
+    const nativeIndex = hip ? hipToIndex.get(hip) : undefined;
+    return {
+      ...marker,
+      engine: "v2" as const,
+      ...(nativeIndex !== undefined ? { nativeId: `c${nativeIndex}` } : {}),
+    };
+  });
 
   const observedNames = new Set<string>();
-  for (const marker of observed) observedNames.add(normalizeName(marker.name));
+  const observedNativeIds = new Set<string>();
+  for (const marker of observed) {
+    observedNames.add(normalizeName(marker.name));
+    if (marker.nativeId) observedNativeIds.add(marker.nativeId);
+  }
 
   const markers: GalaxyMarker[] = [
     heroMarker(runtime.universe),
@@ -68,6 +78,8 @@ export function buildYeisGalaxyIndex(
       info.names?.gliese,
     ].filter((value): value is string => Boolean(value));
 
+    const nativeId = `c${index}`;
+    if (observedNativeIds.has(nativeId)) continue;
     if (aliases.some((name) => observedNames.has(normalizeName(name)))) continue;
 
     markers.push({
@@ -76,7 +88,7 @@ export function buildYeisGalaxyIndex(
       seed: `yeis:c${index}`,
       source: "catalog",
       engine: "yeis",
-      nativeId: `c${index}`,
+      nativeId,
       position: visualPosition(info.position.x, info.position.y, info.position.z),
       spectralType: spectralClass(info.spectral),
     });
@@ -201,6 +213,15 @@ function heroMarker(universe: Universe): GalaxyMarker {
     spectralType: spectralClass(info.spectral),
     heroKey: "home",
   };
+}
+
+function buildHipIndex(catalog: StarCatalog): Map<number, number> {
+  const index = new Map<number, number>();
+  for (let i = 0; i < catalog.count; i += 1) {
+    const hip = catalog.hips[i];
+    if (hip) index.set(hip, i);
+  }
+  return index;
 }
 
 function spectralClass(value: string): string {

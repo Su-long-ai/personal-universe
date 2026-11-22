@@ -73,6 +73,13 @@ export interface SystemDefinition {
   catalogId?: string;
 }
 
+export interface CatalogIdentity {
+  hip?: number;
+  hipName?: string;
+  hdName?: string;
+  gaiaDr3Id?: string;
+}
+
 export interface GalaxyMarker {
   id: string;
   name: string;
@@ -84,6 +91,7 @@ export interface GalaxyMarker {
   spectralType: string;
   heroKey?: string;
   catalogId?: string;
+  catalogIdentity?: CatalogIdentity;
 }
 
 export interface GalaxyIndex {

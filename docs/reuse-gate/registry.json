@@ -303,6 +303,22 @@
       ],
       "notes": "Code-level and runtime verified on 2026-11-22: npm ci/build passes; headless browser boots; a minimal public registerExtraSystem patch successfully injected HELION + AURORA-01 and the stock renderer displayed the Hero planet. Main bundle ~2.54 MB; 449 MB dist is dominated by optional lessons/tours (~389 MB) that are not needed for Personal Universe.",
       "last_checked": "2026-11-22"
+    },
+    {
+      "id": "nasa-exoplanet-archive",
+      "name": "NASA Exoplanet Archive TAP / pscomppars",
+      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
+      "level": "subsystem",
+      "license": "NASA public scientific data / archive terms; attribution retained",
+      "status": "adopt",
+      "covers": [
+        "confirmed exoplanet systems",
+        "stellar host parameters",
+        "HIP/HD/Gaia host identifiers",
+        "TAP/API snapshots"
+      ],
+      "notes": "Already used by Personal Universe. TAP schema exposes hip_name, hd_name and gaia_dr3_id in pscomppars; 2026-11-22 research found 51/64 nearest snapshot hosts have HIP identifiers and all 51 exactly match the vendored HYG-derived YEIS star binary.",
+      "last_checked": "2026-11-22"
     }
   ]
 }

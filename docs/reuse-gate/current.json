@@ -1,40 +1,37 @@
 {
   "schema": 2,
-  "task_id": "YEIS-MODEL-BRIDGE-001",
-  "title": "Run the current shell from YEIS universe/system data behind a reversible engine switch",
+  "task_id": "OBSERVED-HIP-CROSSWALK-001",
+  "title": "Use NASA HIP identifiers to crosswalk confirmed exoplanet hosts into the YEIS/HYG native star catalog",
   "scope": {
     "level": "subsystem",
-    "subject": "Observation-first YEIS model bridge into current Galaxy/System UI"
+    "subject": "Observed-system identity bridge between NASA Exoplanet Archive and YEIS/HYG stars"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "Phase 2 transfers system-data authority without replacing rendering yet. The verified MIT YEIS snapshot provides the real HYG star catalog, deterministic system generation and Hero ExtraSystem registry, but code inspection confirms that this old MIT snapshot does not include a general NASA confirmed-exoplanet catalog. Therefore an unqualified YEIS-only bridge would regress the project's known-astronomy rule by replacing confirmed planets with generated ones. The correct bridge is observation-first: retain the existing NASA Exoplanet Archive snapshot for confirmed nearby host systems, use YEIS HYG stars and deterministic systems for other real stars, and use the YEIS Hero registry for AURORA. Expose this only under ?engine=yeis until render/camera migration is complete. The existing R3F scenes remain display adapters and V2 remains the default fallback.",
+  "research_summary": "The native YEIS star renderer can pick HYG catalog indices directly, but the old MIT YEIS snapshot does not contain the project's NASA confirmed-exoplanet systems. Name-only matching is incomplete because HYG's compact names table indexes Proper/Bayer/Gliese/HIP while many NASA hosts are HD names. NASA pscomppars already exposes hip_name, hd_name and gaia_dr3_id. A live TAP research query over the same nearest-host selection showed 51 of 64 hosts have HIP identifiers, and every one of those 51 HIP values exactly matches the vendored YEIS/HYG binary. Reuse that stable HIP identity key: add host identifiers to the local NASA snapshot, propagate HIP to observed GalaxyMarker metadata, then resolve HIP to YEIS catalog index at runtime. Keep Gaia/HD as retained metadata/fallback, not a new full catalog dependency.",
   "planned_files": [
+    "scripts/fetch-astronomy-catalog.mjs",
+    "src/data/exoplanet-hosts.json",
     "src/lib/universe/types.ts",
-    "src/lib/universe/yeis/index.ts",
+    "src/lib/universe/generation/catalog.ts",
     "src/lib/universe/yeis/bridge.ts",
-    "src/components/universe/UniverseApp.tsx",
     "docs/architecture/universe-backbone.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
-      "finding": "YEIS Universe exposes real catalog stars, deterministic procedural stars/systems and hand-made ExtraSystem exceptions, providing the model authority for non-observed systems."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/gen/SystemGenerator.ts",
-      "finding": "At the selected MIT snapshot, ordinary non-Solar star systems are deterministically synthesized from StarInfo; the source does not integrate the general confirmed NASA exoplanet catalog."
-    },
-    {
       "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "finding": "NASA Exoplanet Archive TAP/API remains the authoritative reusable source already used by the project for confirmed planetary-system parameters."
+      "finding": "NASA Exoplanet Archive TAP is the existing authoritative confirmed-system source and supports selecting additional host identity columns without adding a runtime dependency."
+    },
+    {
+      "url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+      "finding": "Live TAP_SCHEMA inspection on 2026-11-22 confirmed pscomppars columns hip_name, hd_name, gaia_dr3_id and gaia_dr2_id. A matching query over the nearest snapshot hosts found 51/64 HIP values."
     },
     {
       "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
-      "finding": "StarCatalog provides 109,401 HYG-derived real stars with names, positions, magnitudes, color indices and derived physical parameters; namedIndices gives a practical bright named subset for interactive migration."
+      "finding": "YEIS StarCatalog stores a Uint32 HIP identifier for every HYG binary record and supports exact HIP lookup, making HIP the direct identity join key."
     },
     {
-      "url": "https://r3f.docs.pmnd.rs/api/events",
-      "finding": "The current R3F display layer can continue consuming ordinary marker objects and built-in pointer interactions while model authority migrates independently."
+      "url": "https://github.com/astronexus/HYG-Database",
+      "finding": "HYG combines Hipparcos and other nearby-star identifiers; the vendored YEIS binary is an HYG-derived compact representation whose HIP field is preserved."
     }
   ],
   "search_ladder": [
@@ -45,10 +42,9 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0,
-        1
+        2
       ],
-      "conclusion": "YEIS remains the selected mother, but switching its full renderer now would combine model and visual migration in one risky step."
+      "conclusion": "The selected mother already has HYG/HIP identities, but its MIT snapshot does not include the general confirmed exoplanet catalog, so a catalog-level bridge is still needed."
     },
     {
       "level": "framework_engine",
@@ -57,22 +53,21 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0,
-        3
+        2
       ],
-      "conclusion": "A model bridge can expose YEIS catalog/system results through the existing shell types and preserve a reversible engine switch."
+      "conclusion": "YEIS StarCatalog already exposes the exact HIP array and therefore no new identity framework or crossmatch engine is needed."
     },
     {
       "level": "subsystem",
       "status": "found",
       "registry_refs": [
-        "your-eyes-in-space-mit-e520568"
+        "nasa-exoplanet-archive"
       ],
       "source_refs": [
-        1,
-        2
+        0,
+        1
       ],
-      "conclusion": "NASA confirmed systems must remain an observation override above YEIS deterministic generation; this preserves known astronomy while reusing both mature sources."
+      "conclusion": "NASA TAP already provides HIP/HD/Gaia host identifiers; reusing those fields is more reliable and smaller than fuzzy names or another external catalog."
     },
     {
       "level": "component_asset",
@@ -81,162 +76,132 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        3,
-        4
+        2,
+        3
       ],
-      "conclusion": "Use a small bright/named HYG marker subset for clickable migration; do not prematurely render every one of the 109,401 catalog stars as interactive objects."
+      "conclusion": "The existing HYG-derived stars.bin preserves HIP per record, so the crosswalk can be an in-memory index over already-vendored data."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "confirmed exoplanet parameters stay observed rather than generated",
+      "capability": "exact identity for NASA hosts that exist in HYG",
       "importance": "high",
       "coverage": {
-        "observation-first-bridge": "full",
-        "yeis-only-bridge": "none",
-        "switch-full-renderer-now": "none",
-        "stay-v2-model": "full"
+        "hip-crosswalk": "full",
+        "name-fuzzy": "partial",
+        "gaia-crossmatch": "full",
+        "separate-markers": "none"
       },
-      "decision": "NASA catalog systems remain higher-priority overrides; YEIS fills real stars that lack an observed-system override."
+      "decision": "HIP is already present on both sides; measured 51/51 exact matches make it the primary key."
     },
     {
-      "capability": "YEIS determines ordinary star-system generation",
+      "capability": "no new large catalog or preprocessing pipeline",
       "importance": "high",
       "coverage": {
-        "observation-first-bridge": "full",
-        "yeis-only-bridge": "full",
-        "switch-full-renderer-now": "full",
-        "stay-v2-model": "none"
+        "hip-crosswalk": "full",
+        "name-fuzzy": "full",
+        "gaia-crossmatch": "none",
+        "separate-markers": "full"
       },
-      "decision": "For HYG markers, system resolution must call Universe.system(starId) and convert its bodies instead of invoking the local V2 generator."
+      "decision": "HIP crosswalk reuses existing NASA snapshot and existing 2.6 MB YEIS binary."
     },
     {
-      "capability": "Hero AURORA uses the selected mother registry",
+      "capability": "preserve unmapped observed systems",
       "importance": "high",
       "coverage": {
-        "observation-first-bridge": "full",
-        "yeis-only-bridge": "full",
-        "switch-full-renderer-now": "full",
-        "stay-v2-model": "none"
+        "hip-crosswalk": "full",
+        "name-fuzzy": "partial",
+        "gaia-crossmatch": "full",
+        "separate-markers": "full"
       },
-      "decision": "The bridge resolves AURORA from the proven ExtraSystem registration rather than maintaining a second Hero system definition in V2."
+      "decision": "Hosts without HIP remain separate NASA observed markers; no confirmed system is dropped."
     },
     {
-      "capability": "migration remains reversible",
+      "capability": "native star picking can route to observed override",
       "importance": "high",
       "coverage": {
-        "observation-first-bridge": "full",
-        "yeis-only-bridge": "full",
-        "switch-full-renderer-now": "partial",
-        "stay-v2-model": "full"
+        "hip-crosswalk": "full",
+        "name-fuzzy": "partial",
+        "gaia-crossmatch": "partial",
+        "separate-markers": "none"
       },
-      "decision": "Keep V2 default and select the new model with a query switch until visual/camera parity is proven."
-    },
-    {
-      "capability": "avoid temporary renderer rewrite",
-      "importance": "medium",
-      "coverage": {
-        "observation-first-bridge": "full",
-        "yeis-only-bridge": "full",
-        "switch-full-renderer-now": "none",
-        "stay-v2-model": "full"
-      },
-      "decision": "Translate mother-model outputs to the existing SystemDefinition/PlanetDefinition display contracts during this phase."
+      "decision": "Store resolved YEIS nativeId on observed markers when HIP matches so native StarPoints clicks can select the NASA override directly."
     }
   ],
   "candidates": [
     {
-      "id": "observation-first-bridge",
-      "name": "NASA observed systems > YEIS HYG/system model > YEIS Hero registry, behind ?engine=yeis",
-      "level": "framework_engine",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "license": "MIT core + NASA public scientific data + HYG CC BY-SA attribution",
+      "id": "hip-crosswalk",
+      "name": "NASA hip_name -> YEIS/HYG StarCatalog.hips exact crosswalk",
+      "level": "subsystem",
+      "registry_id": "nasa-exoplanet-archive",
+      "source": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+      "license": "NASA data + existing HYG CC BY-SA derived catalog",
       "decision": "reuse",
-      "reason": "Migrates actual model authority while preserving confirmed astronomy, Hero overrides and a rollback path; current rendering can remain unchanged for this phase.",
+      "reason": "Direct exact join using identifiers already present in both reused datasets; empirical check matched every HIP-bearing nearby host in the snapshot.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 2,
-        "license_fit": 4,
-        "maintenance_health": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
         "performance_fit": 5,
         "customization_fit": 5,
         "maturity": 5
       }
     },
     {
-      "id": "yeis-only-bridge",
-      "name": "Use YEIS HYG + deterministic systems for all real-star markers",
+      "id": "name-fuzzy",
+      "name": "Normalize NASA hostname and fuzzy-search YEIS Proper/Bayer/Gliese names",
+      "level": "component_asset",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
+      "license": "MIT code + HYG-derived names",
+      "decision": "reject",
+      "reason": "Misses common HD-only NASA hosts and risks false positives; useful only as a last-resort display aid, not identity authority.",
+      "evaluation": {
+        "coverage": 2.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 3
+      }
+    },
+    {
+      "id": "gaia-crossmatch",
+      "name": "Add a Gaia DR3 identity catalog/crossmatch layer",
       "level": "framework_engine",
       "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "license": "MIT core + HYG CC BY-SA",
+      "source": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
+      "license": "NASA + Gaia data terms",
       "decision": "reject",
-      "reason": "Simpler, but the selected MIT snapshot generates ordinary planets and would overwrite known confirmed-exoplanet information already available from NASA.",
-      "evaluation": {
-        "coverage": 4,
-        "integration_cost": 1.5,
-        "license_fit": 4,
-        "maintenance_health": 4,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "switch-full-renderer-now",
-      "name": "Replace current Galaxy/System renderer with the full YEIS render loop immediately",
-      "level": "full_solution",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
-      "license": "MIT pinned source; third-party notices retained",
-      "decision": "reject",
-      "reason": "Eventually useful but combines data, camera, renderer and UI integration in one step before the model bridge has isolated semantic differences; poor rollback granularity.",
+      "reason": "Would cover some HIP-less hosts but the current HYG binary has no Gaia identifier field, so it would require another catalog/index pipeline before yielding value for native picking.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 4.5,
         "license_fit": 4,
-        "maintenance_health": 3.5,
-        "performance_fit": 4,
-        "customization_fit": 3.5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 5,
         "maturity": 5
       }
     },
     {
-      "id": "stay-v2-model",
-      "name": "Keep the local V2 star/system generator as the active model",
-      "level": "subsystem",
-      "registry_id": "helios-procedural-system",
-      "source": "https://github.com/dhairyaozaa/procedural-star-system",
-      "license": "ISC-inspired local model",
+      "id": "separate-markers",
+      "name": "Keep all NASA observed systems as a disconnected marker layer",
+      "level": "component_asset",
+      "registry_id": "nasa-exoplanet-archive",
+      "source": "local current V2 implementation",
+      "license": "Project code / NASA data",
       "decision": "reject",
-      "reason": "Would preserve current behavior but defeat the accepted mother-engine decision and leave two competing universe models indefinitely.",
+      "reason": "Preserves correctness but prevents native star picks from resolving directly to known observed systems and leaves duplicate representations where a HYG match exists.",
       "evaluation": {
         "coverage": 2.5,
         "integration_cost": 0,
         "license_fit": 5,
         "maintenance_health": 5,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 4
-      }
-    },
-    {
-      "id": "all-hyg-interactive",
-      "name": "Expose all 109,401 HYG catalog stars as current interactive markers immediately",
-      "level": "component_asset",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
-      "license": "HYG-derived data CC BY-SA 4.0",
-      "decision": "reject",
-      "reason": "Model migration does not require making every real star a clickable R3F object; use a bright named subset now and migrate the dedicated star renderer later.",
-      "evaluation": {
-        "coverage": 2,
-        "integration_cost": 3,
-        "license_fit": 3.5,
-        "maintenance_health": 4,
-        "performance_fit": 2,
-        "customization_fit": 3,
+        "performance_fit": 4,
+        "customization_fit": 4,
         "maturity": 4
       }
     }
@@ -244,16 +209,16 @@
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "observation-first-bridge"
+      "hip-crosswalk"
     ],
-    "rationale": "Move system-data authority to the selected YEIS mother while explicitly keeping NASA confirmed exoplanet systems as a higher-priority observation override. Run the bridge behind ?engine=yeis so the current rendering shell can validate semantics independently from the later camera/render migration.",
+    "rationale": "Make HIP the authoritative cross-catalog identity when available, retain HD/Gaia IDs as metadata, and leave HIP-less NASA hosts intact as independent observed markers. This maximizes native renderer integration without adding a new catalog or weakening observed-system correctness.",
     "higher_level_tradeoffs": [
       {
-        "candidate_id": "switch-full-renderer-now",
-        "reason": "The full renderer is broader but couples four migration axes at once; the reversible model bridge produces more diagnostic value per change and does not create throwaway model work."
+        "candidate_id": "gaia-crossmatch",
+        "reason": "Gaia is broader but requires a new identity index on the HYG side; measured HIP coverage already resolves most nearby observed hosts at a fraction of the integration and maintenance cost."
       }
     ],
     "score_overrides": [],
-    "fallback": "If a mapped YEIS system cannot be represented by current display types, keep that object on the V2/NASA path and record the missing body/orbit type for the renderer migration instead of simplifying mother data."
+    "fallback": "If a future observed host lacks HIP but must be merged into native picking, add an explicit curated identity override or a dedicated Gaia crossmatch task; do not silently use fuzzy names as authority."
   }
 }

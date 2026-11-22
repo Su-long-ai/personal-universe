@@ -111,3 +111,30 @@ Personal Universe therefore uses an **observation-first** model order:
 This prevents a broader reused engine from reducing astronomical correctness.
 During migration the YEIS model path is available behind `?engine=yeis`; V2
 remains the rollback path until camera/render parity is established.
+
+
+## Cross-catalog identity
+
+Observed exoplanet hosts and the native YEIS/HYG star field are joined by
+**HIP identifier**, not by fuzzy display names.
+
+The NASA Exoplanet Archive snapshot now stores `hip_name`, `hd_name` and
+`gaia_dr3_id` alongside each host. When `hip_name` is present, its numeric
+HIP value is matched against the `StarCatalog.hips` field already preserved
+inside the vendored HYG-derived binary.
+
+Validation on 2026-11-22:
+
+- nearest observed hosts in local snapshot: 64;
+- hosts with HIP identity: 51;
+- exact HIP matches in YEIS/HYG: **51 / 51**;
+- first 32 hosts exposed by the current bridge: 27 with HIP, **27 / 27** matched.
+
+A matched observed marker keeps `engine: "v2"` because its planetary data
+must still resolve from NASA, but also carries the native YEIS star id
+(`c<catalogIndex>`). This lets the future native YEIS star renderer route a
+click on the physical HYG star directly to the NASA observed-system override.
+
+HIP-less observed hosts remain independent observed markers. HD/Gaia IDs are
+retained as metadata for future explicit crossmatch work; fuzzy names are not
+an identity authority.
