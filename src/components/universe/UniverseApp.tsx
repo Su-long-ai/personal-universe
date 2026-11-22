@@ -801,7 +801,18 @@ export default function UniverseApp({
     }
 
     const mode = params.get("navigation") === "locate" ? "locate" : "open";
-    const key = destinationId + "|" + mode;
+    const requestedPhase = params.get("phase") as UniversePhase | null;
+    const restorableWorldPhase =
+      requestedPhase &&
+      ["approach", "orbit", "atmosphere", "surface"].includes(requestedPhase)
+        ? requestedPhase
+        : null;
+    const key =
+      destinationId +
+      "|" +
+      mode +
+      "|" +
+      (restorableWorldPhase ?? "");
     if (deepLinkHandledRef.current === key) return;
     deepLinkHandledRef.current = key;
 
@@ -811,7 +822,7 @@ export default function UniverseApp({
       contentPlacements,
       galaxy.markers,
     )
-      .then((destination) => {
+      .then(async (destination) => {
         if (cancelled) return;
         if (!destination) {
           deepLinkHandledRef.current = null;
@@ -819,9 +830,28 @@ export default function UniverseApp({
           return;
         }
         document.documentElement.dataset.universeDeepLink = destination.id;
-        return mode === "locate"
-          ? handleLocateDestination(destination)
-          : handleNavigateDestination(destination);
+
+        if (mode === "locate") {
+          await handleLocateDestination(destination);
+          return;
+        }
+
+        await handleNavigateDestination(destination);
+        if (
+          cancelled ||
+          !restorableWorldPhase ||
+          ![
+            "body",
+            "content",
+            "observed-body",
+          ].includes(destination.target.kind)
+        ) {
+          return;
+        }
+
+        setPhase(restorableWorldPhase);
+        document.documentElement.dataset.universeNavigationPhase =
+          restorableWorldPhase;
       })
       .catch((error) => {
         if (cancelled) return;
@@ -928,7 +958,9 @@ export default function UniverseApp({
         return;
       }
 
-      const starId = nativeSystemId(selectedSystem);
+      const starId = selectedSystem
+        ? routeStarIdentityForSystem(selectedSystem, galaxy.markers)
+        : null;
       if (starId && selectedPlanet) {
         replaceNavigationUrl({
           phase: nextPhase,
@@ -937,7 +969,7 @@ export default function UniverseApp({
         });
       }
     },
-    [debugFreeze, phase, selectedPlanet, selectedSystem],
+    [debugFreeze, galaxy.markers, phase, selectedPlanet, selectedSystem],
   );
 
   const handleReturn = useCallback(() => {
