@@ -116,20 +116,15 @@
     },
     {
       "id": "your-eyes-in-space-mit-final",
-      "name": "Your Eyes In Space — mit-final lineage",
+      "name": "Your Eyes In Space — advertised mit-final tag",
       "url": "https://github.com/berkcomba/youreyesinspace",
       "level": "full_solution",
       "license": "MIT for mit-final and earlier; current main AGPL-3.0-or-later",
-      "status": "assess",
+      "status": "hold",
       "covers": [
-        "real star catalogs",
-        "exoplanets",
-        "procedural systems",
-        "galaxy",
-        "deep universe",
-        "planet surfaces"
+        "license lineage reference"
       ],
-      "notes": "Primary whole-solution candidate for the upcoming universe-backbone decision. Verify exact tag/commit before reuse.",
+      "notes": "Current LICENSE says mit-final and earlier are MIT, but the remote tag is not currently exposed/resolvable. Do not select by tag name; use the separately verified e520568 MIT commit entry.",
       "last_checked": "2026-11-22"
     },
     {
@@ -141,12 +136,18 @@
       "status": "assess",
       "covers": [
         "universe-scale camera",
-        "real catalogs",
+        "camera-relative coordinates",
+        "scale-regime controller",
+        "real-catalog architecture",
         "LOD",
-        "shaders",
-        "tile streaming architecture"
+        "procedural shaders",
+        "tile streaming",
+        "black-hole lensing",
+        "nebula/galaxy renderers",
+        "ephemeris sampler",
+        "extensive unit tests"
       ],
-      "notes": "Promising clean MIT backbone; data ingestion/maturity must be benchmarked.",
+      "notes": "Current MIT main audited locally on 2026-11-22. Strong modular engine: camera-relative coordinates, scale regimes, tile streaming, shaders, tests, thin React canvas. Internal packages compile and Vite bundle runs, but repo-wide typecheck currently fails in SearchPanel on stale ApiEntity fields; full star-tile data also expects a backend manifest. Better subsystem donor than immediate mother product today.",
       "last_checked": "2026-11-22"
     },
     {
@@ -278,6 +279,29 @@
         "travel effects"
       ],
       "notes": "Candidate effect system; only adopt if the chosen backbone does not already cover these effects.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "your-eyes-in-space-mit-e520568",
+      "name": "Your Eyes In Space — verified MIT commit e520568",
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "level": "full_solution",
+      "license": "MIT source at e520568; bundled HYG-derived stars.bin is CC BY-SA 4.0; NASA assets/data retain their own notices",
+      "status": "trial",
+      "covers": [
+        "hierarchical universe coordinates",
+        "floating-origin camera",
+        "logarithmic depth",
+        "real HYG star catalog",
+        "deterministic procedural star field and systems",
+        "Solar System orbital data",
+        "procedural planets, atmospheres and clouds",
+        "real Earth/Moon/Mars imagery streaming",
+        "Milky Way and deep universe",
+        "black holes, nebulae and landmarks",
+        "hand-made ExtraSystem exceptions"
+      ],
+      "notes": "Code-level and runtime verified on 2026-11-22: npm ci/build passes; headless browser boots; a minimal public registerExtraSystem patch successfully injected HELION + AURORA-01 and the stock renderer displayed the Hero planet. Main bundle ~2.54 MB; 449 MB dist is dominated by optional lessons/tours (~389 MB) that are not needed for Personal Universe.",
       "last_checked": "2026-11-22"
     }
   ]

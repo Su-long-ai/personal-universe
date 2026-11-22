@@ -1,30 +1,31 @@
 {
   "schema": 2,
-  "task_id": "REUSE-GATE-V2-REGISTRY-FLOW-002",
-  "approved_at": "2026-11-22T13:00:44.538Z",
-  "baseline_commit": "5e6cf1c4bea861f5f420294c8d22f459a7ea75a4",
+  "task_id": "UNIVERSE-BACKBONE-DECISION-001",
+  "approved_at": "2026-11-22T13:04:39.771Z",
+  "baseline_commit": "0b3be2ab2b113ceb3f32170b3422a36fc19ed1ba",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "572086a7f58d0b25a06a788e66dd53cf7008ab1053cec53ca7e3649b2cff04a7",
+  "record_sha256": "d0dc9832b3f2380fa89da2fbbc28987c7e00f4d12283cad6b241dc2bdc3069bc",
   "registry_path": "docs/reuse-gate/registry.json",
-  "registry_sha256": "7847793c8e235381c5d48ecacde4794d15f5d7087c0e484dacad634f28d16586",
+  "registry_sha256": "307e644f4bd7532ce04bf507389c3f43f995a5f4d72cf0a6ea94ee4e7e48e115",
   "scope": {
     "level": "architecture",
-    "subject": "Reuse-gate registry lifecycle and approval semantics"
+    "subject": "Personal Universe galaxy-to-surface mother engine"
   },
-  "policy_change": true,
+  "policy_change": false,
   "planned_files": [
-    "scripts/reuse-gate.mjs",
-    "AGENTS.md",
-    "docs/reuse-gate/README.md"
+    "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "node-gate-fix",
-    "git-hooks-flow"
+    "yeis-v2-hybrid",
+    "procedural-planets-retain"
   ],
   "candidate_scores": {
-    "backstage-model": 40,
-    "opa-model": 47,
-    "node-gate-fix": 60,
-    "git-hooks-flow": 52
+    "yeis-v2-hybrid": 45.5,
+    "yeis-full-fork": 43,
+    "cosmos-v2-hybrid": 41.5,
+    "v2-composite": 35.5,
+    "solar-wanderer-supplement": 37.5,
+    "spacekit-supplement": 37,
+    "procedural-planets-retain": 43
   }
 }
