@@ -47,12 +47,18 @@ For schema-3 approvals the machine verifies:
 - task record hash;
 - referenced registry-entry hashes;
 - approval baseline ancestry;
-- that the research record and referenced registry state existed at the approval baseline;
+- that the research record and referenced registry state were frozen in the committed approval-metadata commit;
 - planned-file coverage;
 - architecture-level approval for policy changes;
 - that the task/approval metadata was committed before the protected implementation commit.
 
 Unrelated registry additions do not invalidate another agent's schema-3 approval.
+
+## Merge semantics
+
+Schema-3 task PRs must be merged with a **merge commit**. Do not squash-merge or rebase-merge them: both rewrite or collapse the commit identities that prove the approval-metadata commit preceded implementation.
+
+The repository is currently private on a GitHub plan where repository Rulesets/required checks are unavailable. Therefore the machine gate hard-blocks build/runtime-smoke/artifact delivery, but GitHub cannot currently disable the Merge button based on the check. Agents must never merge while `Machine Reuse Gate` is missing or failing. If the repository becomes public or the account gains GitHub Pro, make `Machine Reuse Gate` a required status check immediately.
 
 ## Protected policy
 
