@@ -627,7 +627,17 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
 
   if (approval.schema === 2) {
     if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
-      die("legacy approval registry changed after approval: " + approval.task_id);
+      const baselineRegistry = JSON.parse(
+        gitRaw(["show", approval.baseline_commit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
+      );
+      const baselineIndex = validateRegistry(baselineRegistry);
+      const actual = registryEntryHashes(record, registryIndex);
+      const baselineHashes = registryEntryHashes(record, baselineIndex);
+      for (const id of Object.keys(actual)) {
+        if (baselineHashes[id] !== actual[id]) {
+          die("legacy approval referenced registry entry changed after approval: " + approval.task_id + " -> " + id);
+        }
+      }
     }
   } else {
     const expected = approval.registry_entry_hashes || {};
