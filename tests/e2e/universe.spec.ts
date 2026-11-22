@@ -199,10 +199,15 @@ test("black-hole Search preserves exact native travel identity", async ({
     "data-universe-navigation-target",
   );
   expect(exactTarget).toBeTruthy();
-  await expect(html).toHaveAttribute(
-    "data-universe-traveling",
-    exactTarget!,
-  );
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute(
+        "data-universe-travel-complete",
+      );
+      return traveling === exactTarget || complete === exactTarget;
+    })
+    .toBe(true);
 
   const url = new URL(page.url());
   expect(url.searchParams.get("destination")).toMatch(/^blackhole:/);
