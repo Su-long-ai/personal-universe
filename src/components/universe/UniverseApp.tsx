@@ -625,7 +625,7 @@ export default function UniverseApp({
       journey.paused ||
       reducedMotion ||
       journey.destinations.length < 2 ||
-      !["system", "orbit", "surface"].includes(phase)
+      !["system", "approach", "orbit", "surface"].includes(phase)
     ) {
       return;
     }
