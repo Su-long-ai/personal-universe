@@ -98,6 +98,31 @@ Before protected implementation:
 
 The separate approval commit is deliberate: Git history lets the CI gate prove that machine approval existed before the first protected implementation commit.
 
+## GitHub-only batched publication
+
+GitHub's native Git Database API can create tree and commit objects without moving a branch ref. For GitHub-only work, use that capability to preserve the same ordered v3 history while publishing the branch only once:
+
+```
+base commit
+  -> detached research / registry commit
+    -> detached approval commit
+      -> detached implementation commit(s)
+        -> one final branch ref create/update
+```
+
+This is an execution optimization, not a policy shortcut. The approval must still be a distinct ancestor of every protected implementation commit, and the final pushed range is still checked by `gate:reuse:ci`.
+
+Why this is preferred for multi-commit cloud tasks:
+
+- creating raw tree/commit objects does not itself emit a branch push event;
+- one final ref update produces one authoritative branch-push Gate run instead of one run per file write;
+- no local checkout is needed;
+- the exact research -> approval -> implementation ancestry remains machine-verifiable.
+
+For a fresh task branch, create the ref only after the final commit exists. For an existing private task branch, read the current head first and use expected-head / lease-style ref movement; never blind-force over another agent's commits.
+
+Sequential GitHub Contents API writes remain fine for a genuine single-commit edit or when raw Git Data operations are unavailable. They are not preferred for v3 tasks that inherently need multiple ordered commits because each branch write can trigger another CI run.
+
 ## What schema 3 freezes
 
 A schema-3 approval freezes:

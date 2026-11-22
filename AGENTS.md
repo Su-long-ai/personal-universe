@@ -35,6 +35,32 @@ New work must use task-scoped records so parallel agents do not overwrite one gl
 
 The legacy `current.json` / `approval.json` pair remains readable for existing work only. Do not start new parallel tasks with the legacy singleton.
 
+## GitHub-only commit batching
+
+For a task that needs multiple ordered commits and is being implemented entirely through GitHub tools, prefer GitHub's native **Git Database** tree/commit/ref primitives over a sequence of Contents API writes.
+
+The required history does not change:
+
+```
+research / registry commit
+  -> approval commit
+    -> protected implementation commit(s)
+```
+
+The publication boundary does change:
+
+1. Create the research/registry tree and commit as detached Git objects.
+2. Create the approval tree/commit with the research commit as its parent.
+3. Create implementation tree/commit(s) with the approval commit as the ancestor.
+4. Only after the chain is complete, create the fresh task branch at the final commit, or move an existing private task ref once with an expected-head lease.
+5. Open/update the PR after that single ref publication.
+
+Do **not** update the branch ref for each intermediate metadata/file write. Each ref move is a push event and unnecessarily starts another all-branch Machine Reuse Gate run.
+
+Do **not** collapse research, approval and implementation into one commit. Batching reduces ref publications; it never weakens schema-3 ancestry.
+
+Use sequential Contents API writes when the work is genuinely one commit or when raw Git Data actions are unavailable.
+
 ## What the machine gate enforces
 
 The CI gate evaluates the actual protected files changed between the PR base and head. Every protected file must be covered by at least one valid task approval.
