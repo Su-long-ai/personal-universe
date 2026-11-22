@@ -14,42 +14,37 @@ export function placeUniverseContent(
   if (entries.length === 0 || markers.length === 0) return [];
 
   const hero = markers.find((marker) => marker.source === "hero");
-  const autoMarkers = markers
-    .filter(
-      (marker) =>
-        marker.engine === "yeis" &&
-        marker.source !== "hero" &&
-        Boolean(marker.nativeId),
-    )
-    .sort((a, b) => a.id.localeCompare(b.id));
+  const autoMarkers = markers.filter(
+    (marker) =>
+      marker.engine === "yeis" &&
+      marker.source !== "hero" &&
+      Boolean(marker.nativeId),
+  );
 
   const used = new Set<string>();
   const placements: UniverseContentPlacement[] = [];
 
   for (const entry of [...entries].sort(compareEntries)) {
+    const placementKey = contentPlacementKey(entry);
     let marker: GalaxyMarker | undefined;
 
-    if (entry.placement === "hero" && hero) {
+    if (entry.placement === "hero") {
       marker = hero;
-    } else if (autoMarkers.length > 0) {
-      const start = stableHash(entry.id) % autoMarkers.length;
-      for (let offset = 0; offset < autoMarkers.length; offset += 1) {
-        const candidate = autoMarkers[(start + offset) % autoMarkers.length];
-        if (!used.has(candidate.id)) {
-          marker = candidate;
-          break;
-        }
-      }
-      marker ??= autoMarkers[start];
+    } else if (entry.placement === "pinned") {
+      marker = resolvePinnedMarker(entry, markers);
+    } else {
+      marker = chooseRendezvousMarker(placementKey, autoMarkers, used);
     }
 
+    // Pinned content must never silently drift to another star.
     if (!marker) continue;
+
     used.add(marker.id);
     placements.push({
       entry,
       markerId: marker.id,
       nativeId: marker.nativeId,
-      planetSlotSeed: stableHash(`${entry.id}:planet`),
+      planetSlotSeed: stableHash(`${placementKey}:planet`),
     });
   }
 
@@ -94,10 +89,79 @@ export function placementsForMarker(
   return placements.filter((placement) => placement.markerId === markerId);
 }
 
+function resolvePinnedMarker(
+  entry: UniverseContentEntry,
+  markers: GalaxyMarker[],
+): GalaxyMarker | undefined {
+  if (!entry.starId) return undefined;
+  return markers.find(
+    (marker) =>
+      marker.nativeId === entry.starId ||
+      marker.id === entry.starId,
+  );
+}
+
+function chooseRendezvousMarker(
+  key: string,
+  markers: GalaxyMarker[],
+  used: Set<string>,
+): GalaxyMarker | undefined {
+  let bestUnused: GalaxyMarker | undefined;
+  let bestUnusedScore = -1;
+  let bestAny: GalaxyMarker | undefined;
+  let bestAnyScore = -1;
+
+  for (const marker of markers) {
+    const score = rendezvousScore(key, marker);
+
+    if (
+      score > bestAnyScore ||
+      (score === bestAnyScore && compareMarkerIdentity(marker, bestAny) < 0)
+    ) {
+      bestAny = marker;
+      bestAnyScore = score;
+    }
+
+    if (used.has(marker.id)) continue;
+
+    if (
+      score > bestUnusedScore ||
+      (score === bestUnusedScore && compareMarkerIdentity(marker, bestUnused) < 0)
+    ) {
+      bestUnused = marker;
+      bestUnusedScore = score;
+    }
+  }
+
+  // Keep one signal per star while capacity exists. Once entries outnumber
+  // eligible stars, reuse the HRW winner instead of inventing a second scheme.
+  return bestUnused ?? bestAny;
+}
+
+function rendezvousScore(key: string, marker: GalaxyMarker): number {
+  return stableHash(`${key}\u0000${markerIdentity(marker)}`);
+}
+
+function markerIdentity(marker: GalaxyMarker): string {
+  return marker.nativeId ?? marker.id;
+}
+
+function compareMarkerIdentity(
+  a: GalaxyMarker,
+  b: GalaxyMarker | undefined,
+): number {
+  if (!b) return -1;
+  return markerIdentity(a).localeCompare(markerIdentity(b));
+}
+
+function contentPlacementKey(entry: UniverseContentEntry): string {
+  return entry.placementKey?.trim() || entry.id;
+}
+
 function compareEntries(a: UniverseContentEntry, b: UniverseContentEntry): number {
   if (a.featured !== b.featured) return a.featured ? -1 : 1;
   if (a.importance !== b.importance) return b.importance - a.importance;
-  return a.id.localeCompare(b.id);
+  return contentPlacementKey(a).localeCompare(contentPlacementKey(b));
 }
 
 function stableHash(value: string): number {
