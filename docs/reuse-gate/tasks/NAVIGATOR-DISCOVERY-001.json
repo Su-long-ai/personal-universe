@@ -1,0 +1,143 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATOR-DISCOVERY-001",
+  "title": "Group and rank Personal Signals and pinned-MIT YEIS destinations in Universe Navigator",
+  "scope": {
+    "level": "implementation",
+    "subject": "Navigator discovery, grouping and result ranking on the existing YEIS destination model"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Improve discovery without adding a second astronomy index. The pinned MIT YEIS Search/Places model remains the spatial and astronomical authority; Personal Universe only groups and ranks the already-resolved destinations. Personal Signals should remain first-class, browse should expose meaningful groups, and query ordering should prefer personal/exact/prefix matches while preserving existing keyboard Open/Locate behavior. cmdk+Fuse and Pagefind remain valid generic search options but would duplicate or bypass the domain indexes already restored from YEIS.",
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/universe.css",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "Pinned MIT YEIS already defines one keyboard-driven search surface over bodies, foreign-system bodies, catalogue stars, black holes, landmarks and galaxies; Personal Universe should preserve that domain authority while improving presentation."
+    },
+    {
+      "url": "https://github.com/pacocoursey/cmdk",
+      "finding": "cmdk provides a mature command-palette shell and keyboard navigation, while Fuse.js can add generic fuzzy ranking; using them as the astronomy index would duplicate the YEIS search model already integrated."
+    },
+    {
+      "url": "https://pagefind.app/",
+      "finding": "Pagefind is a strong static full-text search subsystem for documents and articles, but it does not model spatial universe destinations or YEIS navigation semantics."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the selected pinned MIT YEIS product/search model as the full astronomical authority and improve only how its resolved destinations are grouped and ranked."
+    },
+    {
+      "level": "framework_engine",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No additional framework is needed because the existing React shell already renders the navigator and YEIS supplies the domain queries."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "pagefind"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Pagefind is valuable for future document search but is not a replacement for the current spatial destination subsystem."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "cmdk-fuse-navigation"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "cmdk/Fuse can supplement generic command-palette UX later, but current grouping/ranking can reuse the existing destination model without another dependency."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-discovery-ui",
+      "name": "Existing Personal Universe Navigator over pinned MIT YEIS destinations",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseNavigator plus pinned MIT YEIS Search/Places destination model",
+      "license": "MIT source at pinned e520568 plus project-owned React presentation",
+      "decision": "reuse",
+      "reason": "Preserves one astronomy/search authority and requires only product-specific grouping and ranking over already-resolved destinations.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "cmdk-fuse-navigation",
+      "name": "cmdk + Fuse.js command palette and fuzzy ranking",
+      "level": "component_asset",
+      "registry_id": "cmdk-fuse-navigation",
+      "source": "cmdk / Fuse.js",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Useful generic UX tooling but unnecessary for this bounded improvement; making Fuse authoritative would duplicate YEIS indexes and add a dependency without improving spatial semantics.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "pagefind-doc-search",
+      "name": "Pagefind static full-text search",
+      "level": "subsystem",
+      "registry_id": "pagefind",
+      "source": "Pagefind",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Strong for long-form document search but not for stars, worlds, galaxies, landmarks or native camera actions; it would sit beside rather than replace YEIS navigation.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-native-discovery-ui"
+    ],
+    "rationale": "Keep the already-integrated pinned MIT YEIS destination model and existing React Navigator, then add only Personal Universe-specific grouping and lightweight ranking. This increases discoverability while retaining one astronomical index and one spatial authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If result volume later makes lightweight ranking insufficient, add cmdk/Fuse only as a presentation/ranking layer over YEIS-resolved destinations rather than replacing YEIS search."
+  }
+}
