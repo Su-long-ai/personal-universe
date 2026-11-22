@@ -92,3 +92,22 @@ Migration is incremental and reversible.
 ## Non-goals
 
 This decision does not freeze final art direction, Hero surface technology, or UI styling. It selects the astronomical/cross-scale **backbone**, not the product's visual identity.
+
+
+## Observation precedence
+
+The verified MIT YEIS snapshot does not contain the general confirmed-planet
+catalogue used by current NASA Exoplanet Archive data. For ordinary catalogue
+stars it synthesizes deterministic planetary systems from stellar parameters.
+
+Personal Universe therefore uses an **observation-first** model order:
+
+1. NASA Exoplanet Archive snapshot for confirmed nearby host systems;
+2. YEIS hand-made/real HYG systems and deterministic system generation for
+   stars without an observed-system override;
+3. YEIS procedural stars/systems outside the real HYG neighbourhood;
+4. Personal Universe Hero `ExtraSystem` overrides where explicitly registered.
+
+This prevents a broader reused engine from reducing astronomical correctness.
+During migration the YEIS model path is available behind `?engine=yeis`; V2
+remains the rollback path until camera/render parity is established.

@@ -10,6 +10,8 @@ export const YEIS_DATA_BASE_URL = "/vendor/yeis/";
 export const HERO_SYSTEM_ID = "h-aurora";
 export const HERO_PLANET_ID = "aurora-01";
 
+export { buildYeisGalaxyIndex, resolveYeisSystem } from "./bridge";
+
 export type YeisCoreRuntime = {
   catalog: StarCatalog;
   universe: Universe;

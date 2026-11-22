@@ -1,34 +1,32 @@
 {
   "schema": 2,
-  "task_id": "YEIS-CORE-MIGRATION-001",
-  "approved_at": "2026-11-22T13:12:09.232Z",
-  "baseline_commit": "4f9aed1e1e3ab051dcd4f8be966fe2c6daf5b267",
+  "task_id": "YEIS-MODEL-BRIDGE-001",
+  "approved_at": "2026-11-22T13:19:26.149Z",
+  "baseline_commit": "3f0a9f9315894d6401764976d6fda0c5e90ea99a",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "d96ea1f873ea61f5c569c0840fb224bd6fa1b3968c688dada93302455e3d77a2",
+  "record_sha256": "c03f543e0727b7fc5a0ca6da9297552c8f69af0f612639e7b0e7ad2a24ef81e0",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "307e644f4bd7532ce04bf507389c3f43f995a5f4d72cf0a6ea94ee4e7e48e115",
   "scope": {
     "level": "subsystem",
-    "subject": "Universe data/model layer migration from local V2 generators to the selected YEIS MIT core"
+    "subject": "Observation-first YEIS model bridge into current Galaxy/System UI"
   },
   "policy_change": false,
   "planned_files": [
-    "src/vendor/yeis/**",
-    "src/lib/universe/yeis/**",
-    "public/vendor/yeis/data/stars.bin",
-    "public/vendor/yeis/data/star-names.json",
-    "public/THIRD_PARTY_ASSETS.md",
-    "src/components/universe/UniverseApp.tsx"
+    "src/lib/universe/types.ts",
+    "src/lib/universe/yeis/index.ts",
+    "src/lib/universe/yeis/bridge.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "vendor-minimal-core",
-    "catalog-assets"
+    "observation-first-bridge"
   ],
   "candidate_scores": {
-    "vendor-minimal-core": 50.5,
-    "full-submodule": 37,
-    "iframe-full-app": 34.5,
-    "rewrite-into-v2": 36.5,
-    "catalog-assets": 43.5
+    "observation-first-bridge": 50,
+    "yeis-only-bridge": 47.5,
+    "switch-full-renderer-now": 37.5,
+    "stay-v2-model": 49,
+    "all-hyg-interactive": 26
   }
 }

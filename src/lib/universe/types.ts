@@ -9,6 +9,7 @@ export type UniversePhase =
 
 export type QualityMode = "auto" | "high" | "low";
 export type StarSource = "procedural" | "catalog" | "hero";
+export type UniverseEngine = "v2" | "yeis";
 export type PlanetSurfaceMode = "none" | "surface-terrain" | "custom";
 export type PlanetArchetype =
   | "rocky"
@@ -77,6 +78,8 @@ export interface GalaxyMarker {
   name: string;
   seed: string;
   source: StarSource;
+  engine?: UniverseEngine;
+  nativeId?: string;
   position: [number, number, number];
   spectralType: string;
   heroKey?: string;

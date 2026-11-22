@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
 import type {
@@ -40,7 +40,8 @@ const VALID_PHASES: UniversePhase[] = [
 ];
 
 export default function UniverseApp() {
-  const galaxy = useMemo(() => buildGalaxyIndex("personal-universe-v2"), []);
+  const v2Galaxy = useMemo(() => buildGalaxyIndex("personal-universe-v2"), []);
+  const [galaxy, setGalaxy] = useState(v2Galaxy);
   const [phase, setPhase] = useState<UniversePhase>("galaxy");
   const [selectedSystem, setSelectedSystem] = useState<SystemDefinition | null>(null);
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
@@ -52,6 +53,12 @@ export default function UniverseApp() {
     status: "loading" | "ready" | "error";
     detail: string;
   } | null>(null);
+  const yeisResolverRef = useRef<((marker: GalaxyMarker) => SystemDefinition) | null>(null);
+  const engineMode =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("engine") === "yeis"
+      ? "yeis"
+      : "v2";
   const reducedMotion = useReducedMotion();
   const ambient = useAmbientAudio(muted, phase);
   const debugFreeze =
@@ -59,7 +66,60 @@ export default function UniverseApp() {
     new URLSearchParams(window.location.search).get("freeze") === "1";
 
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("phase");
+    if (engineMode !== "yeis") return;
+
+    let cancelled = false;
+    void import("../../lib/universe/yeis")
+      .then(async ({ loadYeisCore, buildYeisGalaxyIndex, resolveYeisSystem }) => {
+        const runtime = await loadYeisCore();
+        const observedMarkers = v2Galaxy.markers.filter(
+          (marker) => marker.source === "catalog",
+        );
+        const nextGalaxy = buildYeisGalaxyIndex(runtime, observedMarkers);
+
+        if (cancelled) return;
+        yeisResolverRef.current = (marker) => resolveYeisSystem(runtime, marker);
+        document.documentElement.dataset.universeEngine = "yeis";
+        const yeisSample = nextGalaxy.markers.find(
+          (marker) =>
+            marker.engine === "yeis" &&
+            marker.source === "catalog" &&
+            marker.nativeId !== "c0",
+        );
+        const observedSample = nextGalaxy.markers.find(
+          (marker) => marker.engine === "v2" && marker.source === "catalog",
+        );
+        console.info(
+          `[YEIS-BRIDGE] READY markers=${nextGalaxy.markers.length} ` +
+            `observed=${observedMarkers.length} ` +
+            `yeisSample=${yeisSample?.id ?? "none"}:${yeisSample?.name ?? "none"} ` +
+            `observedSample=${observedSample?.id ?? "none"}:${observedSample?.name ?? "none"}`,
+        );
+        setGalaxy(nextGalaxy);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("[YEIS-BRIDGE] FAILED; retaining V2 fallback", error);
+        document.documentElement.dataset.universeEngine = "v2-fallback";
+        yeisResolverRef.current = null;
+        setGalaxy(v2Galaxy);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [engineMode, v2Galaxy]);
+
+  const resolveMarker = useCallback((marker: GalaxyMarker): SystemDefinition => {
+    if (marker.engine === "yeis" && yeisResolverRef.current) {
+      return yeisResolverRef.current(marker);
+    }
+    return resolveSystem(marker);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("phase");
     if (!requested || !VALID_PHASES.includes(requested as UniversePhase)) return;
 
     const requestedPhase = requested as UniversePhase;
@@ -68,24 +128,38 @@ export default function UniverseApp() {
       return;
     }
 
-    const heroMarker = galaxy.markers.find((marker) => marker.source === "hero");
-    if (!heroMarker) return;
-    const system = resolveSystem(heroMarker);
+    const requestedStar = params.get("star")?.trim().toLowerCase();
+    const targetMarker = requestedStar
+      ? galaxy.markers.find(
+          (marker) =>
+            marker.id.toLowerCase() === requestedStar ||
+            marker.nativeId?.toLowerCase() === requestedStar ||
+            marker.name.toLowerCase() === requestedStar,
+        )
+      : galaxy.markers.find((marker) => marker.source === "hero");
+
+    if (!targetMarker) return;
+    const system = resolveMarker(targetMarker);
+    console.info(
+      `[UNIVERSE-DEBUG] star=${targetMarker.id} engine=${targetMarker.engine ?? "v2"} ` +
+        `system=${system.name} planets=${system.planets.length} source=${system.source}`,
+    );
     setSelectedSystem(system);
 
     if (requestedPhase === "system" || requestedPhase === "returning") {
+      setSelectedPlanet(null);
       setPhase(requestedPhase);
       return;
     }
 
-    const heroPlanet =
+    const selected =
       system.planets.find((planet) => planet.heroKey === "home") ??
       system.planets[0] ??
       null;
-    if (!heroPlanet) return;
-    setSelectedPlanet(heroPlanet);
+    if (!selected) return;
+    setSelectedPlanet(selected);
     setPhase(requestedPhase);
-  }, [galaxy.markers]);
+  }, [galaxy.markers, resolveMarker]);
 
   useEffect(() => {
     const diagnostic = new URLSearchParams(window.location.search).get("diagnostic");
@@ -126,14 +200,14 @@ export default function UniverseApp() {
 
   const handleSelectSystem = useCallback(
     (marker: GalaxyMarker) => {
-      const system = resolveSystem(marker);
+      const system = resolveMarker(marker);
       setSelectedSystem(system);
       setSelectedPlanet(null);
       setScrollDepth(0);
       ambient.ensurePlaying();
       setPhase("system");
     },
-    [ambient],
+    [ambient, resolveMarker],
   );
 
   const handleSelectPlanet = useCallback(
