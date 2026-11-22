@@ -142,10 +142,13 @@ export default function UniverseApp({
       const editing =
         target?.tagName === "INPUT" ||
         target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
         target?.isContentEditable;
+      if (editing) return;
+
       const commandK =
         (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k";
-      const slash = event.key === "/" && !editing;
+      const slash = event.key === "/";
 
       if (!commandK && !slash) return;
       event.preventDefault();
