@@ -920,12 +920,11 @@ export default function UniverseApp({
             </button>
             <button
               type="button"
-              disabled={
-                journey.index >= journey.destinations.length - 1
-              }
               onClick={() => handleJourneyStep(1)}
             >
-              NEXT →
+              {journey.index >= journey.destinations.length - 1
+                ? "DONE"
+                : "NEXT →"}
             </button>
           </div>
           <small className="journey-mode">
