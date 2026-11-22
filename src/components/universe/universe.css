@@ -530,6 +530,40 @@ select {
   background: linear-gradient(90deg, rgba(48, 136, 154, 0.17), rgba(25, 48, 67, 0.08));
 }
 
+.navigator-result-group + .navigator-result-group {
+  margin-top: 12px;
+}
+
+.navigator-result-group-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 6px;
+  background: linear-gradient(180deg, rgba(5, 10, 18, 0.98), rgba(5, 10, 18, 0.9));
+  color: rgba(166, 215, 238, 0.54);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.navigator-result-group-title small {
+  color: rgba(115, 244, 255, 0.42);
+  font-size: 8px;
+}
+
+.navigator-result-row.is-current {
+  border-color: rgba(255, 220, 155, 0.2);
+  box-shadow: inset 2px 0 0 rgba(255, 220, 155, 0.52);
+}
+
+.navigator-result-row.is-current .navigator-open {
+  color: rgba(255, 220, 155, 0.76);
+}
+
 .navigator-result-open {
   min-width: 0;
   display: grid;
@@ -591,6 +625,27 @@ select {
   color: rgba(255, 181, 219, 0.82);
 }
 
+.navigator-kind.kind-project,
+.navigator-kind.kind-research,
+.navigator-kind.kind-experience,
+.navigator-kind.kind-artifact,
+.navigator-kind.kind-note,
+.navigator-kind.kind-hero {
+  border-color: rgba(115, 244, 255, 0.28);
+  color: rgba(143, 239, 255, 0.84);
+}
+
+.navigator-kind.kind-observed,
+.navigator-kind.kind-body {
+  border-color: rgba(255, 201, 120, 0.24);
+  color: rgba(255, 211, 145, 0.76);
+}
+
+.navigator-kind.kind-blackhole {
+  border-color: rgba(201, 159, 255, 0.26);
+  color: rgba(213, 184, 255, 0.82);
+}
+
 .navigator-result-main {
   min-width: 0;
   display: grid;
@@ -644,8 +699,19 @@ select {
     max-height: calc(100vh - 82px);
   }
 
+  .navigator-results {
+    max-height: calc(100vh - 280px);
+    padding-inline: 6px;
+  }
+
   .navigator-result-open {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
+  .navigator-result-group-title {
+    padding-inline: 8px;
   }
 
   .navigator-locate {
