@@ -47,12 +47,15 @@ export type UniverseNavigationTarget =
       markerId: string;
       entryId: string;
     }
+  | { kind: "blackhole"; id: string }
   | { kind: "galaxy"; index: number }
   | { kind: "landmark"; index: number };
 
 export type UniverseNavigationCameraTarget =
   | { kind: "star"; nativeId: string }
   | { kind: "point"; id: string; positionPc: [number, number, number] }
+  | { kind: "body"; starId: string; bodyId: string }
+  | { kind: "blackhole"; id: string }
   | { kind: "galaxy"; index: number }
   | { kind: "landmark"; index: number };
 
@@ -453,10 +456,20 @@ export function navigationCameraTarget(
   markers: GalaxyMarker[],
 ): UniverseNavigationCameraTarget | null {
   const target = destination.target;
-  if (target.kind === "galaxy" || target.kind === "landmark") return target;
+  if (
+    target.kind === "galaxy" ||
+    target.kind === "landmark" ||
+    target.kind === "blackhole"
+  ) {
+    return target;
+  }
   if (target.kind === "star") return target;
   if (target.kind === "body") {
-    return { kind: "star", nativeId: target.starId };
+    return {
+      kind: "body",
+      starId: target.starId,
+      bodyId: target.bodyId,
+    };
   }
   if (target.kind === "content") {
     return { kind: "star", nativeId: target.nativeId };
@@ -1064,8 +1077,12 @@ function blackHoleDestination(
     group: "black-holes",
     title: blackHole.entry.name,
     detail: "BLACK HOLE · YEIS PLACE",
-    target: { kind: "star", nativeId: blackHole.systemStarId },
-    keywords: [blackHole.entry.summary, blackHole.entry.id],
+    target: { kind: "blackhole", id: blackHole.entry.id },
+    keywords: [
+      blackHole.entry.summary,
+      blackHole.entry.id,
+      blackHole.systemStarId,
+    ],
   };
 }
 
@@ -1112,7 +1129,9 @@ function landmarkDestination(
       landmark.def.kind.toUpperCase() +
       " · " +
       (landmark.systemId ? "STELLAR LANDMARK" : "DEEP-SKY PLACE"),
-    target: { kind: "landmark", index },
+    target: landmark.systemId
+      ? { kind: "star", nativeId: landmark.systemId }
+      : { kind: "landmark", index },
     keywords: [
       landmark.def.name,
       landmark.def.id,
@@ -1173,6 +1192,7 @@ function targetKey(target: UniverseNavigationTarget): string {
   if (target.kind === "marker") return "marker:" + target.markerId;
   if (target.kind === "body") return `body:${target.starId}/${target.bodyId}`;
   if (target.kind === "content") return "content:" + target.entryId;
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
 }
 
