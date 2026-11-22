@@ -1,0 +1,37 @@
+{
+  "schema": 3,
+  "task_id": "PLANET-ARRIVAL-PROGRESSIVE-BAKE-001",
+  "approved_at": "2026-11-22T20:27:00.000Z",
+  "baseline_commit": "55ade94ee84361d93dcca5d41e950e7747a6cb0a",
+  "record_path": "docs/reuse-gate/tasks/PLANET-ARRIVAL-PROGRESSIVE-BAKE-001.json",
+  "record_sha256": "30dbe28da92dcb5b5c551e283aa9483e89f76502b5db19bd10dd4f46c8f831c0",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Preserve the existing YEIS destination/Approach contract while moving expensive procedural planet baking behind an immediate usable fallback"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-arrival-backbone",
+    "r3f-existing-scene-host",
+    "procedural-planets-progressive-bake",
+    "react-arrival-scheduling"
+  ],
+  "candidate_scores": {
+    "yeis-arrival-backbone": 49,
+    "r3f-existing-scene-host": 52,
+    "procedural-planets-progressive-bake": 53,
+    "react-arrival-scheduling": 51
+  }
+}
