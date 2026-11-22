@@ -82,12 +82,22 @@ jobs:
         run: node tests/ci/bundle-guard.mjs
 
       - name: Upload dist artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: personal-universe-dist-${{ github.run_id }}
           path: dist
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
+
+      - name: Upload build metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-build-metrics-${{ github.run_id }}
+          path: ci-artifacts
+          if-no-files-found: warn
+          retention-days: 14
 
   e2e:
     name: E2E shard ${{ matrix.shard }}/4
