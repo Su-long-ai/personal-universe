@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "PERFORMANCE-EVIDENCE-V1-001",
+  "approved_at": "2026-11-22T19:28:00.000Z",
+  "baseline_commit": "bf34a81fb1810fc2cd2d47ac15478f6bd6850641",
+  "record_path": "docs/reuse-gate/tasks/PERFORMANCE-EVIDENCE-V1-001.json",
+  "record_sha256": "f047ca39272c365f01f15fe772322e4b5643d5e9369b4aa7a785bd87065921e1",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-image-pipeline": "3e1407a29708f7de453546b7b96d7c52b292469a0dc54f95e4ce04af2914af60",
+    "lighthouse-ci": "e091666396e1cc82f499acaa3f8575c93329ee31db560b49d846a0c8c5b1dc66",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "web-performance-entry-api": "54648a15db35fff89a8960e823f050e27ce02aaee1e1e09d54fd2e6a56cddcfe"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Performance regression evidence and broad release budgets for Personal Universe"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "tests/ci/bundle-guard.mjs",
+    "tests/e2e/performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "selected_ids": [
+    "playwright-performance-entry-evidence",
+    "existing-bundle-guard-extension"
+  ],
+  "candidate_scores": {
+    "playwright-performance-entry-evidence": 57,
+    "existing-bundle-guard-extension": 57,
+    "lighthouse-ci": 48,
+    "astro-image-pipeline": 43
+  }
+}
