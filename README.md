@@ -23,13 +23,14 @@ Build check:
 npm run build
 ```
 
-Regenerate the lightweight local test textures:
+Regenerate the lightweight local test assets:
 
 ```bash
 python scripts/generate_textures.py
+python scripts/generate_ambient.py
 ```
 
-The browser never generates those textures on the first frame; V0 serves prebuilt PNG assets from `public/textures`. This keeps the rendering path responsive and mirrors the later NASA/KTX2 asset pipeline.
+The ambient generator uses the installed FFmpeg to emit a small looping OGG. The browser never generates textures or audio on the first frame; V0 serves prebuilt assets from `public/`. This keeps the rendering path responsive and mirrors the later NASA/KTX2/media asset pipeline.
 
 ## Architecture
 

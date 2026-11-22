@@ -1,5 +1,6 @@
 from pathlib import Path
 import wave
+import subprocess
 import numpy as np
 
 ROOT = Path(r"D:\personal-universe\public\audio")
@@ -65,4 +66,12 @@ with wave.open(str(wav_path), "wb") as wf:
     wf.setframerate(sr)
     wf.writeframes(pcm.tobytes())
 
-print(wav_path)
+ogg_path = ROOT / "deep-space.ogg"
+subprocess.run([
+    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+    "-i", str(wav_path),
+    "-c:a", "libvorbis", "-q:a", "4",
+    str(ogg_path),
+], check=True)
+wav_path.unlink(missing_ok=True)
+print(ogg_path.name, ogg_path.stat().st_size)
