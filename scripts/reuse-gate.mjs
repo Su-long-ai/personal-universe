@@ -625,26 +625,35 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
     die("approval baseline is not an ancestor of HEAD: " + approval.task_id);
   }
 
-  const baselineRecord = gitRaw(["show", approval.baseline_commit + ":" + normalize(approval.record_path)]);
-  if (sha256Text(baselineRecord) !== approval.record_sha256) {
-    die("approved research record did not exist unchanged at its baseline: " + approval.task_id);
+  const tokenCommit = approvalCommit(head, approvalPath);
+  if (!tokenCommit) {
+    die("approval token is not committed in Git history: " + approval.task_id);
   }
 
   if (approval.schema === 2) {
     if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
-      const baselineRegistry = JSON.parse(
-        gitRaw(["show", approval.baseline_commit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
+      const tokenRegistry = JSON.parse(
+        gitRaw(["show", tokenCommit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
       );
-      const baselineIndex = validateRegistry(baselineRegistry);
+      const tokenIndex = validateRegistry(tokenRegistry);
       const actual = registryEntryHashes(record, registryIndex);
-      const baselineHashes = registryEntryHashes(record, baselineIndex);
+      const tokenHashes = registryEntryHashes(record, tokenIndex);
       for (const id of Object.keys(actual)) {
-        if (baselineHashes[id] !== actual[id]) {
+        if (tokenHashes[id] !== actual[id]) {
           die("legacy approval referenced registry entry changed after approval: " + approval.task_id + " -> " + id);
         }
       }
     }
   } else {
+    if (!gitOk(["merge-base", "--is-ancestor", approval.baseline_commit, tokenCommit])) {
+      die("schema-3 approval token precedes its declared baseline: " + approval.task_id);
+    }
+
+    const tokenRecord = gitRaw(["show", tokenCommit + ":" + normalize(approval.record_path)]);
+    if (sha256Text(tokenRecord) !== approval.record_sha256) {
+      die("approved research record was not frozen in the approval metadata commit: " + approval.task_id);
+    }
+
     const expected = approval.registry_entry_hashes || {};
     const actual = registryEntryHashes(record, registryIndex);
     for (const id of Object.keys(actual)) {
@@ -652,14 +661,15 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
         die("registry entry changed after approval: " + approval.task_id + " -> " + id);
       }
     }
-    const baselineRegistry = JSON.parse(
-      gitRaw(["show", approval.baseline_commit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
+
+    const tokenRegistry = JSON.parse(
+      gitRaw(["show", tokenCommit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
     );
-    const baselineIndex = validateRegistry(baselineRegistry);
-    const baselineHashes = registryEntryHashes(record, baselineIndex);
+    const tokenIndex = validateRegistry(tokenRegistry);
+    const tokenHashes = registryEntryHashes(record, tokenIndex);
     for (const id of Object.keys(actual)) {
-      if (baselineHashes[id] !== expected[id]) {
-        die("registry entry was not frozen at approval baseline: " + approval.task_id + " -> " + id);
+      if (tokenHashes[id] !== expected[id]) {
+        die("registry entry was not frozen in the approval metadata commit: " + approval.task_id + " -> " + id);
       }
     }
   }
@@ -670,8 +680,16 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
   if (JSON.stringify(approval.selected_ids) !== JSON.stringify(validation.selectedIds)) {
     die("approval selected_ids do not match research record: " + approval.task_id);
   }
+  if (JSON.stringify(approval.scope) !== JSON.stringify(record.scope)) {
+    die("approval scope does not match research record: " + approval.task_id);
+  }
   if (Boolean(approval.policy_change) !== Boolean(record.policy_change)) {
     die("approval policy_change does not match research record: " + approval.task_id);
+  }
+  for (const [id, score] of Object.entries(validation.scores)) {
+    if (approval.candidate_scores?.[id] !== score) {
+      die("approval candidate score does not match research record: " + approval.task_id + " -> " + id);
+    }
   }
 
   return {
