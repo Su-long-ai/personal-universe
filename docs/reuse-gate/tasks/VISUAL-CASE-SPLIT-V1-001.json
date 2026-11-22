@@ -1,0 +1,179 @@
+{
+  "schema": 2,
+  "task_id": "VISUAL-CASE-SPLIT-V1-001",
+  "title": "Split WebGL visual acceptance into independently sharded Playwright cases",
+  "scope": {
+    "level": "architecture",
+    "subject": "Release visual-test topology and failure isolation for Personal Universe"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "The current suite already uses Playwright native sharding and a GitHub Actions matrix with workers=1 per runner, but each viewport is still one long serial visual journey. Reuse Playwright test-level sharding by splitting Galaxy, Search, Places, Personal Signal system/orbit and Hero-world evidence into independent tests. Keep viewport-heavy tablet/mobile smoke as separate cases so one slow WebGL journey does not hide or delay unrelated failures.",
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-sharding",
+      "finding": "Playwright distributes individual tests across shards; with fullyParallel enabled, test-level granularity improves balancing and failure isolation."
+    },
+    {
+      "url": "https://playwright.dev/docs/ci",
+      "finding": "Playwright recommends workers=1 on CI for stability and scaling across machines with sharding rather than increasing workers on one runner."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs",
+      "finding": "GitHub Actions matrix jobs provide separate hosted runners and independent job/artifact failures."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "conclusion": "No broader visual-regression service is needed because the repository already has screenshots, traces, HTML reports and cloud runners; replacing that stack would add a vendor without fixing the monolithic test shape.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Playwright Test already supplies independent tests, retries/traces/screenshots and native sharding; split the visual journey at the test level instead of building a custom visual runner.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Existing Playwright sharding plus the GitHub Actions matrix already provides the required cross-runner parallelism while retaining workers=1.",
+      "source_refs": [
+        0,
+        2
+      ],
+      "registry_refs": [
+        "playwright-ci-sharding",
+        "github-actions-matrix"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "conclusion": "No new helper dependency is needed; small shared setup/screenshot helpers inside the existing spec are sufficient.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": []
+    }
+  ],
+  "candidates": [
+    {
+      "id": "playwright-independent-visual-cases",
+      "name": "Independent Playwright visual cases",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright Test test-level execution",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Turns each visual state into an independently failing test while preserving existing screenshots, traces, runtime hooks and CI reporting.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-native-shards",
+      "name": "Playwright native sharding on GitHub matrix runners",
+      "level": "subsystem",
+      "registry_id": "playwright-ci-sharding",
+      "source": "Playwright sharding + existing Actions matrix",
+      "license": "Apache-2.0 / GitHub hosted service",
+      "decision": "reuse",
+      "reason": "Already deployed and proven; finer test granularity lets the existing shards balance the visual workload without extra workers.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "same-runner-multiworker",
+      "name": "Multiple WebGL workers on one runner",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright worker parallelism",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Would increase SwiftShader/WebGL contention and conflicts with the established one-worker-per-runner stability policy.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Independent visual-state failure",
+      "importance": "high",
+      "coverage": {
+        "playwright-independent-visual-cases": "full",
+        "playwright-native-shards": "partial",
+        "same-runner-multiworker": "none"
+      },
+      "decision": "Split each major visual state into its own Playwright test."
+    },
+    {
+      "capability": "Reduce slow-case blast radius and wall clock",
+      "importance": "high",
+      "coverage": {
+        "playwright-independent-visual-cases": "full",
+        "playwright-native-shards": "full",
+        "same-runner-multiworker": "partial"
+      },
+      "decision": "Let native sharding distribute the smaller tests across separate runners."
+    },
+    {
+      "capability": "Preserve one WebGL worker per runner",
+      "importance": "high",
+      "coverage": {
+        "playwright-independent-visual-cases": "full",
+        "playwright-native-shards": "full",
+        "same-runner-multiworker": "none"
+      },
+      "decision": "Keep workers=1; do not add same-runner browser concurrency."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-independent-visual-cases",
+      "playwright-native-shards"
+    ],
+    "rationale": "Keep the existing Playwright + GitHub Actions stack and change only the test granularity. Independent visual cases gain isolated screenshots/traces and allow native sharding to balance slow WebGL work without longer timeouts or more workers per runner.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If one scene remains intrinsically slow, isolate only that scene into its own test/project while keeping the same runtime assertions and one-worker-per-runner rule."
+  }
+}

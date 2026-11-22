@@ -758,6 +758,40 @@
       ],
       "notes": "Mature generic Three.js camera-control library. Not selected for native body travel because it does not own YEIS hierarchical reference frames, native celestial-body identity or system switching; adding it would create a competing camera authority.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "astro-base-url",
+      "name": "Astro base path and import.meta.env.BASE_URL",
+      "url": "https://docs.astro.build/en/guides/deploy/github/",
+      "level": "framework_engine",
+      "license": "MIT (Astro)",
+      "status": "adopt",
+      "covers": [
+        "repository-subpath builds",
+        "base-aware public asset URLs",
+        "GitHub Pages project-site deployment",
+        "custom-domain/root-path portability"
+      ],
+      "notes": "Use Astro's official base configuration and Vite/Astro import.meta.env.BASE_URL for public runtime assets instead of hard-coded root-relative URLs. This preserves root-local development while allowing /personal-universe production hosting.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "cloudflare-pages-git",
+      "name": "Cloudflare Pages Git integration",
+      "url": "https://developers.cloudflare.com/pages/get-started/git-integration/",
+      "level": "full_solution",
+      "license": "Commercial hosted service",
+      "status": "assess",
+      "covers": [
+        "private GitHub repository deployment",
+        "production pages.dev hosting",
+        "branch and pull-request preview URLs",
+        "HTTPS and CDN delivery",
+        "custom domains",
+        "GitHub deployment checks"
+      ],
+      "notes": "Mature root-hosted static deployment fallback. Stronger automatic branch/PR preview ergonomics than GitHub Pages, but requires an external Cloudflare account and GitHub App integration.",
+      "last_checked": "2026-11-23"
     }
   ]
 }

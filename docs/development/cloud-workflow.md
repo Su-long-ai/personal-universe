@@ -35,11 +35,11 @@ Start CI diagnosis from the combined HTML report and the failing shard trace rat
 
 ## Preview deployment
 
-`.github/workflows/pages-preview.yml` is an intentionally separate manual GitHub Pages module. It validates the selected ref against `main`, builds it, runs the bundle guard, and preserves a downloadable `dist` before attempting deployment.
+`.github/workflows/pages-preview.yml` publishes the validated static build to the repository's GitHub Pages project site on every `main` push and can also deploy a manually selected ref. The deployment build injects `PUBLIC_SITE_URL=https://su-long-ai.github.io` and `PUBLIC_BASE_PATH=/personal-universe`; ordinary local development and the normal browser CI remain rooted at `/`.
 
-GitHub Pages must already be configured to use GitHub Actions. The current application also assumes root-relative YEIS/runtime assets. The workflow therefore refuses to deploy when Pages reports a non-empty repository `base_path`; deploying to `/<repo>` unchanged would produce a misleading broken preview. A root/custom-domain Pages site can deploy without an extra third-party token.
+Public runtime assets use Astro/Vite `import.meta.env.BASE_URL`, so the same code works at local root, the GitHub Pages repository subpath, and a future custom-domain root without maintaining a second URL layer. After `deploy-pages`, the workflow probes both the live homepage and the YEIS `stars.bin` catalogue before reporting the production URL.
 
-PR CI never depends on Pages. Until a compatible public Pages root or an external preview integration is configured, the canonical cloud previews are the downloadable `dist`, the 18 retained viewport screenshots, and the Playwright report/trace. Vercel remains a future option for automatic per-PR URLs without changing the validation authority.
+GitHub Pages must be configured to use GitHub Actions. PR CI remains independent from Pages, so a Pages account/enablement problem cannot hide browser or build regressions. Cloudflare Pages and Vercel remain mature fallbacks if Pages availability becomes a product constraint rather than a repository setting.
 
 ## When a local machine is justified
 

@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "VISUAL-CASE-SPLIT-V1-001",
+  "approved_at": "2026-11-22T18:56:00.000Z",
+  "baseline_commit": "7bcba9f37c3d1d1e2e3e3d089e1de1a383d03e4c",
+  "record_path": "docs/reuse-gate/tasks/VISUAL-CASE-SPLIT-V1-001.json",
+  "record_sha256": "45164c991596c709a638debeddf0950df5f4e6cf8b70bd99ca653bf65b8b0bc1",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-actions-matrix": "6686d9fcb00d4643c27f293fb2237c655d8f6d1eaa34c15435d444e592ee65fe",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Release visual-test topology and failure isolation for Personal Universe"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "selected_ids": [
+    "playwright-independent-visual-cases",
+    "playwright-native-shards"
+  ],
+  "candidate_scores": {
+    "playwright-independent-visual-cases": 57,
+    "playwright-native-shards": 57,
+    "same-runner-multiworker": 50
+  }
+}
