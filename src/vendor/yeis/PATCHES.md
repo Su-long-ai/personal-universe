@@ -62,8 +62,10 @@ Fiber.
 6. `render/LandmarkSprites.ts`
    - Adds `dispose(scene)` so the R3F host can remove the instanced landmark
      mesh and release its geometry, shader material, and photo atlas texture.
-   - Rendering, coordinate, LOD, atlas, and picking logic remain the exact
-     pinned MIT implementation.
+   - Exposes read-only atlas request/load/failure counters for host runtime
+     smoke evidence and guards the delayed atlas load after React disposal.
+   - Rendering, coordinate, LOD, atlas composition, and picking semantics remain
+     the pinned MIT implementation.
 
 ## Deep-sky landmark imagery
 
