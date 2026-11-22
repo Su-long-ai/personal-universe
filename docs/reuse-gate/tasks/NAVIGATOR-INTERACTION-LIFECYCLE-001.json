@@ -1,0 +1,176 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATOR-INTERACTION-LIFECYCLE-001",
+  "title": "Harden Navigator async query and destination action lifecycle",
+  "scope": {
+    "level": "implementation",
+    "subject": "Prevent stale Search/Places actions and expose loading, pending and immediate navigation failure states without changing YEIS destination authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The existing Navigator already reuses pinned-MIT YEIS search/place semantics and the shared UniverseNavigationDestination executor, but its presentation lifecycle leaves a brief stale-result window after query edits and closes before Open/Locate promises settle, making immediate failures console-only. WAI-ARIA documents the expected editable combobox keyboard contract, while cmdk demonstrates mature grouped loading/empty presentation. Replacing the current destination model or adopting a second state machine would be disproportionate: keep YEIS as the index/authority, keep React as the local lifecycle owner, immediately invalidate stale rows on query edits, expose visible scanning/pending/error states, and close only after the destination action accepts successfully.",
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "Pinned MIT YEIS already owns the domain search/navigation semantics; Personal Universe should not replace that authority merely to harden asynchronous presentation state."
+    },
+    {
+      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/combobox/",
+      "finding": "The WAI-ARIA editable combobox pattern keeps DOM focus in the input while Arrow keys move active suggestions, Enter accepts the current suggestion, and Escape dismisses the popup without JavaScript stealing ordinary text-editing keys."
+    },
+    {
+      "url": "https://github.com/pacocoursey/cmdk",
+      "finding": "cmdk provides mature grouped command-menu selection plus explicit Loading and Empty states, confirming those presentation states are product-level concerns rather than reasons to invent a second search authority."
+    },
+    {
+      "url": "https://react.dev/reference/react",
+      "finding": "React state, refs and effects are sufficient for a bounded cancellation-safe async query/action lifecycle; a separate state-machine runtime is unnecessary for this local interaction surface."
+    },
+    {
+      "url": "https://stately.ai/docs/xstate",
+      "finding": "XState is a mature state-machine/actor framework, but its additional runtime and machine model would be disproportionate for the Navigator's small query/action state surface."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep pinned MIT YEIS as the full astronomical search/navigation authority and harden only the React product shell around its resolved destinations."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "xstate-v5"
+      ],
+      "source_refs": [
+        4
+      ],
+      "conclusion": "XState can model the lifecycle but is globally too heavy for this bounded component state and would add a second orchestration runtime without improving destination semantics."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Surveyed combobox/command-menu solutions solve presentation and accessibility, not the YEIS spatial destination subsystem; no new search subsystem should displace the existing authority."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "cmdk-fuse-navigation",
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "cmdk is a mature component shell, while existing React primitives already cover the narrow stale-result/pending/error gap without a dependency migration or duplicate filtering state."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-existing-navigator-authority",
+      "name": "Existing pinned-MIT YEIS destination authority",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseNavigator over pinned YEIS search/places resolution",
+      "license": "MIT source at pinned e520568 plus project-owned React presentation",
+      "decision": "partial",
+      "reason": "Preserves the globally correct astronomy and spatial identity model; it intentionally leaves product-shell loading and action feedback to Personal Universe.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "xstate-navigator-machine",
+      "name": "XState Navigator interaction machine",
+      "level": "framework_engine",
+      "registry_id": "xstate-v5",
+      "source": "XState v5 actors/state machines",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Technically complete for async interaction state but adds a second orchestration runtime and machine definition for a component with only query status and one pending action.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "cmdk-navigator-shell",
+      "name": "cmdk command palette shell over YEIS destinations",
+      "level": "component_asset",
+      "registry_id": "cmdk-fuse-navigation",
+      "source": "cmdk grouped command menu",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Strong generic palette UX, but migrating now would duplicate active-selection/filter state and still require custom dual Open/Locate actions while the current shell already implements the domain-specific grouping and keyboard contract.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-local-navigator-lifecycle",
+      "name": "Existing React state/ref/effect lifecycle",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "React 18 primitives already in the application",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Closes the exact stale-result and pending/error gap with small local state and cancellation logic while retaining the existing destination model and UI structure.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-existing-navigator-authority",
+      "react-local-navigator-lifecycle"
+    ],
+    "rationale": "Retain the full pinned-MIT YEIS search/Places authority and the existing product UI, then use only React primitives already shipped to invalidate stale rows immediately, show deterministic loading/action state and keep immediate action failures visible. This avoids both a second navigation subsystem and a late-stage command-palette migration while adopting the useful loading/empty interaction semantics observed in mature external components.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If Navigator complexity grows beyond this bounded state surface, revisit cmdk as a presentation shell or XState as orchestration without allowing either to become a second destination/search authority."
+  }
+}
