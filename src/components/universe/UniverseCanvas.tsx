@@ -4,7 +4,7 @@ import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import { CinematicCamera } from "./CinematicCamera";
-import type { YeisGalaxyViewState } from "./YeisGalaxyScene";
+import type { YeisGalaxyViewState, YeisSignalHover } from "./YeisGalaxyScene";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import type { UniverseNavigationCameraRequest } from "../../lib/universe/yeis/navigation";
 import type {
@@ -35,6 +35,7 @@ export function UniverseCanvas({
   contentPlacements,
   navigationRequest,
   onNavigationComplete,
+  onSignalHover,
   selectedSystem,
   selectedPlanet,
   onSelectSystem,
@@ -50,6 +51,7 @@ export function UniverseCanvas({
   contentPlacements: UniverseContentPlacement[];
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
+  onSignalHover: (hover: YeisSignalHover) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
@@ -88,6 +90,7 @@ export function UniverseCanvas({
             navigationRequest={navigationRequest}
             onNavigationComplete={onNavigationComplete}
             onSelectSystem={onSelectSystem}
+            onSignalHover={onSignalHover}
             quality={quality}
             viewStateRef={yeisViewStateRef}
           />
