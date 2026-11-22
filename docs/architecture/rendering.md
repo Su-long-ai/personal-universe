@@ -11,9 +11,9 @@ Personal Universe keeps one navigation authority and one browser rendering host.
 
 ## Close-world rendering
 
-For `approach`, `orbit` and `atmosphere` phases, the selected `PlanetDefinition` creates one live `procedural-planets` `Planet`.
+For `approach`, `orbit` and `atmosphere` phases, the selected `PlanetDefinition` first commits the existing lightweight fallback world. On a capable renderer, one live `procedural-planets` `Planet` is then warmed in after the arrival frame and an idle/warm-up window.
 
-The object is attached to the existing R3F scene and scaled into the established Personal Universe world coordinates. The existing cinematic camera and `PLANET_ANCHOR` remain authoritative.
+The live object is attached to the existing R3F scene and scaled into the established Personal Universe world coordinates. The existing cinematic camera and `PLANET_ANCHOR` remain authoritative. Quick travel/return actions can cancel warm-in without paying the live-world construction cost.
 
 The post-processing chain is:
 
@@ -29,20 +29,23 @@ shared R3F scene
 
 A small inner fallback sphere remains behind the live surface so shader warm-up never presents a blank selected world. It is not a second planet authority.
 
-Quality mode maps to the upstream live renderer's documented terrain/cloud knobs instead of project-owned shaders:
+Quality mode maps to renderer capability plus the upstream live renderer's documented terrain/cloud knobs instead of project-owned shaders:
 
-- low: reduced chunk/depth/cloud budgets;
-- auto: upstream-like balanced defaults;
-- high: higher quadtree and cloud budgets.
+- low: keep the complete lightweight fallback and do not mount `PlanetPass`;
+- auto: use the live renderer on hardware WebGL, but keep the fallback on detected SwiftShader/llvmpipe/software rasterizers;
+- high: explicitly force the live `Planet + PlanetPass` path with the higher quadtree/cloud budgets.
+
+This is a product performance policy, not a CI-only switch: software-rendered browsers get a responsive complete world instead of a GPU-blocking live path, while users can still explicitly request HIGH to exercise live rendering.
 
 ## Runtime evidence
 
-Close-world runtime exposes:
+Close-world runtime exposes the actual active path:
 
-- `data-universe-world-renderer="procedural-planets-live"`
-- `data-universe-world-pipeline="procedural-planets-pass"`
+- live: `data-universe-world-renderer="procedural-planets-live"` and `data-universe-world-pipeline="procedural-planets-pass"`;
+- adaptive fallback: `data-universe-world-renderer="procedural-planets-fallback-<reason>"` and `data-universe-world-pipeline="fallback-<reason>"`;
+- capture readiness: `data-universe-world-ready="true"` only once the active live or fallback path is ready.
 
-Visual Playwright cases require these markers for Personal Signal and Hero worlds in addition to the existing phase/content assertions.
+Normal visual screenshots accept either a ready live path or the renderer-capability fallback. A separate HIGH-quality Playwright case forces the live path and requires `PlanetPass` readiness without taking the expensive software-WebGL screenshot. This preserves real live-renderer coverage without using larger timeouts to hide GPU stalls.
 
 ## Next system-scale layer
 
