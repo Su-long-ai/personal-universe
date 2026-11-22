@@ -29,7 +29,7 @@ const DISABLED_MOUSE = {
 const MANUAL_MOUSE = {
   left: CameraControlsImpl.ACTION.ROTATE,
   middle: CameraControlsImpl.ACTION.DOLLY,
-  right: CameraControlsImpl.ACTION.ROTATE,
+  right: CameraControlsImpl.ACTION.NONE,
   wheel: CameraControlsImpl.ACTION.DOLLY,
 } as const;
 
