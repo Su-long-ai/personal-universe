@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
 import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import "./universe.css";
 
 function useReducedMotion() {
@@ -25,6 +26,7 @@ export default function UniverseApp() {
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
   const reducedMotion = useReducedMotion();
+  const ambient = useAmbientAudio(muted, phase);
   const debugFreeze =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("freeze") === "1";
@@ -79,7 +81,11 @@ export default function UniverseApp() {
       <div className="universe-canvas">
         <UniverseCanvas
           phase={phase}
-          onSelectPlanet={() => phase === "galaxy" && setPhase("approach")}
+          onSelectPlanet={() => {
+            if (phase !== "galaxy") return;
+            ambient.ensurePlaying();
+            setPhase("approach");
+          }}
           quality={quality}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
@@ -93,7 +99,10 @@ export default function UniverseApp() {
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((value) => !value)}
         muted={muted}
-        onToggleMuted={() => setMuted((value) => !value)}
+        onToggleMuted={() => {
+          if (muted) ambient.ensurePlaying();
+          setMuted((value) => !value);
+        }}
         quality={quality}
         onQualityChange={setQuality}
         onReturn={() => setPhase("returning")}
