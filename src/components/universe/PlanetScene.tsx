@@ -196,6 +196,13 @@ export function PlanetScene({
   }, [livePlanet]);
 
   useEffect(() => {
+    document.documentElement.dataset.universeWorldSceneReady = "true";
+    return () => {
+      delete document.documentElement.dataset.universeWorldSceneReady;
+    };
+  }, []);
+
+  useEffect(() => {
     const mode = livePlanet
       ? "procedural-planets-live"
       : fallbackReason
