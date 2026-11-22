@@ -45,7 +45,7 @@ function fallbackColor(archetype: PlanetArchetype) {
 }
 
 function DeepSky() {
-  const texture = useTexture("/textures/stars_milky_way.jpg");
+  const texture = useTexture(`${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
 

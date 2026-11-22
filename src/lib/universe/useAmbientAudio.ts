@@ -34,7 +34,7 @@ export function useAmbientAudio(muted: boolean, phase: UniversePhase) {
     void import("howler").then(({ Howl }) => {
       if (disposed) return;
       const sound = new Howl({
-        src: ["/audio/deep-space.ogg"],
+        src: [`${import.meta.env.BASE_URL}audio/deep-space.ogg`],
         loop: true,
         preload: true,
         volume: targetVolume(phaseRef.current),
