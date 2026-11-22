@@ -737,6 +737,21 @@ select {
   color: rgba(255, 220, 155, 0.76);
 }
 
+.navigator-result-row.is-pending {
+  border-color: rgba(115, 244, 255, 0.16);
+  box-shadow: inset 2px 0 0 rgba(115, 244, 255, 0.34);
+  background: linear-gradient(
+    90deg,
+    rgba(50, 133, 151, 0.1),
+    rgba(20, 38, 55, 0.04)
+  );
+}
+
+.navigator-result-row.is-pending .navigator-open,
+.navigator-result-row.is-pending .navigator-locate {
+  color: rgba(144, 238, 247, 0.72);
+}
+
 .navigator-result-open {
   min-width: 0;
   display: grid;
