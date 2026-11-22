@@ -227,3 +227,60 @@ current `window.location`.
 
 The serialized identity remains YEIS-owned; Personal Universe does not create a
 second slug or route identity for astronomical objects.
+
+## Guided journeys
+
+Implemented under task `GUIDED-JOURNEYS-V3-001`.
+
+Journeys are deliberately orchestration over the existing destination model, not
+a second navigation state machine.
+
+The pinned MIT YEIS `src/core/TourPlayer.ts` was evaluated directly. Personal
+Universe reuses three of its spatial-tour semantics:
+
+- user-initiated navigation interrupts the running journey;
+- automatic progression waits until navigation has settled, then applies a
+  short destination dwell;
+- step changes own and clean up only their temporary orchestration state.
+
+The upstream narration manifests, TTS playback, timed cue engine, render
+overrides, comparison/pulse effects, surface pins and simulation-time ownership
+are specific to YEIS's educational-tour product and are intentionally not
+ported.
+
+The Navigator derives three journeys from the same real Personal Signal
+destinations already generated from Astro Content Collections:
+
+- Featured Journey;
+- Projects Journey;
+- Research Journey.
+
+No second handwritten content list is maintained. Empty groups remain disabled
+instead of inventing portfolio entries.
+
+The journey coordinator stays inside the existing React runtime and calls the
+same `handleNavigateDestination` path used by Search and Places. A journey
+therefore cannot create an alternate star/body identity or camera authority.
+
+Behavior:
+
+- manual Search navigation cancels the current journey;
+- Locate cancels the current journey;
+- Canvas system/planet selection cancels the current journey;
+- Return and Stop cancel it explicitly;
+- Prev/Next reuse the same destination executor;
+- normal mode auto-advances only after navigation is no longer traveling or
+  locating and the product is at a stable system/approach/orbit/surface phase;
+- `prefers-reduced-motion` disables automatic progression while keeping
+  Prev/Next/Done available;
+- camera controls remain outside the journey coordinator.
+
+React Joyride and XState were both evaluated before implementation. Joyride is a
+mature DOM-target onboarding product, but it would not replace spatial
+destination resolution or camera travel. XState is a mature general state
+machine framework, but the current journey state is intentionally tiny and
+subordinate to the existing navigation state. Neither is introduced as a new
+runtime dependency at this stage. If journeys later gain branching,
+persistence, resumability or parallel invoked work, XState should be
+re-evaluated before expanding the local coordinator.
+
