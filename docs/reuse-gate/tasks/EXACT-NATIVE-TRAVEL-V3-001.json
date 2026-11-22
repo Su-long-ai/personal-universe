@@ -1,0 +1,154 @@
+{
+  "schema": 2,
+  "task_id": "EXACT-NATIVE-TRAVEL-V3-001",
+  "title": "Exact native YEIS body and black-hole travel",
+  "scope": {
+    "level": "implementation",
+    "subject": "Route body and black-hole destinations through the pinned YEIS reference-frame and camera primitives instead of degrading to host-star travel"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The existing product can discover YEIS bodies and black holes but main still degrades some targets to their host star or React-only planet model. Reuse the already-adopted pinned MIT YEIS universe/body/camera semantics for exact native travel, with Personal Universe only adapting destination types and product state. Do not add a second camera controller or synthesize cross-scale motion in React.",
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT snapshot is already the selected universe backbone and contains the hierarchical universe, native bodies, black-hole data and camera/autopilot implementation used by the hosted YEIS renderer."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "The pinned MIT UI exposes native navigation entry points including system/body and black-hole travel; those semantics can be adapted without copying the whole legacy UI."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber is the existing renderer host and supplies the shared Three scene/frame lifecycle; it should remain host infrastructure rather than become a second cross-scale travel authority."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls",
+      "finding": "camera-controls is a mature generic Three.js camera-control component with smooth transitions and interaction handling, but it does not model YEIS reference-frame switching or native celestial-body identity."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "The already-selected verified MIT YEIS snapshot is the broader full solution and already owns the exact universe hierarchy, native bodies, compact objects and cross-scale camera semantics required by this gap.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "React Three Fiber remains the correct host framework for the shared Three.js scene, but it intentionally does not provide astronomical reference-frame or native-body navigation semantics.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "react-three-fiber"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Pinned YEIS native travel already defines system/body and black-hole navigation over the same Universe and CameraController state currently hosted by Personal Universe, so those primitives should be reused directly.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "yeis-native-travel-e520568"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "camera-controls is a mature generic Three.js alternative for camera motion, but introducing it would duplicate the existing YEIS camera controller while still leaving reference-frame and target identity work unsolved.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-full-backbone",
+      "name": "Verified MIT YEIS universe backbone",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "YEIS pinned MIT commit e520568",
+      "license": "MIT source at pinned commit; retained third-party notices for data/assets",
+      "decision": "partial",
+      "reason": "Keep the already-adopted mother universe as the identity/reference-frame owner. The implementation only needs to expose more of its existing native travel semantics through the product adapter.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "yeis-native-travel",
+      "name": "Pinned YEIS native body/black-hole travel primitives",
+      "level": "subsystem",
+      "registry_id": "yeis-native-travel-e520568",
+      "source": "Pinned MIT Universe + native camera/UI semantics",
+      "license": "MIT at pinned commit",
+      "decision": "reuse",
+      "reason": "Directly solves exact target identity, star-system frame switching and native camera travel using the same runtime already mounted in the galaxy scene, with no second camera or coordinate system.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "generic-camera-controls",
+      "name": "camera-controls smooth Three.js camera controller",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "camera-controls",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Mature motion component but it cannot resolve or switch YEIS astronomical reference frames and would compete with the native CameraController already responsible for galaxy travel.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-full-backbone",
+      "yeis-native-travel"
+    ],
+    "rationale": "Extend the product adapter to expose exact body and black-hole travel that the already-selected pinned MIT YEIS runtime can perform natively. Keep R3F as the host lifecycle and React as product state only; do not add a second camera controller, coordinate system or custom cross-scale flight algorithm.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a target is genuinely absent from the pinned runtime, fail visibly or center its known host rather than fabricating a different body identity. Re-evaluate the mother backbone before adding another cross-scale navigation engine."
+  }
+}
