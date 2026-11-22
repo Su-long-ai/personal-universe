@@ -52,6 +52,44 @@ const VALID_PHASES: UniversePhase[] = [
   "returning",
 ];
 
+
+function nativePlanetId(planet: PlanetDefinition): string {
+  return planet.id.startsWith("yeis-planet:")
+    ? planet.id.slice("yeis-planet:".length)
+    : planet.id;
+}
+
+function nativeSystemId(system: SystemDefinition | null): string | null {
+  if (!system?.id.startsWith("yeis-system:")) return null;
+  return system.id.slice("yeis-system:".length);
+}
+
+function replaceNavigationUrl({
+  phase,
+  starId,
+  bodyId,
+}: {
+  phase: UniversePhase;
+  starId?: string | null;
+  bodyId?: string | null;
+}) {
+  const url = new URL(window.location.href);
+
+  if (phase === "galaxy") {
+    url.searchParams.delete("phase");
+    url.searchParams.delete("star");
+    url.searchParams.delete("body");
+  } else {
+    url.searchParams.set("phase", phase);
+    if (starId) url.searchParams.set("star", starId);
+    else url.searchParams.delete("star");
+    if (bodyId) url.searchParams.set("body", bodyId);
+    else url.searchParams.delete("body");
+  }
+
+  window.history.replaceState(window.history.state, "", url);
+}
+
 export default function UniverseApp({
   contentEntries = [],
 }: {
@@ -224,6 +262,7 @@ export default function UniverseApp({
     }
 
     const requestedStar = params.get("star")?.trim().toLowerCase();
+    const requestedBody = params.get("body")?.trim().toLowerCase();
     const targetMarker = requestedStar
       ? galaxy.markers.find(
           (marker) =>
@@ -247,7 +286,19 @@ export default function UniverseApp({
       return;
     }
 
+    const exactRequestedPlanet = requestedBody
+      ? system.planets.find((planet) => {
+          const id = planet.id.toLowerCase();
+          return (
+            id === requestedBody ||
+            id === "yeis-planet:" + requestedBody ||
+            nativePlanetId(planet).toLowerCase() === requestedBody
+          );
+        })
+      : undefined;
+
     const selected =
+      exactRequestedPlanet ??
       system.planets.find((planet) => planet.content?.length) ??
       system.planets.find((planet) => planet.heroKey === "home") ??
       system.planets[0] ??
@@ -302,6 +353,12 @@ export default function UniverseApp({
       setScrollDepth(0);
       ambient.ensurePlaying();
       setPhase("system");
+      if (marker.engine === "yeis" && marker.nativeId) {
+        replaceNavigationUrl({
+          phase: "system",
+          starId: marker.nativeId,
+        });
+      }
     },
     [ambient, resolveMarker],
   );
@@ -336,6 +393,11 @@ export default function UniverseApp({
           setPhase(planet ? "approach" : "system");
           document.documentElement.dataset.universeNavigationTarget =
             destination.target.nativeId + ":" + destination.target.bodyId;
+          replaceNavigationUrl({
+            phase: planet ? "approach" : "system",
+            starId: destination.target.nativeId,
+            bodyId: planet ? destination.target.bodyId : null,
+          });
           console.info(
             "[UNIVERSE-NAV] open body:" +
               destination.title +
@@ -365,6 +427,7 @@ export default function UniverseApp({
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
+      replaceNavigationUrl({ phase: "galaxy" });
       setNavigationRequest({
         requestId: navigationRequestSeq.current,
         mode: "travel",
@@ -401,6 +464,7 @@ export default function UniverseApp({
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
+      replaceNavigationUrl({ phase: "galaxy" });
 
       const cameraTarget =
         destination.target.kind === "body"
@@ -447,8 +511,16 @@ export default function UniverseApp({
       setSelectedPlanet(planet);
       ambient.ensurePlaying();
       setPhase("approach");
+      const starId = nativeSystemId(selectedSystem);
+      if (starId) {
+        replaceNavigationUrl({
+          phase: "approach",
+          starId,
+          bodyId: nativePlanetId(planet),
+        });
+      }
     },
-    [ambient],
+    [ambient, selectedSystem],
   );
 
   const handleCinematicPhaseComplete = useCallback(
@@ -475,6 +547,9 @@ export default function UniverseApp({
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase(activeEngine === "yeis" ? "galaxy" : "returning");
+      if (activeEngine === "yeis") {
+        replaceNavigationUrl({ phase: "galaxy" });
+      }
       return;
     }
 
@@ -483,8 +558,13 @@ export default function UniverseApp({
     setSelectedPlanet(null);
     if (selectedSystem) {
       setPhase("system");
+      const starId = nativeSystemId(selectedSystem);
+      if (starId) {
+        replaceNavigationUrl({ phase: "system", starId });
+      }
     } else {
       setPhase("galaxy");
+      replaceNavigationUrl({ phase: "galaxy" });
     }
   }, [activeEngine, phase, selectedSystem]);
 
