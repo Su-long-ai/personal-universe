@@ -190,5 +190,31 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     .getAttribute("data-universe-navigation-target");
   expect(placeTarget).toBeTruthy();
 
+  // The pinned-MIT English dictionaries and shareable body links should work
+  // through the same navigation surface without a second identity layer.
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  await expect(dialog).toBeVisible();
+  await search.fill("Earth");
+  const earth = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ hasText: "Earth" })
+    .first();
+  await expect(earth).toBeVisible();
+  await expect(dialog).not.toContainText("Dünya");
+  await earth.locator(".navigator-result-open").click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ Earth/)).toBeVisible();
+
+  const sharedUrl = new URL(page.url());
+  expect(sharedUrl.searchParams.get("star")).toBeTruthy();
+  expect(sharedUrl.searchParams.get("body")).toBeTruthy();
+  expect(sharedUrl.searchParams.get("phase")).toBe("approach");
+  expect(sharedUrl.searchParams.get("freeze")).toBe("1");
+
+  await page.goto(sharedUrl.toString());
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ Earth/)).toBeVisible();
+
   await runtime.assertClean(testInfo);
 });
