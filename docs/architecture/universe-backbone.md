@@ -138,3 +138,18 @@ click on the physical HYG star directly to the NASA observed-system override.
 HIP-less observed hosts remain independent observed markers. HD/Gaia IDs are
 retained as metadata for future explicit crossmatch work; fuzzy names are not
 an identity authority.
+
+## Hero-system composition
+
+Hero systems remain exceptions only where authorship is valuable. Their surrounding
+ordinary astronomy should still come from the selected mother engine.
+
+For **HELION / AURORA**, Personal Universe asks the vendored YEIS
+`SystemGenerator` for a normal deterministic HELION system, replaces the generated
+planet whose orbit is nearest AURORA's authored 1.08 AU orbit with `AURORA-01`,
+and retains the remaining YEIS-generated planets unchanged. Generated moons that
+belonged to the replaced planet are discarded so no orphaned hierarchy survives.
+
+This keeps AURORA fully authored while preventing a sparse one-world flagship system
+and, importantly, avoids reviving the retired V2 system generator merely as filler.
+

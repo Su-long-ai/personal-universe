@@ -1,37 +1,25 @@
 {
   "schema": 2,
-  "task_id": "OBSERVED-HIP-CROSSWALK-001",
-  "title": "Use NASA HIP identifiers to crosswalk confirmed exoplanet hosts into the YEIS/HYG native star catalog",
+  "task_id": "YEIS-HERO-SYSTEM-COMPOSITION-001",
+  "title": "Restore Hero-system richness with the native YEIS system generator",
   "scope": {
     "level": "subsystem",
-    "subject": "Observed-system identity bridge between NASA Exoplanet Archive and YEIS/HYG stars"
+    "subject": "AURORA ExtraSystem companion-world composition under the YEIS mother model"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The native YEIS star renderer can pick HYG catalog indices directly, but the old MIT YEIS snapshot does not contain the project's NASA confirmed-exoplanet systems. Name-only matching is incomplete because HYG's compact names table indexes Proper/Bayer/Gliese/HIP while many NASA hosts are HD names. NASA pscomppars already exposes hip_name, hd_name and gaia_dr3_id. A live TAP research query over the same nearest-host selection showed 51 of 64 hosts have HIP identifiers, and every one of those 51 HIP values exactly matches the vendored YEIS/HYG binary. Reuse that stable HIP identity key: add host identifiers to the local NASA snapshot, propagate HIP to observed GalaxyMarker metadata, then resolve HIP to YEIS catalog index at runtime. Keep Gaia/HD as retained metadata/fallback, not a new full catalog dependency.",
+  "research_summary": "Runtime regression testing of the YEIS model bridge showed AURORA SYSTEM collapsed from a populated flagship system to a single Hero planet because the current ExtraSystem body factory contains only HELION and AURORA-01. Reintroducing V2 companions would preserve two competing model authorities. The selected YEIS MIT snapshot already has a deterministic SystemGenerator that builds complete systems from StarInfo. Reuse it for HELION, replace the generated planet nearest AURORA's authored 1.08 AU orbit with AURORA-01, remove only moons belonging to that replaced planet, and retain all other native YEIS-generated companions. This exact composition was already runtime-smoked locally and produced six worlds while preserving the Hero surface path.",
   "planned_files": [
-    "scripts/fetch-astronomy-catalog.mjs",
-    "src/data/exoplanet-hosts.json",
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/catalog.ts",
-    "src/lib/universe/yeis/bridge.ts",
+    "src/lib/universe/yeis/index.ts",
     "docs/architecture/universe-backbone.md"
   ],
   "sources": [
     {
-      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
-      "finding": "NASA Exoplanet Archive TAP is the existing authoritative confirmed-system source and supports selecting additional host identity columns without adding a runtime dependency."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/gen/SystemGenerator.ts",
+      "finding": "The pinned MIT generator deterministically creates a complete multi-planet system and moons from StarInfo, so it can supply HELION's ordinary companion worlds without V2."
     },
     {
-      "url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
-      "finding": "Live TAP_SCHEMA inspection on 2026-11-22 confirmed pscomppars columns hip_name, hd_name, gaia_dr3_id and gaia_dr2_id. A matching query over the nearest snapshot hosts found 51/64 HIP values."
-    },
-    {
-      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
-      "finding": "YEIS StarCatalog stores a Uint32 HIP identifier for every HYG binary record and supports exact HIP lookup, making HIP the direct identity join key."
-    },
-    {
-      "url": "https://github.com/astronexus/HYG-Database",
-      "finding": "HYG combines Hipparcos and other nearby-star identifiers; the vendored YEIS binary is an HYG-derived compact representation whose HIP field is preserved."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
+      "finding": "ExtraSystem accepts a BodyData factory, allowing native generated bodies to be composed with one authored Hero replacement without modifying normal YEIS generation."
     }
   ],
   "search_ladder": [
@@ -42,9 +30,10 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        2
+        0,
+        1
       ],
-      "conclusion": "The selected mother already has HYG/HIP identities, but its MIT snapshot does not include the general confirmed exoplanet catalog, so a catalog-level bridge is still needed."
+      "conclusion": "The selected YEIS mother already contains the required full system-generation capability; no second product or engine is needed."
     },
     {
       "level": "framework_engine",
@@ -53,172 +42,167 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        2
+        0
       ],
-      "conclusion": "YEIS StarCatalog already exposes the exact HIP array and therefore no new identity framework or crossmatch engine is needed."
+      "conclusion": "Reuse generateSystem(StarInfo) directly and compose the Hero override at the BodyData boundary."
     },
     {
       "level": "subsystem",
       "status": "found",
       "registry_refs": [
-        "nasa-exoplanet-archive"
+        "your-eyes-in-space-mit-e520568",
+        "helios-procedural-system"
       ],
       "source_refs": [
-        0,
-        1
+        0
       ],
-      "conclusion": "NASA TAP already provides HIP/HD/Gaia host identifiers; reusing those fields is more reliable and smaller than fuzzy names or another external catalog."
+      "conclusion": "Both YEIS and the old V2/Helios-derived generator can populate companions, but only YEIS preserves one model authority."
     },
     {
       "level": "component_asset",
-      "status": "found",
-      "registry_refs": [
-        "your-eyes-in-space-mit-e520568"
-      ],
-      "source_refs": [
-        2,
-        3
-      ],
-      "conclusion": "The existing HYG-derived stars.bin preserves HIP per record, so the crosswalk can be an in-memory index over already-vendored data."
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No new renderer or asset is needed; the regression is purely system-data composition."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "exact identity for NASA hosts that exist in HYG",
+      "capability": "restore multiple ordinary companion worlds",
       "importance": "high",
       "coverage": {
-        "hip-crosswalk": "full",
-        "name-fuzzy": "partial",
-        "gaia-crossmatch": "full",
-        "separate-markers": "none"
+        "yeis-native-generated-companions": "full",
+        "v2-generated-companions": "full",
+        "hand-authored-companions": "full",
+        "keep-single-hero-world": "none"
       },
-      "decision": "HIP is already present on both sides; measured 51/51 exact matches make it the primary key."
+      "decision": "Use the already-selected YEIS generator."
     },
     {
-      "capability": "no new large catalog or preprocessing pipeline",
+      "capability": "keep one universe/system model authority",
       "importance": "high",
       "coverage": {
-        "hip-crosswalk": "full",
-        "name-fuzzy": "full",
-        "gaia-crossmatch": "none",
-        "separate-markers": "full"
+        "yeis-native-generated-companions": "full",
+        "v2-generated-companions": "none",
+        "hand-authored-companions": "partial",
+        "keep-single-hero-world": "full"
       },
-      "decision": "HIP crosswalk reuses existing NASA snapshot and existing 2.6 MB YEIS binary."
+      "decision": "Do not revive V2 in the Hero path."
     },
     {
-      "capability": "preserve unmapped observed systems",
+      "capability": "preserve authored AURORA identity and surface",
       "importance": "high",
       "coverage": {
-        "hip-crosswalk": "full",
-        "name-fuzzy": "partial",
-        "gaia-crossmatch": "full",
-        "separate-markers": "full"
+        "yeis-native-generated-companions": "full",
+        "v2-generated-companions": "full",
+        "hand-authored-companions": "full",
+        "keep-single-hero-world": "full"
       },
-      "decision": "Hosts without HIP remain separate NASA observed markers; no confirmed system is dropped."
+      "decision": "Replace one native generated orbital slot with the existing AURORA BodyData."
     },
     {
-      "capability": "native star picking can route to observed override",
-      "importance": "high",
+      "capability": "deterministic low-maintenance composition",
+      "importance": "medium",
       "coverage": {
-        "hip-crosswalk": "full",
-        "name-fuzzy": "partial",
-        "gaia-crossmatch": "partial",
-        "separate-markers": "none"
+        "yeis-native-generated-companions": "full",
+        "v2-generated-companions": "partial",
+        "hand-authored-companions": "partial",
+        "keep-single-hero-world": "full"
       },
-      "decision": "Store resolved YEIS nativeId on observed markers when HIP matches so native StarPoints clicks can select the NASA override directly."
+      "decision": "Keep the adapter narrow and leave generation to upstream YEIS."
     }
   ],
   "candidates": [
     {
-      "id": "hip-crosswalk",
-      "name": "NASA hip_name -> YEIS/HYG StarCatalog.hips exact crosswalk",
-      "level": "subsystem",
-      "registry_id": "nasa-exoplanet-archive",
-      "source": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
-      "license": "NASA data + existing HYG CC BY-SA derived catalog",
+      "id": "yeis-native-generated-companions",
+      "name": "YEIS SystemGenerator companions + one AURORA replacement",
+      "level": "framework_engine",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/gen/SystemGenerator.ts",
+      "license": "MIT pinned source",
       "decision": "reuse",
-      "reason": "Direct exact join using identifiers already present in both reused datasets; empirical check matched every HIP-bearing nearby host in the snapshot.",
+      "reason": "Restores flagship-system richness without reviving V2 or hand-authoring filler worlds.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 1,
         "license_fit": 5,
-        "maintenance_health": 5,
+        "maintenance_health": 4,
         "performance_fit": 5,
         "customization_fit": 5,
         "maturity": 5
       }
     },
     {
-      "id": "name-fuzzy",
-      "name": "Normalize NASA hostname and fuzzy-search YEIS Proper/Bayer/Gliese names",
-      "level": "component_asset",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
-      "license": "MIT code + HYG-derived names",
+      "id": "v2-generated-companions",
+      "name": "Keep old V2 companions around AURORA",
+      "level": "subsystem",
+      "registry_id": "helios-procedural-system",
+      "source": "local V2 generator",
+      "license": "project / ISC-derived",
       "decision": "reject",
-      "reason": "Misses common HD-only NASA hosts and risks false positives; useful only as a last-resort display aid, not identity authority.",
-      "evaluation": {
-        "coverage": 2.5,
-        "integration_cost": 1,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 4,
-        "customization_fit": 4,
-        "maturity": 3
-      }
-    },
-    {
-      "id": "gaia-crossmatch",
-      "name": "Add a Gaia DR3 identity catalog/crossmatch layer",
-      "level": "framework_engine",
-      "registry_id": "your-eyes-in-space-mit-e520568",
-      "source": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync",
-      "license": "NASA + Gaia data terms",
-      "decision": "reject",
-      "reason": "Would cover some HIP-less hosts but the current HYG binary has no Gaia identifier field, so it would require another catalog/index pipeline before yielding value for native picking.",
+      "reason": "Would leave two competing procedural system models alive in the same flagship system.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 4.5,
-        "license_fit": 4,
-        "maintenance_health": 5,
-        "performance_fit": 3,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 5,
         "customization_fit": 5,
-        "maturity": 5
+        "maturity": 4
       }
     },
     {
-      "id": "separate-markers",
-      "name": "Keep all NASA observed systems as a disconnected marker layer",
-      "level": "component_asset",
-      "registry_id": "nasa-exoplanet-archive",
-      "source": "local current V2 implementation",
-      "license": "Project code / NASA data",
+      "id": "hand-authored-companions",
+      "name": "Author fixed filler planets beside AURORA",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "local authored BodyData",
+      "license": "project code",
       "decision": "reject",
-      "reason": "Preserves correctness but prevents native star picks from resolving directly to known observed systems and leaves duplicate representations where a HYG match exists.",
+      "reason": "Creates bespoke filler data the selected mother already generates more consistently.",
       "evaluation": {
-        "coverage": 2.5,
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    },
+    {
+      "id": "keep-single-hero-world",
+      "name": "Keep AURORA SYSTEM as a one-planet exception",
+      "level": "component_asset",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "current adapter",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Runtime regression showed an unnecessarily sparse flagship system.",
+      "evaluation": {
+        "coverage": 2,
         "integration_cost": 0,
         "license_fit": 5,
         "maintenance_health": 5,
-        "performance_fit": 4,
-        "customization_fit": 4,
-        "maturity": 4
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
       }
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "hip-crosswalk"
+      "yeis-native-generated-companions"
     ],
-    "rationale": "Make HIP the authoritative cross-catalog identity when available, retain HD/Gaia IDs as metadata, and leave HIP-less NASA hosts intact as independent observed markers. This maximizes native renderer integration without adding a new catalog or weakening observed-system correctness.",
+    "rationale": "Generate a normal deterministic HELION system with the selected YEIS mother, then substitute AURORA at one orbital slot. This preserves the authored Hero while restoring native system richness and continuing the removal of V2 model authority.",
     "higher_level_tradeoffs": [
       {
-        "candidate_id": "gaia-crossmatch",
-        "reason": "Gaia is broader but requires a new identity index on the HYG side; measured HIP coverage already resolves most nearby observed hosts at a fraction of the integration and maintenance cost."
+        "candidate_id": "v2-generated-companions",
+        "reason": "It restores count immediately but keeps duplicate model authority, which is worse globally than native YEIS composition."
       }
     ],
     "score_overrides": [],
-    "fallback": "If a future observed host lacks HIP but must be merged into native picking, add an explicit curated identity override or a dedicated Gaia crossmatch task; do not silently use fuzzy names as authority."
+    "fallback": "If HELION generation ever yields no replaceable planet, retain the generated star/system and append AURORA; never fall back to V2 generation."
   }
 }

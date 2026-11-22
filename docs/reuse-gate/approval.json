@@ -1,32 +1,28 @@
 {
   "schema": 2,
-  "task_id": "OBSERVED-HIP-CROSSWALK-001",
-  "approved_at": "2026-11-22T13:40:53.599Z",
-  "baseline_commit": "f2aaf2724122a54ea2475786b74f7a92f20adc6a",
+  "task_id": "YEIS-HERO-SYSTEM-COMPOSITION-001",
+  "approved_at": "2026-11-22T13:47:29.054Z",
+  "baseline_commit": "137f359e492c0e662b96ddf865ea2a6da6ff806a",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "c1fa40a3ec13857ac082dd301d0756b32a09283c81e28c7d0391154187b02f88",
+  "record_sha256": "2ea565738979708ca85799c030729dbff040c608f90b5b0144072a5082b60222",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "3afba0e7961b018d74060856786e3ebff54040e222d222a682b1eea9b013ef55",
   "scope": {
     "level": "subsystem",
-    "subject": "Observed-system identity bridge between NASA Exoplanet Archive and YEIS/HYG stars"
+    "subject": "AURORA ExtraSystem companion-world composition under the YEIS mother model"
   },
   "policy_change": false,
   "planned_files": [
-    "scripts/fetch-astronomy-catalog.mjs",
-    "src/data/exoplanet-hosts.json",
-    "src/lib/universe/types.ts",
-    "src/lib/universe/generation/catalog.ts",
-    "src/lib/universe/yeis/bridge.ts",
+    "src/lib/universe/yeis/index.ts",
     "docs/architecture/universe-backbone.md"
   ],
   "selected_ids": [
-    "hip-crosswalk"
+    "yeis-native-generated-companions"
   ],
   "candidate_scores": {
-    "hip-crosswalk": 57,
-    "name-fuzzy": 40,
-    "gaia-crossmatch": 42.5,
-    "separate-markers": 46
+    "yeis-native-generated-companions": 55,
+    "v2-generated-companions": 49,
+    "hand-authored-companions": 38,
+    "keep-single-hero-world": 48
   }
 }
