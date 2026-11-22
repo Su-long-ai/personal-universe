@@ -205,6 +205,29 @@ product planet (`body:c0/earth` → `c0/earth` at `phase=approach`); moons or
 spacecraft absent from `PlanetDefinition` continue to use exact native YEIS
 travel.
 
+## Viewport-aware world framing
+
+Product-world framing reuses the already-installed `camera-controls` camera
+authority rather than maintaining separate desktop/tablet/mobile shot tables.
+`PLANET_RENDER_RADIUS` is shared by the fallback and baked planet
+representations. For Approach and Orbit, the existing cinematic shot direction
+and transition timing are retained, while the final camera distance comes from
+`CameraControls.getDistanceToFitSphere(PLANET_RENDER_RADIUS)` multiplied by a
+small phase-specific breathing-room factor.
+
+Because `getDistanceToFitSphere()` uses the active camera's effective FOV and
+aspect ratio, portrait viewports automatically move farther away when the
+horizontal FOV is the limiting dimension. A resize/orientation change recomputes
+the shot through the same control instance; no device-specific camera authority
+is introduced.
+
+Camera acceptance is based on the real current control state, not its target
+end-state. `getPosition(..., false)` and `getTarget(..., false)` must reach
+the shot tolerances before the root publishes
+`data-universe-camera-settled=<phase>` and before visual screenshots are
+captured. This prevents a transition command from being mistaken for a settled
+camera simply because camera-controls has already stored its destination.
+
 ## Canvas picking
 
 Both galaxy-scale and system-scale canvas interactions route back into the
@@ -346,14 +369,17 @@ Behavior:
 
 ## Reuse Gate
 
-The approved Reuse Gate record for this implementation is
-`YEIS-FULL-PLACES-TRAVEL-001`. Its frozen approval already lists every protected
-file touched by this navigation mainline.
+The navigation mainline retains the frozen `YEIS-FULL-PLACES-TRAVEL-001`
+approval for its original protected closure. Later productization units use
+independent immutable task approvals, including
+`PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
+`NAVIGATOR-INTERACTION-LIFECYCLE-001`, and
+`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`.
 
-Do not edit the approved record after implementation merely to make it describe
+Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
-A future task that changes the reuse boundary must create/approve a new gate
-task before protected implementation changes.
+Each new protected implementation unit must create and commit its own task and
+approval metadata before its first implementation commit.
 
 ## Runtime acceptance checklist
 
