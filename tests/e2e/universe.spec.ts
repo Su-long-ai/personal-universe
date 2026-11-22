@@ -27,6 +27,28 @@ test("default YEIS boots with native galaxy and personal signals", async ({
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
+  await expect
+    .poll(
+      async () =>
+        page
+          .locator("html")
+          .getAttribute("data-yeis-landmark-photos-complete"),
+      { timeout: 20_000 },
+    )
+    .toBe("1");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-requested",
+    "15",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-loaded",
+    "15",
+  );
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-landmark-photos-failed",
+    "0",
+  );
+
   const content = await positiveDataset(page, "data-personal-content");
   const signals = await positiveDataset(page, "data-personal-signals");
   const overlay = await positiveDataset(page, "data-personal-signal-overlay");
@@ -157,7 +179,7 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
 
-  const search = page.getByRole("textbox", { name: "Search universe" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Personal Universe");
   await expect
     .poll(async () =>
@@ -218,6 +240,66 @@ test("Search keyboard navigation and Places destination both navigate", async ({
 
   await page.goto(sharedUrl.toString());
   await expect(page.getByText(/LOCK ACQUIRED \/\/ Earth/)).toBeVisible();
+
+  sharedUrl.searchParams.set("phase", "orbit");
+  await page.goto(sharedUrl.toString());
+  await waitForYeisEngine(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+
+  await page.getByRole("button", { name: "← RETURN TO SYSTEM" }).click();
+  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  const returnedSystemUrl = new URL(page.url());
+  expect(returnedSystemUrl.searchParams.get("phase")).toBe("system");
+  expect(returnedSystemUrl.searchParams.get("body")).toBeNull();
+  expect(returnedSystemUrl.searchParams.get("destination")).toBeNull();
+
+  await page.getByRole("button", { name: "← RETURN TO GALAXY" }).click();
+  await waitForYeis(page);
+  const returnedGalaxyUrl = new URL(page.url());
+  expect(returnedGalaxyUrl.searchParams.get("phase")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("star")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("body")).toBeNull();
+  expect(returnedGalaxyUrl.searchParams.get("destination")).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("landmark Search shares the same travel destination contract", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Orion Nebula");
+
+  const landmark = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-landmark") })
+    .filter({ hasText: "Orion" })
+    .first();
+  await expect(landmark).toBeVisible();
+  await landmark.locator(".navigator-result-open").click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    /landmark:/,
+  );
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toMatch(/^landmark:/);
+  expect(url.searchParams.get("phase")).toBeNull();
 
   await runtime.assertClean(testInfo);
 });
