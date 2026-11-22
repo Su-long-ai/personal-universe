@@ -1,11 +1,18 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+
+async function openNavigator(page: Page) {
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
 
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
@@ -185,17 +192,14 @@ test("black-hole search preserves exact native travel identity", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Search keyboard navigation and Places destination both navigate", async ({
+test("Search keyboard navigation reaches personal content", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
-  await expect(dialog).toBeVisible();
-
+  const dialog = await openNavigator(page);
   const search = page.getByRole("textbox", { name: "Search universe" });
   await search.fill("Personal Universe");
   await expect
@@ -217,8 +221,15 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     .getAttribute("data-universe-navigation-target");
   expect(personalTarget).toBeTruthy();
 
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  await expect(dialog).toBeVisible();
+  await runtime.assertClean(testInfo);
+});
+
+test("Places featured destination navigates", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
   const featured = page.locator(".navigator-result-row", {
     has: page.locator(".kind-featured"),
   }).first();
@@ -232,10 +243,18 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     .getAttribute("data-universe-navigation-target");
   expect(placeTarget).toBeTruthy();
 
-  // The pinned-MIT English dictionaries and shareable body links should work
-  // through the same navigation surface without a second identity layer.
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  await expect(dialog).toBeVisible();
+  await runtime.assertClean(testInfo);
+});
+
+test("Earth body navigation produces a shareable exact deep link", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("textbox", { name: "Search universe" });
   await search.fill("Earth");
   const earth = page
     .locator(".navigator-result-row")
