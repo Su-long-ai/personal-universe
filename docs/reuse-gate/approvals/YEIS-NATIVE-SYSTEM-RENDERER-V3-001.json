@@ -1,10 +1,10 @@
 {
   "schema": 3,
   "task_id": "YEIS-NATIVE-SYSTEM-RENDERER-V3-001",
-  "approved_at": "2026-11-23T03:29:30+08:00",
-  "baseline_commit": "89a9abb283d4417e7d38ef58473905f2b766e347",
+  "approved_at": "2026-11-23T03:40:00+08:00",
+  "baseline_commit": "61830b21fcd4d1f0a776d28fca50f66226c24e38",
   "record_path": "docs/reuse-gate/tasks/YEIS-NATIVE-SYSTEM-RENDERER-V3-001.json",
-  "record_sha256": "af9ba253e26add3acab6f536d05ec68fa0417c3845c07df35a68dd6bacb2e74f",
+  "record_sha256": "7d100cf4d4cf1d37ffe3bdca3b0b442941913765eb859df4a9b184193ebefab1",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_entry_hashes": {
     "cosmos-web-universe": "3f4285a0d73bb4dd6d35854652f183b4210b658ac31c977a247bfe0cd1037e29",
@@ -22,6 +22,7 @@
     "src/vendor/yeis/render/OrbitLines.ts",
     "src/vendor/yeis/render/RingParticles.ts",
     "src/vendor/yeis/render/TileGlobe.ts",
+    "src/vendor/yeis/render/ProceduralShips.ts",
     "src/vendor/yeis/data/imagery.ts",
     "src/vendor/yeis/PATCHES.md",
     "src/components/universe/YeisSystemScene.tsx",
