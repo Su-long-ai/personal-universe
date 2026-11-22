@@ -191,6 +191,11 @@ export default function UniverseApp({
       return;
     }
 
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("navigator") === "1") {
+      setNavigatorOpen(true);
+    }
+
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const editing =
