@@ -84,6 +84,18 @@ function routeStarIdentityForSystem(
   return marker?.nativeId ?? marker?.id ?? null;
 }
 
+function deepLinkNavigationKey(
+  destinationId: string,
+  mode: "open" | "locate",
+  phase?: UniversePhase | null,
+) {
+  const restorableWorldPhase =
+    phase && ["approach", "orbit", "atmosphere", "surface"].includes(phase)
+      ? phase
+      : "";
+  return destinationId + "|" + mode + "|" + restorableWorldPhase;
+}
+
 function replaceNavigationUrl({
   phase,
   starId,
@@ -530,6 +542,11 @@ export default function UniverseApp({
             setSelectedSystem(null);
             setSelectedPlanet(null);
             setPhase("galaxy");
+            deepLinkHandledRef.current = deepLinkNavigationKey(
+              destination.id,
+              "open",
+              "galaxy",
+            );
             replaceNavigationUrl({
               phase: "galaxy",
               destinationId: destination.id,
@@ -582,6 +599,11 @@ export default function UniverseApp({
             : planet
               ? nativePlanetId(planet)
               : null;
+        deepLinkHandledRef.current = deepLinkNavigationKey(
+          destination.id,
+          "open",
+          nextPhase,
+        );
         replaceNavigationUrl({
           phase: nextPhase,
           starId: destinationStarId,
@@ -625,6 +647,11 @@ export default function UniverseApp({
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
+      deepLinkHandledRef.current = deepLinkNavigationKey(
+        destination.id,
+        "open",
+        "galaxy",
+      );
       replaceNavigationUrl({
         phase: "galaxy",
         destinationId: destination.id,
@@ -677,6 +704,11 @@ export default function UniverseApp({
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
+      deepLinkHandledRef.current = deepLinkNavigationKey(
+        destination.id,
+        "locate",
+        "galaxy",
+      );
       replaceNavigationUrl({
         phase: "galaxy",
         destinationId: destination.id,
@@ -832,12 +864,11 @@ export default function UniverseApp({
       ["approach", "orbit", "atmosphere", "surface"].includes(requestedPhase)
         ? requestedPhase
         : null;
-    const key =
-      destinationId +
-      "|" +
-      mode +
-      "|" +
-      (restorableWorldPhase ?? "");
+    const key = deepLinkNavigationKey(
+      destinationId,
+      mode,
+      restorableWorldPhase,
+    );
     if (deepLinkHandledRef.current === key) return;
     deepLinkHandledRef.current = key;
 
