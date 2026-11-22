@@ -76,6 +76,14 @@ function disposeBaked(root: THREE.Object3D) {
   });
 }
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 export function PlanetScene({
   planet,
   quality,
@@ -93,7 +101,7 @@ export function PlanetScene({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius,
-      textureSize: quality === "low" ? 512 : quality === "high" ? 1024 : 768,
+      textureSize: quality === "low" ? 256 : quality === "high" ? 1024 : 512,
     }),
     [planet, quality],
   );
@@ -101,24 +109,56 @@ export function PlanetScene({
   useEffect(() => {
     let cancelled = false;
     let created: THREE.Group | null = null;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let idleHandle: number | null = null;
+    let fallbackTimer: number | null = null;
+    const idleWindow = window as IdleWindow;
 
-    void bakePlanet(gl, bakeOptions).then((group) => {
-      created = group;
-      if (cancelled) {
-        disposeBaked(group);
-        return;
-      }
-      group.position.set(...PLANET_ANCHOR);
-      group.scale.setScalar(3.65 / radius);
-      group.rotation.set(0.08, -0.65, -0.16);
-      group.name = planet.name;
-      setBaked(group);
-    }).catch((error) => {
-      console.warn("[planet-bake]", planet.name, error);
+    const bake = () => {
+      if (cancelled) return;
+
+      void bakePlanet(gl, bakeOptions).then((group) => {
+        created = group;
+        if (cancelled) {
+          disposeBaked(group);
+          return;
+        }
+        group.position.set(...PLANET_ANCHOR);
+        group.scale.setScalar(3.65 / radius);
+        group.rotation.set(0.08, -0.65, -0.16);
+        group.name = planet.name;
+        setBaked(group);
+      }).catch((error) => {
+        console.warn("[planet-bake]", planet.name, error);
+      });
+    };
+
+    // bakePlanet is deliberately not started in the first arrival commit.
+    // ProceduralPlanets documents baking as GPU-blocking work. Two frames give
+    // the lightweight fallback, HUD and navigation contract a chance to paint;
+    // then an idle slot warms in the deterministic baked representation.
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        if (idleWindow.requestIdleCallback) {
+          idleHandle = idleWindow.requestIdleCallback(() => bake(), {
+            timeout: 900,
+          });
+        } else {
+          fallbackTimer = window.setTimeout(bake, 120);
+        }
+      });
     });
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleHandle);
+      }
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
       setBaked(null);
       if (created) disposeBaked(created);
     };
