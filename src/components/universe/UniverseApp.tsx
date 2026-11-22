@@ -770,6 +770,7 @@ export default function UniverseApp({
     if (
       !journey ||
       journey.paused ||
+      navigatorOpen ||
       reducedMotion ||
       journey.destinations.length < 2 ||
       navigationStatus === "traveling" ||
@@ -790,6 +791,7 @@ export default function UniverseApp({
     handleJourneyStep,
     journey,
     navigationStatus,
+    navigatorOpen,
     phase,
     reducedMotion,
   ]);
