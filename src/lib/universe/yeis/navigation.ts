@@ -465,10 +465,11 @@ export function navigationDestinationForPlanet(
     );
 
     if (
-      marker?.source === "hero" ||
-      (nativeId === HERO_SYSTEM_ID && planet.id === HERO_PLANET_ID)
+      marker?.source === "hero" &&
+      nativeId === HERO_SYSTEM_ID &&
+      planet.id === HERO_PLANET_ID
     ) {
-      return marker ? heroDestination(marker) : null;
+      return heroDestination(marker);
     }
 
     const bodyId = planet.id.startsWith("yeis-planet:")
@@ -881,7 +882,7 @@ function searchDestinations(
       out.push({
         ...destination,
         kind: placement.entry.kind,
-        group: CONTENT_GROUP[placement.entry.kind],
+        group: "personal-signals",
       });
     }
   }
