@@ -277,7 +277,10 @@ test("Search keyboard navigation and Places destination both navigate", async ({
 
   await search.press("Enter");
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
   await expect(page.locator(".content-signal-card")).toBeVisible();
   const personalTarget = await page
     .locator("html")
@@ -293,7 +296,11 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await featured.locator(".navigator-result-open").click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.locator(".content-signal-card")).toBeVisible();
   const placeTarget = await page
     .locator("html")
     .getAttribute("data-universe-navigation-target");
