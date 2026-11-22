@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
-import { waitForYeis } from "./support/runtime";
+import { observeRuntime, waitForYeis } from "./support/runtime";
 
 const VIEWPORTS = [
   { name: "desktop-1440x900", width: 1440, height: 900 },
@@ -31,6 +31,7 @@ for (const viewport of VIEWPORTS) {
     page,
   }, testInfo) => {
     test.setTimeout(240_000);
+    const runtime = await observeRuntime(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({
       width: viewport.width,
@@ -93,5 +94,7 @@ for (const viewport of VIEWPORTS) {
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await shot(page, testInfo, viewport.name, "hero-world");
+
+    await runtime.assertClean(testInfo);
   });
 }
