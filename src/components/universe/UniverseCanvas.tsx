@@ -41,6 +41,7 @@ export function UniverseCanvas({
   contentPlacements,
   navigationRequest,
   onNavigationComplete,
+  onNavigationFailed,
   selectedSystem,
   selectedPlanet,
   onSelectSystem,
@@ -58,6 +59,10 @@ export function UniverseCanvas({
   contentPlacements: UniverseContentPlacement[];
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
+  onNavigationFailed: (
+    request: UniverseNavigationCameraRequest,
+    reason: string,
+  ) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
@@ -99,6 +104,7 @@ export function UniverseCanvas({
             contentPlacements={contentPlacements}
             navigationRequest={navigationRequest}
             onNavigationComplete={onNavigationComplete}
+            onNavigationFailed={onNavigationFailed}
             onNavigateDestination={onNavigateDestination}
             onSignalHover={onSignalHover}
             quality={quality}
