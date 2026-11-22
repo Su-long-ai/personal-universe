@@ -215,7 +215,11 @@ The runtime exposes diagnostics for smoke tests:
 
 - `data-yeis-native-galaxy=ready`
 - `data-yeis-landmarks=<count>`
-- `data-yeis-landmark-photos=<count>`
+- `data-yeis-landmark-photos=<declared-count>`
+- `data-yeis-landmark-photos-requested=<atlas-request-count>`
+- `data-yeis-landmark-photos-loaded=<successful-image-count>`
+- `data-yeis-landmark-photos-failed=<failed-image-count>`
+- `data-yeis-landmark-photos-complete=1` when the real image requests settle
 - `data-yeis-picked-target=<destination-id>`
 
 The pinned image set contains 15 deep-sky photographs. Source/license credits
