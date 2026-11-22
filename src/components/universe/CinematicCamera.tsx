@@ -73,6 +73,7 @@ export function CinematicCamera({
   reducedMotion,
   onPhaseComplete,
 }: CinematicCameraProps) {
+  const { width, height } = useThree((state) => state.size);
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
   const currentPosition = useRef(new Vector3());
