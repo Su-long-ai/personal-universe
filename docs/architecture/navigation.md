@@ -179,3 +179,28 @@ local browser:
 This browser smoke is now part of the branch CI, in addition to Reuse Gate and
 the Astro production build.
 
+## Navigator discovery grouping
+
+Implemented under task `NAVIGATOR-DISCOVERY-001`.
+
+The navigator still consumes one flat array of destinations resolved by the
+pinned MIT YEIS search/Places model, so keyboard selection and Open/Locate
+semantics remain unchanged. Presentation now adds stable groups:
+
+1. Personal Signals
+2. Worlds
+3. Stars + Systems
+4. Black Holes
+5. Landmarks
+6. Galaxies
+
+Browse uses the same grouping over the curated Places set. Search keeps the
+group order stable and ranks matches *within each group* by exact title,
+title prefix, token prefix, title substring and detail substring. This keeps
+Personal Signals visibly first-class without introducing a second fuzzy-search
+index or dependency.
+
+Generic search packages remain escalation options rather than parallel
+authorities: cmdk/Fuse can later enhance palette ergonomics, while Pagefind
+remains reserved for document/article search.
+
