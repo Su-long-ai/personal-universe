@@ -343,6 +343,9 @@ export function YeisGalaxyScene({
           const markerById = new Map(
             markersRef.current.map((marker) => [marker.id, marker]),
           );
+          let nearestSignal:
+            | { placement: UniverseContentPlacement; distance: number }
+            | null = null;
           for (const placement of contentPlacementsRef.current) {
             const marker = markerById.get(placement.markerId);
             const nativeId = placement.nativeId ?? marker?.nativeId;
@@ -357,18 +360,26 @@ export function YeisGalaxyScene({
             if (contentProjection.z < -1 || contentProjection.z > 1) continue;
             const sx = (contentProjection.x * 0.5 + 0.5) * width;
             const sy = (-contentProjection.y * 0.5 + 0.5) * height;
-            if (Math.hypot(sx - x, sy - y) <= pickRadius) {
-              const destination = navigationDestinationForPlacement(
-                placement,
-                markersRef.current,
+            const distance = Math.hypot(sx - x, sy - y);
+            if (
+              distance <= pickRadius &&
+              (!nearestSignal || distance < nearestSignal.distance)
+            ) {
+              nearestSignal = { placement, distance };
+            }
+          }
+
+          if (nearestSignal) {
+            const destination = navigationDestinationForPlacement(
+              nearestSignal.placement,
+              markersRef.current,
+            );
+            if (destination) {
+              console.info(
+                `[PERSONAL-SIGNAL-PICK] ${nearestSignal.placement.entry.id} -> ${destination.id}`,
               );
-              if (destination) {
-                console.info(
-                  `[PERSONAL-SIGNAL-PICK] ${placement.entry.id} -> ${destination.id}`,
-                );
-                navigateDestination(destination);
-                return;
-              }
+              navigateDestination(destination);
+              return;
             }
           }
 

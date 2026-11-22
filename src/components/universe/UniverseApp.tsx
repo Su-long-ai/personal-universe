@@ -192,7 +192,9 @@ export default function UniverseApp({
     new URLSearchParams(window.location.search).get("engine") === "v2"
       ? "v2"
       : "yeis";
-  const [activeEngine, setActiveEngine] = useState<UniverseEngine>(requestedEngine);
+  // Keep the server render and the browser's first hydration render identical.
+  // Query-string rollback is applied by the effect below immediately after hydration.
+  const [activeEngine, setActiveEngine] = useState<UniverseEngine>("yeis");
   const contentPlacements = useMemo(
     () => placeUniverseContent(contentEntries, galaxy.markers),
     [contentEntries, galaxy.markers],
@@ -770,6 +772,7 @@ export default function UniverseApp({
     if (
       !journey ||
       journey.paused ||
+      navigatorOpen ||
       reducedMotion ||
       journey.destinations.length < 2 ||
       navigationStatus === "traveling" ||
@@ -790,6 +793,7 @@ export default function UniverseApp({
     handleJourneyStep,
     journey,
     navigationStatus,
+    navigatorOpen,
     phase,
     reducedMotion,
   ]);

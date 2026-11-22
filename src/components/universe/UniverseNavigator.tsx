@@ -116,6 +116,8 @@ export function UniverseNavigator({
     let cancelled = false;
     let debounceTimer = 0;
     setStatus("loading");
+    setSections([]);
+    setActiveIndex(0);
     const trimmed = query.trim();
     document.documentElement.dataset.universeNavigatorMode = trimmed
       ? "search"
