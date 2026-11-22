@@ -1,0 +1,37 @@
+{
+  "schema": 3,
+  "task_id": "CONTENT-PLACEMENT-STABILITY-V2-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "1e4a0809e15c4a7e5197a8b29b84b5cacdab7531",
+  "record_path": "docs/reuse-gate/tasks/CONTENT-PLACEMENT-STABILITY-V2-001.json",
+  "record_sha256": "bd8d15fff8dc0746f2ba2498c294b11125016f93345d93f8601ab3a158915f9e",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d",
+    "hrw-hash-js": "40d5468438997477491e0ad86fa64f7b12e00dc4e281ec0cf6b8a3e8bacc74a3",
+    "jump-consistent-hash": "b177cda022d017abc077ce8d5931a8ae6a9c9e42c330b8ec1903683f2933d861",
+    "rendezvous-hashing-hrw": "4b24fc8db698e989307c3864d8ad4a3d2e8e32dae0ba36baca7c7bd7f2ead705"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Personal content-to-YEIS-star placement stability under catalog/order changes"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/content.config.ts",
+    "src/pages/index.astro",
+    "src/lib/universe/content/types.ts",
+    "src/lib/universe/content/placement.ts",
+    "src/content/portfolio/personal-universe.md",
+    "docs/architecture/content-layer.md",
+    "tests/content-placement.test.ts"
+  ],
+  "selected_ids": [
+    "rendezvous-hashing-hrw"
+  ],
+  "candidate_scores": {
+    "rendezvous-hashing-hrw": 57,
+    "hrw-hash-js": 48.5,
+    "jump-consistent-hash": 49.5
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-PLACEMENT-STABILITY-V2-001",
+  "title": "Stable Personal Signal placement with rendezvous hashing and explicit star pins",
+  "scope": {
+    "level": "implementation",
+    "subject": "Personal content-to-YEIS-star placement stability under catalog/order changes"
+  },
+  "researched_at": "2026-11-23",
+  "research_summary": "Replace modulo-N auto placement, which remaps most content whenever the eligible marker count changes, with identity-based rendezvous/HRW ranking. Add explicit star pin metadata and a stable placement key so important content can retain a permanent astronomical address while ordinary content remains automatic and stateless.",
+  "planned_files": [
+    "src/content.config.ts",
+    "src/pages/index.astro",
+    "src/lib/universe/content/types.ts",
+    "src/lib/universe/content/placement.ts",
+    "src/content/portfolio/personal-universe.md",
+    "docs/architecture/content-layer.md",
+    "tests/content-placement.test.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://datatracker.ietf.org/doc/rfc2992/",
+      "finding": "RFC 2992 contrasts modulo-N with Highest Random Weight and notes modulo-N is highly disruptive when the destination set changes, while HRW provides minimal disruption."
+    },
+    {
+      "url": "https://github.com/Munawwar/hrw-hash",
+      "finding": "The MIT hrw-hash package demonstrates a compact dependency-free JavaScript HRW implementation whose ranking is independent of destination order and minimally affected by destination-set changes."
+    },
+    {
+      "url": "https://arxiv.org/abs/1406.2294",
+      "finding": "Jump Consistent Hash provides fast minimal-memory remapping, but its bucket model assumes sequentially numbered buckets, which is a weaker fit for identity-addressed stars."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro Content Collections remain the canonical typed content source; the missing capability is deterministic spatial placement, not another CMS or content runtime."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "conclusion": "The repository already has its selected content product and universe engine; this task only changes deterministic assignment semantics between those existing layers.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "not_applicable",
+      "conclusion": "No new framework is required for a stateless key-to-star assignment primitive inside the existing Astro and YEIS architecture.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Astro Content Collections already own typed content ingestion, so placement should remain a narrow subsystem beneath that existing source rather than introduce another content platform.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "astro-content-collections"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "HRW/rendezvous hashing directly addresses minimal-remapping identity-based assignment; Jump Hash and an npm HRW package were also evaluated as narrower implementation choices.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "rendezvous-hashing-hrw",
+        "hrw-hash-js",
+        "jump-consistent-hash"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "rendezvous-hashing-hrw",
+      "name": "Identity-based Rendezvous / HRW placement",
+      "level": "component_asset",
+      "registry_id": "rendezvous-hashing-hrw",
+      "source": "RFC 2992 algorithm semantics with a narrow project-local deterministic score primitive",
+      "license": "Algorithm/reference; project implementation",
+      "decision": "reuse",
+      "reason": "Directly fixes modulo remapping, is independent of marker ordering, works with stable YEIS star identities, requires no lookup table, and avoids adding a runtime dependency for a tiny project-specific adapter.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "hrw-hash-js",
+      "name": "hrw-hash npm package",
+      "level": "component_asset",
+      "registry_id": "hrw-hash-js",
+      "source": "MIT JavaScript HRW package",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "It solves the same primitive cleanly, but adding a package and public API surface is unnecessary when the product needs only a narrow deterministic score/rank adapter already expressed by the standard algorithm.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 3.5
+      }
+    },
+    {
+      "id": "jump-consistent-hash",
+      "name": "Jump Consistent Hash",
+      "level": "component_asset",
+      "registry_id": "jump-consistent-hash",
+      "source": "Lamping and Veach consistent-hash algorithm",
+      "license": "Algorithm/paper reference",
+      "decision": "reject",
+      "reason": "It is excellent for dense sequential buckets but Personal Universe destinations are stable star identities that can appear/disappear independently; HRW fits identity-addressed arbitrary sets without assigning bucket ordinals.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "rendezvous-hashing-hrw"
+    ],
+    "rationale": "Reuse the mature HRW/rendezvous assignment semantics while keeping the implementation as a narrow project adapter over stable content keys and YEIS star identities. Add explicit pin metadata for curated landmarks, preserving the sparse-real-content architecture without a new runtime dependency.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If content scale later makes O(entries×eligible-stars) ranking material, retain the same placement contract and replace only the ranking backend with a proven indexed/weighted HRW implementation."
+  }
+}

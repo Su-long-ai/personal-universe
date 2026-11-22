@@ -27,7 +27,11 @@ Current fields:
 - `title`, `summary`, `kind`, `status`;
 - `importance` and `featured` for future presentation ranking;
 - `tags`;
-- `placement: auto | hero`;
+- `placement: auto | hero | pinned`;
+- optional `placementKey` to keep an automatic spatial identity stable when a
+  source file is renamed or moved;
+- `starId` for pinned entries; schema validation requires it only when
+  `placement: pinned`;
 - optional `href`;
 - `draft`.
 
@@ -39,11 +43,22 @@ projects or experiences are generated.
 `src/lib/universe/content/placement.ts` is a narrow deterministic adapter.
 
 - `hero` entries attach to the handcrafted Hero system.
-- `auto` entries choose from stable non-Hero YEIS markers.
-- collision resolution keeps different entries on different stars while slots
-  remain available.
-- inside a selected system, the same entry deterministically chooses one of the
-  system's already-generated planets.
+- `pinned` entries resolve an explicit stable YEIS `starId`. If that
+  destination is unavailable, the signal is deliberately left unresolved
+  rather than silently drifting to another star.
+- `auto` entries use identity-based Rendezvous / Highest Random Weight (HRW)
+  ranking over eligible non-Hero YEIS markers. Marker array order does not
+  affect the result, and adding/removing a star only remaps entries that
+  genuinely prefer the changed destination instead of modulo-remapping most
+  content.
+- collision resolution keeps different entries on different native star
+  identities while capacity remains available; after capacity is exhausted the
+  normal HRW winner is reused.
+- `placementKey` decouples spatial identity from Astro's content file id.
+  Keeping that key stable preserves both the selected star and the generated
+  planet slot when content files are renamed.
+- inside a selected system, the same placement key deterministically chooses
+  one of the system's already-generated planets.
 
 The content layer never changes YEIS star/planet physics or observed NASA data.
 
@@ -85,8 +100,9 @@ Validated against a clean production build and `astro preview` on 2026-11-22.
   entry.
 - Default YEIS runtime reported `data-personal-content="1"` and
   `data-personal-signals="1"`.
-- The deterministic placement target for the current snapshot is native YEIS
-  star `c59669`.
+- The established Personal Universe address is native YEIS star `c59669`.
+  Content Placement v2 now pins that address explicitly so future catalog or
+  placement-algorithm changes cannot move the flagship project.
 - Native galaxy runtime reported `data-personal-signal-overlay="1"`.
 - Deep-linking to `?phase=system&star=c59669` displayed the Personal Universe
   signal and reported one linked personal signal in that system.
@@ -94,3 +110,29 @@ Validated against a clean production build and `astro preview` on 2026-11-22.
   signal-bearing world (`Spica d`) and rendered the WORLD SIGNAL project card.
 - Visual inspection at 1440x900 confirmed the content card does not obstruct
   the planet, HUD, or orbit caption.
+
+
+## Placement v2 stability contract
+
+The original v1 auto placement used `hash(contentId) % markerCount`. That is
+simple but highly disruptive: inserting or removing an eligible marker changes
+the modulus and can move most signals at once.
+
+Placement v2 reuses Rendezvous / Highest Random Weight semantics. Each
+content-key/star-identity pair gets a deterministic score and the highest
+ranked available star wins. The product keeps only a narrow local scoring
+adapter; no new runtime hashing package is required.
+
+Repository tests cover the intended invariants:
+
+- reversing the marker array produces identical mappings;
+- adding one marker to a 64-star / 24-signal fixture moves only the signal that
+  prefers the new destination;
+- changing a content file id while preserving `placementKey` preserves its
+  star and planet seed;
+- pinned entries always resolve the requested native star;
+- a missing pinned destination never falls back to an unrelated automatic
+  address.
+
+This contract makes authored content portable across future catalog refreshes
+without turning placement into a hand-maintained lookup table.
