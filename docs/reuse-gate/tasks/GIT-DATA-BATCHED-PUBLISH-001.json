@@ -1,0 +1,193 @@
+{
+  "schema": 2,
+  "task_id": "GIT-DATA-BATCHED-PUBLISH-001",
+  "title": "Batch GitHub-only task commits before one branch publish",
+  "scope": {
+    "level": "architecture",
+    "subject": "Cloud write topology for preserving Reuse Gate provenance while reducing redundant branch-push CI triggers"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "GitHub's native Git Database API can create trees and commits as raw Git objects before any branch reference moves. Personal Universe can therefore preserve distinct research, approval and implementation commits required by Machine Reuse Gate v3, then publish the completed commit chain with one final branch ref creation/update. This keeps authoritative all-branch push enforcement while avoiding one hosted Actions run per GitHub Contents API file write.",
+  "planned_files": [
+    "AGENTS.md",
+    "docs/reuse-gate/README.md"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-your-git-database",
+      "finding": "GitHub documents creating raw Git objects and updating a branch reference only after the new commit exists, allowing Git operations without a local Git client."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/git/trees",
+      "finding": "The Create Tree endpoint builds a new tree from a base tree; GitHub explicitly directs clients to commit the tree and then update a branch reference."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/git/commits",
+      "finding": "The Create Commit endpoint creates a commit object from a tree and one or more parent commits without itself updating a branch ref."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/repos/contents",
+      "finding": "The Contents API creates or updates a file through a commit on the target branch; sequential file writes therefore move the branch repeatedly and emit multiple push events."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "A local Git checkout can create many commits and push once, but GitHub-only agents should not require a Windows/local clone merely to preserve commit ancestry and reduce workflow churn.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "GitHub Git Database APIs expose the repository's native tree, commit and ref primitives and directly cover detached multi-commit construction in the existing hosted system.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "github-git-database-batched-writes"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "A final branch ref create/update is the single publication boundary; Machine Reuse Gate then evaluates the whole pushed commit range and retains the earlier approval ancestry.",
+      "source_refs": [
+        0,
+        2
+      ],
+      "registry_refs": [
+        "github-git-database-batched-writes"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "The Contents API remains appropriate for isolated single-commit edits, but using it sequentially for research, approval and multi-file implementation moves the branch after every write and creates redundant push runs.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": []
+    }
+  ],
+  "candidates": [
+    {
+      "id": "github-git-data-batched-publish",
+      "name": "GitHub Git Database detached commits plus one ref publish",
+      "level": "framework_engine",
+      "registry_id": "github-git-database-batched-writes",
+      "source": "GitHub REST Git Database API",
+      "license": "GitHub hosted service / documentation terms",
+      "decision": "reuse",
+      "reason": "Preserves exact schema-3 Git ancestry, needs no local checkout, uses repository-native primitives already available through the GitHub connector, and converts a multi-commit task to one branch push event.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "local-git-single-push",
+      "name": "Local Git multi-commit branch followed by one push",
+      "level": "full_solution",
+      "source": "Git CLI",
+      "license": "GPL-2.0 Git client / repository workflow",
+      "decision": "partial",
+      "reason": "Preserves provenance and one-push publication, but requiring a local clone or user machine would violate the GitHub-first development goal for work that is otherwise fully cloud-capable.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "contents-api-sequential-writes",
+      "name": "Sequential GitHub Contents API writes",
+      "level": "component_asset",
+      "source": "GitHub Contents API",
+      "license": "GitHub hosted service / documentation terms",
+      "decision": "partial",
+      "reason": "Simple and still correct for one-off edits, but every write updates the task branch and can trigger another all-branch Gate run; it is inefficient for v3 tasks that inherently require multiple ordered commits.",
+      "evaluation": {
+        "coverage": 2.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Preserve research -> approval -> implementation Git ancestry",
+      "importance": "high",
+      "coverage": {
+        "github-git-data-batched-publish": "full",
+        "local-git-single-push": "full",
+        "contents-api-sequential-writes": "full"
+      },
+      "decision": "Keep separate commit objects in all cases; batching changes only when the branch ref becomes visible."
+    },
+    {
+      "capability": "Publish a multi-commit GitHub-only task with one branch push event",
+      "importance": "high",
+      "coverage": {
+        "github-git-data-batched-publish": "full",
+        "local-git-single-push": "full",
+        "contents-api-sequential-writes": "none"
+      },
+      "decision": "Prefer detached Git Database commit construction for cloud work and move/create the task ref only after the implementation chain is complete."
+    },
+    {
+      "capability": "Avoid dependency on a local Windows checkout",
+      "importance": "high",
+      "coverage": {
+        "github-git-data-batched-publish": "full",
+        "local-git-single-push": "none",
+        "contents-api-sequential-writes": "full"
+      },
+      "decision": "Use GitHub-native raw Git objects rather than routing generic repository work through the user's machine."
+    },
+    {
+      "capability": "Keep branch updates race-safe",
+      "importance": "high",
+      "coverage": {
+        "github-git-data-batched-publish": "full",
+        "local-git-single-push": "full",
+        "contents-api-sequential-writes": "partial"
+      },
+      "decision": "Use a fresh task branch when possible; on an existing branch, verify the expected head and use lease-style ref updates rather than blind force pushes."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "github-git-data-batched-publish"
+    ],
+    "rationale": "Adopt GitHub's raw Git Database as the cloud commit-construction primitive. Schema-3 provenance still consists of distinct commits, but the branch ref is published only once after the chain is complete, so all-branch Machine Reuse Gate remains authoritative without redundant Actions churn.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "local-git-single-push",
+        "reason": "Local Git is a complete higher-level workflow, but requiring a user/local checkout for otherwise cloud-native repository work reduces availability and conflicts with the GitHub-first operating model."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If a connector lacks raw Git tree/commit/ref actions, use sequential Contents API writes without weakening Gate semantics; prefer batching only when the Git Data primitives are actually available."
+  }
+}

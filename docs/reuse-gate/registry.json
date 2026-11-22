@@ -792,6 +792,22 @@
       ],
       "notes": "Mature root-hosted static deployment fallback. Stronger automatic branch/PR preview ergonomics than GitHub Pages, but requires an external Cloudflare account and GitHub App integration.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "github-git-database-batched-writes",
+      "name": "GitHub Git Database API detached commit chain and single ref publish",
+      "url": "https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-your-git-database",
+      "level": "framework_engine",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "adopt",
+      "covers": [
+        "constructing Git trees and commits without moving a branch ref",
+        "preserving approval-before-implementation commit ancestry",
+        "publishing a multi-commit cloud task with one final branch ref update",
+        "reducing redundant branch-push CI triggers from GitHub-only development"
+      ],
+      "notes": "For multi-commit GitHub-only tasks, create tree/commit objects off-ref, preserve research -> approval -> implementation ancestry, then create/update the task branch once at the final commit. Use expected-SHA/force-with-lease semantics when moving an existing private task ref. Do not collapse schema-3 metadata and implementation into one commit.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
