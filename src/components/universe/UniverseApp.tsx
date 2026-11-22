@@ -179,6 +179,7 @@ export default function UniverseApp({
   const [journey, setJourney] = useState<UniverseJourneyState | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
+  const openedWorldDestinationRef = useRef<string | null>(null);
   const journeyNavigationRef = useRef(false);
   const journeyRef = useRef<UniverseJourneyState | null>(null);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
@@ -457,6 +458,7 @@ export default function UniverseApp({
       }
       if (activeEngine !== "yeis") return;
       delete document.documentElement.dataset.universeNavigationError;
+      openedWorldDestinationRef.current = null;
 
       const spatial =
         destination.target.kind === "galaxy" ||
@@ -549,6 +551,7 @@ export default function UniverseApp({
         setNavigationStatus(null);
         setSelectedSystem(system);
         setSelectedPlanet(planet);
+        openedWorldDestinationRef.current = planet ? destination.id : null;
         setScrollDepth(0);
         delete document.documentElement.dataset.universeLocated;
         ambient.ensurePlaying();
@@ -840,11 +843,7 @@ export default function UniverseApp({
         if (
           cancelled ||
           !restorableWorldPhase ||
-          ![
-            "body",
-            "content",
-            "observed-body",
-          ].includes(destination.target.kind)
+          openedWorldDestinationRef.current !== destination.id
         ) {
           return;
         }
