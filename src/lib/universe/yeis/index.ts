@@ -4,6 +4,7 @@ import { StarCatalog, type StarInfo } from "../../../vendor/yeis/data/StarCatalo
 import type { BodyData } from "../../../vendor/yeis/data/types";
 import { AU_KM, J2000_JD } from "../../../vendor/yeis/core/constants";
 import { generateSystem as generateYeisSystem } from "../../../vendor/yeis/gen/SystemGenerator";
+import { initI18n } from "../../../vendor/yeis/i18n";
 
 export const YEIS_UPSTREAM_COMMIT =
   "e52056897364e060fbd6d00951628f163b57d7a1";
@@ -27,6 +28,7 @@ export function loadYeisCore(): Promise<YeisCoreRuntime> {
 }
 
 async function createRuntime(): Promise<YeisCoreRuntime> {
+  await initI18n("en");
   const catalog = await StarCatalog.load(YEIS_DATA_BASE_URL);
   const universe = new Universe(catalog);
   universe.registerExtraSystem(createAuroraSystem());
