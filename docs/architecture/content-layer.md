@@ -136,3 +136,23 @@ Repository tests cover the intended invariants:
 
 This contract makes authored content portable across future catalog refreshes
 without turning placement into a hand-maintained lookup table.
+
+## Signal overlay capacity
+
+Personal Signal rendering no longer carries a fixed 256-signal ceiling.
+
+The galaxy overlay follows Three.js buffer lifecycle rules:
+
+- preallocate a small power-of-two capacity (minimum 32);
+- reuse the same typed buffer while the authored signal count remains within
+  capacity;
+- when capacity is exceeded, allocate the next power-of-two
+  `BufferGeometry`, swap it onto the existing `Points` object, and dispose
+  the superseded geometry;
+- expose the active capacity as `data-personal-signal-capacity` for runtime
+  diagnostics.
+
+This keeps sparse portfolios cheap while allowing content collections to grow
+well beyond the original fixed limit without rebuilding GPU buffers for every
+incremental content addition.
+
