@@ -232,6 +232,15 @@ export function UniverseNavigator({
             }}
             placeholder="Search personal signals, planets, stars, landmarks, galaxies…"
             aria-label="Search universe"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls="universe-navigator-results"
+            aria-activedescendant={
+              results[activeIndex]
+                ? "universe-navigator-option-" + activeIndex
+                : undefined
+            }
             autoComplete="off"
             spellCheck={false}
           />
@@ -274,7 +283,12 @@ export function UniverseNavigator({
           </div>
         )}
 
-        <div className="navigator-results" role="listbox">
+        <div
+          id="universe-navigator-results"
+          className="navigator-results"
+          role="listbox"
+          aria-busy={status === "loading"}
+        >
           {status === "error" && (
             <div className="navigator-empty">
               YEIS navigation index unavailable.
@@ -313,6 +327,7 @@ export function UniverseNavigator({
                 return (
                   <div
                     key={section.id + ":" + result.id}
+                    id={"universe-navigator-option-" + index}
                     ref={(node) => {
                       if (node) resultRefs.current.set(index, node);
                       else resultRefs.current.delete(index);
