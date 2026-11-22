@@ -1,0 +1,172 @@
+{
+  "schema": 2,
+  "task_id": "SEARCH-PLACES-CASE-SPLIT-V1-001",
+  "title": "Split Search, Places and exact-body navigation into independent Playwright cases",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Functional E2E case isolation for Search, Places and exact-body deep-link flows"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Main CI exposed a real test-shape regression: the existing Search/Places test serializes Personal Signal search, featured Places navigation and Earth exact-body deep-link validation into one 75-second Playwright test. The first main run exceeded the per-test budget and passed only on retry, which failOnFlakyTests correctly rejected. Reuse Playwright independent tests and existing native sharding; split the three user journeys rather than increasing timeout or weakening assertions.",
+  "planned_files": [
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-sharding",
+      "finding": "Playwright shards individual tests; smaller independent tests improve balancing and isolate failures."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-timeouts",
+      "finding": "Playwright applies a per-test timeout; long unrelated flows should not be hidden by simply increasing the test timeout."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "conclusion": "No new external test service is needed; the existing cloud Playwright stack already caught the flaky aggregate test.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Playwright independent tests preserve the same locators/assertions while giving each user path its own timeout, trace and shard placement.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Existing Playwright native sharding already distributes independent tests across the four GitHub runners.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "playwright-ci-sharding"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "conclusion": "A tiny shared navigator helper is sufficient; no package or custom runner is required.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": []
+    }
+  ],
+  "candidates": [
+    {
+      "id": "independent-playwright-functional-cases",
+      "name": "Independent Playwright functional cases",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright Test",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Preserves strict assertions but isolates Personal Signal search, Places and Earth deep-link flows into separately diagnosable tests.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "native-shard-rebalance",
+      "name": "Existing Playwright native sharding",
+      "level": "subsystem",
+      "registry_id": "playwright-ci-sharding",
+      "source": "Playwright Test sharding",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Automatically redistributes the newly independent tests without another Actions matrix or worker model.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "increase-timeout",
+      "name": "Increase monolithic test timeout",
+      "level": "component_asset",
+      "source": "Playwright timeout override",
+      "license": "N/A",
+      "decision": "reject",
+      "reason": "Would mask the exact flaky/slow aggregate behavior that failOnFlakyTests exposed and keep unrelated paths coupled.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 1,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Personal Signal search navigation",
+      "importance": "high",
+      "coverage": {
+        "independent-playwright-functional-cases": "full",
+        "native-shard-rebalance": "partial",
+        "increase-timeout": "partial"
+      },
+      "decision": "Keep existing strict content/system assertions in its own test."
+    },
+    {
+      "capability": "Featured Places navigation",
+      "importance": "high",
+      "coverage": {
+        "independent-playwright-functional-cases": "full",
+        "native-shard-rebalance": "partial",
+        "increase-timeout": "partial"
+      },
+      "decision": "Keep featured destination/system assertions in its own test."
+    },
+    {
+      "capability": "Exact Earth body shareable deep link",
+      "importance": "high",
+      "coverage": {
+        "independent-playwright-functional-cases": "full",
+        "native-shard-rebalance": "partial",
+        "increase-timeout": "partial"
+      },
+      "decision": "Keep exact star/body/phase URL and reload assertions in its own test."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "independent-playwright-functional-cases",
+      "native-shard-rebalance"
+    ],
+    "rationale": "Fix the main CI flake at the test topology level: independent user journeys, unchanged product assertions, unchanged 75-second budget, unchanged one-worker-per-runner policy.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If an individual path still exceeds the standard budget, treat it as a product/runtime performance problem and retain the test rather than raising the timeout globally."
+  }
+}
