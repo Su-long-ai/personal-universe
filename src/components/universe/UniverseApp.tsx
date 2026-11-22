@@ -766,8 +766,7 @@ export default function UniverseApp({
         !navigatorOpen && (
           <aside
             className="personal-signal-hover"
-            role="status"
-            aria-live="polite"
+            aria-hidden="true"
             style={{
               left: Math.min(signalHover.clientX + 16, window.innerWidth - 240),
               top: Math.min(signalHover.clientY + 16, window.innerHeight - 92),
