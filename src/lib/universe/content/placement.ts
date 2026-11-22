@@ -39,7 +39,7 @@ export function placeUniverseContent(
     // Pinned content must never silently drift to another star.
     if (!marker) continue;
 
-    used.add(marker.id);
+    used.add(markerIdentity(marker));
     placements.push({
       entry,
       markerId: marker.id,
@@ -122,7 +122,7 @@ function chooseRendezvousMarker(
       bestAnyScore = score;
     }
 
-    if (used.has(marker.id)) continue;
+    if (used.has(markerIdentity(marker))) continue;
 
     if (
       score > bestUnusedScore ||
