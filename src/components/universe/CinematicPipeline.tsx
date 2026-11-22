@@ -8,6 +8,35 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import type { QualityMode } from "../../lib/universe/types";
 
+function rendererLabel(gl: THREE.WebGLRenderer) {
+  const context = gl.getContext();
+  try {
+    const debug = context.getExtension("WEBGL_debug_renderer_info");
+    if (debug) {
+      return String(
+        context.getParameter(debug.UNMASKED_RENDERER_WEBGL) ?? "",
+      );
+    }
+  } catch {
+    // Privacy-hardened browsers may intentionally hide unmasked renderer data.
+  }
+  return String(context.getParameter(context.RENDERER) ?? "");
+}
+
+export function liveWorldFallbackReason(
+  gl: THREE.WebGLRenderer,
+  quality: QualityMode,
+) {
+  if (quality === "low") return "low-quality";
+  // HIGH is an explicit user/test request for the live path. AUTO adapts.
+  if (quality === "high") return null;
+  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
+    rendererLabel(gl),
+  )
+    ? "software-renderer"
+    : null;
+}
+
 export function CinematicPipeline({
   quality,
   liveWorld,
@@ -17,6 +46,10 @@ export function CinematicPipeline({
 }) {
   const { gl, scene, camera, size } = useThree();
   const high = quality !== "low";
+  const fallbackReason = liveWorld
+    ? liveWorldFallbackReason(gl, quality)
+    : null;
+  const useLiveWorld = liveWorld && !fallbackReason;
 
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -25,12 +58,12 @@ export function CinematicPipeline({
 
     const next = new EffectComposer(gl);
     next.addPass(new RenderPass(scene, camera));
-    const planetPass = liveWorld
+    const planetPass = useLiveWorld
       ? new PlanetPass(scene, camera, {
           background: "transparent",
           output: "linear",
           impostors: true,
-          impostorPixels: quality === "low" ? 120 : 90,
+          impostorPixels: quality === "high" ? 90 : 120,
         })
       : null;
     if (planetPass) next.addPass(planetPass);
@@ -48,20 +81,43 @@ export function CinematicPipeline({
     camera,
     gl,
     high,
-    liveWorld,
     quality,
     scene,
     size.height,
     size.width,
+    useLiveWorld,
   ]);
 
   useEffect(() => {
-    if (!liveWorld || !composer.planetPass) {
+    if (!liveWorld) {
       delete document.documentElement.dataset.universeWorldPipeline;
+      delete document.documentElement.dataset.universeWorldReady;
       return;
     }
+
+    if (fallbackReason) {
+      const mode = `fallback-${fallbackReason}`;
+      document.documentElement.dataset.universeWorldPipeline = mode;
+      document.documentElement.dataset.universeWorldReady = "true";
+      return () => {
+        if (
+          document.documentElement.dataset.universeWorldPipeline === mode
+        ) {
+          delete document.documentElement.dataset.universeWorldPipeline;
+        }
+        delete document.documentElement.dataset.universeWorldReady;
+      };
+    }
+
+    if (!composer.planetPass) {
+      delete document.documentElement.dataset.universeWorldPipeline;
+      delete document.documentElement.dataset.universeWorldReady;
+      return;
+    }
+
     document.documentElement.dataset.universeWorldPipeline =
       "procedural-planets-pass";
+    delete document.documentElement.dataset.universeWorldReady;
     return () => {
       if (
         document.documentElement.dataset.universeWorldPipeline ===
@@ -71,7 +127,7 @@ export function CinematicPipeline({
       }
       delete document.documentElement.dataset.universeWorldReady;
     };
-  }, [composer, liveWorld]);
+  }, [composer, fallbackReason, liveWorld]);
 
   useEffect(() => {
     composer.composer.setSize(size.width, size.height);
@@ -89,9 +145,19 @@ export function CinematicPipeline({
 
   useFrame((_, delta) => {
     composer.composer.render(delta);
+
+    if (!liveWorld) {
+      delete document.documentElement.dataset.universeWorldReady;
+      return;
+    }
+
+    if (fallbackReason) {
+      document.documentElement.dataset.universeWorldReady = "true";
+      return;
+    }
+
     const renderer = composer.planetPass?.planetRenderer;
     if (
-      liveWorld &&
       renderer &&
       renderer.info.planets > 0 &&
       renderer.info.pending === 0
