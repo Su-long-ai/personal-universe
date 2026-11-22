@@ -39,7 +39,7 @@ async function shot(
 ) {
   const path = testInfo.outputPath("visual", `${viewport}--${name}.png`);
   mkdirSync(dirname(path), { recursive: true });
-  await page.screenshot({ path, fullPage: true });
+  await page.screenshot({ path });
   await testInfo.attach(`${viewport}--${name}`, {
     path,
     contentType: "image/png",
@@ -170,6 +170,14 @@ test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
       await waitForYeisEngine(page);
       await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
       await expect(page.locator(".world-content-card")).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "procedural-planets-pass",
+      );
     },
   );
 });
@@ -179,6 +187,14 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-universe-world-renderer",
+      "procedural-planets-live",
+    );
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-universe-world-pipeline",
+      "procedural-planets-pass",
+    );
   });
 });
 
