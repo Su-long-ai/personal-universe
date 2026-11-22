@@ -1,0 +1,173 @@
+{
+  "schema": 2,
+  "task_id": "PLANET-VISUAL-ARRIVAL-COMPOSITION-001",
+  "title": "Make world arrival framing viewport-aware across desktop, tablet and mobile",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing camera-controls fit-distance primitive so product worlds remain visibly framed across aspect ratios without changing navigation authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Current runtime screenshots prove the fixed Cartesian Approach/Orbit shots overfill ordinary and Hero worlds across desktop, tablet and mobile: desktop orbit crops most of the sphere, tablet can become almost a flat planet color, and mobile can lose the readable body entirely. The project already ships Drei CameraControls backed by camera-controls v3.1.2. Its exact source exposes getDistanceToFitSphere(radius), computing distance from effective vertical FOV and camera aspect using the limiting viewport FOV, while setLookAt preserves the chosen cinematic direction. Reuse that primitive to derive world-shot distance from the shared render radius, preserve the existing shot directions and transition timings, and expose a settled marker so visual tests capture the final camera contract rather than an arbitrary frame.",
+  "planned_files": [
+    "src/lib/universe/types.ts",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the universe/navigation mother product; the defect is local world framing after arrival, not a reason to replace the cross-scale engine."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber remains the shared Canvas lifecycle and camera host; world framing should stay inside the existing scene rather than add another render surface."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The exact installed camera-controls line exposes getDistanceToFitSphere(radius), which derives a perspective-camera fit distance from effective FOV and aspect ratio, and setLookAt for preserving the desired viewing direction."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "The adopted planet subsystem renders ordinary worlds at the project-defined scene radius; framing should adapt the existing camera to that radius instead of changing the planet renderer or destination model."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep YEIS as the full universe and cross-scale navigation solution; only the product-world camera framing layer needs correction."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the single R3F Canvas and its current camera lifecycle."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Keep the existing world renderer and shared scene radius; changing visual generation would not solve fixed-camera aspect-ratio overflow."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse the already-shipped camera-controls fit-distance calculation instead of maintaining custom FOV/aspect trigonometry or a second camera controller."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-world-arrival-backbone",
+      "name": "Pinned MIT YEIS world/navigation backbone",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing Personal Universe YEIS integration",
+      "license": "MIT source at pinned e520568 with retained asset notices",
+      "decision": "partial",
+      "reason": "Retains the authoritative destination and cross-scale semantics, but the React product-world camera is intentionally project-owned.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "r3f-existing-camera-host",
+      "name": "Existing React Three Fiber camera host",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current shared Canvas",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "Provides the single camera/render lifecycle and viewport updates; it does not itself select a world framing distance.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-fit-sphere-distance",
+      "name": "camera-controls v3 viewport-aware sphere fit distance",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Existing Drei CameraControls dependency backed by camera-controls v3.1.2",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Directly solves the observed aspect-ratio framing failure using the already-shipped camera authority: derive final shot radius from getDistanceToFitSphere while retaining current shot direction and transition semantics.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-fov-trigonometry",
+      "name": "Project-owned manual FOV/aspect fit formula",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "New local camera math",
+      "license": "project code / MIT framework",
+      "decision": "reject",
+      "reason": "Would duplicate the exact tested fit-distance primitive already present in camera-controls and create another source of camera geometry truth.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-world-arrival-backbone",
+      "r3f-existing-camera-host",
+      "camera-controls-fit-sphere-distance"
+    ],
+    "rationale": "Keep YEIS and R3F as the existing full-product/render authorities and reuse the already-installed camera-controls v3 sphere-fit distance inside CinematicCamera. Share the planet render radius instead of duplicating it, preserve each shot's direction/timing, and publish a camera-settled runtime marker for deterministic visual validation. This fixes viewport composition without introducing a second navigation or camera system.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If overlay-safe composition still needs adjustment after viewport-aware fitting, use camera-controls focal offset or fit padding as a second narrow refinement rather than restoring hard-coded per-device shot coordinates."
+  }
+}
