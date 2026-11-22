@@ -794,6 +794,7 @@ select {
 }
 
 .navigator-kind.kind-observed,
+.navigator-kind.kind-exoplanet,
 .navigator-kind.kind-body {
   border-color: rgba(255, 201, 120, 0.24);
   color: rgba(255, 211, 145, 0.76);
