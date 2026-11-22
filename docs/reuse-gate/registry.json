@@ -530,6 +530,57 @@
       ],
       "notes": "Use for small shareable state that already belongs in the page URL. Prefer this over adding a client router when Personal Universe remains a single Astro page with one existing phase state machine.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "playwright-test",
+      "name": "Playwright Test",
+      "url": "https://playwright.dev/docs/intro",
+      "level": "framework_engine",
+      "license": "Apache-2.0",
+      "status": "adopt",
+      "covers": [
+        "browser E2E",
+        "Chromium lifecycle",
+        "request interception",
+        "trace viewer",
+        "screenshots",
+        "HTML reports",
+        "CI browser installation"
+      ],
+      "notes": "Preferred browser-validation framework for Personal Universe. Reuse Playwright Test for browser lifecycle, assertions, request interception, traces, screenshots and HTML reports instead of maintaining custom CDP/WebSocket smoke tooling.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "github-pages-actions",
+      "name": "GitHub Pages custom Actions deployment",
+      "url": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+      "level": "subsystem",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "trial",
+      "covers": [
+        "static-site deployment",
+        "Actions-native artifact upload",
+        "OIDC Pages deployment",
+        "no third-party deployment token"
+      ],
+      "notes": "Preferred no-extra-credential deployment module when repository Pages is enabled for GitHub Actions. Keep deployment independent from PR validation so Pages availability or plan settings do not block CI.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "vercel-preview-deployments",
+      "name": "Vercel Preview Deployments",
+      "url": "https://vercel.com/products/previews",
+      "level": "full_solution",
+      "license": "Commercial hosted service",
+      "status": "assess",
+      "covers": [
+        "per-branch preview deployments",
+        "pull-request preview URLs",
+        "deployment checks",
+        "hosted static-site delivery"
+      ],
+      "notes": "Strong per-PR preview product, but requires an external Vercel project/account integration. Keep as a future option if GitHub Pages cannot provide the desired preview ergonomics.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
