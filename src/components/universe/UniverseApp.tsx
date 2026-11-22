@@ -352,6 +352,7 @@ export default function UniverseApp({
         setJourney(null);
       }
       if (activeEngine !== "yeis") return;
+      delete document.documentElement.dataset.universeNavigationError;
 
       const spatial =
         destination.target.kind === "galaxy" ||
@@ -512,6 +513,7 @@ export default function UniverseApp({
       journeyRef.current = null;
       setJourney(null);
       if (activeEngine !== "yeis") return;
+      delete document.documentElement.dataset.universeNavigationError;
       const cameraTarget = navigationCameraTarget(destination, galaxy.markers);
       if (!cameraTarget) {
         await handleNavigateDestination(destination);
@@ -706,6 +708,7 @@ export default function UniverseApp({
 
   const handleNavigationComplete = useCallback(
     (request: UniverseNavigationCameraRequest) => {
+      delete document.documentElement.dataset.universeNavigationError;
       setNavigationStatus(
         request.mode === "travel" ? "arrived" : "located",
       );
