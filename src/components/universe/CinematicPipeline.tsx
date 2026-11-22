@@ -98,7 +98,7 @@ export function CinematicPipeline({
     if (fallbackReason) {
       const mode = `fallback-${fallbackReason}`;
       document.documentElement.dataset.universeWorldPipeline = mode;
-      document.documentElement.dataset.universeWorldReady = "true";
+      delete document.documentElement.dataset.universeWorldReady;
       return () => {
         if (
           document.documentElement.dataset.universeWorldPipeline === mode
@@ -152,7 +152,13 @@ export function CinematicPipeline({
     }
 
     if (fallbackReason) {
-      document.documentElement.dataset.universeWorldReady = "true";
+      if (
+        document.documentElement.dataset.universeWorldSceneReady === "true"
+      ) {
+        document.documentElement.dataset.universeWorldReady = "true";
+      } else {
+        delete document.documentElement.dataset.universeWorldReady;
+      }
       return;
     }
 
