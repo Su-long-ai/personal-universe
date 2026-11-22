@@ -2,29 +2,48 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Optional branch, tag, or commit to validate
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLAYWRIGHT_VERSION: 1.65.1
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
+
 jobs:
-  build:
+  validate:
+    name: Build + E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install
+      - name: Deterministic install
         run: npm ci
 
       - name: Reuse Gate
@@ -33,37 +52,52 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Runtime smoke
+      - name: Bundle and asset regression guard
+        run: node tests/ci/bundle-guard.mjs
+
+      - name: Install pinned Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify install did not mutate lockfiles
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Playwright E2E + visual artifacts
+        run: npx playwright test
+
+      - name: Append runtime metrics
+        if: always()
         shell: bash
         run: |
-          nohup npm run preview -- --host 127.0.0.1 --port 4321 >/tmp/personal-universe-preview.log 2>&1 &
-          for i in {1..40}; do
-            if curl -fsS http://127.0.0.1:4321/ >/dev/null; then
-              break
-            fi
-            sleep 0.25
-          done
-
-          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME" ]; then
-            echo "No headless Chrome-compatible browser found on runner" >&2
-            exit 1
+          if [ -f test-results/runtime-metrics.md ]; then
+            cat test-results/runtime-metrics.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom http://127.0.0.1:4321/ > /tmp/personal-universe-dom.html
-          grep -q 'data-universe-engine="yeis"' /tmp/personal-universe-dom.html
-          grep -q 'data-yeis-native-galaxy="ready"' /tmp/personal-universe-dom.html
-          grep -q 'data-personal-signals="1"' /tmp/personal-universe-dom.html
-
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom 'http://127.0.0.1:4321/?navigator=1&navq=Earth' > /tmp/personal-universe-nav.html
-          grep -q 'data-universe-navigator="open"' /tmp/personal-universe-nav.html
-          grep -Eq 'data-universe-navigator-results="[1-9][0-9]*"' /tmp/personal-universe-nav.html
-          grep -q 'Earth' /tmp/personal-universe-nav.html
-
       - name: Upload dist artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: personal-universe-dist-${{ github.sha }}
           path: dist
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload Playwright report, traces, screenshots, and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-e2e-${{ github.sha }}
+          path: |
+            playwright-report
+            test-results
+            ci-artifacts
+          if-no-files-found: warn
+          retention-days: 14
