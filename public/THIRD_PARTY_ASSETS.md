@@ -33,3 +33,25 @@
 - License: CC0
 - Use: locally hosted 1K glTF + PBR textures for near-field surface detail.
 - Runtime dependency on Poly Haven API: none.
+
+
+## Galaxy Explorer — galaxy rendering reference
+
+- Source: https://github.com/zjoooooo/galaxy-explorer
+- License: MIT
+- Copyright: Justin Zhang Jun (2026)
+- Use: spiral-arm density placement, GPU `THREE.Points` rendering patterns and galaxy layering were adapted into the R3F galaxy renderer.
+
+## Helios — procedural star-system reference
+
+- Source: https://github.com/dhairyaozaa/procedural-star-system
+- License: ISC (declared in package metadata / README)
+- Use: deterministic seeded RNG and the decomposition into system/star/planet/moon generators were adapted to TypeScript project data.
+
+## NASA Exoplanet Archive
+
+- Local derived snapshot: `src/data/exoplanet-hosts.json`
+- Source: https://exoplanetarchive.ipac.caltech.edu/
+- Access: TAP / `pscomppars`
+- Use: nearby observed host systems and confirmed-planet parameters.
+- Runtime dependency: none; the snapshot is refreshed during development with `npm run catalog:refresh`.

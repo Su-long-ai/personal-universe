@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import { Vector3 } from "three";
-import { TEST_WORLD, type UniversePhase } from "../../lib/universe/types";
+import { PLANET_ANCHOR, type UniversePhase } from "../../lib/universe/types";
 
 type CinematicCameraProps = {
   phase: UniversePhase;
@@ -11,7 +11,7 @@ type CinematicCameraProps = {
   onPhaseComplete: (phase: UniversePhase) => void;
 };
 
-const WORLD = TEST_WORLD.position;
+const WORLD = PLANET_ANCHOR;
 
 const SHOTS: Partial<
   Record<
@@ -51,12 +51,12 @@ const SHOTS: Partial<
     targetTolerance: 0.06,
   },
   returning: {
-    position: [1.8, 0.45, 14.8],
-    target: [1.6, 0, 0],
+    position: [0, 24, 41],
+    target: [0, 0, 0],
     smoothTime: 1.05,
-    maxSpeed: 26,
-    positionTolerance: 0.16,
-    targetTolerance: 0.1,
+    maxSpeed: 34,
+    positionTolerance: 0.2,
+    targetTolerance: 0.14,
   },
 };
 
@@ -81,13 +81,28 @@ export function CinematicCamera({
     controls.stop();
 
     if (phase === "galaxy") {
-      controls.smoothTime = reducedMotion ? 0.05 : 0.48;
-      controls.maxSpeed = 24;
+      controls.smoothTime = reducedMotion ? 0.05 : 0.58;
+      controls.maxSpeed = 38;
       void controls.setLookAt(
         0,
-        0.4,
-        20 + scrollDepth,
-        1.6,
+        26.5,
+        43 + scrollDepth * 1.8,
+        0,
+        0,
+        0,
+        !reducedMotion,
+      );
+      return;
+    }
+
+    if (phase === "system") {
+      controls.smoothTime = reducedMotion ? 0.05 : 0.52;
+      controls.maxSpeed = 28;
+      void controls.setLookAt(
+        0,
+        8.6,
+        18.5,
+        0,
         0,
         0,
         !reducedMotion,
@@ -146,9 +161,9 @@ export function CinematicCamera({
       mouseButtons={{ left: 0, middle: 0, right: 0, wheel: 0 }}
       touches={{ one: 0, two: 0, three: 0 }}
       minDistance={0.3}
-      maxDistance={36}
+      maxDistance={80}
       restThreshold={0.05}
-      minPolarAngle={0.3}
+      minPolarAngle={0.12}
       maxPolarAngle={Math.PI - 0.3}
       azimuthRotateSpeed={0.55}
       polarRotateSpeed={0.45}

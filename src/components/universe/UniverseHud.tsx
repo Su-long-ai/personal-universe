@@ -1,16 +1,25 @@
-import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import type {
+  PlanetDefinition,
+  QualityMode,
+  SystemDefinition,
+  UniversePhase,
+} from "../../lib/universe/types";
 
 const LABELS: Record<UniversePhase, string> = {
   galaxy: "GALACTIC OVERVIEW",
-  approach: "INTERSTELLAR APPROACH",
+  system: "STELLAR SYSTEM",
+  approach: "INTERPLANETARY APPROACH",
   orbit: "LOW ORBIT",
   atmosphere: "ATMOSPHERIC ENTRY",
-  surface: "SURFACE // AURORA-01",
+  surface: "SURFACE",
   returning: "RETURN VECTOR",
 };
 
 export function UniverseHud({
   phase,
+  selectedSystem,
+  selectedPlanet,
+  markerCount,
   collapsed,
   onToggleCollapsed,
   muted,
@@ -20,6 +29,9 @@ export function UniverseHud({
   onReturn,
 }: {
   phase: UniversePhase;
+  selectedSystem: SystemDefinition | null;
+  selectedPlanet: PlanetDefinition | null;
+  markerCount: number;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   muted: boolean;
@@ -28,10 +40,37 @@ export function UniverseHud({
   onQualityChange: (mode: QualityMode) => void;
   onReturn: () => void;
 }) {
+  const destination =
+    phase === "galaxy"
+      ? {
+          name: "MILKY WAY",
+          detail: `${markerCount} survey markers / observed + procedural`,
+        }
+      : phase === "system" || phase === "returning"
+        ? {
+            name: selectedSystem?.name ?? "UNRESOLVED SYSTEM",
+            detail: selectedSystem
+              ? `${selectedSystem.planets.length} worlds / ${selectedSystem.source}`
+              : "system data unavailable",
+          }
+        : {
+            name: selectedPlanet?.name ?? "UNRESOLVED WORLD",
+            detail: selectedPlanet
+              ? `${selectedPlanet.archetype.replace("_", " ")} / ${selectedPlanet.observed ? "observed" : selectedPlanet.heroKey ? "hero" : "procedural"}`
+              : "planet data unavailable",
+          };
+
+  const returnLabel =
+    phase === "system"
+      ? "← RETURN TO GALAXY"
+      : phase === "returning"
+        ? "RETURNING…"
+        : "← RETURN TO SYSTEM";
+
   return (
     <aside className={`universe-hud ${collapsed ? "is-collapsed" : ""}`}>
       <div className="hud-topline">
-        <span className="hud-mark">PU // 00</span>
+        <span className="hud-mark">PU // 01</span>
         <button className="hud-collapse" onClick={onToggleCollapsed}>
           {collapsed ? "OPEN" : "HIDE"}
         </button>
@@ -45,15 +84,20 @@ export function UniverseHud({
           </div>
 
           <div className="hud-destination">
-            <span>AURORA-01</span>
-            <small>uncatalogued / test world</small>
+            <span>{destination.name}</span>
+            <small>{destination.detail}</small>
           </div>
 
           <div className="hud-actions">
             <button onClick={onToggleMuted}>{muted ? "SOUND OFF" : "SOUND ON"}</button>
             <label>
               QUALITY
-              <select value={quality} onChange={(event) => onQualityChange(event.target.value as QualityMode)}>
+              <select
+                value={quality}
+                onChange={(event) =>
+                  onQualityChange(event.target.value as QualityMode)
+                }
+              >
                 <option value="auto">AUTO</option>
                 <option value="high">HIGH</option>
                 <option value="low">LOW</option>
@@ -62,8 +106,12 @@ export function UniverseHud({
           </div>
 
           {phase !== "galaxy" && (
-            <button className="hud-return" onClick={onReturn}>
-              ← RETURN TO GALAXY
+            <button
+              className="hud-return"
+              onClick={onReturn}
+              disabled={phase === "returning"}
+            >
+              {returnLabel}
             </button>
           )}
         </div>

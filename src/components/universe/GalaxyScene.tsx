@@ -1,60 +1,80 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
-import { BenchmarkPlanet } from "./BenchmarkPlanet";
-import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
+import { generateGalaxyPointCloud } from "../../lib/universe/generation";
 
-function seededRandom(seed: number) {
-  let value = seed >>> 0;
-  return () => {
-    value = (value * 1664525 + 1013904223) >>> 0;
-    return value / 4294967296;
-  };
+function spectralColor(type: string) {
+  const cls = type.charAt(0).toUpperCase();
+  if (cls === "O") return "#91adff";
+  if (cls === "B") return "#a9c1ff";
+  if (cls === "A") return "#d6e4ff";
+  if (cls === "F") return "#fff2d5";
+  if (cls === "G") return "#ffe2a0";
+  if (cls === "K") return "#ffbd72";
+  return "#ff8862";
 }
 
-function ParallaxStars({
-  count,
-  spread,
-  size,
-  opacity,
+function GalaxyDisc() {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        uniforms: { uOpacity: { value: 0.72 } },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec2 vUv;
+          uniform float uOpacity;
+          void main() {
+            vec2 p = (vUv - 0.5) * 2.0;
+            float r = length(p);
+            if (r > 1.0) discard;
+            float a = atan(p.y, p.x);
+            float spiral = 0.5 + 0.5 * cos(4.0 * (a - r * 6.8));
+            float arm = pow(spiral, 5.2);
+            float core = exp(-r * 5.5);
+            float lane = pow(0.5 + 0.5 * cos(4.0 * (a - r * 6.8 - 0.14)), 12.0);
+            float envelope = smoothstep(1.0, 0.12, r);
+            float density = envelope * (0.055 + arm * 0.28 + core * 0.72);
+            density *= 1.0 - lane * 0.38 * smoothstep(0.12, 0.72, r);
+            vec3 warm = vec3(1.0, 0.67, 0.34);
+            vec3 cool = vec3(0.32, 0.52, 0.95);
+            vec3 col = mix(warm, cool, smoothstep(0.08, 0.95, r));
+            col += vec3(0.28, 0.12, 0.28) * arm * smoothstep(0.28, 0.72, r);
+            gl_FragColor = vec4(col * density * 1.8, density * uOpacity);
+          }
+        `,
+      }),
+    [],
+  );
+
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.26, 0]}>
+      <planeGeometry args={[70, 70, 1, 1]} />
+      <primitive object={material} attach="material" />
+    </mesh>
+  );
+}
+
+function GalaxyStars({
+  quality,
   seed,
 }: {
-  count: number;
-  spread: number;
-  size: number;
-  opacity: number;
-  seed: number;
+  quality: QualityMode;
+  seed: string;
 }) {
-  const { positions, colors, scales } = useMemo(() => {
-    const random = seededRandom(seed);
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const scales = new Float32Array(count);
-    const warm = new THREE.Color("#ffd9ad");
-    const cool = new THREE.Color("#b8d5ff");
-    const white = new THREE.Color("#f7fbff");
-    const mixed = new THREE.Color();
-
-    for (let i = 0; i < count; i += 1) {
-      const i3 = i * 3;
-      const radius = spread * (0.25 + random() * 0.75);
-      const theta = random() * Math.PI * 2;
-      const z = (random() - 0.5) * spread * 1.7;
-      positions[i3] = Math.cos(theta) * radius;
-      positions[i3 + 1] = (random() - 0.5) * spread * 0.9;
-      positions[i3 + 2] = z;
-
-      const temperature = random();
-      mixed.copy(temperature < 0.16 ? warm : temperature > 0.78 ? cool : white);
-      const gain = 0.54 + random() * 0.8;
-      colors[i3] = mixed.r * gain;
-      colors[i3 + 1] = mixed.g * gain;
-      colors[i3 + 2] = mixed.b * gain;
-      scales[i] = 0.55 + Math.pow(random(), 5) * 2.8;
-    }
-    return { positions, colors, scales };
-  }, [count, seed, spread]);
-
+  const count = quality === "low" ? 12000 : quality === "high" ? 36000 : 26000;
+  const cloud = useMemo(() => generateGalaxyPointCloud(seed, count), [count, seed]);
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -62,126 +82,136 @@ function ParallaxStars({
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         vertexColors: true,
-        uniforms: {
-          uSize: { value: size },
-          uOpacity: { value: opacity },
-        },
+        uniforms: { uSize: { value: quality === "low" ? 2.0 : 2.7 } },
         vertexShader: `
           attribute float aScale;
           varying vec3 vColor;
           uniform float uSize;
           void main() {
             vColor = color;
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = min(18.0, uSize * aScale * (110.0 / max(1.0, -mvPosition.z)));
-            gl_Position = projectionMatrix * mvPosition;
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = min(9.0, uSize * aScale * (110.0 / max(8.0, -mv.z)));
+            gl_Position = projectionMatrix * mv;
           }
         `,
         fragmentShader: `
           varying vec3 vColor;
-          uniform float uOpacity;
           void main() {
-            vec2 p = gl_PointCoord - vec2(0.5);
+            vec2 p = gl_PointCoord - 0.5;
             float r = length(p);
             if (r > 0.5) discard;
-            float core = smoothstep(0.18, 0.0, r);
-            float halo = pow(max(0.0, 1.0 - r * 2.0), 2.25);
-            float alpha = (halo * 0.72 + core) * uOpacity;
-            gl_FragColor = vec4(vColor * (0.7 + core * 1.8), alpha);
+            float halo = pow(max(0.0, 1.0 - r * 2.0), 2.1);
+            float core = smoothstep(0.16, 0.0, r);
+            gl_FragColor = vec4(vColor * (0.58 + core * 1.5), halo * 0.72 + core * 0.72);
           }
         `,
       }),
-    [opacity, size],
+    [quality],
   );
 
   return (
     <points frustumCulled={false}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" array={positions} count={count} itemSize={3} />
-        <bufferAttribute attach="attributes-color" array={colors} count={count} itemSize={3} />
-        <bufferAttribute attach="attributes-aScale" array={scales} count={count} itemSize={1} />
+        <bufferAttribute attach="attributes-position" array={cloud.positions} count={count} itemSize={3} />
+        <bufferAttribute attach="attributes-color" array={cloud.colors} count={count} itemSize={3} />
+        <bufferAttribute attach="attributes-aScale" array={cloud.scales} count={count} itemSize={1} />
       </bufferGeometry>
       <primitive object={material} attach="material" />
     </points>
   );
 }
 
-function DeepSky() {
+function FarSky() {
   const texture = useTexture("/textures/stars_milky_way.jpg");
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
-
   return (
-    <mesh rotation={[0.18, -0.72, -0.1]} frustumCulled={false}>
-      <sphereGeometry args={[92, 64, 64]} />
+    <mesh rotation={[0.4, -0.5, -0.12]} frustumCulled={false}>
+      <sphereGeometry args={[125, 48, 48]} />
       <meshBasicMaterial
         map={texture}
         side={THREE.BackSide}
-        color="#2b3a50"
+        color="#101927"
         toneMapped={false}
         transparent
-        opacity={0.62}
+        opacity={0.22}
         depthWrite={false}
       />
     </mesh>
   );
 }
 
-function HeroStar() {
+function Marker({
+  marker,
+  onSelect,
+}: {
+  marker: GalaxyMarker;
+  onSelect: (marker: GalaxyMarker) => void;
+}) {
+  const color = marker.source === "hero"
+    ? "#7ff2ff"
+    : marker.source === "catalog"
+      ? "#d9e7ff"
+      : spectralColor(marker.spectralType);
+  const size = marker.source === "hero" ? 0.34 : marker.source === "catalog" ? 0.22 : 0.15;
+
   return (
-    <group position={[-12.5, 5.5, -18]}>
-      <mesh>
-        <sphereGeometry args={[1.35, 64, 64]} />
-        <meshBasicMaterial toneMapped={false}><color attach="color" args={[5.2, 3.7, 1.8]} /></meshBasicMaterial>
+    <group position={marker.position}>
+      <mesh
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(marker);
+        }}
+        onPointerOver={() => document.body.classList.add("planet-hover")}
+        onPointerOut={() => document.body.classList.remove("planet-hover")}
+      >
+        <sphereGeometry args={[size, 18, 18]} />
+        <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
-      <mesh scale={3.2}>
-        <sphereGeometry args={[1, 48, 48]} />
-        <meshBasicMaterial
-          color="#8a5424"
-          transparent
-          opacity={0.09}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-      <mesh scale={7.5}>
-        <sphereGeometry args={[1, 32, 32]} />
-        <meshBasicMaterial
-          color="#3b1a0b"
-          transparent
-          opacity={0.02}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
+      {marker.source === "hero" && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.48, 0.51, 48]} />
+          <meshBasicMaterial color="#70dfea" transparent opacity={0.62} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      {marker.source === "catalog" && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.3, 0.315, 32]} />
+          <meshBasicMaterial color="#a9c5ff" transparent opacity={0.3} side={THREE.DoubleSide} />
+        </mesh>
+      )}
     </group>
   );
 }
 
 export function GalaxyScene({
-  phase,
-  onSelectPlanet,
+  markers,
+  onSelectSystem,
   quality,
+  seed,
 }: {
-  phase: UniversePhase;
-  onSelectPlanet: () => void;
+  markers: GalaxyMarker[];
+  onSelectSystem: (marker: GalaxyMarker) => void;
   quality: QualityMode;
+  seed: string;
 }) {
-  const high = quality !== "low";
+  const root = useRef<THREE.Group>(null);
+
+  useFrame((_, delta) => {
+    if (root.current) root.current.rotation.y += delta * 0.0045;
+  });
 
   return (
     <>
       <color attach="background" args={["#000106"]} />
-      <DeepSky />
-      <ParallaxStars
-        count={high ? 1650 : 700}
-        spread={42}
-        size={high ? 2.6 : 2.1}
-        opacity={high ? 0.68 : 0.52}
-        seed={713}
-      />
-      <HeroStar />
-      <BenchmarkPlanet phase={phase} quality={quality} onSelect={onSelectPlanet} />
+      <FarSky />
+      <group ref={root}>
+        <GalaxyDisc />
+        <GalaxyStars quality={quality} seed={seed} />
+        {markers.map((marker) => (
+          <Marker key={marker.id} marker={marker} onSelect={onSelectSystem} />
+        ))}
+      </group>
     </>
   );
 }

@@ -1,12 +1,24 @@
 import { Canvas } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
+import { SystemScene } from "./SystemScene";
+import { PlanetScene } from "./PlanetScene";
 import { SurfaceScene } from "./SurfaceScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import { CinematicCamera } from "./CinematicCamera";
-import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import type {
+  GalaxyMarker,
+  PlanetDefinition,
+  QualityMode,
+  SystemDefinition,
+  UniversePhase,
+} from "../../lib/universe/types";
 
 export function UniverseCanvas({
   phase,
+  markers,
+  selectedSystem,
+  selectedPlanet,
+  onSelectSystem,
   onSelectPlanet,
   quality,
   scrollDepth,
@@ -14,7 +26,11 @@ export function UniverseCanvas({
   onCinematicPhaseComplete,
 }: {
   phase: UniversePhase;
-  onSelectPlanet: () => void;
+  markers: GalaxyMarker[];
+  selectedSystem: SystemDefinition | null;
+  selectedPlanet: PlanetDefinition | null;
+  onSelectSystem: (marker: GalaxyMarker) => void;
+  onSelectPlanet: (planet: PlanetDefinition) => void;
   quality: QualityMode;
   scrollDepth: number;
   reducedMotion: boolean;
@@ -23,7 +39,7 @@ export function UniverseCanvas({
   return (
     <Canvas
       dpr={quality === "low" ? [1, 1] : [1, 1.75]}
-      camera={{ position: [0, 0.4, 20], fov: 48, near: 0.05, far: 180 }}
+      camera={{ position: [0, 26.5, 43], fov: 48, near: 0.05, far: 260 }}
       gl={{ antialias: quality !== "low", powerPreference: "high-performance" }}
     >
       <CinematicCamera
@@ -32,12 +48,30 @@ export function UniverseCanvas({
         reducedMotion={reducedMotion}
         onPhaseComplete={onCinematicPhaseComplete}
       />
-      {phase === "surface" ? (
-        <SurfaceScene />
-      ) : (
-        <GalaxyScene phase={phase} onSelectPlanet={onSelectPlanet} quality={quality} />
+
+      {(phase === "galaxy" || phase === "returning") && (
+        <GalaxyScene
+          markers={markers}
+          onSelectSystem={onSelectSystem}
+          quality={quality}
+          seed="personal-universe-v2"
+        />
       )}
-      <CinematicPipeline quality={quality} />
+
+      {phase === "system" && selectedSystem && (
+        <SystemScene system={selectedSystem} onSelectPlanet={onSelectPlanet} />
+      )}
+
+      {phase === "surface" && <SurfaceScene />}
+
+      {phase !== "galaxy" &&
+        phase !== "system" &&
+        phase !== "surface" &&
+        selectedPlanet && (
+          <PlanetScene planet={selectedPlanet} quality={quality} />
+        )}
+
+      <CinematicPipeline key={phase} quality={quality} />
     </Canvas>
   );
 }

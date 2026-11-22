@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
-import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import type {
+  GalaxyMarker,
+  PlanetDefinition,
+  QualityMode,
+  SystemDefinition,
+  UniversePhase,
+} from "../../lib/universe/types";
+import {
+  buildGalaxyIndex,
+  resolveSystem,
+} from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import "./universe.css";
 
@@ -19,15 +29,21 @@ function useReducedMotion() {
   return reduced;
 }
 
-const NEXT_PHASE: Partial<Record<UniversePhase, UniversePhase>> = {
-  approach: "orbit",
-  orbit: "atmosphere",
-  atmosphere: "surface",
-  returning: "galaxy",
-};
+const VALID_PHASES: UniversePhase[] = [
+  "galaxy",
+  "system",
+  "approach",
+  "orbit",
+  "atmosphere",
+  "surface",
+  "returning",
+];
 
 export default function UniverseApp() {
+  const galaxy = useMemo(() => buildGalaxyIndex("personal-universe-v2"), []);
   const [phase, setPhase] = useState<UniversePhase>("galaxy");
+  const [selectedSystem, setSelectedSystem] = useState<SystemDefinition | null>(null);
+  const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -40,24 +56,90 @@ export default function UniverseApp() {
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("phase");
-    if (
-      requested &&
-      ["galaxy", "approach", "orbit", "atmosphere", "surface", "returning"].includes(requested)
-    ) {
-      setPhase(requested as UniversePhase);
+    if (!requested || !VALID_PHASES.includes(requested as UniversePhase)) return;
+
+    const requestedPhase = requested as UniversePhase;
+    if (requestedPhase === "galaxy") {
+      setPhase("galaxy");
+      return;
     }
-  }, []);
+
+    const heroMarker = galaxy.markers.find((marker) => marker.source === "hero");
+    if (!heroMarker) return;
+    const system = resolveSystem(heroMarker);
+    setSelectedSystem(system);
+
+    if (requestedPhase === "system" || requestedPhase === "returning") {
+      setPhase(requestedPhase);
+      return;
+    }
+
+    const heroPlanet =
+      system.planets.find((planet) => planet.heroKey === "home") ??
+      system.planets[0] ??
+      null;
+    if (!heroPlanet) return;
+    setSelectedPlanet(heroPlanet);
+    setPhase(requestedPhase);
+  }, [galaxy.markers]);
+
+  const handleSelectSystem = useCallback(
+    (marker: GalaxyMarker) => {
+      const system = resolveSystem(marker);
+      setSelectedSystem(system);
+      setSelectedPlanet(null);
+      setScrollDepth(0);
+      ambient.ensurePlaying();
+      setPhase("system");
+    },
+    [ambient],
+  );
+
+  const handleSelectPlanet = useCallback(
+    (planet: PlanetDefinition) => {
+      setSelectedPlanet(planet);
+      ambient.ensurePlaying();
+      setPhase("approach");
+    },
+    [ambient],
+  );
 
   const handleCinematicPhaseComplete = useCallback(
     (completed: UniversePhase) => {
       if (debugFreeze) return;
+
       setPhase((current) => {
         if (current !== completed) return current;
-        return NEXT_PHASE[completed] ?? current;
+
+        if (completed === "approach") return "orbit";
+        if (completed === "orbit") {
+          return selectedPlanet?.surfaceMode === "none" ? "orbit" : "atmosphere";
+        }
+        if (completed === "atmosphere") return "surface";
+        if (completed === "returning") return "galaxy";
+        return current;
       });
     },
-    [debugFreeze],
+    [debugFreeze, selectedPlanet?.surfaceMode],
   );
+
+  const handleReturn = useCallback(() => {
+    if (phase === "system") {
+      setSelectedSystem(null);
+      setSelectedPlanet(null);
+      setPhase("returning");
+      return;
+    }
+
+    if (phase === "returning") return;
+
+    setSelectedPlanet(null);
+    if (selectedSystem) {
+      setPhase("system");
+    } else {
+      setPhase("galaxy");
+    }
+  }, [phase, selectedSystem]);
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
@@ -71,18 +153,18 @@ export default function UniverseApp() {
       onWheel={(event) => {
         if (phase !== "galaxy") return;
         setScrollDepth((value) =>
-          Math.max(-2.5, Math.min(3, value + Math.sign(event.deltaY) * 0.35)),
+          Math.max(-3.5, Math.min(4.5, value + Math.sign(event.deltaY) * 0.42)),
         );
       }}
     >
       <div className="universe-canvas">
         <UniverseCanvas
           phase={phase}
-          onSelectPlanet={() => {
-            if (phase !== "galaxy") return;
-            ambient.ensurePlaying();
-            setPhase("approach");
-          }}
+          markers={galaxy.markers}
+          selectedSystem={selectedSystem}
+          selectedPlanet={selectedPlanet}
+          onSelectSystem={handleSelectSystem}
+          onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
@@ -94,6 +176,9 @@ export default function UniverseApp() {
 
       <UniverseHud
         phase={phase}
+        selectedSystem={selectedSystem}
+        selectedPlanet={selectedPlanet}
+        markerCount={galaxy.markers.length}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((value) => !value)}
         muted={muted}
@@ -103,33 +188,59 @@ export default function UniverseApp() {
         }}
         quality={quality}
         onQualityChange={setQuality}
-        onReturn={() => setPhase("returning")}
+        onReturn={handleReturn}
       />
 
       {phase === "galaxy" && (
         <section className="hero-copy">
-          <span className="eyebrow">PERSONAL UNIVERSE // PROTOTYPE 00</span>
-          <h1>Somewhere beyond the charted sky.</h1>
-          <p>Scroll to drift. Select the blue world to begin descent.</p>
+          <span className="eyebrow">PERSONAL UNIVERSE // GALACTIC INDEX</span>
+          <h1>A living map of observed and imagined worlds.</h1>
+          <p>
+            Bright survey rings are observed systems. Cyan marks a handcrafted Hero world.
+            Everything else is deterministic procedural space.
+          </p>
         </section>
       )}
 
-      {phase === "surface" && (
+      {phase === "system" && selectedSystem && (
+        <section className="system-copy">
+          <span>
+            {selectedSystem.source.toUpperCase()} SYSTEM // {selectedSystem.star.spectralType}
+          </span>
+          <strong>{selectedSystem.name}</strong>
+          <small>
+            {selectedSystem.planets.length} worlds. Select a planet to approach it.
+            Ordinary worlds remain orbital; Hero worlds may continue below the clouds.
+          </small>
+        </section>
+      )}
+
+      {phase === "surface" && selectedPlanet && (
         <section className="surface-copy">
-          <span>WORLD MODULE // ONLINE</span>
-          <strong>This world is allowed to become something else entirely.</strong>
-          <small>Click the beacon. This is only the heterogeneous-world proof.</small>
+          <span>HERO WORLD // SURFACE MODULE</span>
+          <strong>{selectedPlanet.name}</strong>
+          <small>
+            Custom surfaces are overrides. The procedural universe does not require every
+            generated planet to carry a handcrafted world.
+          </small>
         </section>
       )}
 
-      {phase === "approach" && (
-        <div className="travel-caption">LOCK ACQUIRED // ACCELERATING</div>
+      {phase === "approach" && selectedPlanet && (
+        <div className="travel-caption">
+          LOCK ACQUIRED // {selectedPlanet.name}
+        </div>
       )}
-      {phase === "orbit" && (
-        <div className="travel-caption">ORBITAL INSERTION // AURORA-01</div>
+      {phase === "orbit" && selectedPlanet && (
+        <div className="travel-caption">
+          ORBIT // {selectedPlanet.name}
+          {selectedPlanet.surfaceMode === "none" ? " // SCAN MODE" : ""}
+        </div>
       )}
-      {phase === "atmosphere" && (
-        <div className="travel-caption">ATMOSPHERIC ENTRY</div>
+      {phase === "atmosphere" && selectedPlanet && (
+        <div className="travel-caption">
+          ATMOSPHERIC ENTRY // {selectedPlanet.name}
+        </div>
       )}
     </main>
   );

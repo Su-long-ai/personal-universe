@@ -1,0 +1,1300 @@
+{
+  "generatedAt": "2026-11-22T12:05:31.504Z",
+  "source": "NASA Exoplanet Archive TAP / pscomppars",
+  "sourceUrl": "https://exoplanetarchive.ipac.caltech.edu/",
+  "systems": [
+    {
+      "hostname": "eps Ind A",
+      "raDeg": 330.8714021,
+      "decDeg": -56.7969023,
+      "distancePc": 3.63857,
+      "spectralType": "K5 V",
+      "temperatureK": 4700,
+      "massSolar": 0.8,
+      "radiusSolar": 0.713,
+      "planets": [
+        {
+          "name": "eps Ind A b",
+          "orbitAU": 15.76,
+          "radiusEarth": 12.7,
+          "massEarth": 2065.8846455,
+          "equilibriumTempK": 275
+        }
+      ]
+    },
+    {
+      "hostname": "Kapteyn",
+      "raDeg": 77.9586613,
+      "decDeg": -45.0430198,
+      "distancePc": 3.93305,
+      "spectralType": "M2.0V",
+      "temperatureK": 3550,
+      "massSolar": 0.281,
+      "radiusSolar": 0.291,
+      "planets": [
+        {
+          "name": "Kapteyn c",
+          "orbitAU": 0.311,
+          "radiusEarth": 2.54,
+          "massEarth": 7,
+          "equilibriumTempK": 165.59
+        }
+      ]
+    },
+    {
+      "hostname": "HD 180617",
+      "raDeg": 289.2277322,
+      "decDeg": 5.1631615,
+      "distancePc": 5.91059,
+      "spectralType": "M2.5 V",
+      "temperatureK": 3534,
+      "massSolar": 0.484,
+      "radiusSolar": 0.481,
+      "planets": [
+        {
+          "name": "HD 180617 b",
+          "orbitAU": 0.343,
+          "radiusEarth": 3.53,
+          "massEarth": 12.214,
+          "equilibriumTempK": 201.8
+        }
+      ]
+    },
+    {
+      "hostname": "61 Vir",
+      "raDeg": 199.596455,
+      "decDeg": -18.3157745,
+      "distancePc": 8.50332,
+      "spectralType": "G5 V",
+      "temperatureK": 5577,
+      "massSolar": 0.942,
+      "radiusSolar": 0.963,
+      "planets": [
+        {
+          "name": "61 Vir c",
+          "orbitAU": 0.2175,
+          "radiusEarth": 4.46,
+          "massEarth": 18.2,
+          "equilibriumTempK": 565.87
+        },
+        {
+          "name": "61 Vir d",
+          "orbitAU": 0.476,
+          "radiusEarth": 5.11,
+          "massEarth": 22.9,
+          "equilibriumTempK": 382.51
+        }
+      ]
+    },
+    {
+      "hostname": "HD 62509",
+      "raDeg": 116.328824,
+      "decDeg": 28.026127,
+      "distancePc": 10.34,
+      "spectralType": "K0IIIvar",
+      "temperatureK": 4892.63,
+      "massSolar": 2,
+      "radiusSolar": 8.9,
+      "planets": [
+        {
+          "name": "HD 62509 b",
+          "orbitAU": 1.64,
+          "radiusEarth": 13.3,
+          "massEarth": 731,
+          "equilibriumTempK": 549.6
+        }
+      ]
+    },
+    {
+      "hostname": "Gliese 12",
+      "raDeg": 3.9579137,
+      "decDeg": 13.5576175,
+      "distancePc": 12.21,
+      "spectralType": "M4 V",
+      "temperatureK": 3328,
+      "massSolar": 0.255,
+      "radiusSolar": 0.265,
+      "planets": [
+        {
+          "name": "Gliese 12 b",
+          "orbitAU": 0.067,
+          "radiusEarth": 0.93,
+          "massEarth": 0.95,
+          "equilibriumTempK": 314.6
+        }
+      ]
+    },
+    {
+      "hostname": "GJ 179",
+      "raDeg": 73.0245495,
+      "decDeg": 6.4752347,
+      "distancePc": 12.356,
+      "spectralType": "M3.5 V",
+      "temperatureK": 3370,
+      "massSolar": 0.357,
+      "radiusSolar": 0.38,
+      "planets": [
+        {
+          "name": "GJ 179 b",
+          "orbitAU": 2.41,
+          "radiusEarth": 13.8,
+          "massEarth": 301.93698665,
+          "equilibriumTempK": 64.53
+        }
+      ]
+    },
+    {
+      "hostname": "HD 69830",
+      "raDeg": 124.6010091,
+      "decDeg": -12.6364246,
+      "distancePc": 12.5591,
+      "spectralType": "K0V",
+      "temperatureK": 5385,
+      "massSolar": 0.86,
+      "radiusSolar": 0.886947,
+      "planets": [
+        {
+          "name": "HD 69830 d",
+          "orbitAU": 0.63,
+          "radiusEarth": 4.45,
+          "massEarth": 18.1,
+          "equilibriumTempK": 308.1
+        }
+      ]
+    },
+    {
+      "hostname": "47 UMa",
+      "raDeg": 164.8647611,
+      "decDeg": 40.4304931,
+      "distancePc": 13.7967,
+      "spectralType": "G0V",
+      "temperatureK": 5872,
+      "massSolar": 1.06,
+      "radiusSolar": 1.21334,
+      "planets": [
+        {
+          "name": "47 UMa d",
+          "orbitAU": 11.6,
+          "radiusEarth": 13.5,
+          "massEarth": 521.22,
+          "equilibriumTempK": 91.58
+        },
+        {
+          "name": "47 UMa b",
+          "orbitAU": 2.1,
+          "radiusEarth": 13.2,
+          "massEarth": 804.08,
+          "equilibriumTempK": 215.23
+        }
+      ]
+    },
+    {
+      "hostname": "GJ 163",
+      "raDeg": 62.3228353,
+      "decDeg": -53.3711768,
+      "distancePc": 15.1285,
+      "spectralType": "M",
+      "temperatureK": 3500,
+      "massSolar": 0.4,
+      "radiusSolar": 0.409738,
+      "planets": [
+        {
+          "name": "GJ 163 d",
+          "orbitAU": 1.0304,
+          "radiusEarth": 5.92,
+          "massEarth": 29.4,
+          "equilibriumTempK": 106.43
+        },
+        {
+          "name": "GJ 163 b",
+          "orbitAU": 0.0607,
+          "radiusEarth": 3.25,
+          "massEarth": 10.6,
+          "equilibriumTempK": 438.49
+        }
+      ]
+    },
+    {
+      "hostname": "HD 10647",
+      "raDeg": 25.6233526,
+      "decDeg": -53.7412852,
+      "distancePc": 17.3357,
+      "spectralType": "F9 V",
+      "temperatureK": 6218,
+      "massSolar": 1.11,
+      "radiusSolar": 1.1,
+      "planets": [
+        {
+          "name": "HD 10647 b",
+          "orbitAU": 2.015,
+          "radiusEarth": 13.8,
+          "massEarth": 298.75,
+          "equilibriumTempK": 221.54
+        }
+      ]
+    },
+    {
+      "hostname": "GJ 3021",
+      "raDeg": 4.0634323,
+      "decDeg": -79.8514218,
+      "distancePc": 17.5559,
+      "spectralType": "G6 V",
+      "temperatureK": 5540,
+      "massSolar": 0.9,
+      "radiusSolar": 0.9,
+      "planets": [
+        {
+          "name": "GJ 3021 b",
+          "orbitAU": 0.49,
+          "radiusEarth": 13.1,
+          "massEarth": 1071.04,
+          "equilibriumTempK": 350
+        }
+      ]
+    },
+    {
+      "hostname": "DENIS-P J082303.1-491201",
+      "raDeg": 125.7620668,
+      "decDeg": -49.2003008,
+      "distancePc": 20.77,
+      "spectralType": "L1.5",
+      "temperatureK": null,
+      "massSolar": 0.075,
+      "radiusSolar": null,
+      "planets": [
+        {
+          "name": "DENIS-P J082303.1-491201 b",
+          "orbitAU": 0.36,
+          "radiusEarth": 11.9,
+          "massEarth": 9057.77,
+          "equilibriumTempK": null
+        }
+      ]
+    },
+    {
+      "hostname": "HD 33564",
+      "raDeg": 80.6378979,
+      "decDeg": 79.2318488,
+      "distancePc": 20.9531,
+      "spectralType": "F6 V",
+      "temperatureK": 6250,
+      "massSolar": 1.25,
+      "radiusSolar": 1.4367,
+      "planets": [
+        {
+          "name": "HD 33564 b",
+          "orbitAU": 1.1,
+          "radiusEarth": 12.5,
+          "massEarth": 2892.1,
+          "equilibriumTempK": 344.43
+        }
+      ]
+    },
+    {
+      "hostname": "HD 114783",
+      "raDeg": 198.1818436,
+      "decDeg": -2.2649921,
+      "distancePc": 21.0628,
+      "spectralType": "K0",
+      "temperatureK": 5135,
+      "massSolar": 0.853,
+      "radiusSolar": 0.840622,
+      "planets": [
+        {
+          "name": "HD 114783 b",
+          "orbitAU": 1.16,
+          "radiusEarth": 13.7,
+          "massEarth": 349.6,
+          "equilibriumTempK": 210.79
+        }
+      ]
+    },
+    {
+      "hostname": "RR Cae",
+      "raDeg": 65.2733756,
+      "decDeg": -48.6542601,
+      "distancePc": 21.1916,
+      "spectralType": "M",
+      "temperatureK": 3904,
+      "massSolar": 0.44,
+      "radiusSolar": 0.193119,
+      "planets": [
+        {
+          "name": "RR Cae b",
+          "orbitAU": 5.3,
+          "radiusEarth": 13,
+          "massEarth": 1334.886,
+          "equilibriumTempK": 35.94
+        }
+      ]
+    },
+    {
+      "hostname": "HD 90156",
+      "raDeg": 155.9801144,
+      "decDeg": -29.645103,
+      "distancePc": 21.9496,
+      "spectralType": "G5V",
+      "temperatureK": 5599,
+      "massSolar": 0.84,
+      "radiusSolar": 0.920286,
+      "planets": [
+        {
+          "name": "HD 90156 b",
+          "orbitAU": 0.25,
+          "radiusEarth": 4.43,
+          "massEarth": 17.98,
+          "equilibriumTempK": 518.01
+        }
+      ]
+    },
+    {
+      "hostname": "HD 19994",
+      "raDeg": 48.1943193,
+      "decDeg": -1.1963955,
+      "distancePc": 22.5242,
+      "spectralType": "F8 V",
+      "temperatureK": 6188,
+      "massSolar": 1.365,
+      "radiusSolar": 1.79647,
+      "planets": [
+        {
+          "name": "HD 19994 b",
+          "orbitAU": 1.305,
+          "radiusEarth": 13.6,
+          "massEarth": 435.41,
+          "equilibriumTempK": 350.1
+        }
+      ]
+    },
+    {
+      "hostname": "HD 156668",
+      "raDeg": 259.4183491,
+      "decDeg": 29.228161,
+      "distancePc": 24.3323,
+      "spectralType": "K2",
+      "temperatureK": 4903.69,
+      "massSolar": 0.785167,
+      "radiusSolar": 0.774528,
+      "planets": [
+        {
+          "name": "HD 156668 c",
+          "orbitAU": 1.57,
+          "radiusEarth": 6.17,
+          "massEarth": 31.49679513,
+          "equilibriumTempK": 166.08
+        }
+      ]
+    },
+    {
+      "hostname": "HD 82943",
+      "raDeg": 143.7114034,
+      "decDeg": -12.1302976,
+      "distancePc": 27.5902,
+      "spectralType": "G2/3V",
+      "temperatureK": 5935,
+      "massSolar": 1.08,
+      "radiusSolar": 1.1826,
+      "planets": [
+        {
+          "name": "HD 82943 c",
+          "orbitAU": 0.74345,
+          "radiusEarth": 13.4,
+          "massEarth": 622.603,
+          "equilibriumTempK": 360.95
+        },
+        {
+          "name": "HD 82943 b",
+          "orbitAU": 1.18306,
+          "radiusEarth": 13.5,
+          "massEarth": 534.25,
+          "equilibriumTempK": 286.13
+        }
+      ]
+    },
+    {
+      "hostname": "HD 22781",
+      "raDeg": 55.2065581,
+      "decDeg": 31.8258855,
+      "distancePc": 32.6034,
+      "spectralType": "K1",
+      "temperatureK": 5027,
+      "massSolar": 0.75,
+      "radiusSolar": 0.743475,
+      "planets": [
+        {
+          "name": "HD 22781 b",
+          "orbitAU": 1.167,
+          "radiusEarth": 12.3,
+          "massEarth": 4338.2,
+          "equilibriumTempK": 193.48
+        }
+      ]
+    },
+    {
+      "hostname": "mu Leo",
+      "raDeg": 148.1898673,
+      "decDeg": 26.0067142,
+      "distancePc": 32.6081,
+      "spectralType": "K2 III",
+      "temperatureK": 4538.2,
+      "massSolar": 1.5,
+      "radiusSolar": 11.4,
+      "planets": [
+        {
+          "name": "mu Leo b",
+          "orbitAU": 1.1,
+          "radiusEarth": 13.3,
+          "massEarth": 762.8,
+          "equilibriumTempK": 704.49
+        }
+      ]
+    },
+    {
+      "hostname": "HD 197037",
+      "raDeg": 309.8869681,
+      "decDeg": 42.247593,
+      "distancePc": 33.1944,
+      "spectralType": "F7 V",
+      "temperatureK": 6150,
+      "massSolar": 1.11,
+      "radiusSolar": 1.105,
+      "planets": [
+        {
+          "name": "HD 197037 b",
+          "orbitAU": 2.07,
+          "radiusEarth": 13.9,
+          "massEarth": 251,
+          "equilibriumTempK": 216.67
+        }
+      ]
+    },
+    {
+      "hostname": "HD 11964",
+      "raDeg": 29.2884252,
+      "decDeg": -10.2434693,
+      "distancePc": 33.5369,
+      "spectralType": "G9 V CN+1",
+      "temperatureK": 5303,
+      "massSolar": 0.91,
+      "radiusSolar": 2.00971,
+      "planets": [
+        {
+          "name": "HD 11964 b",
+          "orbitAU": 3.16,
+          "radiusEarth": 14.1,
+          "massEarth": 198,
+          "equilibriumTempK": 203.93
+        },
+        {
+          "name": "HD 11964 c",
+          "orbitAU": 0.229,
+          "radiusEarth": 5.38,
+          "massEarth": 25,
+          "equilibriumTempK": 757.54
+        }
+      ]
+    },
+    {
+      "hostname": "2MASS J01225093-2439505",
+      "raDeg": 20.7128012,
+      "decDeg": -24.6646128,
+      "distancePc": 33.8281,
+      "spectralType": "M3.5 V",
+      "temperatureK": 3530,
+      "massSolar": 0.4,
+      "radiusSolar": 0.36645,
+      "planets": [
+        {
+          "name": "2MASS J01225093-2439505 b",
+          "orbitAU": 52,
+          "radiusEarth": 11.209,
+          "massEarth": 7786.5,
+          "equilibriumTempK": 1600
+        }
+      ]
+    },
+    {
+      "hostname": "LHS 1903",
+      "raDeg": 107.865826,
+      "decDeg": 48.3279327,
+      "distancePc": 35.6917,
+      "spectralType": "M",
+      "temperatureK": 3664,
+      "massSolar": 0.538,
+      "radiusSolar": 0.539,
+      "planets": [
+        {
+          "name": "LHS 1903 b",
+          "orbitAU": 0.02656,
+          "radiusEarth": 1.382,
+          "massEarth": 3.28,
+          "equilibriumTempK": 796
+        },
+        {
+          "name": "LHS 1903 c",
+          "orbitAU": 0.05387,
+          "radiusEarth": 2.046,
+          "massEarth": 4.55,
+          "equilibriumTempK": 559
+        },
+        {
+          "name": "LHS 1903 d",
+          "orbitAU": 0.08604,
+          "radiusEarth": 2.5,
+          "massEarth": 5.96,
+          "equilibriumTempK": 442
+        }
+      ]
+    },
+    {
+      "hostname": "HD 7199",
+      "raDeg": 17.6979344,
+      "decDeg": -66.1886947,
+      "distancePc": 36.1531,
+      "spectralType": "K1 IV",
+      "temperatureK": 5371,
+      "massSolar": 0.77,
+      "radiusSolar": 0.97,
+      "planets": [
+        {
+          "name": "HD 7199 b",
+          "orbitAU": 1.36,
+          "radiusEarth": null,
+          "massEarth": 3639.13526015,
+          "equilibriumTempK": 218.73
+        }
+      ]
+    },
+    {
+      "hostname": "gam1 Leo",
+      "raDeg": 154.993208,
+      "decDeg": 19.841389,
+      "distancePc": 39.8883,
+      "spectralType": "K1 IIIb Fe-0.5",
+      "temperatureK": 4330,
+      "massSolar": 1.23,
+      "radiusSolar": 31.88,
+      "planets": [
+        {
+          "name": "gam1 Leo b",
+          "orbitAU": 1.19,
+          "radiusEarth": 12.5,
+          "massEarth": 2790.43,
+          "equilibriumTempK": 1080.7
+        }
+      ]
+    },
+    {
+      "hostname": "Kepler-42",
+      "raDeg": 292.2196,
+      "decDeg": 44.6173667,
+      "distancePc": 40.0595,
+      "spectralType": "M",
+      "temperatureK": 3068,
+      "massSolar": 0.13,
+      "radiusSolar": 0.17,
+      "planets": [
+        {
+          "name": "Kepler-42 c",
+          "orbitAU": 0.006,
+          "radiusEarth": 0.73,
+          "massEarth": 60.337,
+          "equilibriumTempK": 720
+        },
+        {
+          "name": "Kepler-42 d",
+          "orbitAU": 0.0154,
+          "radiusEarth": 0.57,
+          "massEarth": 0.357785,
+          "equilibriumTempK": 450
+        }
+      ]
+    },
+    {
+      "hostname": "HD 147018",
+      "raDeg": 245.7490012,
+      "decDeg": -61.6901291,
+      "distancePc": 40.4256,
+      "spectralType": "G9 V",
+      "temperatureK": 5441,
+      "massSolar": 0.927,
+      "radiusSolar": 0.937948,
+      "planets": [
+        {
+          "name": "HD 147018 c",
+          "orbitAU": 1.922,
+          "radiusEarth": 12.7,
+          "massEarth": 2080,
+          "equilibriumTempK": 183.28
+        }
+      ]
+    },
+    {
+      "hostname": "HR 8799",
+      "raDeg": 346.8701486,
+      "decDeg": 21.1340376,
+      "distancePc": 41.2441,
+      "spectralType": "A5 V",
+      "temperatureK": 7204.58,
+      "massSolar": 1.5,
+      "radiusSolar": 1.49338,
+      "planets": [
+        {
+          "name": "HR 8799 c",
+          "orbitAU": 38,
+          "radiusEarth": 13,
+          "massEarth": 3000,
+          "equilibriumTempK": 1200
+        }
+      ]
+    },
+    {
+      "hostname": "HD 222582",
+      "raDeg": 355.4640788,
+      "decDeg": -5.9862379,
+      "distancePc": 42.1586,
+      "spectralType": "G5 V",
+      "temperatureK": 5790,
+      "massSolar": 1.12,
+      "radiusSolar": 1.13,
+      "planets": [
+        {
+          "name": "HD 222582 b",
+          "orbitAU": 1.34,
+          "radiusEarth": 12.6,
+          "massEarth": 2660.2371,
+          "equilibriumTempK": 256.39
+        }
+      ]
+    },
+    {
+      "hostname": "TOI-2285",
+      "raDeg": 332.5632644,
+      "decDeg": 58.7060934,
+      "distancePc": 42.409,
+      "spectralType": null,
+      "temperatureK": 3491,
+      "massSolar": 0.454,
+      "radiusSolar": 0.464,
+      "planets": [
+        {
+          "name": "TOI-2285 b",
+          "orbitAU": 0.1363,
+          "radiusEarth": 1.77,
+          "massEarth": 19.5,
+          "equilibriumTempK": 358
+        }
+      ]
+    },
+    {
+      "hostname": "HD 155358",
+      "raDeg": 257.3930947,
+      "decDeg": 33.3549277,
+      "distancePc": 43.6197,
+      "spectralType": "G0",
+      "temperatureK": 5900,
+      "massSolar": 0.92,
+      "radiusSolar": 1.38,
+      "planets": [
+        {
+          "name": "HD 155358 c",
+          "orbitAU": 1.02,
+          "radiusEarth": 13.9,
+          "massEarth": 261,
+          "equilibriumTempK": 330.92
+        }
+      ]
+    },
+    {
+      "hostname": "91 Aqr",
+      "raDeg": 348.9745031,
+      "decDeg": -9.0878076,
+      "distancePc": 44.0304,
+      "spectralType": "K0 III",
+      "temperatureK": 4665,
+      "massSolar": 1.4,
+      "radiusSolar": 11,
+      "planets": [
+        {
+          "name": "91 Aqr b",
+          "orbitAU": 0.7,
+          "radiusEarth": 13.1,
+          "massEarth": 1017,
+          "equilibriumTempK": 891.73
+        }
+      ]
+    },
+    {
+      "hostname": "HD 166724",
+      "raDeg": 273.4988604,
+      "decDeg": -42.5757218,
+      "distancePc": 45.1342,
+      "spectralType": "K0 IV-V",
+      "temperatureK": 5127,
+      "massSolar": 0.81,
+      "radiusSolar": 0.797485,
+      "planets": [
+        {
+          "name": "HD 166724 b",
+          "orbitAU": 5.42,
+          "radiusEarth": 13,
+          "massEarth": 1207.7479466,
+          "equilibriumTempK": 94.83
+        }
+      ]
+    },
+    {
+      "hostname": "HD 187123",
+      "raDeg": 296.7428786,
+      "decDeg": 34.41899,
+      "distancePc": 45.9548,
+      "spectralType": "G3 V",
+      "temperatureK": 5790,
+      "massSolar": 1.04,
+      "radiusSolar": 1.15043,
+      "planets": [
+        {
+          "name": "HD 187123 c",
+          "orbitAU": 4.89,
+          "radiusEarth": 13.2,
+          "massEarth": 912.16752809,
+          "equilibriumTempK": 135.42
+        }
+      ]
+    },
+    {
+      "hostname": "AB Pic",
+      "raDeg": 94.8039208,
+      "decDeg": -58.0541184,
+      "distancePc": 50.0475,
+      "spectralType": "K2 V",
+      "temperatureK": 5285,
+      "massSolar": 0.9,
+      "radiusSolar": 0.999394,
+      "planets": [
+        {
+          "name": "AB Pic b",
+          "orbitAU": 260,
+          "radiusEarth": 12.3,
+          "massEarth": 4290.5,
+          "equilibriumTempK": 15.8
+        }
+      ]
+    },
+    {
+      "hostname": "HD 9446",
+      "raDeg": 23.3350424,
+      "decDeg": 29.2649187,
+      "distancePc": 50.3503,
+      "spectralType": "G5 V",
+      "temperatureK": 5793,
+      "massSolar": 1,
+      "radiusSolar": 1,
+      "planets": [
+        {
+          "name": "HD 9446 c",
+          "orbitAU": 0.654,
+          "radiusEarth": 13.4,
+          "massEarth": 578.426,
+          "equilibriumTempK": 345.42
+        },
+        {
+          "name": "HD 9446 b",
+          "orbitAU": 0.189,
+          "radiusEarth": 14,
+          "massEarth": 222.472,
+          "equilibriumTempK": 642.55
+        }
+      ]
+    },
+    {
+      "hostname": "HD 220773",
+      "raDeg": 351.6144715,
+      "decDeg": 8.6428871,
+      "distancePc": 50.5103,
+      "spectralType": "F9",
+      "temperatureK": 5940,
+      "massSolar": 1.16,
+      "radiusSolar": 1.679696,
+      "planets": [
+        {
+          "name": "HD 220773 b",
+          "orbitAU": 4.94,
+          "radiusEarth": 13.6,
+          "massEarth": 460.8,
+          "equilibriumTempK": 167.02
+        }
+      ]
+    },
+    {
+      "hostname": "HIP 5158",
+      "raDeg": 16.5094891,
+      "decDeg": -22.4536134,
+      "distancePc": 51.6026,
+      "spectralType": null,
+      "temperatureK": 4962,
+      "massSolar": 0.78,
+      "radiusSolar": 0.75,
+      "planets": [
+        {
+          "name": "HIP 5158 b",
+          "orbitAU": 0.89,
+          "radiusEarth": 13.6,
+          "massEarth": 451,
+          "equilibriumTempK": 219.65
+        }
+      ]
+    },
+    {
+      "hostname": "HD 8535",
+      "raDeg": 20.9054804,
+      "decDeg": -41.2701007,
+      "distancePc": 55.4401,
+      "spectralType": "G0 V",
+      "temperatureK": 6136,
+      "massSolar": 1.13,
+      "radiusSolar": 1.19,
+      "planets": [
+        {
+          "name": "HD 8535 b",
+          "orbitAU": 2.45,
+          "radiusEarth": 14,
+          "massEarth": 216.1244,
+          "equilibriumTempK": 206.21
+        }
+      ]
+    },
+    {
+      "hostname": "HD 109271",
+      "raDeg": 188.397397,
+      "decDeg": -11.6215204,
+      "distancePc": 55.8716,
+      "spectralType": "G5 V",
+      "temperatureK": 5783,
+      "massSolar": 1.047,
+      "radiusSolar": 1.294595,
+      "planets": [
+        {
+          "name": "HD 109271 c",
+          "orbitAU": 0.196,
+          "radiusEarth": 5.27,
+          "massEarth": 24.154,
+          "equilibriumTempK": 716.68
+        }
+      ]
+    },
+    {
+      "hostname": "HD 221287",
+      "raDeg": 352.836223,
+      "decDeg": -58.209754,
+      "distancePc": 55.9231,
+      "spectralType": "F7 V",
+      "temperatureK": 6304,
+      "massSolar": 1.25,
+      "radiusSolar": 1.13864,
+      "planets": [
+        {
+          "name": "HD 221287 b",
+          "orbitAU": 1.25,
+          "radiusEarth": 13.1,
+          "massEarth": 982.05,
+          "equilibriumTempK": 290.13
+        }
+      ]
+    },
+    {
+      "hostname": "HD 156411",
+      "raDeg": 259.9639522,
+      "decDeg": -48.5502313,
+      "distancePc": 56.8655,
+      "spectralType": "F8 IV/V",
+      "temperatureK": 5900,
+      "massSolar": 1.25,
+      "radiusSolar": 2.16,
+      "planets": [
+        {
+          "name": "HD 156411 b",
+          "orbitAU": 1.88,
+          "radiusEarth": 14,
+          "massEarth": 235.18,
+          "equilibriumTempK": 304.95
+        }
+      ]
+    },
+    {
+      "hostname": "HD 70573",
+      "raDeg": 125.7079153,
+      "decDeg": 1.8591088,
+      "distancePc": 59.182,
+      "spectralType": "G1-1.5 V",
+      "temperatureK": 5737,
+      "massSolar": 1,
+      "radiusSolar": 0.976919,
+      "planets": [
+        {
+          "name": "HD 70573 b",
+          "orbitAU": 1.76,
+          "radiusEarth": 12.8,
+          "massEarth": 1900,
+          "equilibriumTempK": 206.11
+        }
+      ]
+    },
+    {
+      "hostname": "TOI-880",
+      "raDeg": 94.1644734,
+      "decDeg": -13.987337,
+      "distancePc": 60.6679,
+      "spectralType": "K",
+      "temperatureK": 5050,
+      "massSolar": 0.87,
+      "radiusSolar": 0.83,
+      "planets": [
+        {
+          "name": "TOI-880.02",
+          "orbitAU": 0.0349,
+          "radiusEarth": 2.19,
+          "massEarth": 5.43,
+          "equilibriumTempK": 1085
+        },
+        {
+          "name": "TOI-880 c",
+          "orbitAU": 0.0635,
+          "radiusEarth": 4.95,
+          "massEarth": 21.7,
+          "equilibriumTempK": 805
+        }
+      ]
+    },
+    {
+      "hostname": "HD 177830",
+      "raDeg": 286.3363574,
+      "decDeg": 25.9204327,
+      "distancePc": 62.7674,
+      "spectralType": "K0",
+      "temperatureK": 4949,
+      "massSolar": 1.47,
+      "radiusSolar": 2.62,
+      "planets": [
+        {
+          "name": "HD 177830 c",
+          "orbitAU": 0.5137,
+          "radiusEarth": 7.87,
+          "massEarth": 47.6725,
+          "equilibriumTempK": 538.95
+        }
+      ]
+    },
+    {
+      "hostname": "Kepler-37",
+      "raDeg": 284.0592503,
+      "decDeg": 44.5183733,
+      "distancePc": 63.9207,
+      "spectralType": null,
+      "temperatureK": 5288,
+      "massSolar": 0.8,
+      "radiusSolar": 0.772,
+      "planets": [
+        {
+          "name": "Kepler-37 e",
+          "orbitAU": 0.25,
+          "radiusEarth": 0.37,
+          "massEarth": 8.1,
+          "equilibriumTempK": 401
+        }
+      ]
+    },
+    {
+      "hostname": "HD 11977",
+      "raDeg": 28.7347403,
+      "decDeg": -67.6469871,
+      "distancePc": 67.9331,
+      "spectralType": "G8 III/IV",
+      "temperatureK": 4970,
+      "massSolar": 1.91,
+      "radiusSolar": 10.09,
+      "planets": [
+        {
+          "name": "HD 11977 b",
+          "orbitAU": 1.93,
+          "radiusEarth": 12.7,
+          "massEarth": 2080,
+          "equilibriumTempK": 547.97
+        }
+      ]
+    },
+    {
+      "hostname": "HD 66141",
+      "raDeg": 120.5662825,
+      "decDeg": 2.3350265,
+      "distancePc": 68.1509,
+      "spectralType": "K2 III",
+      "temperatureK": 4323,
+      "massSolar": 1.1,
+      "radiusSolar": 21.4,
+      "planets": [
+        {
+          "name": "HD 66141 b",
+          "orbitAU": 1.2,
+          "radiusEarth": 12.8,
+          "massEarth": 1906.9,
+          "equilibriumTempK": 880.31
+        }
+      ]
+    },
+    {
+      "hostname": "eps CrB",
+      "raDeg": 239.3965057,
+      "decDeg": 26.8776171,
+      "distancePc": 69.8683,
+      "spectralType": "K2 III",
+      "temperatureK": 4406,
+      "massSolar": 1.7,
+      "radiusSolar": 21,
+      "planets": [
+        {
+          "name": "eps CrB b",
+          "orbitAU": 1.3,
+          "radiusEarth": 12.7,
+          "massEarth": 2129.461,
+          "equilibriumTempK": 853.92
+        }
+      ]
+    },
+    {
+      "hostname": "HD 175167",
+      "raDeg": 285.0033888,
+      "decDeg": -69.9450664,
+      "distancePc": 71.0863,
+      "spectralType": "G5 IV/V",
+      "temperatureK": 5635,
+      "massSolar": 1.09,
+      "radiusSolar": 1.75,
+      "planets": [
+        {
+          "name": "HD 175167 b",
+          "orbitAU": 2.4,
+          "radiusEarth": 12.3,
+          "massEarth": 4703.8604236,
+          "equilibriumTempK": 232.03
+        }
+      ]
+    },
+    {
+      "hostname": "24 Sex",
+      "raDeg": 155.8684866,
+      "decDeg": -0.9023998,
+      "distancePc": 72.0691,
+      "spectralType": "K0 IV",
+      "temperatureK": 5098,
+      "massSolar": 1.54,
+      "radiusSolar": 4.9,
+      "planets": [
+        {
+          "name": "24 Sex b",
+          "orbitAU": 1.333,
+          "radiusEarth": 13.4,
+          "massEarth": 632.46,
+          "equilibriumTempK": 471.32
+        }
+      ]
+    },
+    {
+      "hostname": "HD 159243",
+      "raDeg": 263.3395365,
+      "decDeg": 5.7008254,
+      "distancePc": 73.3055,
+      "spectralType": "G0 V",
+      "temperatureK": 6123,
+      "massSolar": 1.125,
+      "radiusSolar": 1.12,
+      "planets": [
+        {
+          "name": "HD 159243 b",
+          "orbitAU": 0.11,
+          "radiusEarth": 13.7,
+          "massEarth": 359.13,
+          "equilibriumTempK": 942.13
+        }
+      ]
+    },
+    {
+      "hostname": "HD 13908",
+      "raDeg": 34.5609102,
+      "decDeg": 65.5941901,
+      "distancePc": 79.5515,
+      "spectralType": "F8 V",
+      "temperatureK": 6255,
+      "massSolar": 1.29,
+      "radiusSolar": 1.67,
+      "planets": [
+        {
+          "name": "HD 13908 c",
+          "orbitAU": 2.03,
+          "radiusEarth": 12.8,
+          "massEarth": 1630.4,
+          "equilibriumTempK": 273.57
+        }
+      ]
+    },
+    {
+      "hostname": "TOI-1758",
+      "raDeg": 354.741581,
+      "decDeg": 75.6852317,
+      "distancePc": 96.6215,
+      "spectralType": null,
+      "temperatureK": 5169,
+      "massSolar": 0.88,
+      "radiusSolar": 0.81,
+      "planets": [
+        {
+          "name": "TOI-1758 b",
+          "orbitAU": 0.141409,
+          "radiusEarth": 3.62,
+          "massEarth": 6.9,
+          "equilibriumTempK": 551.44
+        }
+      ]
+    },
+    {
+      "hostname": "HD 73526",
+      "raDeg": 129.318331,
+      "decDeg": -41.3184231,
+      "distancePc": 97.2396,
+      "spectralType": "G6 V",
+      "temperatureK": 5601,
+      "massSolar": 1.014,
+      "radiusSolar": 1.53,
+      "planets": [
+        {
+          "name": "HD 73526 c",
+          "orbitAU": 1.03,
+          "radiusEarth": 13.3,
+          "massEarth": 715.09,
+          "equilibriumTempK": 329.17
+        }
+      ]
+    },
+    {
+      "hostname": "TOI-1749",
+      "raDeg": 282.7372281,
+      "decDeg": 64.419466,
+      "distancePc": 99.5561,
+      "spectralType": "M0 V",
+      "temperatureK": 3985,
+      "massSolar": 0.58,
+      "radiusSolar": 0.55,
+      "planets": [
+        {
+          "name": "TOI-1749 d",
+          "orbitAU": 0.0707,
+          "radiusEarth": 2.52,
+          "massEarth": 15,
+          "equilibriumTempK": 533
+        },
+        {
+          "name": "TOI-1749 b",
+          "orbitAU": 0.0291,
+          "radiusEarth": 1.39,
+          "massEarth": 57,
+          "equilibriumTempK": 831
+        }
+      ]
+    },
+    {
+      "hostname": "HD 110014",
+      "raDeg": 189.8111935,
+      "decDeg": -7.9956702,
+      "distancePc": 100.758,
+      "spectralType": "K2 III",
+      "temperatureK": 4445,
+      "massSolar": 2.17,
+      "radiusSolar": 20.9,
+      "planets": [
+        {
+          "name": "HD 110014 b",
+          "orbitAU": 2.14,
+          "radiusEarth": 12.4,
+          "massEarth": 3524.59,
+          "equilibriumTempK": 669.84
+        }
+      ]
+    },
+    {
+      "hostname": "HD 106906",
+      "raDeg": 184.4713308,
+      "decDeg": -55.9755805,
+      "distancePc": 103.029,
+      "spectralType": "F5 V",
+      "temperatureK": 6516,
+      "massSolar": 1.5,
+      "radiusSolar": 2.12351,
+      "planets": [
+        {
+          "name": "HD 106906 b",
+          "orbitAU": 650,
+          "radiusEarth": 12.4,
+          "massEarth": 3496,
+          "equilibriumTempK": 1800
+        }
+      ]
+    },
+    {
+      "hostname": "HD 132563",
+      "raDeg": 224.5892892,
+      "decDeg": 44.0428571,
+      "distancePc": 105.155,
+      "spectralType": "F8",
+      "temperatureK": 6289,
+      "massSolar": 1.231,
+      "radiusSolar": 1.29577,
+      "planets": [
+        {
+          "name": "HD 132563 b",
+          "orbitAU": 2.62,
+          "radiusEarth": 13.6,
+          "massEarth": 473.547,
+          "equilibriumTempK": 213.27
+        }
+      ]
+    },
+    {
+      "hostname": "Kepler-560",
+      "raDeg": 300.2066441,
+      "decDeg": 45.0182402,
+      "distancePc": 109.308,
+      "spectralType": null,
+      "temperatureK": 3556,
+      "massSolar": 0.34,
+      "radiusSolar": 0.33,
+      "planets": [
+        {
+          "name": "Kepler-560 b",
+          "orbitAU": 0.0899,
+          "radiusEarth": 1.72,
+          "massEarth": 3.61,
+          "equilibriumTempK": 298
+        }
+      ]
+    },
+    {
+      "hostname": "SR 12 AB",
+      "raDeg": 246.8312363,
+      "decDeg": -24.6946687,
+      "distancePc": 112.31721584,
+      "spectralType": null,
+      "temperatureK": 3828.93,
+      "massSolar": null,
+      "radiusSolar": 1.103075,
+      "planets": [
+        {
+          "name": "SR 12 AB c",
+          "orbitAU": null,
+          "radiusEarth": 12.3,
+          "massEarth": 4131.62,
+          "equilibriumTempK": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,87 +1,113 @@
 {
-  "task_id": "V1-SURFACE-WORLD-001",
-  "title": "Replace placeholder surface with reusable finite terrain and CC0 photogrammetry detail",
+  "task_id": "V2-UNIVERSE-AUTO-001",
+  "title": "Establish reusable Milky Way, deterministic star systems, procedural planets, real catalog snapshots, and Hero overrides",
   "researched_at": "2026-11-22",
-  "research_summary": "Use ProceduralTerrains 2.0.5 finite runtime for terrain geometry/LOD/material, pin the shared Three.js runtime to 0.185.1 (the common supported intersection of R3F, Drei, postprocessing, ProceduralPlanets and ProceduralTerrains), and add a locally hosted Poly Haven CC0 boulder glTF for near-field photogrammetry detail. Avoid ProceduralTerrains water/cloud pipeline in this slice because the existing planet renderer already owns the orbital atmosphere/cloud stack and the surface goal is only to stop the visual quality drop after landing.",
+  "research_summary": "Replace the single handcrafted test-world assumption with a layered universe architecture. Reuse Galaxy Explorer's MIT-licensed spiral-arm/GPU-points rendering patterns, Helios' ISC-licensed deterministic RNG and generator decomposition, the already-installed MIT ProceduralPlanets renderer, and a local NASA Exoplanet Archive TAP snapshot for observed host systems. Keep ordinary systems deterministic and lightweight; Hero systems override the default generator and may opt into custom surfaces. HYG/Gaia are not bundled in this slice: HYG is CC BY-SA and moved off the archived GitHub mirror, while a full Gaia catalogue is unnecessarily large for the browser. The current AGPL Your Eyes In Space project is architecture reference only and is not copied.",
   "planned_files": [
     "package.json",
-    "package-lock.json",
-    "src/components/universe/SurfaceTerrain.tsx",
-    "src/components/universe/SurfaceScene.tsx",
+    "scripts/fetch-astronomy-catalog.mjs",
+    "src/data/exoplanet-hosts.json",
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/**",
+    "src/components/universe/GalaxyScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/PlanetScene.tsx",
     "src/components/universe/CinematicCamera.tsx",
-    "public/models/boulder_01/**",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/universe.css",
     "public/THIRD_PARTY_ASSETS.md"
   ],
   "sources": [
     {
-      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
-      "finding": "The runtime exposes createTerrain/FiniteTerrain with caller-owned renderer, prepare/update/sampleHeight/dispose, finite noise sources and direct renderer.render support; it explicitly targets three@~0.185.1."
+      "url": "https://github.com/zjoooooo/galaxy-explorer",
+      "finding": "MIT browser Milky Way implementation uses procedural spiral-arm star placement, a single THREE.Points draw call for the star disk, GPU point sizing/color, and a painted disk that fades as the camera approaches."
     },
     {
-      "url": "https://github.com/ZyFou/ProceduralTerrains/releases",
-      "finding": "2.0.5 is the current release and reports production runtime/browser validation, 994 frontend tests, 18 API tests, and public npm packaging."
+      "url": "https://github.com/dhairyaozaa/procedural-star-system",
+      "finding": "ISC Helios decomposes deterministic generation into SeededRNG, SystemGenerator, StarGenerator, PlanetGenerator and MoonGenerator and uses Web Workers for non-blocking generation; its Three.js dependency is 0.185.1, matching this project."
     },
     {
-      "url": "https://polyhaven.com/our-api",
-      "finding": "Poly Haven's API is publicly available with a User-Agent requirement; downloaded assets themselves remain CC0 and can be hosted locally instead of depending on the API at runtime."
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "MIT ProceduralPlanets is already installed; same seed + parameters deterministically produce terrestrial planets, gas giants and stars, with live or baked rendering and Three.js >=0.160."
     },
     {
-      "url": "https://polyhaven.com/license",
-      "finding": "Poly Haven assets are CC0; locally bundled assets do not carry the live API attribution condition."
+      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
+      "finding": "NASA Exoplanet Archive provides TAP/API access to planetary systems, stellar hosts and confirmed-planet tables; a local snapshot avoids runtime API dependency."
     },
     {
-      "url": "https://docs.polyhaven.com/en/technical-standards/textures",
-      "finding": "Poly Haven PBR assets are photoscanned/photometric, calibrated, seamless and include diffuse/roughness/normal/displacement-style maps, making them suitable for breaking the procedural look."
+      "url": "https://github.com/astronexus/HYG-Database",
+      "finding": "HYG v4.1 is a useful ~120k-star compact catalogue but the GitHub mirror is archived and the data is CC BY-SA 4.0; defer bundling it until a dedicated catalogue/licensing task."
     },
     {
-      "url": "https://threejs.org/docs/pages/ImprovedNoise.html",
-      "finding": "Three.js ships ImprovedNoise as a stable fallback if the external terrain runtime fails integration."
+      "url": "https://github.com/berkcomba/youreyesinspace",
+      "finding": "Current project demonstrates real catalogues plus deterministic procedural fill and on-demand systems, but current AGPL licensing makes it reference-only for this project."
+    },
+    {
+      "url": "https://docs.astropy.org/en/stable/coordinates/galactocentric.html",
+      "finding": "Astropy documents ICRS Cartesian conversion and Galactocentric transforms; use source-backed RA/Dec/distance values and keep the first snapshot as a local-neighborhood layer rather than pretending procedural disk coordinates are measured positions."
     }
   ],
   "candidates": [
     {
-      "name": "ProceduralTerrains 2.0.5 finite runtime",
-      "source": "https://github.com/ZyFou/ProceduralTerrains",
+      "name": "Galaxy Explorer spiral disk / GPU points",
+      "source": "https://github.com/zjoooooo/galaxy-explorer",
       "license": "MIT",
       "decision": "reuse",
-      "reason": "Provides mature finite terrain generation, LOD, built-in terrain shader, height sampling and lifecycle. Isolated build and real WebGL render both succeeded against Three 0.187; mainline will instead pin the documented 0.185.1 peer."
+      "reason": "Port the spiral-arm density placement and one-Points-buffer rendering pattern into R3F instead of retaining the current uniform random star cloud."
     },
     {
-      "name": "Poly Haven Boulder 01",
-      "source": "https://polyhaven.com/",
-      "license": "CC0",
+      "name": "Helios deterministic generator decomposition",
+      "source": "https://github.com/dhairyaozaa/procedural-star-system",
+      "license": "ISC",
       "decision": "reuse",
-      "reason": "Photogrammetry model with LODs and 1K glTF/PBR files adds real near-field rock detail without custom modeling; files will be downloaded and hosted locally."
+      "reason": "Adapt its seeded RNG and Star/System/Planet/Moon data decomposition to typed project data; do not reuse its visual shaders because ProceduralPlanets already covers that layer better."
     },
     {
-      "name": "Three.js ImprovedNoise + custom plane terrain",
-      "source": "https://threejs.org/docs/pages/ImprovedNoise.html",
+      "name": "ProceduralPlanets",
+      "source": "https://github.com/ZyFou/ProceduralPlanets",
       "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already integrated and version-compatible; use it as the default visual renderer for generated planets and Hero orbit views."
+    },
+    {
+      "name": "NASA Exoplanet Archive TAP snapshot",
+      "source": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
+      "license": "NASA public scientific data; attribution retained",
+      "decision": "reuse",
+      "reason": "Refresh a compact local JSON snapshot of observed nearby host systems during development; runtime stays static/offline."
+    },
+    {
+      "name": "HYG v4.1 bundled bright-star subset",
+      "source": "https://github.com/astronexus/HYG-Database",
+      "license": "CC BY-SA 4.0",
       "decision": "partial",
-      "reason": "Stable fallback with no extra peer constraint, but would require rebuilding terrain LOD/material/sampling behavior that ProceduralTerrains already provides."
+      "reason": "Technically ideal for a future measured local-star layer, but defer it from this slice to avoid mixing share-alike catalogue packaging into the first architecture migration."
     },
     {
-      "name": "ProceduralTerrains water/cloud/render pipeline",
-      "source": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
-      "license": "MIT",
+      "name": "procedural-galaxy by syakubson",
+      "source": "https://github.com/syakubson/procedural-galaxy",
+      "license": "No explicit license verified in research",
       "decision": "reject",
-      "reason": "Would introduce another full-scene pipeline and duplicate cloud/water responsibilities before the landing scene itself is proven."
+      "reason": "Its deterministic galaxy→systems→planets→handcrafted capitals architecture is useful as a reference, but code is not copied without an explicit license."
     },
     {
-      "name": "Keep current cone mountains and flat plane",
-      "source": "local V0 placeholder",
-      "license": "Project code",
+      "name": "Your Eyes In Space current code",
+      "source": "https://github.com/berkcomba/youreyesinspace",
+      "license": "AGPL-3.0-or-later",
       "decision": "reject",
-      "reason": "Already visibly drops quality after cinematic atmospheric entry."
+      "reason": "Excellent architecture reference for real+procedural universe exploration, but current copyleft terms do not fit direct code reuse here."
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected": [
-      "procedural-terrains@2.0.5 finite terrain",
-      "three@0.185.1 common peer version",
-      "Poly Haven Boulder 01 1K glTF/PBR asset"
+      "Galaxy Explorer MIT spiral-arm + one-draw-call starfield patterns",
+      "Helios ISC seeded generator architecture",
+      "procedural-planets@0.5.1 for planet rendering",
+      "NASA Exoplanet Archive local TAP snapshot"
     ],
-    "fallback": "Three ImprovedNoise if terrain integration regresses the existing orbital renderer."
+    "fallback": "Keep the existing V1 hero planet and static Milky Way texture available behind Hero override if the new procedural galaxy renderer regresses."
   }
 }

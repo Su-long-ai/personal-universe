@@ -14,7 +14,8 @@
     "prebuild": "npm run gate:reuse",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "catalog:refresh": "node scripts/fetch-astronomy-catalog.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^7.1.9",

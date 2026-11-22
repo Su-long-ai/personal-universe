@@ -107,7 +107,8 @@ select {
 .hud-kicker,
 .eyebrow,
 .travel-caption,
-.surface-copy span {
+.surface-copy span,
+.system-copy span {
   font-size: 10px;
   letter-spacing: 0.2em;
   color: rgba(206, 225, 255, 0.62);
@@ -209,7 +210,8 @@ select {
   backdrop-filter: blur(10px);
 }
 
-.surface-copy {
+.surface-copy,
+.system-copy {
   position: absolute;
   z-index: 9;
   right: 5vw;
@@ -220,11 +222,14 @@ select {
 }
 
 .surface-copy strong,
-.surface-copy small {
+.surface-copy small,
+.system-copy strong,
+.system-copy small {
   display: block;
 }
 
-.surface-copy strong {
+.surface-copy strong,
+.system-copy strong {
   margin-top: 10px;
   font-size: clamp(28px, 3vw, 48px);
   line-height: 1.02;
@@ -232,7 +237,8 @@ select {
   color: #d9fbff;
 }
 
-.surface-copy small {
+.surface-copy small,
+.system-copy small {
   margin-top: 12px;
   color: rgba(202, 239, 241, 0.56);
 }
@@ -243,7 +249,8 @@ select {
   }
 
   .hero-copy,
-  .surface-copy {
+  .surface-copy,
+  .system-copy {
     right: 24px;
     bottom: 28px;
     max-width: calc(100vw - 48px);
@@ -263,4 +270,19 @@ select {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+
+.system-copy strong {
+  color: #e7f0ff;
+}
+
+.system-copy small {
+  max-width: 500px;
+  margin-left: auto;
+}
+
+.hud-return:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
