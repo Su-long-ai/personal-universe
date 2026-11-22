@@ -219,17 +219,23 @@ export function YeisGalaxyScene({
         observedSky.renderOrder = -7;
         scene.add(observedSky);
 
+        const initialSignalCapacity = Math.max(
+          32,
+          2 ** Math.ceil(
+            Math.log2(contentPlacementsRef.current.length + 1),
+          ),
+        );
         const contentGeometry = new BufferGeometry();
         contentGeometry.setAttribute(
           "position",
           new BufferAttribute(
-            new Float32Array(
-              Math.max(32, contentPlacementsRef.current.length + 16) * 3,
-            ),
+            new Float32Array(initialSignalCapacity * 3),
             3,
           ),
         );
         contentGeometry.setDrawRange(0, 0);
+        document.documentElement.dataset.personalSignalCapacity =
+          String(initialSignalCapacity);
         const contentMaterial = new PointsMaterial({
           color: 0x73f4ff,
           size: quality === "low" ? 8 : 11,
