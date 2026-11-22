@@ -530,6 +530,22 @@
       ],
       "notes": "Use for small shareable state that already belongs in the page URL. Prefer this over adding a client router when Personal Universe remains a single Astro page with one existing phase state machine.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "three-buffer-geometry-capacity",
+      "name": "Three.js BufferGeometry / BufferAttribute capacity management",
+      "url": "https://threejs.org/manual/en/how-to-update-things.html",
+      "level": "component_asset",
+      "license": "MIT (Three.js)",
+      "status": "adopt",
+      "covers": [
+        "GPU buffer preallocation",
+        "BufferGeometry attribute replacement",
+        "dynamic draw updates",
+        "geometry disposal on capacity replacement"
+      ],
+      "notes": "Three.js documents that rendered buffer attributes cannot be resized in place; when capacity is exceeded, allocate replacement geometry/attributes and dispose superseded GPU resources. Personal Signal overlay uses geometric capacity growth to avoid a fixed ceiling and avoid exact-fit reallocation churn.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
