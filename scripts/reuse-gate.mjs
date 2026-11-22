@@ -451,6 +451,17 @@ function validateRecord(record, registryIndex) {
   };
 }
 
+function effectiveRangeBase(baseArg, head) {
+  let base = baseArg || "";
+  if (!base || /^0+$/.test(base)) {
+    base = gitOk(["rev-parse", head + "^"]) ? git(["rev-parse", head + "^"]) : git(["rev-list", "--max-parents=0", head]);
+  }
+  if (gitOk(["merge-base", "--is-ancestor", base, head])) return base;
+  const mergeBase = git(["merge-base", base, head]);
+  if (!mergeBase) die("cannot determine merge-base for " + base.slice(0, 12) + " and " + head.slice(0, 12) + ".");
+  return mergeBase;
+}
+
 function changedFiles(mode, baseArg, headArg) {
   if (mode === "staged") {
     const out = git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"]);
@@ -459,14 +470,8 @@ function changedFiles(mode, baseArg, headArg) {
 
   if (mode === "range" || mode === "ci") {
     const head = headArg || process.env.REUSE_GATE_HEAD_SHA || "HEAD";
-    let base = baseArg || process.env.REUSE_GATE_BASE_SHA || "";
-    if (!base || /^0+$/.test(base)) {
-      base = gitOk(["rev-parse", head + "^"]) ? git(["rev-parse", head + "^"]) : git(["rev-list", "--max-parents=0", head]);
-    }
-    if (!gitOk(["merge-base", "--is-ancestor", base, head])) {
-      die("reuse gate base " + base.slice(0, 12) + " is not an ancestor of " + head.slice(0, 12) + ".");
-    }
-    const out = git(["diff", "--name-only", "--diff-filter=ACMR", base + "..."+ head]);
+    const base = effectiveRangeBase(baseArg || process.env.REUSE_GATE_BASE_SHA || "", head);
+    const out = git(["diff", "--name-only", "--diff-filter=ACMR", base + "..." + head]);
     return out ? out.split(/\r?\n/).map(normalize).filter(Boolean) : [];
   }
 
@@ -698,8 +703,8 @@ function check(mode, baseArg, headArg) {
 
   const head = headArg || process.env.REUSE_GATE_HEAD_SHA || git(["rev-parse", "HEAD"]);
   let rangeBase = baseArg || process.env.REUSE_GATE_BASE_SHA || "";
-  if ((mode === "range" || mode === "ci") && (!rangeBase || /^0+$/.test(rangeBase))) {
-    rangeBase = gitOk(["rev-parse", head + "^"]) ? git(["rev-parse", head + "^"]) : git(["rev-list", "--max-parents=0", head]);
+  if (mode === "range" || mode === "ci") {
+    rangeBase = effectiveRangeBase(rangeBase, head);
   }
 
   const registry = readJson(REGISTRY_PATH, "reuse registry");
