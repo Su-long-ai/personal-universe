@@ -304,7 +304,8 @@ export function UniverseNavigator({
                 const isCurrent = result.id === activeDestinationId;
                 const spatial =
                   result.target.kind === "galaxy" ||
-                  result.target.kind === "landmark";
+                  result.target.kind === "landmark" ||
+                  result.target.kind === "blackhole";
 
                 return (
                   <div
