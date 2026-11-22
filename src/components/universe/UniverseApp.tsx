@@ -685,6 +685,25 @@ export default function UniverseApp({
     handleNavigateDestination,
   ]);
 
+  const handleNavigationFailed = useCallback(
+    (
+      request: UniverseNavigationCameraRequest,
+      reason: string,
+    ) => {
+      setNavigationStatus(null);
+      setNavigationRequest(null);
+      document.documentElement.dataset.universeNavigationError =
+        cameraTargetLabel(request.target);
+      console.error(
+        "[UNIVERSE-NAV] failed " +
+          cameraTargetLabel(request.target) +
+          " · " +
+          reason,
+      );
+    },
+    [],
+  );
+
   const handleNavigationComplete = useCallback(
     (request: UniverseNavigationCameraRequest) => {
       setNavigationStatus(
@@ -768,6 +787,7 @@ export default function UniverseApp({
           contentPlacements={contentPlacements}
           navigationRequest={navigationRequest}
           onNavigationComplete={handleNavigationComplete}
+          onNavigationFailed={handleNavigationFailed}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleSelectSystem}
