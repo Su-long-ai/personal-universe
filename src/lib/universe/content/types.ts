@@ -6,7 +6,7 @@ export type UniverseContentKind =
   | "note";
 
 export type UniverseContentStatus = "active" | "complete" | "archived";
-export type UniverseContentPlacementMode = "auto" | "hero";
+export type UniverseContentPlacementMode = "auto" | "hero" | "pinned";
 
 export interface UniverseContentEntry {
   id: string;
@@ -18,6 +18,16 @@ export interface UniverseContentEntry {
   tags: string[];
   featured: boolean;
   placement: UniverseContentPlacementMode;
+  /**
+   * Stable placement identity independent of the source file path.
+   * Keep this value unchanged when renaming/moving a content file.
+   */
+  placementKey?: string;
+  /**
+   * YEIS native star id (for example c59669) or an existing marker id.
+   * Required when placement === "pinned".
+   */
+  starId?: string;
   href?: string;
 }
 
