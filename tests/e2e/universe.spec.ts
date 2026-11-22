@@ -146,6 +146,45 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("black-hole search preserves exact native travel identity", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+
+  const search = page.getByRole("textbox", { name: "Search universe" });
+  await search.fill("Cygnus X-1");
+
+  const blackHole = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-blackhole") })
+    .first();
+  await expect(blackHole).toBeVisible();
+  await blackHole.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect
+    .poll(async () => html.getAttribute("data-universe-navigation-target"))
+    .toMatch(/^blackhole:/);
+
+  const exactTarget = await html.getAttribute(
+    "data-universe-navigation-target",
+  );
+  expect(exactTarget).toBeTruthy();
+  await expect(html).toHaveAttribute(
+    "data-universe-traveling",
+    exactTarget!,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Search keyboard navigation and Places destination both navigate", async ({
   page,
 }, testInfo) => {
