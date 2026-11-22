@@ -13,6 +13,8 @@ Personal Universe treats GitHub Actions as the normal validation environment. A 
 7. Fix on the branch and repeat until green.
 8. Merge schema-3 work with a **merge commit** so approval-before-implementation history is preserved. The same CI runs again on `main`.
 
+PR jobs checkout the immutable event `github.sha` rather than the moving `refs/pull/.../merge` ref, so a long-running build/E2E job cannot silently switch commits when another push lands on the PR.
+
 A WIP or feature branch does not need a permanent branch trigger. Run **CI → Run workflow** and provide the branch/tag/SHA in the optional `ref` input. Manual validation compares the selected ref against `origin/main`, so branches such as `wip/yeis-full-places-travel` can use the same machine gate and browser suite.
 
 ## What CI proves
