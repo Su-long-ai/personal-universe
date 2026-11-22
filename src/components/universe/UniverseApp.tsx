@@ -180,6 +180,10 @@ export default function UniverseApp({
   const [navigationStatus, setNavigationStatus] = useState<
     "locating" | "traveling" | "located" | "arrived" | null
   >(null);
+  const [navigationFailure, setNavigationFailure] = useState<{
+    request: UniverseNavigationCameraRequest;
+    reason: string;
+  } | null>(null);
   const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
     null,
   );
@@ -479,6 +483,7 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeJourneyComplete;
       }
       if (activeEngine !== "yeis") return;
+      setNavigationFailure(null);
       delete document.documentElement.dataset.universeNavigationError;
       openedWorldDestinationRef.current = null;
 
@@ -692,6 +697,7 @@ export default function UniverseApp({
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       if (activeEngine !== "yeis") return;
+      setNavigationFailure(null);
       delete document.documentElement.dataset.universeNavigationError;
       const cameraTarget = navigationCameraTarget(destination, galaxy.markers);
       if (!cameraTarget) {
@@ -932,6 +938,7 @@ export default function UniverseApp({
     ) => {
       setNavigationStatus(null);
       setNavigationRequest(null);
+      setNavigationFailure({ request, reason });
       document.documentElement.dataset.universeNavigationError =
         cameraTargetLabel(request.target);
       console.error(
@@ -947,12 +954,42 @@ export default function UniverseApp({
   const handleNavigationComplete = useCallback(
     (request: UniverseNavigationCameraRequest) => {
       delete document.documentElement.dataset.universeNavigationError;
+      setNavigationFailure(null);
       setNavigationStatus(
         request.mode === "travel" ? "arrived" : "located",
       );
     },
     [],
   );
+
+  const handleRetryNavigation = useCallback(() => {
+    if (!navigationFailure) return;
+    navigationRequestSeq.current += 1;
+    const request: UniverseNavigationCameraRequest = {
+      ...navigationFailure.request,
+      requestId: navigationRequestSeq.current,
+    };
+    setNavigationFailure(null);
+    setNavigationRequest(request);
+    setNavigationStatus(
+      request.mode === "travel" ? "traveling" : "locating",
+    );
+    delete document.documentElement.dataset.universeNavigationError;
+    document.documentElement.dataset.universeNavigationTarget =
+      cameraTargetLabel(request.target);
+    document.documentElement.dataset.universeNavigationPhase = "galaxy";
+    console.info(
+      "[UNIVERSE-NAV] retry " +
+        request.title +
+        " -> " +
+        cameraTargetLabel(request.target),
+    );
+  }, [navigationFailure]);
+
+  const handleDismissNavigationFailure = useCallback(() => {
+    setNavigationFailure(null);
+    delete document.documentElement.dataset.universeNavigationError;
+  }, []);
 
   const handleSelectPlanet = useCallback(
     (planet: PlanetDefinition) => {
@@ -1282,6 +1319,36 @@ export default function UniverseApp({
         onLocate={handleLocateDestination}
         onStartJourney={handleStartJourney}
       />
+
+      {navigationFailure && (
+        <aside
+          className="navigation-failure-notice"
+          role="alert"
+          data-navigation-target={cameraTargetLabel(
+            navigationFailure.request.target,
+          )}
+        >
+          <div className="navigation-failure-copy">
+            <span>ROUTE INTERRUPTED</span>
+            <strong>{navigationFailure.request.title}</strong>
+            <small>
+              The universe camera could not complete this route. Retry keeps
+              the same destination.
+            </small>
+          </div>
+          <div className="navigation-failure-actions">
+            <button type="button" onClick={handleRetryNavigation}>
+              RETRY
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissNavigationFailure}
+            >
+              DISMISS
+            </button>
+          </div>
+        </aside>
+      )}
 
       {phase === "galaxy" && navigationRequest && (
         <div className="galaxy-locate-caption">
