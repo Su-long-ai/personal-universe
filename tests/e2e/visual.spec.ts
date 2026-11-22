@@ -107,6 +107,23 @@ async function visualCase(
   await runtime.assertClean(testInfo);
 }
 
+async function expectCaptureWorldReady(page: Page) {
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-world-ready", "true");
+
+  const renderer = await html.getAttribute("data-universe-world-renderer");
+  const pipeline = await html.getAttribute("data-universe-world-pipeline");
+
+  expect(renderer).toMatch(
+    /^procedural-planets-(?:live|fallback-(?:software-renderer|low-quality))$/,
+  );
+  if (renderer === "procedural-planets-live") {
+    expect(pipeline).toBe("procedural-planets-pass");
+  } else {
+    expect(pipeline).toMatch(/^fallback-(?:software-renderer|low-quality)$/);
+  }
+}
+
 test("visual: desktop galaxy", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "galaxy", async () => {
     await page.goto("/?freeze=1");
@@ -181,6 +198,7 @@ test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
       await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
       await waitForCameraSettled(page, "orbit");
       await expect(page.locator(".world-content-card")).toBeVisible();
+      await expectCaptureWorldReady(page);
     },
   );
 });
@@ -191,7 +209,38 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await waitForCameraSettled(page, "orbit");
+    await expectCaptureWorldReady(page);
   });
+});
+
+test("live world: HIGH quality reaches PlanetPass readiness", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(75_000);
+  const runtime = await observeRuntime(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: DESKTOP.width, height: DESKTOP.height });
+  await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  await page.getByLabel("QUALITY").selectOption("high");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-renderer",
+    "procedural-planets-live",
+    { timeout: 45_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 45_000 },
+  );
+
+  await runtime.assertClean(testInfo);
 });
 
 for (const viewport of [TABLET, MOBILE]) {
@@ -220,6 +269,7 @@ for (const viewport of [TABLET, MOBILE]) {
           await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
           await waitForCameraSettled(page, "orbit");
           await expect(page.locator(".world-content-card")).toBeVisible();
+          await expectCaptureWorldReady(page);
         },
       );
     },

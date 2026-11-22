@@ -1,0 +1,37 @@
+{
+  "schema": 3,
+  "task_id": "LIVE-WORLD-RENDERER-V3-001",
+  "approved_at": "2026-11-23T03:22:00+08:00",
+  "baseline_commit": "9eab29738e65a43441007071fdb64dccb7008ea8",
+  "record_path": "docs/reuse-gate/tasks/LIVE-WORLD-RENDERER-V3-001.json",
+  "record_sha256": "37911d75e90620b2c486c0a9a00e4989fd10812bb9c66585ac2cd21cdecee22d",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "cosmos-web-universe": "3f4285a0d73bb4dd6d35854652f183b4210b658ac31c977a247bfe0cd1037e29",
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Product-grade YEIS-selected world rendering inside the existing shared React Three Fiber Canvas without adding a second navigation or render authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "docs/architecture/rendering.md",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "selected_ids": [
+    "r3f-shared-host",
+    "procedural-planets-live"
+  ],
+  "candidate_scores": {
+    "yeis-full-world-stack": 43.5,
+    "cosmos-full-replacement": 35.5,
+    "r3f-shared-host": 54.5,
+    "procedural-planets-live": 55
+  }
+}
