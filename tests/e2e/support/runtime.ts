@@ -104,9 +104,16 @@ export async function observeRuntime(
   };
 }
 
+export async function waitForYeisEngine(page: Page) {
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-engine",
+    "yeis",
+  );
+}
+
 export async function waitForYeis(page: Page) {
   const html = page.locator("html");
-  await expect(html).toHaveAttribute("data-universe-engine", "yeis");
+  await waitForYeisEngine(page);
   await expect(html).toHaveAttribute("data-yeis-native-galaxy", "ready");
 }
 
