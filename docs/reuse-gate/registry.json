@@ -792,6 +792,21 @@
       ],
       "notes": "Mature root-hosted static deployment fallback. Stronger automatic branch/PR preview ergonomics than GitHub Pages, but requires an external Cloudflare account and GitHub App integration.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "webgl-context-loss-api",
+      "name": "WebGL context-loss events and WEBGL_lose_context",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/webglcontextlost_event",
+      "level": "component_asset",
+      "license": "Web platform API",
+      "status": "adopt",
+      "covers": [
+        "runtime WebGL context-loss detection",
+        "deterministic WebGL failure injection",
+        "webglcontextlost and webglcontextcreationerror browser events"
+      ],
+      "notes": "Use browser-native context-loss events for release failure detection and the standard WEBGL_lose_context extension for deterministic negative-path tests. Drive it through existing Playwright page.evaluate rather than adding a WebGL test framework.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
