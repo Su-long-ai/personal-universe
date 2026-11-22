@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GalaxyMarker } from "../../lib/universe/types";
+import type {
+  GalaxyMarker,
+  SystemDefinition,
+} from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
   loadUniverseNavigation,
@@ -13,6 +16,7 @@ export function UniverseNavigator({
   open,
   markers,
   placements,
+  currentSystem,
   activeDestinationId,
   onClose,
   onNavigate,
@@ -21,6 +25,7 @@ export function UniverseNavigator({
   open: boolean;
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
+  currentSystem?: SystemDefinition | null;
   activeDestinationId?: string | null;
   onClose: () => void;
   onNavigate: (
@@ -68,9 +73,12 @@ export function UniverseNavigator({
       : "places";
 
     const request = trimmed
-      ? loadUniverseNavigation(trimmed, placements, markers).then(
-          navigationSectionsForResults,
-        )
+      ? loadUniverseNavigation(
+          trimmed,
+          placements,
+          markers,
+          currentSystem ?? null,
+        ).then(navigationSectionsForResults)
       : loadUniversePlaces(placements, markers);
 
     void request
@@ -97,7 +105,7 @@ export function UniverseNavigator({
     return () => {
       cancelled = true;
     };
-  }, [markers, open, placements, query]);
+  }, [currentSystem, markers, open, placements, query]);
 
   useEffect(() => {
     const active = results[activeIndex];
