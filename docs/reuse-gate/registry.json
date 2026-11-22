@@ -725,6 +725,39 @@
       ],
       "notes": "Mature DOM floating-position solution and supports cursor/virtual-point anchors. Not selected for Personal Signal hover because WebGL signal hit testing/projection is the hard part and the simple non-interactive label needs only bounded client coordinates.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "yeis-native-travel-e520568",
+      "name": "YEIS native body and compact-object travel semantics at verified MIT commit e520568",
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "level": "subsystem",
+      "license": "MIT at pinned commit e52056897364e060fbd6d00951628f163b57d7a1",
+      "status": "adopt",
+      "covers": [
+        "reference-frame switching between star systems",
+        "native celestial-body lookup",
+        "camera autopilot to exact bodies",
+        "black-hole system/body identity",
+        "body and black-hole navigation semantics"
+      ],
+      "notes": "Reuse the pinned universe/body/camera semantics already hosted inside the R3F canvas. The pinned UI exposes body/system/black-hole travel entry points; Personal Universe should adapt destinations to these primitives rather than inventing a second cross-scale camera path.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "yomotsu-camera-controls",
+      "name": "camera-controls",
+      "url": "https://github.com/yomotsu/camera-controls",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "Three.js camera orbit and truck",
+        "smooth transitions",
+        "fit and look-at",
+        "pointer/touch camera controls"
+      ],
+      "notes": "Mature generic Three.js camera-control library. Not selected for native body travel because it does not own YEIS hierarchical reference frames, native celestial-body identity or system switching; adding it would create a competing camera authority.",
+      "last_checked": "2026-11-23"
     }
   ]
 }

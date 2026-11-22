@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "EXACT-NATIVE-TRAVEL-V3-001",
+  "approved_at": "2026-11-23T02:05:00+08:00",
+  "baseline_commit": "3e80495c9af1e77424a6bd1dcd82740d024b65d9",
+  "record_path": "docs/reuse-gate/tasks/EXACT-NATIVE-TRAVEL-V3-001.json",
+  "record_sha256": "b6f70866d133d0861d4a7ddb07d91e085818b5e6dd666c04e91f0c4281aa2210",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yeis-native-travel-e520568": "c3ded8d14bd098a8bf2ef129c09c5dd48ada0e7a8b525494fc861ca7d95b6073",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Route body and black-hole destinations through the pinned YEIS reference-frame and camera primitives instead of degrading to host-star travel"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-full-backbone",
+    "yeis-native-travel"
+  ],
+  "candidate_scores": {
+    "yeis-full-backbone": 54,
+    "yeis-native-travel": 52.5,
+    "generic-camera-controls": 38
+  }
+}
