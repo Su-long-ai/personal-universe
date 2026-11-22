@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
 import * as THREE from "three";
@@ -10,11 +10,20 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import { liveWorldFallbackReason } from "./CinematicPipeline";
 
 const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
 const LIVE_PLANET_RADIUS = 2000;
 const LIVE_WORLD_RADIUS = 3.65;
 const FALLBACK_WORLD_RADIUS = 3.48;
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 function presetFor(planet: PlanetDefinition) {
   switch (planet.archetype) {
@@ -107,6 +116,7 @@ export function PlanetScene({
   planet: PlanetDefinition;
   quality: QualityMode;
 }) {
+  const { gl } = useThree();
   const sunDirection = useMemo(
     () =>
       new THREE.Vector3(
@@ -116,35 +126,93 @@ export function PlanetScene({
       ).normalize(),
     [],
   );
-  const livePlanet = useMemo(
-    () =>
-      new Planet({
-        preset: presetFor(planet),
-        seed: hashSeed(planet.seed),
-        radius: LIVE_PLANET_RADIUS,
-        lightSource: sunDirection,
-        name: planet.name,
-        ...liveQuality(quality),
-      }),
-    [planet, quality, sunDirection],
-  );
+  const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const liveKey = `${planet.id}:${quality}`;
+  const [warmedKey, setWarmedKey] = useState<string | null>(null);
+  const liveEnabled = warmedKey === liveKey && !fallbackReason;
 
   useEffect(() => {
-    document.documentElement.dataset.universeWorldRenderer =
-      "procedural-planets-live";
+    if (fallbackReason) return;
+
+    let cancelled = false;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let warmupTimer: number | null = null;
+    let idleHandle: number | null = null;
+    let fallbackTimer: number | null = null;
+    const idleWindow = window as IdleWindow;
+
+    const enableLive = () => {
+      if (!cancelled) setWarmedKey(liveKey);
+    };
+
+    // Commit the lightweight world and product HUD before constructing the
+    // expensive live Planet. Quick travel/return actions can cancel this
+    // warm-in entirely instead of paying for a world the user already left.
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        warmupTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          if (idleWindow.requestIdleCallback) {
+            idleHandle = idleWindow.requestIdleCallback(enableLive, {
+              timeout: 1200,
+            });
+          } else {
+            fallbackTimer = window.setTimeout(enableLive, 120);
+          }
+        }, 1800);
+      });
+    });
+
     return () => {
-      if (
-        document.documentElement.dataset.universeWorldRenderer ===
-        "procedural-planets-live"
-      ) {
-        delete document.documentElement.dataset.universeWorldRenderer;
+      cancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      if (warmupTimer !== null) window.clearTimeout(warmupTimer);
+      if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleHandle);
       }
-      livePlanet.dispose();
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+    };
+  }, [fallbackReason, liveKey]);
+
+  const livePlanet = useMemo(() => {
+    if (!liveEnabled) return null;
+    return new Planet({
+      preset: presetFor(planet),
+      seed: hashSeed(planet.seed),
+      radius: LIVE_PLANET_RADIUS,
+      lightSource: sunDirection,
+      name: planet.name,
+      ...liveQuality(quality),
+    });
+  }, [liveEnabled, planet, quality, sunDirection]);
+
+  useEffect(() => {
+    return () => {
+      livePlanet?.dispose();
     };
   }, [livePlanet]);
 
+  useEffect(() => {
+    const mode = livePlanet
+      ? "procedural-planets-live"
+      : fallbackReason
+        ? `procedural-planets-fallback-${fallbackReason}`
+        : "procedural-planets-warmup";
+    document.documentElement.dataset.universeWorldRenderer = mode;
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldRenderer === mode
+      ) {
+        delete document.documentElement.dataset.universeWorldRenderer;
+      }
+    };
+  }, [fallbackReason, livePlanet]);
+
   useFrame((_, delta) => {
-    livePlanet.rotation.y += delta * 0.014;
+    if (livePlanet) livePlanet.rotation.y += delta * 0.014;
   });
 
   return (
@@ -189,10 +257,12 @@ export function PlanetScene({
             metalness={0.02}
           />
         </mesh>
-        <primitive
-          object={livePlanet}
-          scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
-        />
+        {livePlanet ? (
+          <primitive
+            object={livePlanet}
+            scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
+          />
+        ) : null}
       </group>
     </>
   );
