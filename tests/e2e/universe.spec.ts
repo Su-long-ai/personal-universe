@@ -204,6 +204,73 @@ test("observed NASA exoplanet Search opens the exact observed world", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Chinese Moon alias preserves exact native-body travel identity", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("月球");
+
+  const moon = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ hasText: "Moon" })
+    .first();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  const destinationId = "body:c0/moon";
+  const nativeTarget = "c0/moon";
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute(
+        "data-universe-travel-complete",
+      );
+      return traveling === nativeTarget || complete === nativeTarget;
+    })
+    .toBe(true);
+  await expect(html).toHaveAttribute(
+    "data-universe-travel-complete",
+    nativeTarget,
+    { timeout: 15_000 },
+  );
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toBe(destinationId);
+  expect(url.searchParams.get("phase")).toBeNull();
+  expect(url.searchParams.get("star")).toBeNull();
+  expect(url.searchParams.get("body")).toBeNull();
+  await expect(page.locator(".navigation-failure-notice")).toHaveCount(0);
+  expect(
+    await html.getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("black-hole Search preserves exact native travel identity", async ({
   page,
 }, testInfo) => {
