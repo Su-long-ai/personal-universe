@@ -534,6 +534,75 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await runtime.assertClean(testInfo);
 });
 
+test("manual Orbit camera takeover interrupts Journey without changing destination", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  const controls = page.locator(".universe-journey-controls");
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "settled",
+  );
+
+  const destinationId = await html.getAttribute(
+    "data-universe-active-destination",
+  );
+  expect(destinationId).toBeTruthy();
+  const destinationBefore = new URL(page.url()).searchParams.get(
+    "destination",
+  );
+  expect(destinationBefore).toBe(destinationId);
+
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box, "product world canvas should have a drag surface").not.toBeNull();
+  const startX = box!.x + box!.width * 0.62;
+  const startY = box!.y + box!.height * 0.52;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 84, startY + 34, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "manual",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-camera-settled");
+  await expect(controls).toHaveCount(0);
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  await expect(html).not.toHaveAttribute("data-universe-journey-complete");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  expect(new URL(page.url()).searchParams.get("destination")).toBe(
+    destinationBefore,
+  );
+  expect(new URL(page.url()).searchParams.get("phase")).toBe("orbit");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Guided Journey completes visibly and competing navigation interrupts", async ({
   page,
 }, testInfo) => {
