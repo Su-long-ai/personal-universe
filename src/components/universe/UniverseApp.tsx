@@ -55,6 +55,18 @@ const VALID_PHASES: UniversePhase[] = [
   "returning",
 ];
 
+function cameraTargetLabel(
+  target: UniverseNavigationCameraRequest["target"],
+): string {
+  if (target.kind === "star") return target.nativeId;
+  if (target.kind === "point") return "point:" + target.id;
+  if (target.kind === "body") {
+    return "body:" + target.starId + "/" + target.bodyId;
+  }
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
+  return target.kind + ":" + target.index;
+}
+
 export default function UniverseApp({
   contentEntries = [],
 }: {
@@ -326,7 +338,8 @@ export default function UniverseApp({
 
       const spatial =
         destination.target.kind === "galaxy" ||
-        destination.target.kind === "landmark";
+        destination.target.kind === "landmark" ||
+        destination.target.kind === "blackhole";
 
       setActiveDestinationId(destination.id);
       document.documentElement.dataset.universeActiveDestination =
@@ -356,6 +369,38 @@ export default function UniverseApp({
                 name === bodyId
               );
             }) ?? null;
+        }
+
+        if (destination.target.kind === "body" && !planet) {
+          const cameraTarget = navigationCameraTarget(
+            destination,
+            galaxy.markers,
+          );
+          if (cameraTarget) {
+            navigationRequestSeq.current += 1;
+            setSelectedSystem(null);
+            setSelectedPlanet(null);
+            setPhase("galaxy");
+            setNavigationRequest({
+              requestId: navigationRequestSeq.current,
+              mode: "travel",
+              target: cameraTarget,
+              title: destination.title,
+            });
+            setNavigationStatus("traveling");
+            const nativeBodyTarget = cameraTargetLabel(cameraTarget);
+            document.documentElement.dataset.universeNavigationTarget =
+              nativeBodyTarget;
+            document.documentElement.dataset.universeNavigationPhase =
+              "galaxy";
+            console.info(
+              "[UNIVERSE-NAV] native body travel " +
+                destination.title +
+                " -> " +
+                nativeBodyTarget,
+            );
+            return;
+          }
         }
 
         setNavigationRequest(null);
@@ -407,12 +452,7 @@ export default function UniverseApp({
         title: destination.title,
       });
       setNavigationStatus("traveling");
-      const spatialTarget =
-        cameraTarget.kind === "star"
-          ? cameraTarget.nativeId
-          : cameraTarget.kind === "point"
-            ? "point:" + cameraTarget.id
-            : cameraTarget.kind + ":" + cameraTarget.index;
+      const spatialTarget = cameraTargetLabel(cameraTarget);
       document.documentElement.dataset.universeNavigationTarget =
         spatialTarget;
       console.info(
@@ -453,12 +493,7 @@ export default function UniverseApp({
         title: destination.title,
       });
       setNavigationStatus("locating");
-      const target =
-        cameraTarget.kind === "star"
-          ? cameraTarget.nativeId
-          : cameraTarget.kind === "point"
-            ? "point:" + cameraTarget.id
-            : cameraTarget.kind + ":" + cameraTarget.index;
+      const target = cameraTargetLabel(cameraTarget);
       document.documentElement.dataset.universeActiveDestination =
         destination.id;
       document.documentElement.dataset.universeNavigationTarget = target;
