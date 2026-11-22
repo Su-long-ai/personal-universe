@@ -237,6 +237,28 @@ function searchDestinations(
     });
   }
 
+  const currentStarId = runtime.universe.current.starId;
+  const currentSystemName =
+    runtime.universe.starName(currentStarId) + " System";
+  for (const body of runtime.universe.bodies) {
+    if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
+    const haystack = normalize(
+      [body.name, body.data.name, body.id, body.data.type].join(" "),
+    );
+    if (!haystack.includes(query)) continue;
+    out.push({
+      id: `body:${currentStarId}:${body.id}`,
+      kind: "body",
+      title: body.name,
+      detail: body.data.type.toUpperCase() + " · " + currentSystemName,
+      target: {
+        kind: "body",
+        nativeId: currentStarId,
+        bodyId: body.id,
+      },
+    });
+  }
+
   for (const foreign of runtime.universe.searchForeignBodies(query, 8)) {
     if (foreign.body.type !== "planet" && foreign.body.type !== "dwarf") {
       continue;
