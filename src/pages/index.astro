@@ -14,6 +14,8 @@ const contentEntries: UniverseContentEntry[] = portfolio.map(({ id, data }) => (
   tags: data.tags,
   featured: data.featured,
   placement: data.placement,
+  ...(data.placementKey ? { placementKey: data.placementKey } : {}),
+  ...(data.starId ? { starId: data.starId } : {}),
   ...(data.href ? { href: data.href } : {}),
 }));
 ---

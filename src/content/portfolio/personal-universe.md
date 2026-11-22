@@ -10,7 +10,9 @@ tags:
   - Three.js
   - procedural-universe
 featured: true
-placement: "auto"
+placement: "pinned"
+placementKey: "personal-universe"
+starId: "c59669"
 draft: false
 ---
 
