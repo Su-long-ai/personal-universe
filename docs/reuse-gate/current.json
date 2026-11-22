@@ -1,77 +1,274 @@
 {
-  "task_id": "V2-UNIVERSE-SCALE-001",
-  "title": "Scale interactive galaxy markers and defer heavy planet/surface code",
+  "schema": 2,
+  "task_id": "REUSE-GATE-V2-001",
+  "title": "Upgrade reuse enforcement from local candidate checks to top-down whole-solution-first governance",
+  "scope": {
+    "level": "architecture",
+    "subject": "Project-wide reuse research and implementation gate"
+  },
+  "policy_change": true,
   "researched_at": "2026-11-22",
-  "research_summary": "Scale the V2 universe without inventing a custom loader or picking engine. Use React.lazy + Suspense for PlanetScene and SurfaceScene so the heavy procedural-planet/terrain code is fetched only on first entry. Remove the now-unused live PlanetPass from the always-on cinematic composer because orbit planets use the package-supported bakePlanet path. Batch procedural system markers into one THREE.Points object and rely on Three Raycaster Points.threshold plus R3F pointer events for picking, increasing explorable deterministic systems without one mesh/draw-call per marker.",
+  "research_summary": "Upgrade the existing lightweight Node/Git/npm reuse gate rather than replace it with a heavyweight governance platform. Reuse ADR/MADR decision structure, a Technology Radar-style lifecycle registry, and OpenSSF Scorecard-style evaluation dimensions. Search must proceed from full solutions to frameworks/engines to subsystems to components/assets before custom implementation. Architecture/subsystem tasks must carry a coverage matrix, global-value evaluations, and explicit tradeoffs whenever a lower-level choice is selected over a higher-level candidate. Keep Git hooks and npm lifecycle as the enforcement surface. OPA/Conftest and Backstage were evaluated as higher-level policy/catalog products but rejected for runtime/platform overhead relative to this single repository.",
   "planned_files": [
-    "src/components/universe/CinematicPipeline.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/GalaxyScene.tsx",
-    "src/lib/universe/generation/index.ts"
+    "scripts/reuse-gate.mjs",
+    "AGENTS.md",
+    "docs/reuse-gate/README.md",
+    "docs/reuse-gate/registry.json"
   ],
   "sources": [
     {
-      "url": "https://react.dev/reference/react/lazy",
-      "finding": "React.lazy defers a component's code until it is first rendered; Suspense provides the loading boundary and the dynamic import result is cached."
+      "url": "https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record",
+      "finding": "Architecture decisions should record context, alternatives, outcome, tradeoffs, consequences and status, and important decisions should remain available in the workload repository."
     },
     {
-      "url": "https://threejs.org/docs/pages/Raycaster",
-      "finding": "THREE.Raycaster supports Points objects and exposes params.Points.threshold in world units for point-picking precision."
+      "url": "https://adr.github.io/madr/",
+      "finding": "MADR provides a lightweight structured decision format designed to make assumptions, considered options and outcomes explicit without turning records into large design documents."
     },
     {
-      "url": "https://r3f.docs.pmnd.rs/api/events",
-      "finding": "React Three Fiber exposes pointer/click events for Three objects that implement raycast, forwarding Three intersection data through its event system."
+      "url": "https://radar.allegro.tech/help-and-about-tech-radar/",
+      "finding": "Technology Radar uses Adopt, Trial, Assess and Hold states and requires rationale, alternatives and evaluation criteria before broad adoption."
     },
     {
-      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/main/docs/baking.md",
-      "finding": "bakePlanet returns ordinary meshes and is explicitly recommended for distant planets, dozens of background bodies and mobile; live PlanetRenderer is reserved for close/live effects."
+      "url": "https://scorecard.dev/",
+      "finding": "OpenSSF Scorecard treats maintenance, license and dependency/security signals as separate project-health dimensions rather than reducing a candidate to one local feature."
+    },
+    {
+      "url": "https://www.openpolicyagent.org/ecosystem/entry/conftest",
+      "finding": "Conftest can machine-test arbitrary structured JSON/YAML using OPA/Rego and is a mature generic option for policy-as-code."
+    },
+    {
+      "url": "https://backstage.io/docs/next/features/software-catalog/system-model/",
+      "finding": "Backstage models Components inside Systems and Domains, demonstrating why a reusable-solution registry needs multiple abstraction levels instead of a flat library list."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "backstage-catalog"
+      ],
+      "source_refs": [
+        5
+      ],
+      "conclusion": "A full software-catalog platform exists, but operating Backstage just to govern one repository would cost more than the benefit."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "opa-conftest"
+      ],
+      "source_refs": [
+        4
+      ],
+      "conclusion": "OPA/Conftest can enforce structured policies, but adds a separate binary and Rego toolchain; the existing small Node gate can express the project-specific rules directly."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "madr",
+        "technology-radar",
+        "openssf-scorecard"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Reuse the strongest lightweight concepts: ADR-style decisions, Radar lifecycle status and multidimensional candidate evaluation."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "git-hooks",
+        "npm-lifecycle"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep the already-working Git pre-commit and npm predev/prebuild enforcement surfaces."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "machine enforcement before implementation",
+      "importance": "high",
+      "coverage": {
+        "backstage": "partial",
+        "opa-conftest": "full",
+        "node-gate": "full"
+      },
+      "decision": "Keep the Node gate as the enforcement runtime; no additional service or binary."
+    },
+    {
+      "capability": "whole-solution-first search order",
+      "importance": "high",
+      "coverage": {
+        "backstage": "partial",
+        "opa-conftest": "none",
+        "node-gate": "full"
+      },
+      "decision": "Encode the search ladder explicitly in the record schema and reject missing upper-level searches."
+    },
+    {
+      "capability": "long-lived reusable-solution knowledge",
+      "importance": "high",
+      "coverage": {
+        "backstage": "full",
+        "opa-conftest": "partial",
+        "node-gate": "full"
+      },
+      "decision": "Use a version-controlled registry JSON rather than deploy a catalog service."
+    },
+    {
+      "capability": "global-value comparison instead of single-regression rejection",
+      "importance": "high",
+      "coverage": {
+        "backstage": "partial",
+        "opa-conftest": "partial",
+        "node-gate": "full"
+      },
+      "decision": "Require multidimensional candidate evaluation and machine-calculate a global value score; selecting against a higher score requires an explicit override."
     }
   ],
   "candidates": [
     {
-      "name": "React.lazy + Suspense",
-      "source": "https://react.dev/reference/react/lazy",
-      "license": "React MIT",
+      "id": "backstage",
+      "name": "Backstage Software Catalog as governance platform",
+      "level": "full_solution",
+      "registry_id": "backstage-catalog",
+      "source": "https://backstage.io/docs/features/software-catalog/",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Excellent system/component catalog model, but deploying and maintaining a platform is disproportionate for one repository.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "opa-conftest",
+      "name": "OPA / Conftest policy engine",
+      "level": "framework_engine",
+      "registry_id": "opa-conftest",
+      "source": "https://www.openpolicyagent.org/ecosystem/entry/conftest",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Strong generic policy enforcement, but a separate Go binary and Rego language are unnecessary overhead for the small repository-local rule set.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "node-gate",
+      "name": "Existing Node reuse gate extended with top-down schema",
+      "level": "subsystem",
+      "registry_id": "madr",
+      "source": "local scripts/reuse-gate.mjs",
+      "license": "Project code informed by reusable open methodologies",
       "decision": "reuse",
-      "reason": "Native React solution for splitting heavy PlanetScene and SurfaceScene chunks; no custom loader required."
+      "reason": "Preserves the proven Git/npm enforcement path while adding the missing whole-solution search ladder, registry, coverage matrix and global-value checks.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
     },
     {
-      "name": "THREE.Points + Raycaster threshold + R3F events",
-      "source": "https://threejs.org/docs/pages/Raycaster",
-      "license": "Three.js MIT",
+      "id": "radar-registry",
+      "name": "Technology Radar-style registry status",
+      "level": "subsystem",
+      "registry_id": "technology-radar",
+      "source": "https://radar.allegro.tech/help-and-about-tech-radar/",
+      "license": "Reference methodology",
       "decision": "reuse",
-      "reason": "One GPU points object can carry hundreds of procedural system markers while remaining clickable through built-in raycasting and R3F events."
+      "reason": "Adopt/Trial/Assess/Hold is compact, understandable and prevents rediscovering or accidentally re-adopting rejected/held solutions.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
     },
     {
-      "name": "One Mesh per procedural system",
-      "source": "current V2 implementation",
-      "license": "Project code",
-      "decision": "reject",
-      "reason": "Simple but scales draw calls linearly and is unnecessary because Points already supports picking."
+      "id": "scorecard-eval",
+      "name": "OpenSSF-style multidimensional evaluation",
+      "level": "subsystem",
+      "registry_id": "openssf-scorecard",
+      "source": "https://scorecard.dev/",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Reuse the idea of separate maintenance/license/health dimensions; do not make the external CLI a mandatory dependency.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
     },
     {
-      "name": "Custom asset loader / manual chunk registry",
-      "source": "local design option",
-      "license": "Project code",
-      "decision": "reject",
-      "reason": "React.lazy and the bundler already solve component-level on-demand loading."
-    },
-    {
-      "name": "Always-on PlanetRenderer/PlanetPass",
-      "source": "https://github.com/ZyFou/ProceduralPlanets",
-      "license": "MIT",
-      "decision": "reject",
-      "reason": "The current close-up path now uses bakePlanet; keeping live PlanetRenderer in the initial galaxy bundle adds shader/runtime cost with no active live Planet."
+      "id": "git-npm-hooks",
+      "name": "Git hooks plus npm lifecycle enforcement",
+      "level": "component_asset",
+      "registry_id": "git-hooks",
+      "source": "https://git-scm.com/docs/githooks",
+      "license": "Existing project tooling",
+      "decision": "reuse",
+      "reason": "Already installed, zero additional service, and proven to block unapproved implementation files.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 0,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
     }
   ],
   "decision": {
     "mode": "reuse",
-    "selected": [
-      "React.lazy + Suspense",
-      "THREE.Points raycast batching",
-      "R3F pointer events",
-      "procedural-planets bakePlanet as deferred planet renderer"
+    "selected_ids": [
+      "node-gate",
+      "radar-registry",
+      "scorecard-eval",
+      "git-npm-hooks"
     ],
-    "fallback": "Keep catalog and Hero markers as individual meshes for stronger visual affordance; only procedural markers are batched."
+    "rationale": "Retain the minimal repository-local enforcement runtime, but upgrade its data model using established ADR/catalog/radar/scorecard concepts. This captures the system-level reuse that the old gate missed without introducing a governance platform larger than the project.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "backstage",
+        "reason": "Backstage has broader catalog coverage, but its service/platform footprint and operational cost outweigh that gain for one repository; we reuse its hierarchy concept in a static registry."
+      },
+      {
+        "candidate_id": "opa-conftest",
+        "reason": "OPA/Conftest is a more general policy engine, but the additional binary and Rego maintenance do not improve this repository's four-level search logic enough to justify the integration cost."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the Node policy grows beyond a single-repository scope, move the same JSON records to Conftest/OPA or a Backstage catalog without changing the decision schema."
   }
 }

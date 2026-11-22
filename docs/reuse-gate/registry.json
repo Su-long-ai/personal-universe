@@ -1,0 +1,284 @@
+{
+  "schema": 1,
+  "updated_at": "2026-11-22",
+  "status_model": "adopt|trial|assess|hold",
+  "entries": [
+    {
+      "id": "backstage-catalog",
+      "name": "Backstage Software Catalog",
+      "url": "https://backstage.io/docs/features/software-catalog/",
+      "level": "full_solution",
+      "license": "Apache-2.0",
+      "status": "assess",
+      "covers": [
+        "software catalog",
+        "systems",
+        "components",
+        "resources",
+        "ownership",
+        "relationships"
+      ],
+      "notes": "Useful model for hierarchical reuse registry; too heavy to deploy for this single project.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "opa-conftest",
+      "name": "OPA / Conftest",
+      "url": "https://www.openpolicyagent.org/ecosystem/entry/conftest",
+      "level": "framework_engine",
+      "license": "Apache-2.0",
+      "status": "assess",
+      "covers": [
+        "policy as code",
+        "structured JSON/YAML validation",
+        "CI gating"
+      ],
+      "notes": "Powerful generic policy engine, but adds a Go binary/Rego toolchain for rules that fit the existing small Node gate.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "madr",
+      "name": "Markdown Architectural Decision Records (MADR)",
+      "url": "https://adr.github.io/madr/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "adopt",
+      "covers": [
+        "decision context",
+        "alternatives",
+        "outcome",
+        "consequences",
+        "status"
+      ],
+      "notes": "Reuse the lightweight structured decision-record pattern; Git history supplies append-only history.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "technology-radar",
+      "name": "Technology Radar status model",
+      "url": "https://radar.allegro.tech/help-and-about-tech-radar/",
+      "level": "subsystem",
+      "license": "Reference methodology",
+      "status": "adopt",
+      "covers": [
+        "adopt",
+        "trial",
+        "assess",
+        "hold",
+        "technology lifecycle"
+      ],
+      "notes": "Reuse status semantics in the local reuse registry.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "openssf-scorecard",
+      "name": "OpenSSF Scorecard",
+      "url": "https://scorecard.dev/",
+      "level": "subsystem",
+      "license": "Apache-2.0",
+      "status": "adopt",
+      "covers": [
+        "maintenance health",
+        "license signal",
+        "dependency hygiene",
+        "security posture"
+      ],
+      "notes": "Reuse evaluation dimensions conceptually; do not require the Scorecard CLI for every candidate.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "git-hooks",
+      "name": "Git hooks / core.hooksPath",
+      "url": "https://git-scm.com/docs/githooks",
+      "level": "component_asset",
+      "license": "GPL-2.0 project tooling",
+      "status": "adopt",
+      "covers": [
+        "pre-commit enforcement"
+      ],
+      "notes": "Already used by this project for local commit-time enforcement.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "npm-lifecycle",
+      "name": "npm lifecycle scripts",
+      "url": "https://docs.npmjs.com/cli/using-npm/scripts",
+      "level": "component_asset",
+      "license": "npm tooling",
+      "status": "adopt",
+      "covers": [
+        "predev",
+        "prebuild",
+        "script chaining"
+      ],
+      "notes": "Already used to enforce the gate before dev/build.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "your-eyes-in-space-mit-final",
+      "name": "Your Eyes In Space — mit-final lineage",
+      "url": "https://github.com/berkcomba/youreyesinspace",
+      "level": "full_solution",
+      "license": "MIT for mit-final and earlier; current main AGPL-3.0-or-later",
+      "status": "assess",
+      "covers": [
+        "real star catalogs",
+        "exoplanets",
+        "procedural systems",
+        "galaxy",
+        "deep universe",
+        "planet surfaces"
+      ],
+      "notes": "Primary whole-solution candidate for the upcoming universe-backbone decision. Verify exact tag/commit before reuse.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "cosmos-web-universe",
+      "name": "Cosmos browser universe engine",
+      "url": "https://github.com/beevr-labs/Cosmos",
+      "level": "full_solution",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "universe-scale camera",
+        "real catalogs",
+        "LOD",
+        "shaders",
+        "tile streaming architecture"
+      ],
+      "notes": "Promising clean MIT backbone; data ingestion/maturity must be benchmarked.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "solar-wanderer",
+      "name": "Solar Wanderer",
+      "url": "https://hysenlabs.com/projects/hyqzz-solar-wanderer",
+      "level": "framework_engine",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "floating origin",
+        "log depth",
+        "solar-system scale travel",
+        "JPL ephemerides",
+        "atmosphere"
+      ],
+      "notes": "Candidate for scale/travel subsystem if a full-solution backbone is not selected.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "spacekit",
+      "name": "SpaceKit.js",
+      "url": "https://github.com/typpo/spacekit",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "trial",
+      "covers": [
+        "ephemerides",
+        "Kepler orbits",
+        "celestial objects",
+        "particles"
+      ],
+      "notes": "Prefer extracting orbital math/data pieces over adopting its renderer lifecycle wholesale.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "galaxy-explorer",
+      "name": "Galaxy Explorer",
+      "url": "https://github.com/zjoooooo/galaxy-explorer",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "adopt",
+      "covers": [
+        "spiral galaxy density",
+        "GPU point rendering",
+        "galaxy visual layering"
+      ],
+      "notes": "Already reused in the current V2 galaxy renderer.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "helios-procedural-system",
+      "name": "Helios procedural star-system generator",
+      "url": "https://github.com/dhairyaozaa/procedural-star-system",
+      "level": "subsystem",
+      "license": "ISC",
+      "status": "adopt",
+      "covers": [
+        "seeded RNG",
+        "system generation",
+        "stars",
+        "planets",
+        "moons"
+      ],
+      "notes": "Already reused in the current V2 deterministic generator decomposition.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "procedural-planets",
+      "name": "ProceduralPlanets",
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "adopt",
+      "covers": [
+        "procedural planets",
+        "atmosphere",
+        "clouds",
+        "oceans",
+        "baking"
+      ],
+      "notes": "Already integrated; baked mode is the default for scalable ordinary worlds.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "procedural-terrains",
+      "name": "ProceduralTerrains",
+      "url": "https://github.com/ZyFou/ProceduralTerrains",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "trial",
+      "covers": [
+        "terrain",
+        "mini terrain",
+        "planet terrain",
+        "vegetation",
+        "export"
+      ],
+      "notes": "Preserved as an optional Hero-surface experiment, not a universal surface requirement.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "pmndrs-sky",
+      "name": "@pmndrs/sky",
+      "url": "https://sky.docs.pmnd.rs/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "Hillaire atmosphere",
+        "ground-to-orbit sky",
+        "aerial perspective",
+        "night sky"
+      ],
+      "notes": "Potential future WebGPU branch; current main stack is not yet a clean compatibility fit.",
+      "last_checked": "2026-11-22"
+    },
+    {
+      "id": "three-nebula",
+      "name": "three-nebula",
+      "url": "https://github.com/creativelifeform/three-nebula",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "GPU particles",
+        "nebulae",
+        "dust",
+        "travel effects"
+      ],
+      "notes": "Candidate effect system; only adopt if the chosen backbone does not already cover these effects.",
+      "last_checked": "2026-11-22"
+    }
+  ]
+}

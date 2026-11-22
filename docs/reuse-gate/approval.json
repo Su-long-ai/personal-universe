@@ -1,14 +1,35 @@
 {
-  "schema": 1,
-  "task_id": "V2-UNIVERSE-SCALE-001",
-  "approved_at": "2026-11-22T12:13:46.102Z",
-  "baseline_commit": "461d8a42e634b99f54fab7d0e12414f83cb4c00a",
+  "schema": 2,
+  "task_id": "REUSE-GATE-V2-001",
+  "approved_at": "2026-11-22T12:37:01.072Z",
+  "baseline_commit": "ddff765cbbd24c44f8b3a2ac39d33207381a6b78",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "4fdbdbca4b75dfd2e5265717ae25c1f09fe5c158a95d4137c65ca4ce7777fe4e",
+  "record_sha256": "f0b6e8ac539def18a74b68a076943e71ebfbe624f64781f2c3902abd610551f2",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_sha256": "7847793c8e235381c5d48ecacde4794d15f5d7087c0e484dacad634f28d16586",
+  "scope": {
+    "level": "architecture",
+    "subject": "Project-wide reuse research and implementation gate"
+  },
+  "policy_change": true,
   "planned_files": [
-    "src/components/universe/CinematicPipeline.tsx",
-    "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/GalaxyScene.tsx",
-    "src/lib/universe/generation/index.ts"
-  ]
+    "scripts/reuse-gate.mjs",
+    "AGENTS.md",
+    "docs/reuse-gate/README.md",
+    "docs/reuse-gate/registry.json"
+  ],
+  "selected_ids": [
+    "node-gate",
+    "radar-registry",
+    "scorecard-eval",
+    "git-npm-hooks"
+  ],
+  "candidate_scores": {
+    "backstage": 40,
+    "opa-conftest": 43,
+    "node-gate": 54,
+    "radar-registry": 49,
+    "scorecard-eval": 49,
+    "git-npm-hooks": 52
+  }
 }
