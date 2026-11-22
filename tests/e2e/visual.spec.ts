@@ -199,6 +199,10 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
       "data-universe-world-pipeline",
       "procedural-planets-pass",
     );
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-universe-world-ready",
+      "true",
+    );
   });
 });
 
