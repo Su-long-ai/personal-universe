@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - "**"
   pull_request:
     branches:
       - main
@@ -57,6 +57,7 @@ jobs:
   build:
     name: Build + Bundle Guard
     needs: reuse-gate
+    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -174,7 +175,7 @@ jobs:
   e2e-report:
     name: Combined Playwright Report
     needs: e2e
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
