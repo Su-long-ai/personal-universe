@@ -368,7 +368,9 @@ export default function UniverseApp({
               ? destination.target.nativeId + "/" + destination.target.entryId
               : destination.target.kind === "body"
                 ? destination.target.starId + "/" + destination.target.bodyId
-                : destination.target.nativeId;
+                : destination.target.kind === "star"
+                  ? destination.target.nativeId
+                  : destination.id;
         document.documentElement.dataset.universeNavigationTarget =
           nativeTarget;
         document.documentElement.dataset.universeNavigationPhase =
