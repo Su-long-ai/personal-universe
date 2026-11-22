@@ -581,6 +581,16 @@ select {
   color: rgba(255, 218, 151, 0.76);
 }
 
+.navigator-kind.kind-galaxy {
+  border-color: rgba(173, 151, 255, 0.3);
+  color: rgba(196, 181, 255, 0.86);
+}
+
+.navigator-kind.kind-landmark {
+  border-color: rgba(255, 161, 207, 0.26);
+  color: rgba(255, 181, 219, 0.82);
+}
+
 .navigator-result-main {
   min-width: 0;
   display: grid;

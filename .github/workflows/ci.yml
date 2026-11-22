@@ -50,11 +50,15 @@ jobs:
             exit 1
           fi
 
-          "$CHROME"             --headless=new             --no-sandbox             --disable-gpu             --disable-background-networking             --virtual-time-budget=12000             --dump-dom             http://127.0.0.1:4321/             > /tmp/personal-universe-dom.html
-
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom http://127.0.0.1:4321/ > /tmp/personal-universe-dom.html
           grep -q 'data-universe-engine="yeis"' /tmp/personal-universe-dom.html
           grep -q 'data-yeis-native-galaxy="ready"' /tmp/personal-universe-dom.html
           grep -q 'data-personal-signals="1"' /tmp/personal-universe-dom.html
+
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom 'http://127.0.0.1:4321/?navigator=1&navq=Earth' > /tmp/personal-universe-nav.html
+          grep -q 'data-universe-navigator="open"' /tmp/personal-universe-nav.html
+          grep -Eq 'data-universe-navigator-results="[1-9][0-9]*"' /tmp/personal-universe-nav.html
+          grep -q 'Earth' /tmp/personal-universe-nav.html
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4

@@ -23,8 +23,8 @@ import {
 } from "../../lib/universe/content";
 import {
   navigationMarker,
+  type UniverseNavigationCameraRequest,
   type UniverseNavigationDestination,
-  type UniverseNavigationFocusRequest,
 } from "../../lib/universe/yeis/navigation";
 import "./universe.css";
 
@@ -67,9 +67,12 @@ export default function UniverseApp({
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [scrollDepth, setScrollDepth] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
-  const [navigationFocus, setNavigationFocus] =
-    useState<UniverseNavigationFocusRequest | null>(null);
-  const navigationFocusSeq = useRef(0);
+  const [navigationRequest, setNavigationRequest] =
+    useState<UniverseNavigationCameraRequest | null>(null);
+  const [navigationStatus, setNavigationStatus] = useState<
+    "locating" | "traveling" | "located" | "arrived" | null
+  >(null);
+  const navigationRequestSeq = useRef(0);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -95,6 +98,11 @@ export default function UniverseApp({
     if (activeEngine !== "yeis") {
       setNavigatorOpen(false);
       return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("navigator") === "1") {
+      setNavigatorOpen(true);
     }
 
     const handleShortcut = (event: KeyboardEvent) => {
@@ -301,46 +309,137 @@ export default function UniverseApp({
   const handleNavigateDestination = useCallback(
     async (destination: UniverseNavigationDestination) => {
       if (activeEngine !== "yeis") return;
-      const marker = await navigationMarker(destination, galaxy.markers);
-      setNavigationFocus(null);
-      delete document.documentElement.dataset.universeLocated;
-      handleSelectSystem(marker);
+
+      if (
+        destination.target.kind === "star" ||
+        destination.target.kind === "body"
+      ) {
+        const marker = await navigationMarker(destination, galaxy.markers);
+        setNavigationRequest(null);
+        setNavigationStatus(null);
+        delete document.documentElement.dataset.universeLocated;
+
+        if (destination.target.kind === "body") {
+          const system = resolveMarker(marker);
+          const planet =
+            system.planets.find(
+              (candidate) =>
+                candidate.id === destination.target.bodyId ||
+                candidate.id ===
+                  "yeis-planet:" + destination.target.bodyId,
+            ) ?? null;
+
+          setSelectedSystem(system);
+          setSelectedPlanet(planet);
+          setScrollDepth(0);
+          ambient.ensurePlaying();
+          setPhase(planet ? "approach" : "system");
+          document.documentElement.dataset.universeNavigationTarget =
+            destination.target.nativeId + ":" + destination.target.bodyId;
+          console.info(
+            "[UNIVERSE-NAV] open body:" +
+              destination.title +
+              " -> " +
+              destination.target.nativeId +
+              ":" +
+              destination.target.bodyId,
+          );
+          return;
+        }
+
+        handleSelectSystem(marker);
+        document.documentElement.dataset.universeNavigationTarget =
+          destination.target.nativeId;
+        console.info(
+          "[UNIVERSE-NAV] open " +
+            destination.kind +
+            ":" +
+            destination.title +
+            " -> " +
+            destination.target.nativeId,
+        );
+        return;
+      }
+
+      navigationRequestSeq.current += 1;
+      setSelectedSystem(null);
+      setSelectedPlanet(null);
+      setPhase("galaxy");
+      setNavigationRequest({
+        requestId: navigationRequestSeq.current,
+        mode: "travel",
+        target: destination.target,
+        title: destination.title,
+      });
+      setNavigationStatus("traveling");
+      const spatialTarget =
+        destination.target.kind + ":" + destination.target.index;
       document.documentElement.dataset.universeNavigationTarget =
-        destination.nativeId;
+        spatialTarget;
       console.info(
-        "[UNIVERSE-NAV] open " +
+        "[UNIVERSE-NAV] travel " +
           destination.kind +
           ":" +
           destination.title +
           " -> " +
-          destination.nativeId,
+          spatialTarget,
       );
     },
-    [activeEngine, galaxy.markers, handleSelectSystem],
+    [
+      activeEngine,
+      ambient,
+      galaxy.markers,
+      handleSelectSystem,
+      resolveMarker,
+    ],
   );
 
   const handleLocateDestination = useCallback(
     (destination: UniverseNavigationDestination) => {
       if (activeEngine !== "yeis") return;
-      navigationFocusSeq.current += 1;
+      navigationRequestSeq.current += 1;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
-      setNavigationFocus({
-        requestId: navigationFocusSeq.current,
-        nativeId: destination.nativeId,
+
+      const cameraTarget =
+        destination.target.kind === "body"
+          ? {
+              kind: "star" as const,
+              nativeId: destination.target.nativeId,
+            }
+          : destination.target;
+
+      setNavigationRequest({
+        requestId: navigationRequestSeq.current,
+        mode: "locate",
+        target: cameraTarget,
         title: destination.title,
       });
+      setNavigationStatus("locating");
+      const target =
+        cameraTarget.kind === "star"
+          ? cameraTarget.nativeId
+          : cameraTarget.kind + ":" + cameraTarget.index;
       console.info(
         "[UNIVERSE-NAV] locate " +
           destination.kind +
           ":" +
           destination.title +
           " -> " +
-          destination.nativeId,
+          target,
       );
     },
     [activeEngine],
+  );
+
+  const handleNavigationComplete = useCallback(
+    (request: UniverseNavigationCameraRequest) => {
+      setNavigationStatus(
+        request.mode === "travel" ? "arrived" : "located",
+      );
+    },
+    [],
   );
 
   const handleSelectPlanet = useCallback(
@@ -411,7 +510,8 @@ export default function UniverseApp({
           engineMode={activeEngine}
           markers={galaxy.markers}
           contentPlacements={contentPlacements}
-          navigationFocus={navigationFocus}
+          navigationRequest={navigationRequest}
+          onNavigationComplete={handleNavigationComplete}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           onSelectSystem={handleSelectSystem}
@@ -477,9 +577,16 @@ export default function UniverseApp({
         onLocate={handleLocateDestination}
       />
 
-      {phase === "galaxy" && navigationFocus && (
+      {phase === "galaxy" && navigationRequest && (
         <div className="galaxy-locate-caption">
-          LOCATED // {navigationFocus.title}
+          {navigationStatus === "arrived"
+            ? "ARRIVED"
+            : navigationStatus === "located"
+              ? "LOCATED"
+              : navigationRequest.mode === "travel"
+                ? "NAVIGATING"
+                : "LOCATING"} //{" "}
+          {navigationRequest.title}
         </div>
       )}
 

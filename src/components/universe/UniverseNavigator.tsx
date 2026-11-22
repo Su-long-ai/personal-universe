@@ -39,6 +39,10 @@ export function UniverseNavigator({
     }
 
     document.documentElement.dataset.universeNavigator = "open";
+    const debugQuery = new URLSearchParams(window.location.search).get("navq");
+    if (debugQuery) {
+      setQuery(debugQuery);
+    }
     window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => {
       delete document.documentElement.dataset.universeNavigator;
@@ -139,7 +143,7 @@ export function UniverseNavigator({
                 else activate(result);
               }
             }}
-            placeholder="Search projects, stars, black holes, landmarks…"
+            placeholder="Search projects, stars, galaxies, black holes, landmarks…"
             aria-label="Search universe"
           />
           <kbd>CTRL K</kbd>
@@ -194,7 +198,9 @@ export function UniverseNavigator({
                   <strong>{result.title}</strong>
                   <small>{result.detail}</small>
                 </span>
-                <span className="navigator-open">OPEN →</span>
+                <span className="navigator-open">
+                  {result.target.kind === "star" || result.target.kind === "body" ? "OPEN →" : "TRAVEL →"}
+                </span>
               </button>
               <button
                 type="button"
@@ -210,7 +216,7 @@ export function UniverseNavigator({
 
         <footer className="navigator-footer">
           <span>↑↓ SELECT</span>
-          <span>ENTER OPEN</span>
+          <span>ENTER OPEN / TRAVEL</span>
           <span>SHIFT+ENTER LOCATE</span>
           <span>ESC CLOSE</span>
         </footer>
