@@ -56,6 +56,23 @@ export function CinematicPipeline({
   ]);
 
   useEffect(() => {
+    if (!liveWorld || !composer.planetPass) {
+      delete document.documentElement.dataset.universeWorldPipeline;
+      return;
+    }
+    document.documentElement.dataset.universeWorldPipeline =
+      "procedural-planets-pass";
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldPipeline ===
+        "procedural-planets-pass"
+      ) {
+        delete document.documentElement.dataset.universeWorldPipeline;
+      }
+    };
+  }, [composer, liveWorld]);
+
+  useEffect(() => {
     composer.composer.setSize(size.width, size.height);
     composer.composer.setPixelRatio(
       Math.min(gl.getPixelRatio(), high ? 1.75 : 1),
