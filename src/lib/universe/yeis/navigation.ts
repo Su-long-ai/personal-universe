@@ -268,6 +268,7 @@ const CURATED_GALAXIES: CuratedRef[] = [
 
 const QUERY_ALIASES: Record<string, string> = {
   "太阳": "sun",
+  "太阳系": "solar system",
   "地球": "earth",
   "月球": "moon",
   "月亮": "moon",
@@ -823,7 +824,7 @@ function buildPlaces(
   const exoplanets = observedExoplanetDestinations(markers).slice(0, 24);
   if (exoplanets.length) sections.push(section("exoplanets", exoplanets));
 
-  const bodies = curatedBodies(runtime);
+  const bodies = [solarSystemDestination(runtime), ...curatedBodies(runtime)];
   if (bodies.length) sections.push(section("bodies", bodies));
 
   const stars = curatedStars(runtime, CURATED_STARS, "star");
@@ -894,6 +895,10 @@ function searchDestinations(
     )
   ) {
     out.push(heroDestination(heroMarker));
+  }
+
+  if (queries.includes(normalize("solar system"))) {
+    out.push(solarSystemDestination(runtime));
   }
 
   for (const destination of observedDestinations(markers)) {
@@ -1176,6 +1181,20 @@ function heroDestination(
     },
     markerId: marker.id,
     keywords: ["aurora", "helion", "hero", "home", HERO_SYSTEM_ID],
+  };
+}
+
+function solarSystemDestination(
+  runtime: YeisCoreRuntime,
+): UniverseNavigationDestination {
+  return {
+    id: "star:c0",
+    kind: "star",
+    group: "bodies",
+    title: "Solar System",
+    detail: "HOME SYSTEM · " + runtime.universe.starName("c0"),
+    target: { kind: "star", nativeId: "c0" },
+    keywords: ["Sun", "Sol", "solar", "home system"],
   };
 }
 
