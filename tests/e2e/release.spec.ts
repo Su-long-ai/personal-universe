@@ -125,12 +125,17 @@ test("guided Journey stays manual under reduced motion", async ({
   await openNavigator(page);
   const journey = page
     .locator(".navigator-journeys button:not([disabled])")
-    .filter({ hasText: /(?:[2-9]|\d{2,}) STOPS/ })
     .first();
   await expect(journey).toBeVisible();
+  const stopText = await journey.locator("small").innerText();
+  const stopMatch = /^(\\d+) STOPS$/.exec(stopText.trim());
+  expect(stopMatch, "enabled Journey should expose a positive stop count").toBeTruthy();
+  const stopCount = Number(stopMatch![1]);
+  expect(stopCount).toBeGreaterThan(0);
   await journey.click();
 
   const controls = page.locator(".universe-journey-controls");
+  const progress = page.locator(".journey-current small");
   await expect(controls).toBeVisible();
   await expect(page.locator(".journey-mode")).toHaveText(
     "REDUCED MOTION · MANUAL ADVANCE",
@@ -139,12 +144,20 @@ test("guided Journey stays manual under reduced motion", async ({
     "data-universe-journey",
     /.+/,
   );
-  await expect(page.locator(".journey-current small")).toContainText("1 /");
+  await expect(progress).toHaveText(`1 / ${stopCount}`);
 
-  await page.getByRole("button", { name: "NEXT →" }).click();
-  await expect(page.locator(".journey-current small")).toContainText("2 /");
+  // Normal journeys auto-advance after a 6.5s dwell. Reduced motion must not.
+  await page.waitForTimeout(7_000);
+  await expect(progress).toHaveText(`1 / ${stopCount}`);
 
-  await page.getByRole("button", { name: "Stop guided journey" }).click();
+  if (stopCount > 1) {
+    await page.getByRole("button", { name: "NEXT →" }).click();
+    await expect(progress).toHaveText(`2 / ${stopCount}`);
+    await page.getByRole("button", { name: "Stop guided journey" }).click();
+  } else {
+    await page.getByRole("button", { name: "DONE" }).click();
+  }
+
   await expect(controls).toBeHidden();
   await expect(page.locator("html")).not.toHaveAttribute(
     "data-universe-journey",
