@@ -606,6 +606,175 @@ test("Guided Journey completes visibly and competing navigation interrupts", asy
   await runtime.assertClean(testInfo);
 });
 
+test("Hero Search produces a reloadable exact world deep link", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("AURORA-01");
+
+  const hero = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-hero") })
+    .filter({ hasText: "AURORA-01" })
+    .first();
+  await expect(hero).toBeVisible();
+  await hero.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  const destinationId = "hero:aurora-01";
+  const nativeTarget = "h-aurora/aurora-01";
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ AURORA-01/)).toBeVisible();
+
+  const sharedUrl = new URL(page.url());
+  expect(sharedUrl.searchParams.get("destination")).toBe(destinationId);
+  expect(sharedUrl.searchParams.get("star")).toBe("h-aurora");
+  expect(sharedUrl.searchParams.get("body")).toBe("aurora-01");
+  expect(sharedUrl.searchParams.get("phase")).toBe("approach");
+
+  await page.goto(sharedUrl.toString());
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ AURORA-01/)).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Chinese Andromeda alias starts the exact galaxy travel contract", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("仙女座");
+
+  const galaxy = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-galaxy") })
+    .filter({ hasText: "Andromeda" })
+    .first();
+  await expect(galaxy).toBeVisible();
+  await galaxy.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    /^galaxy:\d+$/,
+  );
+  const destinationId = await html.getAttribute(
+    "data-universe-active-destination",
+  );
+  expect(destinationId).toMatch(/^galaxy:\d+$/);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    destinationId!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute(
+        "data-universe-travel-complete",
+      );
+      return traveling === destinationId || complete === destinationId;
+    })
+    .toBe(true);
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toBe(destinationId);
+  expect(url.searchParams.get("phase")).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Locate then real canvas click reuses the same landmark destination", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Orion Nebula");
+
+  const landmark = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-landmark") })
+    .filter({ hasText: "Orion" })
+    .first();
+  await expect(landmark).toBeVisible();
+  await landmark.locator(".navigator-locate").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-locate-complete",
+    /^landmark:\d+$/,
+  );
+
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box, "native YEIS canvas should have a clickable viewport").not.toBeNull();
+  await page.mouse.click(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  );
+
+  await expect(html).toHaveAttribute(
+    "data-yeis-picked-target",
+    "landmark:l-m42",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "landmark:l-m42",
+  );
+  expect(new URL(page.url()).searchParams.get("destination")).toBe(
+    "landmark:l-m42",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("landmark Search shares the same travel destination contract", async ({
   page,
 }, testInfo) => {
