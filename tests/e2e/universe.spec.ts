@@ -281,7 +281,9 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     "data-universe-navigation-phase",
     "approach",
   );
-  await expect(page.locator(".content-signal-card")).toBeVisible();
+  const personalWorld = page.locator(".world-content-card");
+  await expect(personalWorld).toBeVisible();
+  await expect(personalWorld).toContainText("Personal Universe");
   const personalTarget = await page
     .locator("html")
     .getAttribute("data-universe-navigation-target");
@@ -300,7 +302,8 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     "data-universe-navigation-phase",
     "approach",
   );
-  await expect(page.locator(".content-signal-card")).toBeVisible();
+  const featuredWorld = page.locator(".world-content-card");
+  await expect(featuredWorld).toBeVisible();
   const placeTarget = await page
     .locator("html")
     .getAttribute("data-universe-navigation-target");
