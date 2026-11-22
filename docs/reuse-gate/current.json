@@ -1,88 +1,93 @@
 {
-  "task_id": "V1-VISUAL-BENCHMARK-001",
-  "title": "Replace V0 placeholder planet and sky with reusable cinematic rendering stack",
+  "task_id": "V1-CINEMATIC-APPROACH-001",
+  "title": "Replace hand-written damp camera with reusable cinematic camera controls",
   "researched_at": "2026-11-22",
-  "research_summary": "Keep the current stable R3F v8/WebGL2 stack. Reuse procedural-planets for the hero planet and its physically based atmosphere/ocean/volumetric clouds, Solar System Scope for a real Milky Way sky texture, Three.js/EffectComposer for the rendering pipeline, and the existing GSAP/camera-controls stack later for authored travel. Do not adopt @pmndrs/sky yet because its React bindings require R3F v10 alpha/WebGPU.",
+  "research_summary": "Use Drei 9.122.0's CameraControls wrapper, which in this installed tree is backed by camera-controls 2.10.1. It integrates directly with R3F's active camera and renderer and retains SmoothDamp/Promise-based transition APIs. Avoid the separately installed root camera-controls 3.1.2 in this task so we do not mix major versions. Defer Theatre.js to authored polish after the path is stable, and defer Three RenderTransitionPass to the later Galaxy->Surface scene swap.",
   "planned_files": [
-    "package.json",
-    "package-lock.json",
-    "src/components/universe/BenchmarkPlanet.tsx",
-    "src/components/universe/CinematicPipeline.tsx",
-    "src/components/universe/GalaxyScene.tsx",
+    "src/components/universe/CinematicCamera.tsx",
     "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/universe.css",
-    "public/textures/stars_milky_way.jpg",
-    "public/THIRD_PARTY_ASSETS.md"
+    "src/components/universe/UniverseApp.tsx"
   ],
   "sources": [
     {
-      "url": "https://github.com/ZyFou/ProceduralPlanets",
-      "finding": "procedural-planets 0.5.1 is MIT, WebGL2, Three >=0.160, with terrain LOD, analytic ocean, volumetric clouds, physically based atmosphere, and PlanetPass/EffectComposer integration."
+      "url": "https://drei.docs.pmnd.rs/controls/camera-controls",
+      "finding": "Drei provides a React Three Fiber CameraControls component backed by the official camera-controls implementation, connected to R3F camera/renderer and exposing transition/rest callbacks."
     },
     {
-      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/main/docs/embedding.md",
-      "finding": "PlanetPass is designed to render directly after a RenderPass into an HDR composer so bloom and final tone mapping can see the planet."
+      "url": "https://github.com/yomotsu/camera-controls",
+      "finding": "camera-controls v3 supports SmoothDamp transitions; setLookAt and related transition methods return Promises for composing complex camera moves."
     },
     {
-      "url": "https://www.solarsystemscope.com/textures/",
-      "finding": "Solar System Scope provides a Stars + Milky Way equirectangular texture pack under CC BY 4.0, based on NASA imagery/data."
+      "url": "https://www.theatrejs.com/docs/latest/getting-started/with-react-three-fiber",
+      "finding": "Theatre.js supports an editable R3F PerspectiveCamera and exported timeline state, making it suitable for later authored camera polish rather than the first runtime transition implementation."
     },
     {
-      "url": "https://github.com/zjoooooo/galaxy-explorer",
-      "finding": "Galaxy Explorer is MIT and demonstrates a production-oriented separation of painted galactic disc, procedural star points, cinematic travel and performance fallback."
+      "url": "https://threejs.org/docs/pages/RenderTransitionPass.html",
+      "finding": "Three.js RenderTransitionPass blends two separate scenes/cameras and is better reserved for the later galaxy-to-surface scene swap."
     },
     {
-      "url": "https://github.com/pmndrs/sky",
-      "finding": "@pmndrs/sky is MIT and high quality, but React bindings require R3F >=10 alpha and WebGPU, so it is not selected for the stable V1 mainline."
+      "url": "https://gsap.com/docs/v3/GSAP/Timeline/",
+      "finding": "GSAP Timeline is strong for deterministic sequencing and callbacks, but camera-controls already owns camera state/constraints, so using GSAP directly on the camera would duplicate responsibility."
+    },
+    {
+      "url": "https://www.npmjs.com/package/@react-three/drei/v/9.122.0",
+      "finding": "Local package inspection confirms Drei 9.122.0 resolves camera-controls 2.10.1; the task will use Drei's own wrapper/dependency rather than the root camera-controls 3.x."
     }
   ],
   "candidates": [
     {
-      "name": "procedural-planets 0.5.1",
-      "source": "https://github.com/ZyFou/ProceduralPlanets",
+      "name": "Drei 9.122 CameraControls + bundled camera-controls 2.10.1",
+      "source": "https://drei.docs.pmnd.rs/controls/camera-controls",
       "license": "MIT",
       "decision": "reuse",
-      "reason": "Directly compatible with our Three 0.187/WebGL2 stack and replaces the hand-built sphere shell with terrain, ocean, clouds and atmosphere."
+      "reason": "Already installed, native to R3F, supports smooth Promise-based transitions, and avoids custom lifecycle/adaptor code. Local dependency inspection confirms the bundled version is 2.10.1."
     },
     {
-      "name": "Solar System Scope Stars + Milky Way texture",
-      "source": "https://www.solarsystemscope.com/textures/",
-      "license": "CC BY 4.0",
-      "decision": "reuse",
-      "reason": "Provides a real-looking deep-sky foundation immediately; attribution can be retained locally."
+      "name": "Theatre.js R3F camera",
+      "source": "https://www.theatrejs.com/docs/latest/api/r3f",
+      "license": "Apache-2.0 runtime core",
+      "decision": "partial",
+      "reason": "Excellent for visual keyframe authoring and later polish, but adds project-state/editor workflow before the basic camera route is proven."
     },
     {
-      "name": "Galaxy Explorer",
-      "source": "https://github.com/zjoooooo/galaxy-explorer",
+      "name": "Three RenderTransitionPass",
+      "source": "https://threejs.org/docs/pages/RenderTransitionPass.html",
       "license": "MIT",
       "decision": "partial",
-      "reason": "Reuse its rendering/composition ideas and later port selected galaxy techniques; for this benchmark the priority is the hero planet, not a full galaxy transplant."
+      "reason": "Useful for future scene A/B transitions, not for moving one camera through the existing orbital scene."
     },
     {
-      "name": "@pmndrs/sky 0.6",
-      "source": "https://github.com/pmndrs/sky",
-      "license": "MIT",
+      "name": "GSAP camera position/lookAt tweening",
+      "source": "https://gsap.com/docs/v3/GSAP/Timeline/",
+      "license": "GSAP Standard no-charge license",
       "decision": "reject",
-      "reason": "Excellent visual candidate but its React path requires R3F 10 alpha/WebGPU. Upgrading the whole app would add unnecessary stability risk before the benchmark passes."
+      "reason": "Would require our own camera target synchronization and constraints, duplicating camera-controls' purpose."
     },
     {
-      "name": "Continue polishing the existing sphere + transparent shell",
+      "name": "Continue custom MathUtils.damp CameraDirector",
       "source": "local V0 implementation",
       "license": "Project code",
       "decision": "reject",
-      "reason": "The V0 technique has already demonstrated a low visual ceiling and duplicates mature atmospheric/planet rendering work."
+      "reason": "No authored path semantics, completion signal, input constraints, or reusable transition primitives; already caps cinematic quality."
+    },
+    {
+      "name": "Direct root camera-controls 3.1.2",
+      "source": "https://github.com/yomotsu/camera-controls",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "The root package is a different major version from Drei 9.122's bundled 2.10.1; mixing both would add avoidable integration/version risk."
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected": [
-      "procedural-planets",
-      "Solar System Scope Milky Way texture",
-      "Three.js EffectComposer/UnrealBloom/OutputPass"
+      "@react-three/drei 9.122 CameraControls",
+      "bundled camera-controls 2.10.1"
     ],
     "deferred": [
-      "@pmndrs/sky until R3F v10/WebGPU is stable enough",
-      "full Galaxy Explorer port until the hero-frame benchmark passes"
-    ]
+      "Theatre.js for authored polish",
+      "RenderTransitionPass for Galaxy->Surface cut"
+    ],
+    "implementation_note": "Camera transition completion will drive phase progression instead of fixed timers, while debug freeze remains available for visual snapshots."
   }
 }

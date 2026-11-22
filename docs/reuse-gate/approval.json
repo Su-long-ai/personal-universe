@@ -1,19 +1,13 @@
 {
   "schema": 1,
-  "task_id": "V1-VISUAL-BENCHMARK-001",
-  "approved_at": "2026-11-22T09:51:46.374Z",
-  "baseline_commit": "27df31c3b9a57d5d48fb507833f98bde2b2fda65",
+  "task_id": "V1-CINEMATIC-APPROACH-001",
+  "approved_at": "2026-11-22T10:04:55.763Z",
+  "baseline_commit": "ee9e2c284c2a0cf6f30a7b1d5e14e0891278935f",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "1868b27e1cad4d556cdbb8f88a98b5a0e31437b62e82c59727798824272bffe6",
+  "record_sha256": "2f0c548d8c4708fa2f0e293094745b51407b05890474887701eedff590cfd0f9",
   "planned_files": [
-    "package.json",
-    "package-lock.json",
-    "src/components/universe/BenchmarkPlanet.tsx",
-    "src/components/universe/CinematicPipeline.tsx",
-    "src/components/universe/GalaxyScene.tsx",
+    "src/components/universe/CinematicCamera.tsx",
     "src/components/universe/UniverseCanvas.tsx",
-    "src/components/universe/universe.css",
-    "public/textures/stars_milky_way.jpg",
-    "public/THIRD_PARTY_ASSETS.md"
+    "src/components/universe/UniverseApp.tsx"
   ]
 }

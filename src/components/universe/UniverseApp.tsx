@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
 import type { QualityMode, UniversePhase } from "../../lib/universe/types";
@@ -19,6 +19,13 @@ function useReducedMotion() {
   return reduced;
 }
 
+const NEXT_PHASE: Partial<Record<UniversePhase, UniversePhase>> = {
+  approach: "orbit",
+  orbit: "atmosphere",
+  atmosphere: "surface",
+  returning: "galaxy",
+};
+
 export default function UniverseApp() {
   const [phase, setPhase] = useState<UniversePhase>("galaxy");
   const [collapsed, setCollapsed] = useState(false);
@@ -33,36 +40,24 @@ export default function UniverseApp() {
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("phase");
-    if (requested && ["galaxy", "approach", "orbit", "atmosphere", "surface", "returning"].includes(requested)) {
+    if (
+      requested &&
+      ["galaxy", "approach", "orbit", "atmosphere", "surface", "returning"].includes(requested)
+    ) {
       setPhase(requested as UniversePhase);
     }
   }, []);
 
-  useEffect(() => {
-    if (debugFreeze || phase === "galaxy" || phase === "surface" || phase === "returning") return;
-    const durations: Partial<Record<UniversePhase, number>> = reducedMotion
-      ? { approach: 350, orbit: 350, atmosphere: 300 }
-      : { approach: 2400, orbit: 1750, atmosphere: 1450 };
-
-    const next: Partial<Record<UniversePhase, UniversePhase>> = {
-      approach: "orbit",
-      orbit: "atmosphere",
-      atmosphere: "surface",
-    };
-
-    const timer = window.setTimeout(() => {
-      const destination = next[phase];
-      if (destination) setPhase(destination);
-    }, durations[phase] ?? 800);
-
-    return () => window.clearTimeout(timer);
-  }, [phase, reducedMotion, debugFreeze]);
-
-  useEffect(() => {
-    if (debugFreeze || phase !== "returning") return;
-    const timer = window.setTimeout(() => setPhase("galaxy"), reducedMotion ? 250 : 1250);
-    return () => window.clearTimeout(timer);
-  }, [phase, reducedMotion, debugFreeze]);
+  const handleCinematicPhaseComplete = useCallback(
+    (completed: UniversePhase) => {
+      if (debugFreeze) return;
+      setPhase((current) => {
+        if (current !== completed) return current;
+        return NEXT_PHASE[completed] ?? current;
+      });
+    },
+    [debugFreeze],
+  );
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
@@ -75,7 +70,9 @@ export default function UniverseApp() {
       className={`universe-root ${transitionClass}`}
       onWheel={(event) => {
         if (phase !== "galaxy") return;
-        setScrollDepth((value) => Math.max(-2.5, Math.min(3, value + Math.sign(event.deltaY) * 0.35)));
+        setScrollDepth((value) =>
+          Math.max(-2.5, Math.min(3, value + Math.sign(event.deltaY) * 0.35)),
+        );
       }}
     >
       <div className="universe-canvas">
@@ -89,6 +86,7 @@ export default function UniverseApp() {
           quality={quality}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
+          onCinematicPhaseComplete={handleCinematicPhaseComplete}
         />
       </div>
 
@@ -124,9 +122,15 @@ export default function UniverseApp() {
         </section>
       )}
 
-      {phase === "approach" && <div className="travel-caption">LOCK ACQUIRED // ACCELERATING</div>}
-      {phase === "orbit" && <div className="travel-caption">ORBITAL INSERTION // AURORA-01</div>}
-      {phase === "atmosphere" && <div className="travel-caption">ATMOSPHERIC ENTRY</div>}
+      {phase === "approach" && (
+        <div className="travel-caption">LOCK ACQUIRED // ACCELERATING</div>
+      )}
+      {phase === "orbit" && (
+        <div className="travel-caption">ORBITAL INSERTION // AURORA-01</div>
+      )}
+      {phase === "atmosphere" && (
+        <div className="travel-caption">ATMOSPHERIC ENTRY</div>
+      )}
     </main>
   );
 }
