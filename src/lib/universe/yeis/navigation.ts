@@ -442,9 +442,11 @@ export function navigationDestinationForPlanet(
   placements: UniverseContentPlacement[] = [],
 ): UniverseNavigationDestination | null {
   const contentEntries = planet.content ?? [];
-  if (contentEntries.length === 1) {
+  const singleContent =
+    contentEntries.length === 1 ? contentEntries[0] : undefined;
+  if (singleContent) {
     const placement = placements.find(
-      (candidate) => candidate.entry.id === contentEntries[0].id,
+      (candidate) => candidate.entry.id === singleContent.id,
     );
     if (placement) {
       const personal = navigationDestinationForPlacement(
@@ -503,26 +505,29 @@ export function navigationDestinationForPlanet(
     );
 
   if (observedMarker) {
-    return (
-      observedExoplanetDestinations([observedMarker]).find(
-        (destination) =>
-          destination.target.kind === "observed-body" &&
-          destination.target.bodyId === planet.id,
-      ) ?? {
-        id: "exoplanet:" + observedMarker.id + ":" + planet.name,
-        kind: "exoplanet",
-        group: "exoplanets",
-        title: planet.name,
-        detail: "OBSERVED EXOPLANET · " + system.name,
-        target: {
-          kind: "observed-body",
-          markerId: observedMarker.id,
-          bodyId: planet.id,
-        },
-        markerId: observedMarker.id,
-        keywords: [system.name, planet.archetype],
-      }
+    const observedDestination = observedExoplanetDestinations([
+      observedMarker,
+    ]).find(
+      (destination) =>
+        destination.target.kind === "observed-body" &&
+        destination.target.bodyId === planet.id,
     );
+    if (observedDestination) return observedDestination;
+
+    return {
+      id: "exoplanet:" + observedMarker.id + ":" + planet.name,
+      kind: "exoplanet",
+      group: "exoplanets",
+      title: planet.name,
+      detail: "OBSERVED EXOPLANET · " + system.name,
+      target: {
+        kind: "observed-body",
+        markerId: observedMarker.id,
+        bodyId: planet.id,
+      },
+      markerId: observedMarker.id,
+      keywords: [system.name, planet.archetype],
+    };
   }
 
   return null;
