@@ -24,6 +24,7 @@ import {
 import {
   navigationCameraTarget,
   navigationDestinationForMarker,
+  navigationDestinationForPlanet,
   navigationMarker,
   resolveUniverseNavigationDestination,
   type UniverseNavigationCameraRequest,
@@ -718,11 +719,34 @@ export default function UniverseApp({
 
   const handleSelectPlanet = useCallback(
     (planet: PlanetDefinition) => {
+      if (activeEngine === "yeis" && selectedSystem) {
+        const destination = navigationDestinationForPlanet(
+          selectedSystem,
+          planet,
+          galaxy.markers,
+          contentPlacements,
+        );
+        if (destination) {
+          void handleNavigateDestination(destination);
+          return;
+        }
+      }
+
+      journeyNavigationRef.current = false;
+      journeyRef.current = null;
+      setJourney(null);
       setSelectedPlanet(planet);
       ambient.ensurePlaying();
       setPhase("approach");
     },
-    [ambient],
+    [
+      activeEngine,
+      ambient,
+      contentPlacements,
+      galaxy.markers,
+      handleNavigateDestination,
+      selectedSystem,
+    ],
   );
 
   const handleCinematicPhaseComplete = useCallback(
