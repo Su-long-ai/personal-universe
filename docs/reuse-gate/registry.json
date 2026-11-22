@@ -612,6 +612,36 @@
       ],
       "notes": "Already present through the project React dependency. Suitable for the small local journey coordinator without introducing a second state framework.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "three-vector3-project",
+      "name": "Three.js Vector3 camera projection",
+      "url": "https://threejs.org/docs/#api/en/math/Vector3.project",
+      "level": "component_asset",
+      "license": "MIT (Three.js)",
+      "status": "adopt",
+      "covers": [
+        "3D point to normalized-device-coordinate projection",
+        "camera-aware screen-space positioning",
+        "existing Three.js runtime reuse"
+      ],
+      "notes": "Use the existing Three.js projection primitive to map Personal Signal sky directions to screen coordinates for lightweight hover hit testing. No new runtime dependency.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "floating-ui-virtual-elements",
+      "name": "Floating UI virtual elements",
+      "url": "https://floating-ui.com/docs/virtual-elements",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "floating-element positioning",
+        "virtual point anchors",
+        "collision-aware tooltip placement"
+      ],
+      "notes": "Mature DOM floating-position solution and supports cursor/virtual-point anchors. Not selected for Personal Signal hover because WebGL signal hit testing/projection is the hard part and the simple non-interactive label needs only bounded client coordinates.",
+      "last_checked": "2026-11-23"
     }
   ]
 }
