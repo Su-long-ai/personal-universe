@@ -671,7 +671,12 @@ export default function UniverseApp({
       galaxy.markers,
     )
       .then((destination) => {
-        if (cancelled || !destination) return;
+        if (cancelled) return;
+        if (!destination) {
+          deepLinkHandledRef.current = null;
+          document.documentElement.dataset.universeDeepLink = "unresolved";
+          return;
+        }
         document.documentElement.dataset.universeDeepLink = destination.id;
         return mode === "locate"
           ? handleLocateDestination(destination)
