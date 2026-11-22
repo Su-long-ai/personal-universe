@@ -62,6 +62,11 @@ export function UniverseCanvas({
   onCinematicPhaseComplete: (phase: UniversePhase) => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
+  const liveWorld =
+    Boolean(selectedPlanet) &&
+    (phase === "approach" ||
+      phase === "orbit" ||
+      phase === "atmosphere");
 
   return (
     <Canvas
@@ -123,7 +128,11 @@ export function UniverseCanvas({
           )}
       </Suspense>
 
-      <CinematicPipeline key={phase} quality={quality} />
+      <CinematicPipeline
+        key={phase}
+        quality={quality}
+        liveWorld={liveWorld}
+      />
     </Canvas>
   );
 }
