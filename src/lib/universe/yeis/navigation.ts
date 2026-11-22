@@ -6,6 +6,7 @@ import { markerForYeisStarId } from "./bridge";
 export type UniverseNavigationKind =
   | "personal"
   | "featured"
+  | "body"
   | "star"
   | "blackhole"
   | "landmark"
@@ -13,6 +14,7 @@ export type UniverseNavigationKind =
 
 export type UniverseNavigationTarget =
   | { kind: "star"; nativeId: string }
+  | { kind: "body"; nativeId: string; bodyId: string }
   | { kind: "galaxy"; index: number }
   | { kind: "landmark"; index: number };
 
@@ -29,35 +31,77 @@ export interface UniverseNavigationDestination {
 export interface UniverseNavigationCameraRequest {
   requestId: number;
   mode: "locate" | "travel";
-  target: UniverseNavigationTarget;
+  target: Exclude<UniverseNavigationTarget, { kind: "body" }>;
   title: string;
 }
 
 /**
- * English-facing subset of the pinned MIT YEIS Places list.
- * Stable refs and spatial semantics come from src/ui/places.ts / src/main.ts
- * at e520568; Personal Universe owns only product presentation.
+ * Refs below are copied from the pinned MIT YEIS src/ui/places.ts at
+ * e520568. Personal Universe derives display text from the active YEIS model
+ * and intentionally omits the Solar-System body/spacecraft group from browse:
+ * those objects are not first-class in the current R3F system renderer.
  */
-const FEATURED_STAR_REFS = [
+const CURATED_STAR_REFS = [
   "Proxima Centauri",
+  "Rigil Kentaurus",
   "Sirius",
   "Vega",
   "Betelgeuse",
+  "Rigel",
   "Polaris",
+  "Aldebaran",
+  "Antares",
+  "Deneb",
 ] as const;
 
-const FEATURED_GALAXY_REFS = [
-  "Andromeda",
-  "M33",
-  "Büyük Macellan",
-  "M87",
+const CURATED_BLACK_HOLE_REFS = [
+  "b0",
+  "cygx1",
+  "b2",
+  "b3",
+  "b4",
+  "b1",
+  "m31star",
+  "lmcx1",
+  "m33x7",
+  "cenastar",
 ] as const;
 
-const FEATURED_LANDMARK_REFS = [
+const CURATED_LANDMARK_REFS = [
+  "l-crabpsr",
+  "l-vela",
+  "l-b1919",
+  "l-lich",
+  "l-j1748",
+  "l-hulsetaylor",
+  "l-geminga",
+  "l-j0437",
+  "l-sgr1806",
   "l-m42",
   "l-pleiades",
+  "l-carina",
   "l-m1",
   "l-omegacen",
+  "l-30dor",
+  "l-r136a1",
+  "l-sn1987a",
+  "l-g1",
+  "l-m31v1",
+  "l-ngc604",
+] as const;
+
+const CURATED_GALAXY_REFS = [
+  { ref: 0, title: "Milky Way" },
+  { ref: "Büyük Macellan", title: "Large Magellanic Cloud" },
+  { ref: "Küçük Macellan", title: "Small Magellanic Cloud" },
+  { ref: "Andromeda", title: "Andromeda (M31)" },
+  { ref: "Üçgen", title: "Triangulum (M33)" },
+  { ref: "Centaurus A", title: "Centaurus A" },
+  { ref: "Girdap", title: "Whirlpool (M51)" },
+  { ref: "Fırıldak (M101)", title: "Pinwheel (M101)" },
+  { ref: "Sombrero", title: "Sombrero (M104)" },
+  { ref: "M87", title: "Virgo A (M87)" },
+  { ref: "Antenler", title: "Antennae Galaxies" },
 ] as const;
 
 export async function loadUniverseNavigation(
@@ -80,7 +124,12 @@ export async function navigationMarker(
   destination: UniverseNavigationDestination,
   markers: GalaxyMarker[],
 ): Promise<GalaxyMarker> {
-  if (destination.target.kind !== "star") {
+  const nativeId =
+    destination.target.kind === "star" || destination.target.kind === "body"
+      ? destination.target.nativeId
+      : null;
+
+  if (!nativeId) {
     throw new Error(
       `Navigation target ${destination.id} is spatial, not a star/system target`,
     );
@@ -92,12 +141,9 @@ export async function navigationMarker(
     (destination.markerId
       ? markers.find((marker) => marker.id === destination.markerId)
       : undefined) ??
-    markers.find((marker) => marker.nativeId === destination.target.nativeId);
+    markers.find((marker) => marker.nativeId === nativeId);
 
-  return (
-    existing ??
-    markerForYeisStarId(runtime, markers, destination.target.nativeId)
-  );
+  return existing ?? markerForYeisStarId(runtime, markers, nativeId);
 }
 
 function browseDestinations(
@@ -107,7 +153,7 @@ function browseDestinations(
 ): UniverseNavigationDestination[] {
   const out = personalDestinations(placements, markers);
 
-  for (const ref of FEATURED_STAR_REFS) {
+  for (const ref of CURATED_STAR_REFS) {
     const hit = runtime.catalog.search(ref, 1)[0];
     if (hit === undefined) continue;
     const nativeId = "c" + hit;
@@ -122,13 +168,19 @@ function browseDestinations(
     });
   }
 
-  for (const ref of FEATURED_GALAXY_REFS) {
-    const hit = runtime.universe.galaxies.search(ref, 1)[0];
-    if (hit === undefined) continue;
-    out.push(galaxyDestination(runtime, hit, "featured"));
+  for (const ref of CURATED_BLACK_HOLE_REFS) {
+    const blackHole = runtime.universe.blackHole(ref);
+    if (!blackHole) continue;
+    out.push({
+      id: "featured:blackhole:" + ref,
+      kind: "featured",
+      title: blackHole.entry.name,
+      detail: "FEATURED PLACE · BLACK HOLE",
+      target: { kind: "star", nativeId: blackHole.systemStarId },
+    });
   }
 
-  for (const id of FEATURED_LANDMARK_REFS) {
+  for (const id of CURATED_LANDMARK_REFS) {
     const index = runtime.universe.landmarks.findIndex(
       (landmark) => landmark.def.id === id,
     );
@@ -136,18 +188,16 @@ function browseDestinations(
     out.push(landmarkDestination(runtime, index, "featured"));
   }
 
-  const sagA = runtime.universe.blackHole("b0");
-  if (sagA) {
-    out.push({
-      id: "featured:b0",
-      kind: "featured",
-      title: sagA.entry.name,
-      detail: "FEATURED PLACE · BLACK HOLE",
-      target: { kind: "star", nativeId: sagA.systemStarId },
-    });
+  for (const item of CURATED_GALAXY_REFS) {
+    const index =
+      typeof item.ref === "number"
+        ? item.ref
+        : runtime.universe.galaxies.search(item.ref, 1)[0];
+    if (index === undefined || index < 0) continue;
+    out.push(galaxyDestination(runtime, index, "featured", item.title));
   }
 
-  return dedupe(out).slice(0, 18);
+  return dedupe(out).slice(0, 72);
 }
 
 function searchDestinations(
@@ -187,6 +237,26 @@ function searchDestinations(
     });
   }
 
+  for (const foreign of runtime.universe.searchForeignBodies(query, 8)) {
+    if (foreign.body.type !== "planet" && foreign.body.type !== "dwarf") {
+      continue;
+    }
+    out.push({
+      id: `body:${foreign.starId}:${foreign.body.id}`,
+      kind: "body",
+      title: foreign.name,
+      detail:
+        foreign.body.type.toUpperCase() +
+        " · " +
+        foreign.systemName,
+      target: {
+        kind: "body",
+        nativeId: foreign.starId,
+        bodyId: foreign.body.id,
+      },
+    });
+  }
+
   for (const index of runtime.catalog.search(query, 8)) {
     const nativeId = "c" + index;
     const info = runtime.catalog.info(index);
@@ -220,13 +290,14 @@ function searchDestinations(
     out.push(galaxyDestination(runtime, index));
   }
 
-  return dedupe(out).slice(0, 16);
+  return dedupe(out).slice(0, 20);
 }
 
 function galaxyDestination(
   runtime: YeisCoreRuntime,
   index: number,
   kind: UniverseNavigationKind = "galaxy",
+  title?: string,
 ): UniverseNavigationDestination {
   const galaxies = runtime.universe.galaxies;
   const distancePc = Math.hypot(
@@ -237,7 +308,7 @@ function galaxyDestination(
   return {
     id: "galaxy:" + index,
     kind,
-    title: galaxies.name(index),
+    title: title ?? galaxies.name(index),
     detail:
       "GALAXY · " +
       (index === 0 ? "HOME" : formatDistanceLy(distancePc)),
@@ -315,6 +386,9 @@ function dedupe(
 
 function targetKey(target: UniverseNavigationTarget): string {
   if (target.kind === "star") return "star:" + target.nativeId;
+  if (target.kind === "body") {
+    return "body:" + target.nativeId + ":" + target.bodyId;
+  }
   return target.kind + ":" + target.index;
 }
 
