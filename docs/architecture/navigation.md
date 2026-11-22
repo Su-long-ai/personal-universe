@@ -136,3 +136,46 @@ Production validation on 2026-11-22:
 
 This is a module-graph change only; destination ranking and spatial semantics still
 come from the pinned MIT YEIS implementation.
+
+## Full pinned-MIT Places / Travel completion
+
+Completed on 2026-11-23.
+
+The navigator now restores the supported curated destination set from the
+pinned MIT YEIS `src/ui/places.ts` instead of keeping the earlier small sample:
+
+- 10 curated stars;
+- 10 black-hole systems;
+- 20 pulsar / nebula / cluster / record-star landmarks;
+- 11 galaxies;
+- Personal Signals from Astro content placement.
+
+The catalogue refs and spatial semantics remain YEIS-owned. Personal Universe
+only supplies English-facing presentation for the curated galaxy names.
+Solar-System spacecraft / moon entries are intentionally not advertised in the
+browse list because the current R3F product renderer does not yet render those
+body classes as first-class travel targets.
+
+Search also restores YEIS body discovery for directly renderable worlds:
+current-system and foreign-system planets/dwarfs are returned as `body`
+destinations. Opening one resolves its native YEIS star/system and enters the
+matching existing planet rather than creating a parallel body model. Locate for
+a body remains a galactic locate of its host star, so YEIS is still the only
+physical-coordinate authority.
+
+### GitHub-only browser validation
+
+The repository CI now runs a real headless Chrome pass after the production
+build. The navigation integration was validated in GitHub Actions without a
+local browser:
+
+- default route hydrated with `data-universe-engine="yeis"`;
+- native galaxy reached `data-yeis-native-galaxy="ready"`;
+- personal signal hydration remained present;
+- `?navigator=1&navq=Earth` opened the Universe Navigator;
+- the hydrated navigator reported a non-zero result count;
+- the rendered DOM contained the `Earth` destination.
+
+This browser smoke is now part of the branch CI, in addition to Reuse Gate and
+the Astro production build.
+
