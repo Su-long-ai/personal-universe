@@ -156,3 +156,28 @@ This keeps sparse portfolios cheap while allowing content collections to grow
 well beyond the original fixed limit without rebuilding GPU buffers for every
 incremental content addition.
 
+## Personal Signal hover discovery
+
+Implemented under task `PERSONAL-SIGNAL-HOVER-V3-001`.
+
+Desktop discovery reuses the same Personal Signal placements and YEIS star
+positions already used by the native galaxy overlay. The active Three.js camera
+projects those authoritative 3D directions into screen coordinates; the Canvas
+pointer surface then selects the nearest signal within a small screen-space
+radius.
+
+This intentionally does not create a second raycast scene or duplicate signal
+geometry. R3F's pointer-event framework was evaluated, but the hosted YEIS
+`Points` objects are imperative renderer objects rather than declarative JSX
+interaction nodes. Floating UI virtual elements were also evaluated; they solve
+DOM floating-element positioning after an anchor is already known, while the
+actual problem here is identifying the hovered WebGL signal.
+
+Pointer movement is coalesced with `requestAnimationFrame`, so hover hit tests
+run at most once per rendered frame rather than once per raw pointer event.
+Coarse/touch input continues to use direct signal picking instead of hover.
+
+The hover card is non-interactive and exposes only real Content Collection
+metadata (title and kind). It never fabricates content or becomes a second
+navigation authority.
+

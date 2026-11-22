@@ -284,3 +284,41 @@ runtime dependency at this stage. If journeys later gain branching,
 persistence, resumability or parallel invoked work, XState should be
 re-evaluated before expanding the local coordinator.
 
+## Exact native body and black-hole travel
+
+Implemented under task `EXACT-NATIVE-TRAVEL-V3-001`.
+
+Search and Places already expose native YEIS bodies and black holes. The product
+adapter now preserves those exact identities instead of degrading them to a
+host-star-only destination.
+
+The execution rule is intentionally asymmetric:
+
+- if a native body has a matching React `PlanetDefinition`, Personal Universe
+  opens the existing product system/planet scene;
+- if the body exists only in the pinned YEIS runtime (for example a native
+  object not represented by the current React planet model), the app keeps the
+  galaxy/native renderer mounted and sends the exact `nativeId + bodyId`
+  target to YEIS;
+- black-hole destinations keep the pinned YEIS black-hole id and resolve its
+  owning system/body inside the native runtime.
+
+The native path reuses the pinned MIT universe and camera primitives:
+
+1. switch the YEIS reference frame to the owning star system when necessary;
+2. shift the existing native camera/controller frame by the returned delta;
+3. resolve the requested native body from that same runtime;
+4. call the existing YEIS camera autopilot for the exact body.
+
+Locate remains a galaxy-scale operation, so body locate points at its owning
+star and black-hole locate points at the black hole's owning system. Travel is
+exact.
+
+No second camera controller, coordinate system or cross-scale flight algorithm
+is introduced. `camera-controls` was evaluated as a mature generic Three.js
+alternative but rejected for this gap because it does not own YEIS astronomical
+reference frames or native body identity.
+
+If a stale/invalid body id is ever requested, the runtime records a diagnostic
+fallback/error instead of silently substituting a different celestial body.
+

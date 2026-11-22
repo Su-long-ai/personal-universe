@@ -855,6 +855,36 @@ select {
 }
 
 
+
+.personal-signal-hover {
+  position: fixed;
+  z-index: 12;
+  width: min(220px, calc(100vw - 32px));
+  display: grid;
+  gap: 5px;
+  padding: 9px 11px;
+  border: 1px solid rgba(115, 244, 255, 0.24);
+  background: rgba(2, 9, 16, 0.82);
+  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+
+.personal-signal-hover span {
+  color: rgba(115, 244, 255, 0.62);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+.personal-signal-hover strong {
+  overflow: hidden;
+  color: rgba(239, 253, 255, 0.94);
+  font-size: 12px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .galaxy-locate-caption {
   position: absolute;
   z-index: 9;
