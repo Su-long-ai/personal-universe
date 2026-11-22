@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-universe-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reuse-gate:
+    name: Machine Reuse Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify PR/push diff against machine approvals
+        run: npm run gate:reuse:ci
+        env:
+          REUSE_GATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          REUSE_GATE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+  build:
+    name: Build + Runtime Smoke
+    needs: reuse-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Runtime smoke
+        shell: bash
+        run: |
+          nohup npm run preview -- --host 127.0.0.1 --port 4321 >/tmp/personal-universe-preview.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4321/ >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "No headless Chrome-compatible browser found on runner" >&2
+            exit 1
+          fi
+
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom http://127.0.0.1:4321/ > /tmp/personal-universe-dom.html
+          grep -q 'data-universe-engine="yeis"' /tmp/personal-universe-dom.html
+          grep -q 'data-yeis-native-galaxy="ready"' /tmp/personal-universe-dom.html
+          grep -q 'data-personal-signals="1"' /tmp/personal-universe-dom.html
+
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --virtual-time-budget=12000 --dump-dom 'http://127.0.0.1:4321/?navigator=1&navq=Earth' > /tmp/personal-universe-nav.html
+          grep -q 'data-universe-navigator="open"' /tmp/personal-universe-nav.html
+          grep -Eq 'data-universe-navigator-results="[1-9][0-9]*"' /tmp/personal-universe-nav.html
+          grep -q 'Earth' /tmp/personal-universe-nav.html
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 7

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-11-22",
+  "updated_at": "2026-11-23",
   "status_model": "adopt|trial|assess|hold",
   "entries": [
     {
@@ -434,6 +434,102 @@
       ],
       "notes": "Useful later for article/document search, but not a replacement for YEIS spatial destination search.",
       "last_checked": "2026-11-22"
+    },
+    {
+      "id": "github-actions-pr-diff-gate",
+      "name": "GitHub Actions PR-diff gate with required status checks",
+      "url": "https://docs.github.com/en/actions",
+      "level": "subsystem",
+      "license": "GitHub hosted service / documentation terms",
+      "status": "trial",
+      "covers": [
+        "clean-runner PR diff enforcement",
+        "required status checks",
+        "changed-file policy coverage",
+        "cloud CI gating",
+        "parallel task validation"
+      ],
+      "notes": "Use the repository-local Node policy engine inside GitHub Actions, but evaluate the PR commit range instead of only a dirty working tree. Pair with a required status check so changing or deleting the workflow cannot silently bypass merge gating.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "rendezvous-hashing-hrw",
+      "name": "Rendezvous / Highest Random Weight (HRW) hashing",
+      "url": "https://datatracker.ietf.org/doc/rfc2992/",
+      "level": "component_asset",
+      "license": "Algorithm/reference; RFC text under IETF terms",
+      "status": "adopt",
+      "covers": [
+        "stable object-to-destination mapping",
+        "order-independent destination ranking",
+        "minimal remapping when destinations are added or removed",
+        "stateless deterministic assignment"
+      ],
+      "notes": "Selected as the placement primitive for Personal Signals. Unlike modulo-N, HRW ranks each stable destination identity per content key, so adding/removing a star changes only mappings that genuinely prefer the changed destination.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "hrw-hash-js",
+      "name": "hrw-hash JavaScript package",
+      "url": "https://github.com/Munawwar/hrw-hash",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "JavaScript HRW/rendezvous hashing",
+        "order-independent destination ranking",
+        "minimal remapping",
+        "FNV-based deterministic hashing"
+      ],
+      "notes": "Very small and dependency-free, but Personal Universe only needs one narrow deterministic score primitive. Prefer the standard HRW algorithm directly to avoid another runtime dependency unless future weighted/ranked APIs justify the package.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "jump-consistent-hash",
+      "name": "Jump Consistent Hash",
+      "url": "https://arxiv.org/abs/1406.2294",
+      "level": "component_asset",
+      "license": "Algorithm/paper reference",
+      "status": "assess",
+      "covers": [
+        "minimal-memory consistent hashing",
+        "minimal remapping as bucket count changes",
+        "fast deterministic bucket selection"
+      ],
+      "notes": "Excellent for sequentially numbered buckets, but less appropriate for Personal Universe because star destinations are identity-addressed and can be inserted/removed independently rather than only appended as dense bucket numbers.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "i18next",
+      "name": "i18next",
+      "url": "https://www.i18next.com/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "runtime translation lookup",
+        "locale resource loading",
+        "interpolation and pluralization",
+        "browser localization integrations"
+      ],
+      "notes": "Mature generic i18n subsystem. Useful when an application owns its translation resources, but redundant when reusing YEIS data that already ships matching pinned dictionaries and lookup semantics.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "web-url-history-api",
+      "name": "Browser URLSearchParams + History API",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/History_API",
+      "level": "framework_engine",
+      "license": "Web Platform browser APIs / standards",
+      "status": "adopt",
+      "covers": [
+        "URL query parsing and serialization",
+        "same-document history updates",
+        "shareable deep-link state",
+        "zero-runtime-dependency navigation state"
+      ],
+      "notes": "Use for small shareable state that already belongs in the page URL. Prefer this over adding a client router when Personal Universe remains a single Astro page with one existing phase state machine.",
+      "last_checked": "2026-11-23"
     }
   ]
 }

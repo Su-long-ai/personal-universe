@@ -1,0 +1,234 @@
+{
+  "schema": 2,
+  "task_id": "REUSE-GATE-MACHINE-V3-001",
+  "title": "Machine-enforced PR diff reuse gate with parallel task approvals",
+  "scope": {
+    "level": "architecture",
+    "subject": "Repository-wide reuse policy enforcement across GitHub PRs and parallel agents"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "Upgrade the existing Node reuse gate from a dirty-working-tree check into a GitHub PR-diff policy engine that can verify changed protected files against task-scoped approvals, while preserving the lightweight local gate and avoiding a second generic policy runtime.",
+  "planned_files": [
+    "scripts/reuse-gate.mjs",
+    ".github/workflows/ci.yml",
+    "package.json",
+    "AGENTS.md",
+    "docs/reuse-gate/README.md",
+    "docs/reuse-gate/tasks/**",
+    "docs/reuse-gate/approvals/**"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.github.com/en/actions",
+      "finding": "GitHub Actions provides clean-runner pull-request execution and exposes base/head commit context suitable for deterministic diff gating."
+    },
+    {
+      "url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches",
+      "finding": "Required status checks can make a named machine gate a merge prerequisite, preventing a missing or failing check from being treated as success."
+    },
+    {
+      "url": "https://www.openpolicyagent.org/docs/latest/",
+      "finding": "OPA is a mature generic policy engine, but adopting Rego and another runtime would duplicate the small repository-specific Node policy engine already in use."
+    },
+    {
+      "url": "https://backstage.io/docs/features/software-catalog/",
+      "finding": "Backstage offers broad software-governance/catalog capabilities but is far larger than the repository-local reuse-decision problem."
+    },
+    {
+      "url": "https://git-scm.com/docs/githooks",
+      "finding": "Git hooks remain useful for fast local pre-commit feedback but cannot enforce changes created directly through GitHub or other remote agents."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Backstage covers broader software governance and cataloging, but its deployment and operating surface are disproportionate for one static-site repository.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "backstage-catalog"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "OPA/Conftest can express the policy generically, but adds a second policy language/runtime where the existing Node gate already owns the repository-specific semantics.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "opa-conftest"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "GitHub Actions plus a PR-range-aware extension of the existing Node gate covers remote agents, clean runners, changed-file verification and required checks with minimal new machinery.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "github-actions-pr-diff-gate"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Git hooks and npm lifecycle scripts remain valuable as low-latency local feedback, but are supplemental because they cannot police GitHub-only changes.",
+      "source_refs": [
+        4
+      ],
+      "registry_refs": [
+        "git-hooks",
+        "npm-lifecycle"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "github-actions-pr-diff-gate",
+      "name": "Existing Node reuse gate extended with GitHub PR-range enforcement",
+      "level": "subsystem",
+      "registry_id": "github-actions-pr-diff-gate",
+      "source": "GitHub Actions + repository-local Node gate",
+      "license": "Project code plus GitHub hosted CI",
+      "decision": "reuse",
+      "reason": "Extends the already-proven gate into the clean CI environment, reuses Git and Actions, and keeps the policy implementation small while adding machine-verifiable PR coverage.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "opa-conftest",
+      "name": "OPA / Conftest policy engine",
+      "level": "framework_engine",
+      "registry_id": "opa-conftest",
+      "source": "OPA / Conftest",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Technically capable but introduces Rego, a new binary/toolchain and duplicate policy ownership without providing enough additional value for this repository-sized policy.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "backstage-catalog",
+      "name": "Backstage Software Catalog and governance surface",
+      "level": "full_solution",
+      "registry_id": "backstage-catalog",
+      "source": "Backstage",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Provides far broader governance than needed and would introduce a service-sized operational dependency for a single repository reuse policy.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "git-hooks-only",
+      "name": "Git hooks and npm lifecycle only",
+      "level": "component_asset",
+      "registry_id": "git-hooks",
+      "source": "Git hooks / npm scripts",
+      "license": "Git tooling",
+      "decision": "partial",
+      "reason": "Keep as fast local feedback, but it cannot enforce GitHub connector edits, cloud agents or PRs created without the local checkout.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Clean-runner PR changed-file enforcement",
+      "importance": "high",
+      "coverage": {
+        "github-actions-pr-diff-gate": "full",
+        "opa-conftest": "full",
+        "backstage-catalog": "partial",
+        "git-hooks-only": "none"
+      },
+      "decision": "Use the existing Node gate in GitHub Actions because it gives full PR-range enforcement without adding a second policy runtime."
+    },
+    {
+      "capability": "Parallel agents with independent task approvals",
+      "importance": "high",
+      "coverage": {
+        "github-actions-pr-diff-gate": "full",
+        "opa-conftest": "partial",
+        "backstage-catalog": "partial",
+        "git-hooks-only": "none"
+      },
+      "decision": "Add task-scoped record and approval files so independent branches and agents do not contend on one global current/approval token."
+    },
+    {
+      "capability": "Protection of the gate and CI policy itself",
+      "importance": "high",
+      "coverage": {
+        "github-actions-pr-diff-gate": "full",
+        "opa-conftest": "full",
+        "backstage-catalog": "partial",
+        "git-hooks-only": "partial"
+      },
+      "decision": "Treat workflow and gate policy paths as protected implementation and require architecture-level policy_change approval for modifications."
+    },
+    {
+      "capability": "Fast local feedback before commit",
+      "importance": "medium",
+      "coverage": {
+        "github-actions-pr-diff-gate": "partial",
+        "opa-conftest": "partial",
+        "backstage-catalog": "none",
+        "git-hooks-only": "full"
+      },
+      "decision": "Retain Git hooks and npm lifecycle checks as a complementary fast path while GitHub remains the authoritative merge gate."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "github-actions-pr-diff-gate"
+    ],
+    "rationale": "Extend the existing repository-local Node gate and execute it against GitHub PR commit ranges. This preserves the current reuse semantics, adds machine-verifiable cloud enforcement, supports concurrent task approvals, and avoids introducing a second generic policy platform.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "backstage-catalog",
+        "reason": "Backstage is broader than the selected subsystem but its service deployment, plugin model and operational surface add substantially more cost than the narrow repository policy requires."
+      },
+      {
+        "candidate_id": "opa-conftest",
+        "reason": "OPA is a stronger generic policy framework, but the existing Node gate already encodes the required semantics; adding Rego would duplicate policy ownership and slow iteration without improving current coverage."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the repository policy outgrows the Node implementation materially, migrate the validated structured records to OPA/Conftest rather than adding more ad-hoc shell checks."
+  }
+}
