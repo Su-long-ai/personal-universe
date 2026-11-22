@@ -195,7 +195,7 @@ export function UniverseNavigator({
                   <small>{result.detail}</small>
                 </span>
                 <span className="navigator-open">
-                  {result.target.kind === "star" ? "OPEN →" : "TRAVEL →"}
+                  {result.target.kind === "star" || result.target.kind === "body" ? "OPEN →" : "TRAVEL →"}
                 </span>
               </button>
               <button
