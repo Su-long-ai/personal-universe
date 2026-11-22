@@ -52,6 +52,12 @@ const VALID_PHASES: UniversePhase[] = [
   "returning",
 ];
 
+type UniverseJourneyState = {
+  title: string;
+  destinations: UniverseNavigationDestination[];
+  index: number;
+  paused: boolean;
+};
 
 function nativePlanetId(planet: PlanetDefinition): string {
   return planet.id.startsWith("yeis-planet:")
@@ -110,7 +116,10 @@ export default function UniverseApp({
   const [navigationStatus, setNavigationStatus] = useState<
     "locating" | "traveling" | "located" | "arrived" | null
   >(null);
+  const [journey, setJourney] = useState<UniverseJourneyState | null>(null);
   const navigationRequestSeq = useRef(0);
+  const journeyNavigationRef = useRef(false);
+  const journeyRef = useRef<UniverseJourneyState | null>(null);
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -365,6 +374,13 @@ export default function UniverseApp({
 
   const handleNavigateDestination = useCallback(
     async (destination: UniverseNavigationDestination) => {
+      const journeyDriven = journeyNavigationRef.current;
+      journeyNavigationRef.current = false;
+      if (!journeyDriven) {
+        journeyRef.current = null;
+        setJourney(null);
+        delete document.documentElement.dataset.universeJourney;
+      }
       if (activeEngine !== "yeis") return;
 
       if (
@@ -459,6 +475,10 @@ export default function UniverseApp({
 
   const handleLocateDestination = useCallback(
     (destination: UniverseNavigationDestination) => {
+      journeyNavigationRef.current = false;
+      journeyRef.current = null;
+      setJourney(null);
+      delete document.documentElement.dataset.universeJourney;
       if (activeEngine !== "yeis") return;
       navigationRequestSeq.current += 1;
       setSelectedSystem(null);
@@ -497,6 +517,103 @@ export default function UniverseApp({
     [activeEngine],
   );
 
+  const handleStartJourney = useCallback(
+    (
+      title: string,
+      destinations: UniverseNavigationDestination[],
+    ) => {
+      if (!destinations.length) return;
+      const next: UniverseJourneyState = {
+        title,
+        destinations,
+        index: 0,
+        paused: false,
+      };
+      journeyRef.current = next;
+      setJourney(next);
+      journeyNavigationRef.current = true;
+      document.documentElement.dataset.universeJourney = title;
+      void handleNavigateDestination(destinations[0]);
+      console.info(
+        "[UNIVERSE-JOURNEY] start " +
+          title +
+          " stops=" +
+          destinations.length,
+      );
+    },
+    [handleNavigateDestination],
+  );
+
+  const handleJourneyStep = useCallback(
+    (delta: number) => {
+      const current = journeyRef.current;
+      if (!current) return;
+      const nextIndex = current.index + delta;
+      if (nextIndex < 0) return;
+      if (nextIndex >= current.destinations.length) {
+        journeyNavigationRef.current = false;
+        journeyRef.current = null;
+        setJourney(null);
+        delete document.documentElement.dataset.universeJourney;
+        console.info("[UNIVERSE-JOURNEY] complete " + current.title);
+        return;
+      }
+
+      const next = { ...current, index: nextIndex };
+      journeyRef.current = next;
+      setJourney(next);
+      journeyNavigationRef.current = true;
+      void handleNavigateDestination(next.destinations[nextIndex]);
+    },
+    [handleNavigateDestination],
+  );
+
+  const handleToggleJourneyPause = useCallback(() => {
+    const current = journeyRef.current;
+    if (!current) return;
+    const next = { ...current, paused: !current.paused };
+    journeyRef.current = next;
+    setJourney(next);
+  }, []);
+
+  const handleStopJourney = useCallback(() => {
+    journeyNavigationRef.current = false;
+    journeyRef.current = null;
+    setJourney(null);
+    delete document.documentElement.dataset.universeJourney;
+  }, []);
+
+  useEffect(() => {
+    journeyRef.current = journey;
+  }, [journey]);
+
+  useEffect(() => {
+    if (
+      !journey ||
+      journey.paused ||
+      reducedMotion ||
+      journey.destinations.length < 2 ||
+      navigationStatus === "traveling" ||
+      navigationStatus === "locating" ||
+      !["system", "approach", "orbit", "surface"].includes(phase)
+    ) {
+      return;
+    }
+
+    // Reuse the pinned MIT TourPlayer sequencing idea without porting its
+    // narration/cue state machine: settle first, then dwell, then advance.
+    const timer = window.setTimeout(() => {
+      handleJourneyStep(1);
+    }, 6500);
+    return () => window.clearTimeout(timer);
+  }, [
+    handleJourneyStep,
+    journey,
+    navigationStatus,
+    phase,
+    reducedMotion,
+  ]);
+
   const handleNavigationComplete = useCallback(
     (request: UniverseNavigationCameraRequest) => {
       setNavigationStatus(
@@ -508,6 +625,10 @@ export default function UniverseApp({
 
   const handleSelectPlanet = useCallback(
     (planet: PlanetDefinition) => {
+      journeyNavigationRef.current = false;
+      journeyRef.current = null;
+      setJourney(null);
+      delete document.documentElement.dataset.universeJourney;
       setSelectedPlanet(planet);
       ambient.ensurePlaying();
       setPhase("approach");
@@ -555,6 +676,10 @@ export default function UniverseApp({
   );
 
   const handleReturn = useCallback(() => {
+    journeyNavigationRef.current = false;
+    journeyRef.current = null;
+    setJourney(null);
+    delete document.documentElement.dataset.universeJourney;
     if (phase === "system") {
       setSelectedSystem(null);
       setSelectedPlanet(null);
@@ -579,6 +704,17 @@ export default function UniverseApp({
       replaceNavigationUrl({ phase: "galaxy" });
     }
   }, [activeEngine, phase, selectedSystem]);
+
+  const handleCanvasSelectSystem = useCallback(
+    (marker: GalaxyMarker) => {
+      journeyNavigationRef.current = false;
+      journeyRef.current = null;
+      setJourney(null);
+      delete document.documentElement.dataset.universeJourney;
+      handleSelectSystem(marker);
+    },
+    [handleSelectSystem],
+  );
 
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
@@ -606,7 +742,7 @@ export default function UniverseApp({
           onNavigationComplete={handleNavigationComplete}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
-          onSelectSystem={handleSelectSystem}
+          onSelectSystem={handleCanvasSelectSystem}
           onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}
@@ -641,6 +777,63 @@ export default function UniverseApp({
         </aside>
       )}
 
+      {journey && (
+        <aside className="universe-journey-controls">
+          <header>
+            <div>
+              <span>GUIDED JOURNEY</span>
+              <strong>{journey.title}</strong>
+            </div>
+            <button
+              type="button"
+              onClick={handleStopJourney}
+              aria-label="Stop guided journey"
+            >
+              STOP
+            </button>
+          </header>
+          <div className="journey-current">
+            <small>
+              {journey.index + 1} / {journey.destinations.length}
+            </small>
+            <strong>{journey.destinations[journey.index]?.title}</strong>
+          </div>
+          <div className="journey-progress" aria-hidden="true">
+            <i
+              style={{
+                width:
+                  ((journey.index + 1) / journey.destinations.length) * 100 +
+                  "%",
+              }}
+            />
+          </div>
+          <div className="journey-actions">
+            <button
+              type="button"
+              disabled={journey.index === 0}
+              onClick={() => handleJourneyStep(-1)}
+            >
+              ← PREV
+            </button>
+            <button type="button" onClick={handleToggleJourneyPause}>
+              {journey.paused ? "RESUME" : "PAUSE"}
+            </button>
+            <button type="button" onClick={() => handleJourneyStep(1)}>
+              {journey.index >= journey.destinations.length - 1
+                ? "DONE"
+                : "NEXT →"}
+            </button>
+          </div>
+          <small className="journey-mode">
+            {reducedMotion
+              ? "REDUCED MOTION · MANUAL ADVANCE"
+              : journey.paused
+                ? "PAUSED · CAMERA REMAINS FREE"
+                : "AUTO ADVANCE · CAMERA REMAINS FREE"}
+          </small>
+        </aside>
+      )}
+
       <UniverseHud
         phase={phase}
         selectedSystem={selectedSystem}
@@ -667,6 +860,7 @@ export default function UniverseApp({
         onClose={() => setNavigatorOpen(false)}
         onNavigate={handleNavigateDestination}
         onLocate={handleLocateDestination}
+        onStartJourney={handleStartJourney}
       />
 
       {phase === "galaxy" && navigationRequest && (

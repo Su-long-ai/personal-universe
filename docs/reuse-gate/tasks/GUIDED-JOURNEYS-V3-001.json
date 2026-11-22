@@ -1,0 +1,228 @@
+{
+  "schema": 2,
+  "task_id": "GUIDED-JOURNEYS-V3-001",
+  "title": "Guided journeys over the shared universe destination model",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Interruptible Personal Universe guided journeys derived from existing destination sections"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Keep guided journeys as a thin product orchestration layer over the existing shared destination executor. Reuse the pinned MIT YEIS TourPlayer's interruption, settled-arrival and dwell semantics plus React's existing hooks; do not import a second generic state runtime or a DOM-tooltip tour product.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "docs/architecture/navigation.md",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://react-joyride.com/docs/getting-started",
+      "finding": "React Joyride is a mature complete guided-tour product with steps, controls, lifecycle events and accessibility, but its steps target DOM elements/tooltips rather than spatial universe destinations."
+    },
+    {
+      "url": "https://stately.ai/docs/xstate/v5",
+      "finding": "XState v5 is a stable state-machine and actor framework for application orchestration with React integration."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "finding": "Pinned MIT TourPlayer already demonstrates interruption when navigation changes, next/previous/pause control, arrival-aware progression and a post-arrival dwell."
+    },
+    {
+      "url": "https://react.dev/reference/react",
+      "finding": "The existing React runtime provides state, refs, effects and memoized callbacks sufficient for a small coordinator without another state-management dependency."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "React Joyride covers a full conventional guided-tour experience, but its DOM target/tooltip lifecycle does not own or understand the universe destination executor and would add a second navigation-adjacent abstraction.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "react-joyride"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "XState can model the journey as a machine, but the required state is only active journey, index and pause plus existing navigation status; a new actor runtime would add more integration surface than value.",
+      "source_refs": [
+        1
+      ],
+      "registry_refs": [
+        "xstate-v5"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Pinned MIT YEIS TourPlayer contains the exact spatial-tour sequencing ideas needed: user-navigation interruption, arrival-aware progression, dwell, next/previous and cleanup. Reuse those semantics without copying its educational narration/cue subsystem.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "yeis-tourplayer-e520568",
+        "your-eyes-in-space-mit-e520568"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Existing React hooks are enough to hold the small coordinator state and timers, so the implementation can remain dependency-free and share the already-frozen destination executor.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "react-core-hooks"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "react-joyride-product",
+      "name": "React Joyride",
+      "level": "full_solution",
+      "registry_id": "react-joyride",
+      "source": "React Joyride",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Excellent DOM onboarding product, but spatial destinations are not DOM tooltip targets; adopting it would add an overlapping lifecycle while still requiring the same universe-navigation adapter.",
+      "evaluation": {
+        "coverage": 2.5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "xstate-machine",
+      "name": "XState v5 journey machine",
+      "level": "framework_engine",
+      "registry_id": "xstate-v5",
+      "source": "XState v5",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Predictable and mature, but disproportionate for a four-field journey state that must remain subordinate to the existing universe navigation state rather than become a second authority.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "yeis-tourplayer-patterns",
+      "name": "Pinned YEIS TourPlayer sequencing semantics",
+      "level": "subsystem",
+      "registry_id": "yeis-tourplayer-e520568",
+      "source": "YEIS MIT e520568 src/core/TourPlayer.ts",
+      "license": "MIT at pinned commit",
+      "decision": "partial",
+      "reason": "Directly matches spatial travel: interruption on competing navigation, settle-before-advance, dwell, manual next/previous/pause and cleanup. Only these semantics are reused; educational media/cue machinery is excluded.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "react-hooks-orchestration",
+      "name": "Existing React hooks as the narrow coordinator",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "React core hooks already in project",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "No new dependency or runtime authority; hooks can coordinate the selected TourPlayer semantics while every actual movement stays in the shared destination executor.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Spatial destination sequencing through the existing universe executor",
+      "importance": "high",
+      "coverage": {
+        "react-joyride-product": "partial",
+        "xstate-machine": "partial",
+        "yeis-tourplayer-patterns": "full",
+        "react-hooks-orchestration": "full"
+      },
+      "decision": "Reuse pinned TourPlayer sequencing semantics and React hooks so journey steps call the existing destination executor instead of introducing a second router."
+    },
+    {
+      "capability": "User navigation interrupts the journey without locking camera controls",
+      "importance": "high",
+      "coverage": {
+        "react-joyride-product": "partial",
+        "xstate-machine": "full",
+        "yeis-tourplayer-patterns": "full",
+        "react-hooks-orchestration": "full"
+      },
+      "decision": "Adopt the pinned TourPlayer interruption pattern but detect interruption in the existing navigation callbacks, preserving manual camera and destination control."
+    },
+    {
+      "capability": "Advance only after spatial navigation settles and dwell at destination",
+      "importance": "high",
+      "coverage": {
+        "react-joyride-product": "partial",
+        "xstate-machine": "full",
+        "yeis-tourplayer-patterns": "full",
+        "react-hooks-orchestration": "full"
+      },
+      "decision": "Gate automatic advance on existing navigationStatus/phase and then apply a short timer; do not invent a second flight-state machine."
+    },
+    {
+      "capability": "Reduced-motion and manual completion",
+      "importance": "medium",
+      "coverage": {
+        "react-joyride-product": "partial",
+        "xstate-machine": "partial",
+        "yeis-tourplayer-patterns": "partial",
+        "react-hooks-orchestration": "full"
+      },
+      "decision": "Use the app's existing prefers-reduced-motion signal to disable auto-advance while retaining Prev/Next/Done."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-tourplayer-patterns",
+      "react-hooks-orchestration"
+    ],
+    "rationale": "Reuse the spatial sequencing semantics that already exist in the allowed MIT YEIS TourPlayer, but implement only a small React coordinator around the project's single destination executor. This preserves one navigation authority, adds no runtime dependency, and keeps journeys derived from real Content Collection destinations.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "react-joyride-product",
+        "reason": "React Joyride is broader as an onboarding product, but its DOM tooltip target model does not replace spatial destination resolution or camera travel and would create an overlapping tour lifecycle for little net gain."
+      },
+      {
+        "candidate_id": "xstate-machine",
+        "reason": "XState is a stronger generic orchestration framework, but the journey state is intentionally tiny and subordinate to existing navigation status; adding another actor/state-machine runtime would increase integration and test surface without removing project-specific work."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If journey behavior grows into branching, persistence, resumability or parallel invoked work, re-evaluate XState v5 before expanding the local coordinator."
+  }
+}

@@ -546,6 +546,72 @@
       ],
       "notes": "Three.js documents that rendered buffer attributes cannot be resized in place; when capacity is exceeded, allocate replacement geometry/attributes and dispose superseded GPU resources. Personal Signal overlay uses geometric capacity growth to avoid a fixed ceiling and avoid exact-fit reallocation churn.",
       "last_checked": "2026-11-23"
+    },
+    {
+      "id": "react-joyride",
+      "name": "React Joyride guided-tour product",
+      "url": "https://react-joyride.com/docs/getting-started",
+      "level": "full_solution",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "React guided-tour UI",
+        "step sequencing",
+        "pause/skip controls",
+        "keyboard and accessibility",
+        "controlled and uncontrolled tour lifecycle"
+      ],
+      "notes": "Mature complete DOM-target onboarding product. Rejected for spatial-universe journeys because its core model targets DOM elements/tooltips and would duplicate Personal Universe destination navigation.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "xstate-v5",
+      "name": "XState v5",
+      "url": "https://stately.ai/docs/xstate/v5",
+      "level": "framework_engine",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "state machines",
+        "actors",
+        "event-driven orchestration",
+        "React integration"
+      ],
+      "notes": "Strong general orchestration framework. Current guided journey has a deliberately tiny state surface and already shares the destination executor, so adding a second state runtime would be disproportionate.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "yeis-tourplayer-e520568",
+      "name": "YEIS TourPlayer at verified MIT commit e520568",
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "level": "subsystem",
+      "license": "MIT at pinned commit e52056897364e060fbd6d00951628f163b57d7a1",
+      "status": "adopt",
+      "covers": [
+        "interruptible spatial tour sequencing",
+        "settled-navigation advancement",
+        "destination dwell",
+        "next/previous/pause lifecycle",
+        "temporary orchestration cleanup"
+      ],
+      "notes": "Reuse only the sequencing semantics needed by Personal Universe. Do not port narration, TTS, timed cues, render overrides, comparison effects, surface pins or simulation-time ownership.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "react-core-hooks",
+      "name": "React core state/effect hooks",
+      "url": "https://react.dev/reference/react",
+      "level": "component_asset",
+      "license": "MIT",
+      "status": "adopt",
+      "covers": [
+        "component state",
+        "refs",
+        "effects",
+        "memoized callbacks"
+      ],
+      "notes": "Already present through the project React dependency. Suitable for the small local journey coordinator without introducing a second state framework.",
+      "last_checked": "2026-11-23"
     }
   ]
 }

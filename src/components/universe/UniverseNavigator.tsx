@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { GalaxyMarker } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
@@ -23,6 +23,7 @@ export function UniverseNavigator({
   onClose,
   onNavigate,
   onLocate,
+  onStartJourney,
 }: {
   open: boolean;
   markers: GalaxyMarker[];
@@ -34,12 +35,54 @@ export function UniverseNavigator({
   onLocate: (
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
+  onStartJourney?: (
+    title: string,
+    destinations: UniverseNavigationDestination[],
+  ) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<UniverseNavigationDestination[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+
+  const journeyOptions = useMemo(() => {
+    const personal = results.filter(
+      (destination) => destination.kind === "personal" && destination.entryId,
+    );
+    const placementByEntryId = new Map(
+      placements.map((placement) => [placement.entry.id, placement]),
+    );
+    const byKind = (kind: string) =>
+      personal.filter(
+        (destination) =>
+          destination.entryId &&
+          placementByEntryId.get(destination.entryId)?.entry.kind === kind,
+      );
+    const featured = personal.filter(
+      (destination) =>
+        destination.entryId &&
+        placementByEntryId.get(destination.entryId)?.entry.featured,
+    );
+
+    return [
+      {
+        id: "featured",
+        title: "Featured Journey",
+        destinations: featured,
+      },
+      {
+        id: "projects",
+        title: "Projects Journey",
+        destinations: byKind("project"),
+      },
+      {
+        id: "research",
+        title: "Research Journey",
+        destinations: byKind("research"),
+      },
+    ];
+  }, [placements, results]);
 
   useEffect(() => {
     if (!open) {
@@ -171,6 +214,33 @@ export function UniverseNavigator({
               : String(results.length) + " DESTINATIONS"}
           </small>
         </div>
+
+        {!query.trim() && onStartJourney && (
+          <div className="navigator-journeys" aria-label="Guided journeys">
+            <span className="navigator-journeys-label">GUIDED JOURNEYS</span>
+            <div>
+              {journeyOptions.map((journey) => (
+                <button
+                  type="button"
+                  key={journey.id}
+                  disabled={journey.destinations.length === 0}
+                  onClick={() => {
+                    if (!journey.destinations.length) return;
+                    onStartJourney(journey.title, journey.destinations);
+                    onClose();
+                  }}
+                >
+                  <strong>{journey.title}</strong>
+                  <small>
+                    {journey.destinations.length
+                      ? journey.destinations.length + " STOPS"
+                      : "NO SIGNALS YET"}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="navigator-results" role="listbox">
           {status === "error" && (
