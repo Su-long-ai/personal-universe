@@ -1,0 +1,120 @@
+{
+  "schema": 2,
+  "task_id": "SHAREABLE-NAV-LINKS-001",
+  "title": "Make YEIS star and world navigation reloadable and shareable through existing URL state",
+  "scope": {
+    "level": "implementation",
+    "subject": "Stable star/body deep links on the existing Personal Universe phase state machine"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Personal Universe is a single Astro page with an existing React phase state machine and established debug query semantics for phase/star. The smallest reusable solution is to extend that same URL contract with an optional body identifier and update it through the browser URLSearchParams/History APIs. YEIS remains the native star/system/body authority. A client router would duplicate phase ownership and add route lifecycle complexity without creating new spatial semantics.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/History_API",
+      "finding": "The browser History API supports same-document URL updates without reload, suitable for reflecting existing client state in a shareable link."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams",
+      "finding": "URLSearchParams provides native query parsing and mutation while preserving unrelated parameters when used through a URL object."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The pinned MIT YEIS runtime remains the source of native star/system/body identity; deep links should reference those stable native IDs rather than invent another content-address model."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse the existing YEIS native identities and current Personal Universe phase/star semantics instead of introducing a second navigation state machine."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "web-url-history-api"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "The native browser URL/History platform already covers serialization and same-document URL updates with no routing dependency."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "A client routing subsystem is unnecessary because this remains one Astro page and route changes would duplicate the existing phase machine."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No component package is needed; the product already has stable native destination IDs and a single navigation surface."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "native-url-state",
+      "name": "URLSearchParams + History API on the current phase/star/body state",
+      "level": "framework_engine",
+      "registry_id": "web-url-history-api",
+      "source": "Browser URLSearchParams and History API",
+      "license": "Web Platform browser APIs / standards",
+      "decision": "reuse",
+      "reason": "Adds share/reload semantics to the state machine already in use without another runtime, router or duplicated destination model.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "yeis-native-identities",
+      "name": "Existing pinned MIT YEIS native star and body identities",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YEIS-backed UniverseApp phase/star system",
+      "license": "MIT source at pinned e520568",
+      "decision": "reuse",
+      "reason": "Native YEIS IDs are already the stable spatial identity consumed by system resolution, so deep links should serialize those rather than invent a parallel identifier layer.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "native-url-state",
+      "yeis-native-identities"
+    ],
+    "rationale": "Extend the existing phase/star URL semantics with an optional YEIS body ID and use native browser history updates when navigation changes. This produces stable shareable links while retaining the existing React phase machine and YEIS identity authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If the site later becomes genuinely multi-page or route-owned, migrate the same star/body URL contract into Astro routes or a router; do not change the serialized native IDs."
+  }
+}
