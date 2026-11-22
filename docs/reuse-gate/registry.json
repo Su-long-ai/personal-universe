@@ -500,6 +500,38 @@
       "last_checked": "2026-11-23"
     },
     {
+      "id": "i18next",
+      "name": "i18next",
+      "url": "https://www.i18next.com/",
+      "level": "subsystem",
+      "license": "MIT",
+      "status": "assess",
+      "covers": [
+        "runtime translation lookup",
+        "locale resource loading",
+        "interpolation and pluralization",
+        "browser localization integrations"
+      ],
+      "notes": "Mature generic i18n subsystem. Useful when an application owns its translation resources, but redundant when reusing YEIS data that already ships matching pinned dictionaries and lookup semantics.",
+      "last_checked": "2026-11-23"
+    },
+    {
+      "id": "web-url-history-api",
+      "name": "Browser URLSearchParams + History API",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/History_API",
+      "level": "framework_engine",
+      "license": "Web Platform browser APIs / standards",
+      "status": "adopt",
+      "covers": [
+        "URL query parsing and serialization",
+        "same-document history updates",
+        "shareable deep-link state",
+        "zero-runtime-dependency navigation state"
+      ],
+      "notes": "Use for small shareable state that already belongs in the page URL. Prefer this over adding a client router when Personal Universe remains a single Astro page with one existing phase state machine.",
+      "last_checked": "2026-11-23"
+    },
+    {
       "id": "playwright-test",
       "name": "Playwright Test",
       "url": "https://playwright.dev/docs/intro",

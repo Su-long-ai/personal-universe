@@ -25,10 +25,12 @@ intentional Personal Universe adaptations:
    - Data format and parsing are unchanged.
 
 3. `i18n/index.ts`
-   - Replaces the upstream product UI locale loader with a tiny identity/Intl
-     compatibility shim exporting only the formatting functions required by the
-     model closure.
-   - This avoids importing YEIS product UI/locales into Personal Universe.
+   - Restores the exact pinned-MIT YEIS runtime translator after visual smoke
+     exposed Turkish source labels leaking through the earlier identity shim.
+   - Vendors only `locales/en/data.json` and `locales/en/ui.json`; the host
+     calls `initI18n("en")` before constructing `Universe`.
+   - Translation lookup and source keys remain upstream behavior; Personal
+     Universe does not maintain a parallel body-name alias table.
 
 No model, orbital, catalogue, procedural-generation, galaxy, black-hole, or
 stellar algorithms were rewritten in this migration.

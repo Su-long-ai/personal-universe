@@ -179,3 +179,51 @@ local browser:
 This browser smoke is now part of the branch CI, in addition to Reuse Gate and
 the Astro production build.
 
+## Navigator discovery grouping
+
+Implemented under task `NAVIGATOR-DISCOVERY-002`.
+
+The navigator still consumes one flat array of destinations resolved by the
+pinned MIT YEIS search/Places model, so keyboard selection and Open/Locate
+semantics remain unchanged. Presentation now adds stable groups:
+
+1. Personal Signals
+2. Worlds
+3. Stars + Systems
+4. Black Holes
+5. Landmarks
+6. Galaxies
+
+Browse uses the same grouping over the curated Places set. Search keeps the
+group order stable and ranks matches *within each group* by exact title,
+title prefix, token prefix, title substring and detail substring. This keeps
+Personal Signals visibly first-class without introducing a second fuzzy-search
+index or dependency.
+
+Generic search packages remain escalation options rather than parallel
+authorities: cmdk/Fuse can later enhance palette ergonomics, while Pagefind
+remains reserved for document/article search.
+
+## Shareable star and world links
+
+Implemented under task `SHAREABLE-NAV-LINKS-002`.
+
+The existing debug URL contract is promoted into a stable single-page deep-link
+contract rather than introducing a router:
+
+- `phase=<phase>`
+- `star=<native YEIS star id>`
+- optional `body=<native YEIS body id>`
+
+On initial load, `body` is resolved inside the requested native YEIS system
+before the content/Hero/first-world fallback, so an exact shared world wins.
+Opening a star or world through normal navigation updates the same query
+parameters with the browser History API. Returning to the galactic overview
+removes only `phase`, `star` and `body`.
+
+Unrelated query state such as `engine`, `diagnostic`, `freeze`,
+`navigator` and `navq` is preserved because URL mutation starts from the
+current `window.location`.
+
+The serialized identity remains YEIS-owned; Personal Universe does not create a
+second slug or route identity for astronomical objects.

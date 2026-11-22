@@ -4,7 +4,17 @@ import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
   loadUniverseNavigation,
   type UniverseNavigationDestination,
+  type UniverseNavigationGroup,
 } from "../../lib/universe/yeis/navigation";
+
+const GROUP_LABELS: Record<UniverseNavigationGroup, string> = {
+  personal: "PERSONAL SIGNALS",
+  worlds: "WORLDS",
+  stars: "STARS + SYSTEMS",
+  blackholes: "BLACK HOLES",
+  landmarks: "LANDMARKS",
+  galaxies: "GALAXIES",
+};
 
 export function UniverseNavigator({
   open,
@@ -175,43 +185,63 @@ export function UniverseNavigator({
                 No destination matched this signal.
               </div>
             )}
-          {results.map((result, index) => (
-            <div
-              key={result.id}
-              className={
-                "navigator-result-row" +
-                (index === activeIndex ? " is-active" : "")
-              }
-              role="option"
-              aria-selected={index === activeIndex}
-              onPointerEnter={() => setActiveIndex(index)}
-            >
-              <button
-                type="button"
-                className="navigator-result-open"
-                onClick={() => activate(result)}
-              >
-                <span className={"navigator-kind kind-" + result.kind}>
-                  {result.kind}
-                </span>
-                <span className="navigator-result-main">
-                  <strong>{result.title}</strong>
-                  <small>{result.detail}</small>
-                </span>
-                <span className="navigator-open">
-                  {result.target.kind === "star" || result.target.kind === "body" ? "OPEN →" : "TRAVEL →"}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="navigator-locate"
-                onClick={() => locate(result)}
-                aria-label={"Locate " + result.title + " in galaxy"}
-              >
-                LOCATE
-              </button>
-            </div>
-          ))}
+          {results.map((result, index) => {
+            const showGroup =
+              index === 0 || results[index - 1]?.group !== result.group;
+            return (
+              <div className="navigator-result-block" key={result.id}>
+                {showGroup && (
+                  <div
+                    className={
+                      "navigator-group-label group-" + result.group
+                    }
+                  >
+                    <span>{GROUP_LABELS[result.group]}</span>
+                    {result.group === "personal" && (
+                      <small>YOUR CONTENT</small>
+                    )}
+                  </div>
+                )}
+                <div
+                  className={
+                    "navigator-result-row" +
+                    (index === activeIndex ? " is-active" : "")
+                  }
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  onPointerEnter={() => setActiveIndex(index)}
+                >
+                  <button
+                    type="button"
+                    className="navigator-result-open"
+                    onClick={() => activate(result)}
+                  >
+                    <span className={"navigator-kind kind-" + result.kind}>
+                      {result.kind}
+                    </span>
+                    <span className="navigator-result-main">
+                      <strong>{result.title}</strong>
+                      <small>{result.detail}</small>
+                    </span>
+                    <span className="navigator-open">
+                      {result.target.kind === "star" ||
+                      result.target.kind === "body"
+                        ? "OPEN →"
+                        : "TRAVEL →"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="navigator-locate"
+                    onClick={() => locate(result)}
+                    aria-label={"Locate " + result.title + " in galaxy"}
+                  >
+                    LOCATE
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <footer className="navigator-footer">
