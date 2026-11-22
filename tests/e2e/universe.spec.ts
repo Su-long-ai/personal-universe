@@ -249,6 +249,7 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     "orbit",
   );
   await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("phase")).toBe("orbit");
 
   await page.getByRole("button", { name: "← RETURN TO SYSTEM" }).click();
   await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
