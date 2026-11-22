@@ -1,48 +1,55 @@
 {
   "schema": 2,
-  "task_id": "NAVIGATOR-LOCATE-SHORTCUT-FIX-001",
-  "title": "Prevent Locate shortcut from stealing normal search text entry",
+  "task_id": "NAVIGATION-LAZY-BOUNDARY-001",
+  "title": "Restore the YEIS lazy-loading boundary after Search/Locate integration",
   "scope": {
     "level": "implementation",
-    "subject": "Keyboard interaction for the restored Search/Places navigator"
+    "subject": "Navigation module dependency graph and initial bundle boundary"
   },
   "researched_at": "2026-11-22",
-  "research_summary": "The committed Locate implementation binds the plain letter L inside the search input, which conflicts with ordinary query entry. The existing navigator already uses Enter to activate the current result, so the smallest coherent fix is Shift+Enter for Locate and Enter for Open. This preserves native text entry, requires no new keybinding framework, and leaves the explicit LOCATE button available for pointer users.",
+  "research_summary": "The production build warns that the YEIS core dynamic import is ineffective because the statically imported navigation module itself statically imports Universe/index. Official ES/Vite semantics confirm that static imports eagerly join the initial module graph while import() creates an on-demand graph boundary. Keep the navigator UI and result types static, but load YEIS runtime/normalization only inside async navigation functions. This preserves one YEIS search implementation without duplicating an astronomical index.",
   "policy_change": false,
   "planned_files": [
-    "src/components/universe/UniverseNavigator.tsx",
+    "src/lib/universe/yeis/navigation.ts",
     "docs/architecture/navigation.md"
   ],
   "sources": [
     {
-      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/combobox/",
-      "finding": "Editable combobox patterns reserve printable characters for text editing; action keys should not steal ordinary character input."
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
+      "finding": "Pinned MIT Universe owns the normalization/search semantics that navigation reuses."
     },
     {
-      "url": "https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/shiftKey",
-      "finding": "KeyboardEvent.shiftKey exposes the Shift modifier without taking over printable text keys."
+      "url": "https://vite.dev/guide/features",
+      "finding": "Vite preserves lazy loading for dynamic imports; statically reachable dependencies belong to the eager graph."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import",
+      "finding": "Dynamic import is evaluated on demand, unlike static import declarations that make modules eager dependencies."
     }
   ],
   "search_ladder": [
     {
       "level": "full_solution",
-      "status": "none",
-      "registry_refs": [],
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
       "source_refs": [
         0
       ],
-      "conclusion": "No navigation product change is needed for a local keybinding conflict."
+      "conclusion": "Keep the selected YEIS mother engine and its search semantics; no replacement search product is needed."
     },
     {
       "level": "framework_engine",
-      "status": "none",
+      "status": "found",
       "registry_refs": [
-        "react-three-fiber"
+        "astro-content-collections"
       ],
       "source_refs": [
-        0
+        1,
+        2
       ],
-      "conclusion": "Rendering framework is unrelated to keyboard semantics."
+      "conclusion": "The existing Astro/Vite build already provides the lazy module boundary needed; no bundler plugin is required."
     },
     {
       "level": "subsystem",
@@ -51,120 +58,122 @@
         "your-eyes-in-space-mit-e520568"
       ],
       "source_refs": [
-        0
+        0,
+        1,
+        2
       ],
-      "conclusion": "Keep the restored YEIS-style navigator and change only the conflicting activation gesture."
+      "conclusion": "Move YEIS runtime imports into the async navigation operations while preserving the existing destination API."
     },
     {
       "level": "component_asset",
       "status": "none",
       "registry_refs": [],
       "source_refs": [
-        0,
-        1
+        1,
+        2
       ],
-      "conclusion": "Native KeyboardEvent modifier state fully covers the fix; no shortcut package is needed."
+      "conclusion": "No component package can improve this module-graph issue."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "allow arbitrary search text including the letter l",
+      "capability": "preserve YEIS as the single astronomical search source",
       "importance": "high",
       "coverage": {
-        "shift-enter-locate": "full",
-        "plain-l-locate": "none",
-        "alt-l-locate": "full"
+        "lazy-yeis-navigation": "full",
+        "eager-navigation-core": "full",
+        "duplicate-light-index": "partial"
       },
-      "decision": "Printable letters must remain text input."
+      "decision": "Do not add a second star/search index."
     },
     {
-      "capability": "keyboard-only Locate action",
+      "capability": "keep heavy YEIS core out of the static navigator graph",
       "importance": "high",
       "coverage": {
-        "shift-enter-locate": "full",
-        "plain-l-locate": "full",
-        "alt-l-locate": "full"
+        "lazy-yeis-navigation": "full",
+        "eager-navigation-core": "none",
+        "duplicate-light-index": "full"
       },
-      "decision": "Shift+Enter reuses the selected-result activation key without adding a second unrelated mnemonic."
+      "decision": "Use function-local dynamic imports for runtime-only dependencies."
     },
     {
-      "capability": "avoid browser/global shortcut conflicts",
-      "importance": "medium",
+      "capability": "keep Search/Open/Locate behavior unchanged",
+      "importance": "high",
       "coverage": {
-        "shift-enter-locate": "full",
-        "plain-l-locate": "full",
-        "alt-l-locate": "partial"
+        "lazy-yeis-navigation": "full",
+        "eager-navigation-core": "full",
+        "duplicate-light-index": "partial"
       },
-      "decision": "Prefer a modifier on the existing Enter action over another letter chord."
+      "decision": "Only dependency timing changes; the destination API stays stable."
     }
   ],
   "candidates": [
     {
-      "id": "shift-enter-locate",
-      "name": "Enter opens; Shift+Enter locates",
-      "level": "component_asset",
-      "source": "native KeyboardEvent.shiftKey on existing navigator input",
-      "license": "browser API / project code",
+      "id": "lazy-yeis-navigation",
+      "name": "Function-local dynamic YEIS imports inside navigation operations",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "existing navigation API + native import()",
+      "license": "MIT pinned YEIS / web platform",
       "decision": "reuse",
-      "reason": "Preserves all printable text, aligns Locate with the existing selected-result activation gesture, and adds no dependency.",
+      "reason": "Restores the intended lazy boundary while retaining the single upstream search implementation and current navigator API.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 0.5,
+        "integration_cost": 1,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
         "customization_fit": 5,
         "maturity": 5
-      },
-      "registry_id": "your-eyes-in-space-mit-e520568"
+      }
     },
     {
-      "id": "plain-l-locate",
-      "name": "Keep plain L as Locate",
-      "level": "component_asset",
-      "source": "current committed behavior",
-      "license": "project code",
+      "id": "eager-navigation-core",
+      "name": "Keep YEIS core statically reachable through navigation.ts",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "current build graph",
+      "license": "MIT pinned YEIS",
       "decision": "reject",
-      "reason": "Conflicts directly with normal search entry for any query containing l/L.",
+      "reason": "Works functionally but defeats the existing dynamic boundary and produces Vite ineffective-dynamic-import warnings.",
       "evaluation": {
-        "coverage": 2,
+        "coverage": 4,
         "integration_cost": 0,
         "license_fit": 5,
-        "maintenance_health": 2,
-        "performance_fit": 5,
-        "customization_fit": 2,
-        "maturity": 2
-      },
-      "registry_id": "your-eyes-in-space-mit-e520568"
+        "maintenance_health": 4,
+        "performance_fit": 2,
+        "customization_fit": 4,
+        "maturity": 5
+      }
     },
     {
-      "id": "alt-l-locate",
-      "name": "Use Alt+L for Locate",
+      "id": "duplicate-light-index",
+      "name": "Build a separate lightweight project/star search index to avoid loading YEIS",
       "level": "component_asset",
-      "source": "native keyboard modifiers",
-      "license": "browser API / project code",
+      "registry_id": "cmdk-fuse-navigation",
+      "source": "generic client-side search stack",
+      "license": "MIT",
       "decision": "reject",
-      "reason": "Avoids text theft but introduces a new mnemonic chord and can collide with browser/platform menu behaviors; Shift+Enter is more local to result activation.",
+      "reason": "Could make the navigator light but duplicates astronomical search/ranking and creates a second mapping layer back to YEIS IDs.",
       "evaluation": {
-        "coverage": 4.5,
-        "integration_cost": 0.5,
+        "coverage": 3.5,
+        "integration_cost": 3,
         "license_fit": 5,
-        "maintenance_health": 4,
+        "maintenance_health": 3,
         "performance_fit": 5,
-        "customization_fit": 4,
-        "maturity": 4
-      },
-      "registry_id": "your-eyes-in-space-mit-e520568"
+        "customization_fit": 5,
+        "maturity": 5
+      }
     }
   ],
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "shift-enter-locate"
+      "lazy-yeis-navigation"
     ],
-    "rationale": "Use native Shift+Enter on the existing Enter activation path. Keep Enter=Open, Shift+Enter=Locate, and the visible LOCATE button for pointer users.",
+    "rationale": "Preserve the static navigator shell but move all YEIS runtime-only dependencies behind import() inside async search/marker resolution. This restores code splitting without a second search index.",
     "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If later accessibility testing prefers a different gesture, keep pointer LOCATE and expose the keyboard mapping through the same activation handler."
+    "fallback": "If Vite still reports a static path into the core, inspect the remaining navigation imports and move only runtime values behind the same lazy boundary; keep type-only imports static."
   }
 }

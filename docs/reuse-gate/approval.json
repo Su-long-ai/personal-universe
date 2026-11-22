@@ -1,27 +1,27 @@
 {
   "schema": 2,
-  "task_id": "NAVIGATOR-LOCATE-SHORTCUT-FIX-001",
-  "approved_at": "2026-11-22T15:33:59.020Z",
-  "baseline_commit": "3a5931f63ea1e55d963c26c3dae87930ade78c1a",
+  "task_id": "NAVIGATION-LAZY-BOUNDARY-001",
+  "approved_at": "2026-11-22T15:38:42.107Z",
+  "baseline_commit": "74e04a1ae0812f1f03b2b7d092e799018caf3ff0",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "70daf897b5daa55cf96bc41d511f68fc31887d8deecccdd19433d46f6209cd2e",
+  "record_sha256": "2f6ac9c061d63072c5b6a0e4db069fd387ae4daba42d7b0b308a2aa15079fd35",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "4041a3ab6511cb220709b4e9b6279b8e2f32b9b91dfbf55ae13bfae6378bd6a5",
   "scope": {
     "level": "implementation",
-    "subject": "Keyboard interaction for the restored Search/Places navigator"
+    "subject": "Navigation module dependency graph and initial bundle boundary"
   },
   "policy_change": false,
   "planned_files": [
-    "src/components/universe/UniverseNavigator.tsx",
+    "src/lib/universe/yeis/navigation.ts",
     "docs/architecture/navigation.md"
   ],
   "selected_ids": [
-    "shift-enter-locate"
+    "lazy-yeis-navigation"
   ],
   "candidate_scores": {
-    "shift-enter-locate": 58.5,
-    "plain-l-locate": 33,
-    "alt-l-locate": 51.5
+    "lazy-yeis-navigation": 57,
+    "eager-navigation-core": 49,
+    "duplicate-light-index": 41
   }
 }

@@ -117,3 +117,22 @@ letter `l`. The binding is corrected to `Shift+Enter` for Locate while plain
 `Enter` remains Open. Printable search characters are never intercepted by
 result actions, and the explicit LOCATE button remains available for pointer
 users.
+
+## Navigation lazy-load boundary
+
+Search/Locate must not make the navigator a second eager path into the heavy YEIS
+runtime. The navigator shell and destination types remain in the static React graph,
+while `loadYeisCore()` and YEIS query normalization are imported only when an
+async navigation operation executes.
+
+Production validation on 2026-11-22:
+
+- the previous Vite `INEFFECTIVE_DYNAMIC_IMPORT` warning is gone;
+- the production build keeps separate `Universe` / `yeis` / `YeisGalaxyScene`
+  chunks rather than folding the core through `navigation.ts`;
+- a fresh Chrome profile still searched Sirius, located `c29786`, completed the
+  same `0.269212 rad` native-camera turn, and opened Sirius System;
+- printable `l` input still remained ordinary search text.
+
+This is a module-graph change only; destination ranking and spatial semantics still
+come from the pinned MIT YEIS implementation.

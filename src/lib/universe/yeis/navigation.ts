@@ -1,11 +1,6 @@
 import type { GalaxyMarker } from "../types";
 import type { UniverseContentPlacement } from "../content";
-import { normalizeQuery } from "../../../vendor/yeis/core/Universe";
-import {
-  HERO_SYSTEM_ID,
-  loadYeisCore,
-  type YeisCoreRuntime,
-} from "./index";
+import type { YeisCoreRuntime } from "./index";
 import { markerForYeisStarId } from "./bridge";
 
 export type UniverseNavigationKind =
@@ -49,10 +44,14 @@ export async function loadUniverseNavigation(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
 ): Promise<UniverseNavigationDestination[]> {
+  const [{ loadYeisCore }, { normalizeQuery }] = await Promise.all([
+    import("./index"),
+    import("../../../vendor/yeis/core/Universe"),
+  ]);
   const runtime = await loadYeisCore();
   const q = normalizeQuery(query);
   return q
-    ? searchDestinations(runtime, q, placements, markers)
+    ? searchDestinations(runtime, q, placements, markers, normalizeQuery)
     : browseDestinations(runtime, placements, markers);
 }
 
@@ -60,6 +59,7 @@ export async function navigationMarker(
   destination: UniverseNavigationDestination,
   markers: GalaxyMarker[],
 ): Promise<GalaxyMarker> {
+  const { loadYeisCore } = await import("./index");
   const runtime = await loadYeisCore();
   const existing =
     (destination.markerId
@@ -109,6 +109,7 @@ function searchDestinations(
   query: string,
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
+  normalize: (value: string) => string,
 ): UniverseNavigationDestination[] {
   const out: UniverseNavigationDestination[] = [];
 
@@ -116,7 +117,7 @@ function searchDestinations(
     const placement = placements.find(
       (candidate) => candidate.entry.id === destination.entryId,
     );
-    const haystack = normalizeQuery(
+    const haystack = normalize(
       [
         destination.title,
         destination.detail,
@@ -127,7 +128,7 @@ function searchDestinations(
   }
 
   if (
-    normalizeQuery("AURORA HELION HERO WORLD").includes(query) ||
+    normalize("AURORA HELION HERO WORLD").includes(query) ||
     query.includes("aurora") ||
     query.includes("helion")
   ) {
@@ -136,7 +137,7 @@ function searchDestinations(
       kind: "featured",
       title: "AURORA",
       detail: "HERO SYSTEM · PERSONAL UNIVERSE",
-      nativeId: HERO_SYSTEM_ID,
+      nativeId: runtime.heroSystem.id,
     });
   }
 
