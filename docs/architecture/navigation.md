@@ -240,6 +240,19 @@ from current AGPL YEIS.
 
 Journeys are deliberately orchestration, not a second navigation state machine.
 
+The pinned MIT `src/core/TourPlayer.ts` was evaluated rather than ported
+wholesale. Three core ideas are retained:
+
+- a user-initiated navigation interrupts the running journey;
+- automatic progression waits until navigation is settled, then applies a
+  short destination dwell;
+- step changes own and clean up only their temporary orchestration state.
+
+Its narration manifests, TTS playback, timed cue engine, render overrides,
+surface pins, comparison/pulse effects and simulation-time restoration are
+specific to the upstream educational-tour product and are intentionally not
+copied into Personal Universe.
+
 The Places surface derives:
 
 - Featured Journey
@@ -254,7 +267,8 @@ Behavior:
 - manual Search/Places/Canvas navigation, Locate, Return or Stop interrupts the
   journey immediately;
 - camera controls remain available;
-- ordinary mode may advance after a short hold at stable product phases;
+- ordinary mode advances only after navigation has settled and the
+  current product phase remains stable for the journey dwell;
 - `prefers-reduced-motion` disables automatic advance and keeps Prev/Next
   manual controls;
 - a Journey never invents content: if the relevant Content Collection group is
