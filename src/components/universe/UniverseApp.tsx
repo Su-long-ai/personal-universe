@@ -525,21 +525,33 @@ export default function UniverseApp({
 
   const handleCinematicPhaseComplete = useCallback(
     (completed: UniversePhase) => {
-      if (debugFreeze) return;
+      if (debugFreeze || phase !== completed) return;
 
-      setPhase((current) => {
-        if (current !== completed) return current;
+      let nextPhase = completed;
+      if (completed === "approach") nextPhase = "orbit";
+      else if (completed === "orbit") {
+        nextPhase =
+          selectedPlanet?.surfaceMode === "none" ? "orbit" : "atmosphere";
+      } else if (completed === "atmosphere") nextPhase = "surface";
+      else if (completed === "returning") nextPhase = "galaxy";
 
-        if (completed === "approach") return "orbit";
-        if (completed === "orbit") {
-          return selectedPlanet?.surfaceMode === "none" ? "orbit" : "atmosphere";
-        }
-        if (completed === "atmosphere") return "surface";
-        if (completed === "returning") return "galaxy";
-        return current;
-      });
+      setPhase(nextPhase);
+
+      if (nextPhase === "galaxy") {
+        replaceNavigationUrl({ phase: "galaxy" });
+        return;
+      }
+
+      const starId = nativeSystemId(selectedSystem);
+      if (starId && selectedPlanet) {
+        replaceNavigationUrl({
+          phase: nextPhase,
+          starId,
+          bodyId: nativePlanetId(selectedPlanet),
+        });
+      }
     },
-    [debugFreeze, selectedPlanet?.surfaceMode],
+    [debugFreeze, phase, selectedPlanet, selectedSystem],
   );
 
   const handleReturn = useCallback(() => {
