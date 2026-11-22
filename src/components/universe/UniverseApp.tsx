@@ -121,7 +121,7 @@ export default function UniverseApp({
     new URLSearchParams(window.location.search).get("engine") === "v2"
       ? "v2"
       : "yeis";
-  const [activeEngine, setActiveEngine] = useState<UniverseEngine>(requestedEngine);
+  const [activeEngine, setActiveEngine] = useState<UniverseEngine>("yeis");
   const contentPlacements = useMemo(
     () => placeUniverseContent(contentEntries, galaxy.markers),
     [contentEntries, galaxy.markers],
