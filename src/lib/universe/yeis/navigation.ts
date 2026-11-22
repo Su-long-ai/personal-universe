@@ -543,13 +543,22 @@ export async function resolveUniverseNavigationDestination(
     if (slash <= 0 || slash >= payload.length - 1) return null;
     const starId = payload.slice(0, slash);
     const bodyId = payload.slice(slash + 1);
+    const { loadYeisCore } = await import("./index");
+    const runtime = await loadYeisCore();
+    const nativeSystem = runtime.universe.system(starId);
+    nativeSystem.update(2451545.0, 0);
+    const nativeBody = nativeSystem.get(bodyId);
+    if (!nativeBody) return null;
     const marker = markers.find((candidate) => candidate.nativeId === starId);
     return {
       id: key,
       kind: "body",
       group: "bodies",
-      title: bodyId,
-      detail: "BODY · " + (marker?.name ?? starId),
+      title: nativeBody.name,
+      detail:
+        nativeBody.data.type.toUpperCase() +
+        " · " +
+        (marker?.name ?? runtime.universe.starName(starId)),
       target: {
         kind: "body",
         starId,
@@ -557,6 +566,7 @@ export async function resolveUniverseNavigationDestination(
         markerId: marker?.id,
       },
       markerId: marker?.id,
+      keywords: [nativeBody.data.name, nativeBody.data.type],
     };
   }
 
