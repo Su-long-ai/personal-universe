@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "NAVIGATOR-DISCOVERY-002",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "e8873b8772315c32a477f5c9359dfc073dd5ca40",
+  "record_path": "docs/reuse-gate/tasks/NAVIGATOR-DISCOVERY-002.json",
+  "record_sha256": "d5dcc17d46f5ea86b6e5ac781442e74762cedd101ef5455683b4488360d4e68a",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "cmdk-fuse-navigation": "b58253e925847c073074ec277d3a56b96ca449d2e3045cb293d4ce3e3735c5df",
+    "pagefind": "1decefed20a6e0381ae67654f818a3effb6d078adde93826e8b9dda11c2821fc",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Navigator discovery, grouping and result ranking on the existing YEIS destination model"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/universe.css",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-native-discovery-ui"
+  ],
+  "candidate_scores": {
+    "yeis-native-discovery-ui": 55.5,
+    "cmdk-fuse-navigation": 43,
+    "pagefind-doc-search": 39.5
+  }
+}
