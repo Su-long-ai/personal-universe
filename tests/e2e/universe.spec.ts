@@ -103,14 +103,16 @@ test("personal signal deep link reaches system and world content", async ({
   await page.goto(
     `/?phase=system&star=${encodeURIComponent(target!)}&freeze=1`,
   );
+  await waitForYeis(page);
   await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
   await expect(page.locator(".content-signal-card")).toBeVisible();
 
   await page.goto(
     `/?phase=orbit&star=${encodeURIComponent(target!)}&freeze=1`,
   );
-  await expect(page.locator(".world-content-card")).toBeVisible();
+  await waitForYeis(page);
   await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+  await expect(page.locator(".world-content-card")).toBeVisible();
 
   await runtime.assertClean(testInfo);
 });

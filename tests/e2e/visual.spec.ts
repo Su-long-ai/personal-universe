@@ -82,16 +82,20 @@ for (const viewport of VIEWPORTS) {
     await page.goto(
       `/?phase=system&star=${encodeURIComponent(target!)}&freeze=1`,
     );
+    await waitForYeis(page);
     await expect(page.locator(".content-signal-card")).toBeVisible();
     await shot(page, testInfo, viewport.name, "system-personal-signal");
 
     await page.goto(
       `/?phase=orbit&star=${encodeURIComponent(target!)}&freeze=1`,
     );
+    await waitForYeis(page);
+    await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await expect(page.locator(".world-content-card")).toBeVisible();
     await shot(page, testInfo, viewport.name, "orbit-personal-world");
 
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
+    await waitForYeis(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await shot(page, testInfo, viewport.name, "hero-world");
 
