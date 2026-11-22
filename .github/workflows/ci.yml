@@ -102,7 +102,9 @@ jobs:
   e2e:
     name: E2E shard ${{ matrix.shard }}/4
     needs: build
-    runs-on: ubuntu-latest
+    # Pin browser jobs to the LTS image Playwright's Linux dependency installer
+    # supports reliably; ubuntu-latest may roll forward independently.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
