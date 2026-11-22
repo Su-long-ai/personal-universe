@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "PLAYWRIGHT-SHARDING-V1-001",
+  "approved_at": "2026-11-23T00:00:00.000Z",
+  "baseline_commit": "cc148186a748605c7c2177cc918259e00617532f",
+  "record_path": "docs/reuse-gate/tasks/PLAYWRIGHT-SHARDING-V1-001.json",
+  "record_sha256": "4caa975d9ef6220a17b82cdfbe4f5405531d9a714a152e78f6ce606ddbcfd07a",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-actions-matrix": "6686d9fcb00d4643c27f293fb2237c655d8f6d1eaa34c15435d444e592ee65fe",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "vercel-preview-deployments": "b3b24d36808806186022cb0f5e5467a3500bdfe2ba9ae62a7ef7b878d8a02111"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "CI wall-clock reduction for Playwright functional and visual regression without same-runner WebGL contention"
+  },
+  "policy_change": true,
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    "playwright.config.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "selected_ids": [
+    "playwright-native-sharding",
+    "github-actions-matrix-shards"
+  ],
+  "candidate_scores": {
+    "playwright-native-sharding": 54,
+    "github-actions-matrix-shards": 55,
+    "same-runner-multiworker": 50,
+    "vercel-preview-runtime": 29
+  }
+}
