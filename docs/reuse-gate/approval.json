@@ -1,35 +1,30 @@
 {
   "schema": 2,
-  "task_id": "REUSE-GATE-V2-001",
-  "approved_at": "2026-11-22T12:37:01.072Z",
-  "baseline_commit": "ddff765cbbd24c44f8b3a2ac39d33207381a6b78",
+  "task_id": "REUSE-GATE-V2-REGISTRY-FLOW-002",
+  "approved_at": "2026-11-22T13:00:44.538Z",
+  "baseline_commit": "5e6cf1c4bea861f5f420294c8d22f459a7ea75a4",
   "record_path": "docs/reuse-gate/current.json",
-  "record_sha256": "f0b6e8ac539def18a74b68a076943e71ebfbe624f64781f2c3902abd610551f2",
+  "record_sha256": "572086a7f58d0b25a06a788e66dd53cf7008ab1053cec53ca7e3649b2cff04a7",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_sha256": "7847793c8e235381c5d48ecacde4794d15f5d7087c0e484dacad634f28d16586",
   "scope": {
     "level": "architecture",
-    "subject": "Project-wide reuse research and implementation gate"
+    "subject": "Reuse-gate registry lifecycle and approval semantics"
   },
   "policy_change": true,
   "planned_files": [
     "scripts/reuse-gate.mjs",
     "AGENTS.md",
-    "docs/reuse-gate/README.md",
-    "docs/reuse-gate/registry.json"
+    "docs/reuse-gate/README.md"
   ],
   "selected_ids": [
-    "node-gate",
-    "radar-registry",
-    "scorecard-eval",
-    "git-npm-hooks"
+    "node-gate-fix",
+    "git-hooks-flow"
   ],
   "candidate_scores": {
-    "backstage": 40,
-    "opa-conftest": 43,
-    "node-gate": 54,
-    "radar-registry": 49,
-    "scorecard-eval": 49,
-    "git-npm-hooks": 52
+    "backstage-model": 40,
+    "opa-model": 47,
+    "node-gate-fix": 60,
+    "git-hooks-flow": 52
   }
 }

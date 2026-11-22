@@ -23,7 +23,6 @@ const POLICY_FILES = new Set([
   "scripts/reuse-gate.mjs",
   "AGENTS.md",
   "docs/reuse-gate/README.md",
-  "docs/reuse-gate/registry.json",
 ]);
 
 function die(message) {
@@ -65,7 +64,11 @@ function requiredText(value, label, minLength = 1) {
 
 function protectedImplementation(path) {
   const p = normalize(path);
-  if (p === "docs/reuse-gate/current.json" || p === "docs/reuse-gate/approval.json") {
+  if (
+    p === "docs/reuse-gate/current.json" ||
+    p === "docs/reuse-gate/approval.json" ||
+    p === "docs/reuse-gate/registry.json"
+  ) {
     return false;
   }
   return (

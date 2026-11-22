@@ -24,7 +24,7 @@ Before implementation:
 4. Run `npm run reuse:approve` while implementation paths are clean.
 5. Only then edit protected files.
 
-Do not bypass or disable the gate. Policy files themselves are protected after this upgrade; changes to the gate require an architecture-level record with `policy_change: true`.
+Do not bypass or disable the gate. Executable policy files themselves are protected after this upgrade; changes to the gate script/instructions/hooks require an architecture-level record with `policy_change: true`. `registry.json` is research metadata: update it before approval, then its SHA-256 is frozen by the approval token.
 
 `npm run dev`, `npm run build`, and Git pre-commit enforce the active approval.
 

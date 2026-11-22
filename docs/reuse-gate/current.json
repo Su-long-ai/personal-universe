@@ -1,44 +1,35 @@
 {
   "schema": 2,
-  "task_id": "REUSE-GATE-V2-001",
-  "title": "Upgrade reuse enforcement from local candidate checks to top-down whole-solution-first governance",
+  "task_id": "REUSE-GATE-V2-REGISTRY-FLOW-002",
+  "title": "Make the reuse registry an approval-time research input instead of an implementation/policy file",
   "scope": {
     "level": "architecture",
-    "subject": "Project-wide reuse research and implementation gate"
+    "subject": "Reuse-gate registry lifecycle and approval semantics"
   },
   "policy_change": true,
   "researched_at": "2026-11-22",
-  "research_summary": "Upgrade the existing lightweight Node/Git/npm reuse gate rather than replace it with a heavyweight governance platform. Reuse ADR/MADR decision structure, a Technology Radar-style lifecycle registry, and OpenSSF Scorecard-style evaluation dimensions. Search must proceed from full solutions to frameworks/engines to subsystems to components/assets before custom implementation. Architecture/subsystem tasks must carry a coverage matrix, global-value evaluations, and explicit tradeoffs whenever a lower-level choice is selected over a higher-level candidate. Keep Git hooks and npm lifecycle as the enforcement surface. OPA/Conftest and Backstage were evaluated as higher-level policy/catalog products but rejected for runtime/platform overhead relative to this single repository.",
+  "research_summary": "The v2 gate correctly hash-locks registry.json into each approval, but currently also classifies the registry as a protected policy implementation file. That makes the documented workflow impossible: research is supposed to update the persistent registry before reuse:approve, while approval refuses dirty protected files. Reuse the catalog/decision-record model where catalog evidence is an input to a decision, not executable policy. Keep the registry SHA-256 freeze after approval, while only the gate script, policy instructions, README and hooks remain policy files.",
   "planned_files": [
     "scripts/reuse-gate.mjs",
     "AGENTS.md",
-    "docs/reuse-gate/README.md",
-    "docs/reuse-gate/registry.json"
+    "docs/reuse-gate/README.md"
   ],
   "sources": [
     {
+      "url": "https://backstage.io/docs/features/software-catalog/",
+      "finding": "Backstage treats catalog entities as maintained descriptive metadata about systems/components; the catalog is data consumed by workflows rather than the policy engine itself."
+    },
+    {
       "url": "https://learn.microsoft.com/en-us/azure/well-architected/architect-role/architecture-decision-record",
-      "finding": "Architecture decisions should record context, alternatives, outcome, tradeoffs, consequences and status, and important decisions should remain available in the workload repository."
-    },
-    {
-      "url": "https://adr.github.io/madr/",
-      "finding": "MADR provides a lightweight structured decision format designed to make assumptions, considered options and outcomes explicit without turning records into large design documents."
-    },
-    {
-      "url": "https://radar.allegro.tech/help-and-about-tech-radar/",
-      "finding": "Technology Radar uses Adopt, Trial, Assess and Hold states and requires rationale, alternatives and evaluation criteria before broad adoption."
-    },
-    {
-      "url": "https://scorecard.dev/",
-      "finding": "OpenSSF Scorecard treats maintenance, license and dependency/security signals as separate project-health dimensions rather than reducing a candidate to one local feature."
+      "finding": "Architecture decision records use evidence/context as inputs to a decision and preserve the decision separately, supporting the distinction between mutable research evidence before approval and frozen decision state afterward."
     },
     {
       "url": "https://www.openpolicyagent.org/ecosystem/entry/conftest",
-      "finding": "Conftest can machine-test arbitrary structured JSON/YAML using OPA/Rego and is a mature generic option for policy-as-code."
+      "finding": "Policy-as-code systems distinguish policy rules from the structured data/configuration being evaluated, supporting keeping enforcement logic protected while allowing evidence inputs to be prepared before evaluation."
     },
     {
-      "url": "https://backstage.io/docs/next/features/software-catalog/system-model/",
-      "finding": "Backstage models Components inside Systems and Domains, demonstrating why a reusable-solution registry needs multiple abstraction levels instead of a flat library list."
+      "url": "https://git-scm.com/docs/githooks",
+      "finding": "Git hooks remain the existing commit-time enforcement surface and do not require research metadata itself to be treated as hook policy code."
     }
   ],
   "search_ladder": [
@@ -49,9 +40,9 @@
         "backstage-catalog"
       ],
       "source_refs": [
-        5
+        0
       ],
-      "conclusion": "A full software-catalog platform exists, but operating Backstage just to govern one repository would cost more than the benefit."
+      "conclusion": "A software catalog cleanly separates catalog data from executable governance, but deploying Backstage remains disproportionate."
     },
     {
       "level": "framework_engine",
@@ -60,89 +51,75 @@
         "opa-conftest"
       ],
       "source_refs": [
-        4
+        2
       ],
-      "conclusion": "OPA/Conftest can enforce structured policies, but adds a separate binary and Rego toolchain; the existing small Node gate can express the project-specific rules directly."
+      "conclusion": "OPA/Conftest makes the policy/data separation explicit but still adds an unnecessary policy runtime for this repository."
     },
     {
       "level": "subsystem",
       "status": "found",
       "registry_refs": [
-        "madr",
-        "technology-radar",
-        "openssf-scorecard"
+        "madr"
       ],
       "source_refs": [
-        0,
-        1,
-        2,
-        3
+        1
       ],
-      "conclusion": "Reuse the strongest lightweight concepts: ADR-style decisions, Radar lifecycle status and multidimensional candidate evaluation."
+      "conclusion": "Keep the local Node decision gate and make registry data a frozen decision input rather than policy implementation."
     },
     {
       "level": "component_asset",
       "status": "found",
       "registry_refs": [
-        "git-hooks",
-        "npm-lifecycle"
+        "git-hooks"
       ],
-      "source_refs": [],
-      "conclusion": "Keep the already-working Git pre-commit and npm predev/prebuild enforcement surfaces."
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Keep Git/npm enforcement unchanged; only correct how registry.json participates in pre-approval dirtiness checks."
     }
   ],
   "coverage_matrix": [
     {
-      "capability": "machine enforcement before implementation",
+      "capability": "registry can be updated during research before approval",
       "importance": "high",
       "coverage": {
-        "backstage": "partial",
-        "opa-conftest": "full",
-        "node-gate": "full"
+        "backstage-model": "full",
+        "opa-model": "full",
+        "node-gate-fix": "full"
       },
-      "decision": "Keep the Node gate as the enforcement runtime; no additional service or binary."
+      "decision": "All viable models separate evidence/catalog data from policy code; implement that separation in the lightweight Node gate."
     },
     {
-      "capability": "whole-solution-first search order",
+      "capability": "registry becomes immutable for an approved implementation task",
       "importance": "high",
       "coverage": {
-        "backstage": "partial",
-        "opa-conftest": "none",
-        "node-gate": "full"
+        "backstage-model": "partial",
+        "opa-model": "partial",
+        "node-gate-fix": "full"
       },
-      "decision": "Encode the search ladder explicitly in the record schema and reject missing upper-level searches."
+      "decision": "Retain the existing registry SHA-256 in approval.json; any post-approval mutation continues to invalidate the token."
     },
     {
-      "capability": "long-lived reusable-solution knowledge",
+      "capability": "policy files cannot be changed by ordinary tasks",
       "importance": "high",
       "coverage": {
-        "backstage": "full",
-        "opa-conftest": "partial",
-        "node-gate": "full"
+        "backstage-model": "partial",
+        "opa-model": "full",
+        "node-gate-fix": "full"
       },
-      "decision": "Use a version-controlled registry JSON rather than deploy a catalog service."
-    },
-    {
-      "capability": "global-value comparison instead of single-regression rejection",
-      "importance": "high",
-      "coverage": {
-        "backstage": "partial",
-        "opa-conftest": "partial",
-        "node-gate": "full"
-      },
-      "decision": "Require multidimensional candidate evaluation and machine-calculate a global value score; selecting against a higher score requires an explicit override."
+      "decision": "Keep script/AGENTS/README/hooks under architecture policy_change protection while removing only registry.json from policy classification."
     }
   ],
   "candidates": [
     {
-      "id": "backstage",
-      "name": "Backstage Software Catalog as governance platform",
+      "id": "backstage-model",
+      "name": "Adopt Backstage catalog/policy separation wholesale",
       "level": "full_solution",
       "registry_id": "backstage-catalog",
       "source": "https://backstage.io/docs/features/software-catalog/",
       "license": "Apache-2.0",
       "decision": "reject",
-      "reason": "Excellent system/component catalog model, but deploying and maintaining a platform is disproportionate for one repository.",
+      "reason": "Its conceptual catalog/data separation is correct, but operating Backstage for one repository remains unnecessary.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 5,
@@ -154,16 +131,16 @@
       }
     },
     {
-      "id": "opa-conftest",
-      "name": "OPA / Conftest policy engine",
+      "id": "opa-model",
+      "name": "Move registry validation into OPA/Conftest data + policy",
       "level": "framework_engine",
       "registry_id": "opa-conftest",
       "source": "https://www.openpolicyagent.org/ecosystem/entry/conftest",
       "license": "Apache-2.0",
       "decision": "reject",
-      "reason": "Strong generic policy enforcement, but a separate Go binary and Rego language are unnecessary overhead for the small repository-local rule set.",
+      "reason": "It solves the lifecycle cleanly but still adds a separate binary/Rego toolchain for a three-line classification correction.",
       "evaluation": {
-        "coverage": 4,
+        "coverage": 5,
         "integration_cost": 4,
         "license_fit": 5,
         "maintenance_health": 5,
@@ -173,36 +150,17 @@
       }
     },
     {
-      "id": "node-gate",
-      "name": "Existing Node reuse gate extended with top-down schema",
+      "id": "node-gate-fix",
+      "name": "Keep Node gate; classify registry as research input and hash-lock it after approval",
       "level": "subsystem",
       "registry_id": "madr",
       "source": "local scripts/reuse-gate.mjs",
-      "license": "Project code informed by reusable open methodologies",
+      "license": "Project code informed by ADR/catalog patterns",
       "decision": "reuse",
-      "reason": "Preserves the proven Git/npm enforcement path while adding the missing whole-solution search ladder, registry, coverage matrix and global-value checks.",
+      "reason": "Smallest change, preserves all current enforcement, and resolves the workflow contradiction without weakening post-approval integrity.",
       "evaluation": {
         "coverage": 5,
-        "integration_cost": 1,
-        "license_fit": 5,
-        "maintenance_health": 4,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 4
-      }
-    },
-    {
-      "id": "radar-registry",
-      "name": "Technology Radar-style registry status",
-      "level": "subsystem",
-      "registry_id": "technology-radar",
-      "source": "https://radar.allegro.tech/help-and-about-tech-radar/",
-      "license": "Reference methodology",
-      "decision": "reuse",
-      "reason": "Adopt/Trial/Assess/Hold is compact, understandable and prevents rediscovering or accidentally re-adopting rejected/held solutions.",
-      "evaluation": {
-        "coverage": 3,
-        "integration_cost": 1,
+        "integration_cost": 0,
         "license_fit": 5,
         "maintenance_health": 5,
         "performance_fit": 5,
@@ -211,33 +169,14 @@
       }
     },
     {
-      "id": "scorecard-eval",
-      "name": "OpenSSF-style multidimensional evaluation",
-      "level": "subsystem",
-      "registry_id": "openssf-scorecard",
-      "source": "https://scorecard.dev/",
-      "license": "Apache-2.0",
-      "decision": "reuse",
-      "reason": "Reuse the idea of separate maintenance/license/health dimensions; do not make the external CLI a mandatory dependency.",
-      "evaluation": {
-        "coverage": 3,
-        "integration_cost": 1,
-        "license_fit": 5,
-        "maintenance_health": 5,
-        "performance_fit": 5,
-        "customization_fit": 5,
-        "maturity": 5
-      }
-    },
-    {
-      "id": "git-npm-hooks",
-      "name": "Git hooks plus npm lifecycle enforcement",
+      "id": "git-hooks-flow",
+      "name": "Retain Git/npm enforcement surfaces",
       "level": "component_asset",
       "registry_id": "git-hooks",
       "source": "https://git-scm.com/docs/githooks",
       "license": "Existing project tooling",
       "decision": "reuse",
-      "reason": "Already installed, zero additional service, and proven to block unapproved implementation files.",
+      "reason": "No change needed; commit/build enforcement continues to consume the corrected approval semantics.",
       "evaluation": {
         "coverage": 3,
         "integration_cost": 0,
@@ -252,23 +191,21 @@
   "decision": {
     "mode": "reuse",
     "selected_ids": [
-      "node-gate",
-      "radar-registry",
-      "scorecard-eval",
-      "git-npm-hooks"
+      "node-gate-fix",
+      "git-hooks-flow"
     ],
-    "rationale": "Retain the minimal repository-local enforcement runtime, but upgrade its data model using established ADR/catalog/radar/scorecard concepts. This captures the system-level reuse that the old gate missed without introducing a governance platform larger than the project.",
+    "rationale": "Correct only the registry lifecycle classification: registry.json is mutable research evidence before approval and is frozen by SHA-256 after approval; executable gate policy remains protected. This removes a real workflow deadlock without weakening enforcement or adding a governance platform.",
     "higher_level_tradeoffs": [
       {
-        "candidate_id": "backstage",
-        "reason": "Backstage has broader catalog coverage, but its service/platform footprint and operational cost outweigh that gain for one repository; we reuse its hierarchy concept in a static registry."
+        "candidate_id": "backstage-model",
+        "reason": "Backstage provides a richer catalog platform, but its service footprint is far larger than the single lifecycle bug being fixed; we retain its data-versus-policy separation concept only."
       },
       {
-        "candidate_id": "opa-conftest",
-        "reason": "OPA/Conftest is a more general policy engine, but the additional binary and Rego maintenance do not improve this repository's four-level search logic enough to justify the integration cost."
+        "candidate_id": "opa-model",
+        "reason": "OPA cleanly separates policy and input data, but introducing a second policy language and runtime has lower global value than fixing the existing Node gate directly."
       }
     ],
     "score_overrides": [],
-    "fallback": "If the Node policy grows beyond a single-repository scope, move the same JSON records to Conftest/OPA or a Backstage catalog without changing the decision schema."
+    "fallback": "If registry rules later require cross-repository policy, migrate the same JSON registry and decision schema to OPA/Conftest or Backstage."
   }
 }

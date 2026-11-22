@@ -77,10 +77,10 @@ Approval freezes:
 - planned implementation paths;
 - selected candidates and calculated global scores.
 
-If the research or registry changes after approval, the task is blocked until it is re-approved.
+If the research or registry changes after approval, the task is blocked until it is re-approved. This is why registry updates belong before `reuse:approve`, not in the implementation phase.
 
 ## Protected policy
 
-The gate itself, `AGENTS.md`, the gate README and registry are protected by the same mechanism. A policy change must use an architecture-level record with `policy_change: true`.
+The gate script, `AGENTS.md`, gate README and Git hooks are executable policy and require an architecture-level record with `policy_change: true`. The registry is research metadata: it may be updated before approval, and approval freezes its SHA-256 so later mutation invalidates the token.
 
 The enforcement runtime intentionally stays small and reuses Git hooks and npm lifecycle hooks. OPA/Conftest remains the escalation path if this policy ever grows beyond a repository-local Node script.
