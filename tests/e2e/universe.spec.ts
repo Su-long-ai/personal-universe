@@ -168,6 +168,42 @@ test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("observed NASA exoplanet Search opens the exact observed world", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Gliese 12 b");
+
+  const exoplanet = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-exoplanet") })
+    .filter({ hasText: "Gliese 12 b" })
+    .first();
+  await expect(exoplanet).toBeVisible();
+  await exoplanet.locator(".navigator-result-open").click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ Gliese 12 b/)).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toMatch(/^exoplanet:/);
+  expect(url.searchParams.get("body")).toBe(
+    "catalog:Gliese 12:Gliese 12 b",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("black-hole Search preserves exact native travel identity", async ({
   page,
 }, testInfo) => {
