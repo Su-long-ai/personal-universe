@@ -23,6 +23,7 @@ export type UniverseNavigationGroup =
 export type UniverseNavigationTarget =
   | { kind: "star"; nativeId: string }
   | { kind: "body"; nativeId: string; bodyId: string }
+  | { kind: "blackhole"; id: string }
   | { kind: "galaxy"; index: number }
   | { kind: "landmark"; index: number };
 
@@ -40,7 +41,7 @@ export interface UniverseNavigationDestination {
 export interface UniverseNavigationCameraRequest {
   requestId: number;
   mode: "locate" | "travel";
-  target: Exclude<UniverseNavigationTarget, { kind: "body" }>;
+  target: UniverseNavigationTarget;
   title: string;
 }
 
@@ -189,7 +190,7 @@ function browseDestinations(
       group: "blackholes",
       title: blackHole.entry.name,
       detail: "FEATURED PLACE · BLACK HOLE",
-      target: { kind: "star", nativeId: blackHole.systemStarId },
+      target: { kind: "blackhole", id: blackHole.entry.id },
     });
   }
 
@@ -318,7 +319,7 @@ function searchDestinations(
       group: "blackholes",
       title: blackHole.entry.name,
       detail: "BLACK HOLE · YEIS PLACE",
-      target: { kind: "star", nativeId: blackHole.systemStarId },
+      target: { kind: "blackhole", id: blackHole.entry.id },
     });
   }
 
@@ -483,6 +484,7 @@ function targetKey(target: UniverseNavigationTarget): string {
   if (target.kind === "body") {
     return "body:" + target.nativeId + ":" + target.bodyId;
   }
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
 }
 
