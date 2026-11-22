@@ -1,51 +1,72 @@
-# Reuse-first implementation gate v2
+# Reuse-first implementation gate v3
 
-This project uses a machine-enforced **whole-solution-first** reuse workflow.
+Personal Universe uses a machine-enforced, whole-solution-first reuse workflow.
 
-## Why v2 exists
+The important change in v3 is that enforcement is no longer limited to a dirty local checkout. GitHub CI evaluates the actual protected files changed by a pull request or push and requires those files to be covered by valid, pre-existing task approvals.
 
-The original gate prevented local reinvention but could still miss a larger existing product that covered several planned subsystems at once. v2 forces research to move top-down before implementation:
+## Search order
+
+Research must move top-down:
 
 ```
 full solution
   -> framework / engine / platform
     -> subsystem
       -> component / asset / algorithm / data
-        -> custom code
+        -> custom implementation
 ```
 
-A lower-level solution may still be selected when it has better total value. It just cannot win by silently ignoring a broader candidate.
+A lower-level solution may still win when total value is better. The gate requires the broader alternatives and their tradeoffs to be recorded instead of silently ignored.
 
-## Records
+## Persistent registry
 
-- `current.json` — the active decision record.
-- `approval.json` — immutable-for-the-task approval token containing Git baseline and hashes.
-- `registry.json` — persistent reusable-solution catalog.
+`docs/reuse-gate/registry.json` is the reusable-solution catalog.
 
-The registry borrows the lightweight lifecycle idea of Technology Radar:
+Statuses:
 
-- `adopt` — proven default.
-- `trial` — validated but still limited.
-- `assess` — promising, requires evaluation.
-- `hold` — do not use for new implementation.
+- `adopt` — proven default
+- `trial` — validated but still bounded
+- `assess` — promising; evaluate before adoption
+- `hold` — unavailable for new selection
 
-## Required record structure
+The registry is shared knowledge. New tasks should reuse it before starting external research from zero.
 
-Every task declares `scope.level` as `architecture`, `subsystem`, or `implementation`.
+## Task-scoped records
 
-Every record must include:
+New work must not use one global mutable approval token.
+
+Each task gets:
+
+```
+docs/reuse-gate/tasks/<TASK_ID>.json
+docs/reuse-gate/approvals/<TASK_ID>.json
+```
+
+This allows multiple agents to work in parallel without overwriting one another's research/approval state.
+
+Legacy `current.json` and `approval.json` are still readable for existing v2 work, but are not the normal v3 workflow.
+
+## Required task record
+
+Each task declares `scope.level` as:
+
+- `architecture`
+- `subsystem`
+- `implementation`
+
+Every record includes:
 
 - external sources;
-- the four-level `search_ladder`;
+- the four-level search ladder;
 - registry-backed candidates;
-- multidimensional candidate evaluations;
+- multidimensional evaluations;
 - exact `planned_files`;
 - explicit selected candidate IDs;
-- explicit tradeoffs for higher-level candidates.
+- higher-level tradeoffs.
 
-Architecture and subsystem tasks additionally require a capability `coverage_matrix`.
+Architecture and subsystem tasks also require a capability `coverage_matrix`.
 
-Candidate evaluation is intentionally multidimensional:
+Candidate dimensions remain:
 
 - coverage;
 - integration cost;
@@ -55,32 +76,124 @@ Candidate evaluation is intentionally multidimensional:
 - customization fit;
 - maturity.
 
-The gate calculates a global-value score to make broad benefit visible. It does **not** blindly auto-pick the highest number. If a higher-scoring candidate is rejected, the decision must explicitly record why.
+The score makes global value visible. It does not blindly pick the numerically highest option; higher-scoring rejected candidates require an explicit override reason.
 
-## Workflow
+## Approval workflow
 
-1. Check `registry.json` first.
-2. Research full solutions before smaller parts.
-3. Update the registry and `current.json`.
-4. Run:
-   `node scripts/reuse-gate.mjs lint`
-5. While protected files are still clean, run:
-   `npm run reuse:approve`
-6. Implement.
-7. `npm run dev`, `npm run build` and pre-commit re-check the approval.
+Before protected implementation:
 
-Approval freezes:
+1. Update the registry if needed.
+2. Create/update `docs/reuse-gate/tasks/<TASK_ID>.json`.
+3. Lint:
+   `node scripts/reuse-gate.mjs lint docs/reuse-gate/tasks/<TASK_ID>.json`
+4. While protected implementation files are still clean:
+   `npm run reuse:approve:task -- docs/reuse-gate/tasks/<TASK_ID>.json`
+5. Commit the task record, registry research and generated approval token.
+6. Only after that commit, implement protected files.
+7. Run:
+   `npm run gate:reuse`
+   and
+   `npm run gate:reuse:staged`
+8. Push/open the PR.
 
-- research-record SHA-256;
-- reuse-registry SHA-256;
-- Git HEAD baseline;
+The separate approval commit is deliberate: Git history lets the CI gate prove that machine approval existed before the first protected implementation commit.
+
+## What schema 3 freezes
+
+A schema-3 approval freezes:
+
+- task-record SHA-256;
+- approval baseline commit;
 - planned implementation paths;
-- selected candidates and calculated global scores.
+- selected candidates;
+- calculated global scores;
+- hashes of only the registry entries referenced by that task.
 
-If the research or registry changes after approval, the task is blocked until it is re-approved. This is why registry updates belong before `reuse:approve`, not in the implementation phase.
+Freezing referenced entries instead of the entire registry is important for parallel work. Agent A can add an unrelated candidate without invalidating Agent B's approval. If a registry entry that B actually relied on changes, B must re-evaluate/re-approve.
+
+## GitHub PR/push enforcement
+
+`.github/workflows/ci.yml` runs a dedicated **Machine Reuse Gate** before build.
+
+The runner checks the actual commit range:
+
+- PR: base SHA -> PR head SHA
+- push: previous SHA -> pushed SHA
+- manual run: previous commit fallback
+
+For every protected changed file the gate finds at least one valid approval whose `planned_files` cover that path.
+
+For schema-3 approvals it also verifies:
+
+- the approval baseline is an ancestor of the evaluated head;
+- the task record existed unchanged at the baseline;
+- referenced registry entries match the approved versions;
+- policy files use an architecture-level `policy_change: true` task;
+- the approval-token commit precedes the first implementation commit for the covered file.
+
+A protected change without coverage blocks CI.
+
+## Protected implementation
+
+Protected implementation includes the product/runtime surface such as:
+
+- `src/**`
+- `public/**`
+- `scripts/**`
+- `package.json` / `package-lock.json`
+- Astro/TypeScript config
+
+Gate metadata itself is not treated as implementation, so research/approval can be prepared first.
 
 ## Protected policy
 
-The gate script, `AGENTS.md`, gate README and Git hooks are executable policy and require an architecture-level record with `policy_change: true`. The registry is research metadata: it may be updated before approval, and approval freezes its SHA-256 so later mutation invalidates the token.
+Executable policy is protected more strictly:
 
-The enforcement runtime intentionally stays small and reuses Git hooks and npm lifecycle hooks. OPA/Conftest remains the escalation path if this policy ever grows beyond a repository-local Node script.
+- `scripts/reuse-gate.mjs`
+- `AGENTS.md`
+- this README
+- `.githooks/**`
+- `.github/workflows/**`
+- `.github/actions/**`
+
+These paths require:
+
+- `scope.level = architecture`
+- `policy_change = true`
+
+The gate may be improved, but not bypassed by deleting a workflow, converting failures to warnings, excluding a protected path, or weakening checks without an approved architecture-level policy task.
+
+## Local vs cloud enforcement
+
+Local checks remain useful:
+
+- `npm run gate:reuse` — working tree
+- `npm run gate:reuse:staged` — staged changes
+
+GitHub's PR-range check is authoritative for cloud development:
+
+- `npm run gate:reuse:ci`
+
+This makes GitHub connector/agent development subject to the same policy even when no local Git hook ever runs.
+
+## Why the runtime stays Node
+
+OPA/Conftest remains a valid escalation option, but v3 deliberately extends the existing Node implementation first.
+
+The current policy is repository-specific, small enough to audit, and already integrated into npm/Git. Adding Rego and another policy runtime would duplicate ownership without increasing current coverage.
+
+If the policy grows substantially beyond repository-local file/research rules, the structured v3 task records are suitable inputs for a future OPA migration.
+
+## Parallel-agent rule
+
+Each agent should create a separate task ID and approval token for its own substantial work. Agents may share an approval only when they are genuinely implementing the same researched task and file scope.
+
+Do not create two competing generic subsystems when the registry or another active task already provides one.
+
+## License boundary
+
+YEIS source reuse remains pinned to:
+
+`e52056897364e060fbd6d00951628f163b57d7a1`
+
+That verified snapshot is the allowed MIT code boundary. Current AGPL YEIS can be inspected for design ideas but newer AGPL code must not be copied into Personal Universe.
