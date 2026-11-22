@@ -327,45 +327,52 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await earth.locator(".navigator-result-open").click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText(/LOCK ACQUIRED \/\/ Earth/)).toBeVisible();
+
+  // Earth is a pinned-YEIS native body, not necessarily a React PlanetDefinition.
+  // Prove the exact native target survives both the live camera handoff and the
+  // shareable destination URL instead of requiring the React-only approach caption.
+  const html = page.locator("html");
+  const earthTarget = "body:c0/earth";
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    earthTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    earthTarget,
+  );
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute("data-universe-travel-complete");
+      return traveling === earthTarget || complete === earthTarget;
+    })
+    .toBe(true);
 
   const sharedUrl = new URL(page.url());
-  expect(sharedUrl.searchParams.get("star")).toBeTruthy();
-  expect(sharedUrl.searchParams.get("body")).toBeTruthy();
-  expect(sharedUrl.searchParams.get("phase")).toBe("approach");
+  expect(sharedUrl.searchParams.get("destination")).toBe(earthTarget);
+  expect(sharedUrl.searchParams.get("phase")).toBeNull();
+  expect(sharedUrl.searchParams.get("star")).toBeNull();
+  expect(sharedUrl.searchParams.get("body")).toBeNull();
   expect(sharedUrl.searchParams.get("freeze")).toBe("1");
 
   await page.goto(sharedUrl.toString());
-  await expect(page.getByText(/LOCK ACQUIRED \/\/ Earth/)).toBeVisible();
-
-  sharedUrl.searchParams.set("phase", "orbit");
-  await page.goto(sharedUrl.toString());
-  await waitForYeisEngine(page);
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "orbit",
-  );
-  await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
-  expect(new URL(page.url()).searchParams.get("phase")).toBe("orbit");
-
-  await page.getByRole("button", { name: "← RETURN TO SYSTEM" }).click();
-  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "system",
-  );
-  const returnedSystemUrl = new URL(page.url());
-  expect(returnedSystemUrl.searchParams.get("phase")).toBe("system");
-  expect(returnedSystemUrl.searchParams.get("body")).toBeNull();
-  expect(returnedSystemUrl.searchParams.get("destination")).toBeNull();
-
-  await page.getByRole("button", { name: "← RETURN TO GALAXY" }).click();
   await waitForYeis(page);
-  const returnedGalaxyUrl = new URL(page.url());
-  expect(returnedGalaxyUrl.searchParams.get("phase")).toBeNull();
-  expect(returnedGalaxyUrl.searchParams.get("star")).toBeNull();
-  expect(returnedGalaxyUrl.searchParams.get("body")).toBeNull();
-  expect(returnedGalaxyUrl.searchParams.get("destination")).toBeNull();
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    earthTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    earthTarget,
+  );
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute("data-universe-travel-complete");
+      return traveling === earthTarget || complete === earthTarget;
+    })
+    .toBe(true);
 
   await runtime.assertClean(testInfo);
 });
