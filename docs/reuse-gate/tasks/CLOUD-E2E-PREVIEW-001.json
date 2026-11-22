@@ -1,0 +1,239 @@
+{
+  "schema": 2,
+  "task_id": "CLOUD-E2E-PREVIEW-001",
+  "title": "GitHub-first CI, Playwright E2E, visual artifacts and preview delivery",
+  "scope": {
+    "level": "architecture",
+    "subject": "Cloud-first validation, browser regression, artifact diagnostics and static preview workflows"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "Use GitHub Actions as the authoritative clean-runner backbone, Playwright Test as the mature browser E2E and diagnostics framework, and GitHub Pages Actions as an optional no-extra-token preview module. Keep Vercel as a future per-PR preview option rather than adding an external integration now.",
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/pages-preview.yml",
+    "src/components/universe/UniverseApp.tsx"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/ci",
+      "finding": "Playwright officially supports CI browser installation and recommends one worker on CI for stability and reproducibility."
+    },
+    {
+      "url": "https://playwright.dev/docs/best-practices",
+      "finding": "Playwright recommends Trace Viewer for diagnosing CI failures and provides DOM, network and action context without a custom browser-debugging framework."
+    },
+    {
+      "url": "https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages",
+      "finding": "GitHub Pages custom workflows support configure-pages, upload-pages-artifact and deploy-pages with Pages and OIDC permissions for static-site deployment."
+    },
+    {
+      "url": "https://vercel.com/products/previews",
+      "finding": "Vercel provides automatic branch and pull-request preview deployments, but it is an external hosted integration beyond the repository's existing GitHub-only surface."
+    },
+    {
+      "url": "https://docs.npmjs.com/cli/using-npm/scripts",
+      "finding": "npm lifecycle scripts provide reusable deterministic build hooks and remain useful as a local and CI composition layer around the repository's existing commands."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Vercel provides a mature full preview-deployment product, but requires an external project/account integration that is not necessary for the primary GitHub-only validation loop.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "vercel-preview-deployments"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Playwright Test already supplies browser lifecycle, assertions, interception, screenshots, traces and reports, so a custom Chrome CDP/WebSocket testing framework would duplicate mature capability.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "GitHub Actions remains the clean-runner authority, while GitHub Pages Actions can consume the same static build as an optional no-extra-token preview deployment module.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "github-actions-pr-diff-gate",
+        "github-pages-actions"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "npm lifecycle scripts remain useful for deterministic install/build composition, but they are only a component beneath GitHub Actions and Playwright rather than a complete validation system.",
+      "source_refs": [
+        4
+      ],
+      "registry_refs": [
+        "npm-lifecycle"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "vercel-preview-deployments",
+      "name": "Vercel Preview Deployments",
+      "level": "full_solution",
+      "registry_id": "vercel-preview-deployments",
+      "source": "Vercel hosted preview platform",
+      "license": "Commercial hosted service",
+      "decision": "reject",
+      "reason": "Excellent per-PR preview ergonomics, but adding an external account/project connection is unnecessary while GitHub-native validation and artifact delivery cover the current development loop.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 3,
+        "license_fit": 3,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-test",
+      "name": "Playwright Test",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Directly replaces the hand-written Chrome smoke with mature browser lifecycle, waiting, assertions, request interception, traces, screenshots and HTML reports.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "github-actions-cloud-validation",
+      "name": "GitHub Actions PR-diff validation backbone",
+      "level": "subsystem",
+      "registry_id": "github-actions-pr-diff-gate",
+      "source": "GitHub Actions + repository-local machine gate",
+      "license": "GitHub hosted service / project policy code",
+      "decision": "reuse",
+      "reason": "Already authoritative for repository policy and clean-runner validation; extending its downstream build/E2E/artifact job avoids adding another CI platform.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "github-pages-actions",
+      "name": "GitHub Pages custom Actions deployment",
+      "level": "subsystem",
+      "registry_id": "github-pages-actions",
+      "source": "GitHub Pages Actions",
+      "license": "GitHub hosted service / documentation terms",
+      "decision": "reuse",
+      "reason": "Provides an optional static deployment path using the same repository and Actions identity without requiring a Vercel or Cloudflare credential.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "npm-lifecycle",
+      "name": "npm lifecycle and repository scripts",
+      "level": "component_asset",
+      "registry_id": "npm-lifecycle",
+      "source": "npm scripts",
+      "license": "npm tooling",
+      "decision": "partial",
+      "reason": "Retain deterministic repository commands as the composition surface, but they do not provide browsers, traces, hosted runners or deployment on their own.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Clean-runner browser regression and failure diagnosis",
+      "importance": "high",
+      "coverage": {
+        "vercel-preview-deployments": "partial",
+        "playwright-test": "full",
+        "github-actions-cloud-validation": "partial",
+        "github-pages-actions": "none",
+        "npm-lifecycle": "none"
+      },
+      "decision": "Run Playwright Test inside GitHub Actions so browser behavior, traces, screenshots, console/page errors and request failures are reproducible without the user's Windows machine."
+    },
+    {
+      "capability": "No-extra-credential static preview and downloadable build output",
+      "importance": "high",
+      "coverage": {
+        "vercel-preview-deployments": "full",
+        "playwright-test": "none",
+        "github-actions-cloud-validation": "partial",
+        "github-pages-actions": "full",
+        "npm-lifecycle": "partial"
+      },
+      "decision": "Always keep dist and browser artifacts in CI; add GitHub Pages as a separate optional deployment module so Pages settings cannot block validation."
+    },
+    {
+      "capability": "Policy-preserving branch, PR and manual WIP validation",
+      "importance": "high",
+      "coverage": {
+        "vercel-preview-deployments": "partial",
+        "playwright-test": "partial",
+        "github-actions-cloud-validation": "full",
+        "github-pages-actions": "partial",
+        "npm-lifecycle": "partial"
+      },
+      "decision": "Preserve the v3 Machine Reuse Gate as the upstream job and let build/E2E run only after the PR-diff policy gate succeeds."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-test",
+      "github-actions-cloud-validation",
+      "github-pages-actions"
+    ],
+    "rationale": "Combine the existing GitHub Actions authority with Playwright's mature browser-test stack and an optional GitHub Pages deployment module. This gives the largest cloud-only development loop without custom CDP code or a new third-party deployment dependency.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "vercel-preview-deployments",
+        "reason": "Vercel is broader and offers superior automatic per-PR URLs, but it requires an external account/project integration; GitHub Actions plus artifacts and optional Pages already covers validation and diagnosis without that dependency."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If GitHub Pages cannot provide adequate preview ergonomics, connect Vercel later while retaining Playwright and GitHub Actions as the independent validation authority."
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "schema": 2,
+  "task_id": "YEIS-BRIDGE-RUNTIME-I18N-001",
+  "title": "Translate pinned YEIS static body names at the React bridge runtime boundary",
+  "scope": {
+    "level": "implementation",
+    "subject": "Runtime English projection of statically-authored YEIS Solar System body and moon names"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Playwright trace proved exact Earth navigation succeeds but the R3F HUD renders the statically-authored Turkish name Dünya. Pinned MIT YEIS explicitly documents that its `_()` translation function must be called at runtime, not module top level. The vendored solarSystem data intentionally stores Turkish source strings, while the English dictionary already maps those keys. Reuse that same runtime translator when bridge.ts projects BodyData into React PlanetDefinition/MoonDefinition instead of mutating upstream data, adding alias tables, or introducing another i18n runtime.",
+  "planned_files": [
+    "src/lib/universe/yeis/bridge.ts",
+    "docs/architecture/universe-backbone.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/index.ts",
+      "finding": "Pinned MIT YEIS documents that `_()` must be called at runtime and supplies the gettext-style lookup used after initI18n loads the English dictionary."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/solarSystem.ts",
+      "finding": "The pinned Solar System data stores Turkish source names such as Dünya, Güneş and Ay; these are source keys rather than already-localized English display strings."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/locales/en",
+      "finding": "The pinned English dictionaries already contain the matching translations, so the missing behavior is runtime projection at the host bridge."
+    },
+    {
+      "url": "https://www.i18next.com/",
+      "finding": "i18next remains a mature generic alternative but would duplicate the already-restored YEIS dictionary/runtime for a bridge-boundary translation call."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "The selected pinned MIT YEIS solution already owns the source strings and English dictionaries; the host should reuse that authority rather than create a second naming system.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "not_applicable",
+      "conclusion": "No new rendering or application framework is needed to translate names while projecting existing YEIS bodies into existing R3F definitions.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "A generic localization subsystem such as i18next could translate the strings, but it would duplicate the already-restored version-matched YEIS i18n subsystem.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "i18next"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "conclusion": "A local Earth/Moon/Sun alias map would be duplicated project data and would regress coverage for the rest of the pinned Solar System catalogue.",
+      "source_refs": [],
+      "registry_refs": []
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-runtime-bridge-translation",
+      "name": "Pinned YEIS `_()` translation at the React bridge projection boundary",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned MIT i18n runtime plus English dictionaries already vendored",
+      "license": "MIT source at e520568",
+      "decision": "reuse",
+      "reason": "Uses the exact translation authority already selected for YEIS and fixes every projected static planet/moon name without changing source data or introducing a second localization runtime.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "i18next-bridge-translation",
+      "name": "Translate bridge names through i18next",
+      "level": "subsystem",
+      "registry_id": "i18next",
+      "source": "Generic i18next runtime",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Mature but redundant because the pinned YEIS dictionaries and `_()` runtime already own these exact Turkish source keys and are loaded for the product.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-runtime-bridge-translation"
+    ],
+    "rationale": "Call the pinned MIT YEIS runtime translator when bridge.ts projects static BodyData and moon names into React definitions. This follows upstream's own runtime-only i18n contract, keeps one naming authority, and fixes the observed Dünya leak without modifying upstream Solar System source data.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If additional statically-authored fields become visible in the React product, translate those fields through the same YEIS runtime boundary rather than adding local aliases."
+  }
+}
