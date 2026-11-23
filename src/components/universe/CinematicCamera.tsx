@@ -385,7 +385,7 @@ export function CinematicCamera({
     const settleGuardMs = reducedMotion
       ? 250
       : Math.max(1200, Math.min(4000, Math.round(shot.smoothTime * 3000)));
-    transitionWatchdog.current = window.setTimeout(() => {
+    const watchdogId = window.setTimeout(() => {
       if (
         transitionGeneration.current !== generation ||
         configuredPhase.current !== phase ||
@@ -399,7 +399,7 @@ export function CinematicCamera({
       // on a transition Promise after this point: hosted SwiftShader can stall
       // both while the page is otherwise still responsive.
       document.documentElement.dataset.universeCameraWatchdog =
-        phase + ":" + generation;
+        "fired:" + phase + ":" + generation;
       controls.stop();
       void controls.setLookAt(
         desiredPosition.current.x,
@@ -413,10 +413,15 @@ export function CinematicCamera({
       controls.update(0);
       publishSettled(generation);
     }, settleGuardMs);
+    transitionWatchdog.current = watchdogId;
+    document.documentElement.dataset.universeCameraWatchdog =
+      "armed:" + phase + ":" + generation;
 
     return () => {
-      if (transitionWatchdog.current !== null) {
-        window.clearTimeout(transitionWatchdog.current);
+      // Clean up only the timer created by this exact effect generation.
+      // A stale cleanup must never cancel the watchdog armed by a newer phase.
+      window.clearTimeout(watchdogId);
+      if (transitionWatchdog.current === watchdogId) {
         transitionWatchdog.current = null;
       }
     };
