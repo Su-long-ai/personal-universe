@@ -160,11 +160,15 @@ export function CinematicCamera({
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
   const configuredPhase = useRef<UniversePhase | null>(null);
+  const transitionGeneration = useRef(0);
+  const transitionWatchdog = useRef<number | null>(null);
   const manualOverride = useRef(false);
   const currentPosition = useRef(new Vector3());
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
+  const desiredPositionTolerance = useRef(0);
+  const desiredTargetTolerance = useRef(0);
 
   const manualCameraEnabled =
     phase === "system" || phase === "orbit" || phase === "surface";
@@ -189,10 +193,69 @@ export function CinematicCamera({
             : 1.4
           : 65;
 
+  const publishSettled = useCallback(
+    (expectedGeneration = transitionGeneration.current) => {
+      if (
+        expectedGeneration !== transitionGeneration.current ||
+        manualOverride.current ||
+        configuredPhase.current !== phase ||
+        completedPhase.current === phase
+      ) {
+        return;
+      }
+
+      completedPhase.current = phase;
+      if (transitionWatchdog.current !== null) {
+        window.clearTimeout(transitionWatchdog.current);
+        transitionWatchdog.current = null;
+      }
+      document.documentElement.dataset.universeCameraSettled = phase;
+      document.documentElement.dataset.universeCameraMode = "settled";
+      document.documentElement.dataset.universeCameraGeneration =
+        String(expectedGeneration);
+      onPhaseComplete(phase);
+    },
+    [onPhaseComplete, phase],
+  );
+
+  const publishIfReached = useCallback(
+    (expectedGeneration = transitionGeneration.current) => {
+      if (
+        expectedGeneration !== transitionGeneration.current ||
+        manualOverride.current ||
+        configuredPhase.current !== phase
+      ) {
+        return;
+      }
+
+      const controls = controlsRef.current;
+      if (!controls) return;
+
+      controls.getPosition(currentPosition.current, false);
+      controls.getTarget(currentTarget.current, false);
+      const positionReached =
+        currentPosition.current.distanceTo(desiredPosition.current) <=
+        desiredPositionTolerance.current;
+      const targetReached =
+        currentTarget.current.distanceTo(desiredTarget.current) <=
+        desiredTargetTolerance.current;
+
+      if (positionReached && targetReached) {
+        publishSettled(expectedGeneration);
+      }
+    },
+    [phase, publishSettled],
+  );
+
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
     completedPhase.current = null;
+    transitionGeneration.current += 1;
+    if (transitionWatchdog.current !== null) {
+      window.clearTimeout(transitionWatchdog.current);
+      transitionWatchdog.current = null;
+    }
     delete document.documentElement.dataset.universeCameraSettled;
     document.documentElement.dataset.universeCameraMode = "manual";
     onUserControlStart();
@@ -202,8 +265,16 @@ export function CinematicCamera({
     completedPhase.current = null;
     configuredPhase.current = null;
     manualOverride.current = false;
+    transitionGeneration.current += 1;
+    const generation = transitionGeneration.current;
+    if (transitionWatchdog.current !== null) {
+      window.clearTimeout(transitionWatchdog.current);
+      transitionWatchdog.current = null;
+    }
     delete document.documentElement.dataset.universeCameraSettled;
     document.documentElement.dataset.universeCameraMode = "cinematic";
+    document.documentElement.dataset.universeCameraGeneration =
+      String(generation);
     const controls = controlsRef.current;
     if (!controls) return;
 
@@ -248,7 +319,9 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : liveSurfaceShot
+          : surfaceCameraFrame
+            ? liveSurfaceShot
+            : null
         : SHOTS[phase];
     if (!shot) return;
 
@@ -256,6 +329,7 @@ export function CinematicCamera({
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
     } else {
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
+      delete document.documentElement.dataset.universeCameraGeneration;
     }
 
     controls.smoothTime = reducedMotion ? 0.05 : shot.smoothTime;
@@ -263,6 +337,8 @@ export function CinematicCamera({
 
     desiredTarget.current.set(...shot.target);
     desiredPosition.current.set(...shot.position);
+    desiredPositionTolerance.current = shot.positionTolerance;
+    desiredTargetTolerance.current = shot.targetTolerance;
 
     if (shot.frameScale) {
       const distance =
@@ -274,16 +350,55 @@ export function CinematicCamera({
         .add(desiredTarget.current);
     }
 
-    void controls.setLookAt(
-      desiredPosition.current.x,
-      desiredPosition.current.y,
-      desiredPosition.current.z,
-      desiredTarget.current.x,
-      desiredTarget.current.y,
-      desiredTarget.current.z,
-      shot.transition ?? !reducedMotion,
-    );
     configuredPhase.current = phase;
+    void controls
+      .setLookAt(
+        desiredPosition.current.x,
+        desiredPosition.current.y,
+        desiredPosition.current.z,
+        desiredTarget.current.x,
+        desiredTarget.current.y,
+        desiredTarget.current.z,
+        shot.transition ?? !reducedMotion,
+      )
+      .then(() => publishIfReached(generation));
+
+    // camera-controls is the transition executor, but on heavily throttled
+    // software-rendered runners a smooth transition can otherwise remain in
+    // motion indefinitely. Bound the product contract: if the same generation
+    // is still active after several smooth-time constants, snap the exact
+    // requested shot and publish settlement from the same target/tolerance.
+    const settleGuardMs = reducedMotion
+      ? 250
+      : Math.max(1200, Math.min(4000, Math.round(shot.smoothTime * 3000)));
+    transitionWatchdog.current = window.setTimeout(() => {
+      if (
+        transitionGeneration.current !== generation ||
+        configuredPhase.current !== phase ||
+        manualOverride.current
+      ) {
+        return;
+      }
+
+      void controls
+        .setLookAt(
+          desiredPosition.current.x,
+          desiredPosition.current.y,
+          desiredPosition.current.z,
+          desiredTarget.current.x,
+          desiredTarget.current.y,
+          desiredTarget.current.z,
+          false,
+        )
+        .then(() => publishIfReached(generation));
+    }, settleGuardMs);
+
+    return () => {
+      if (transitionWatchdog.current !== null) {
+        window.clearTimeout(transitionWatchdog.current);
+        transitionWatchdog.current = null;
+      }
+    };
   }, [
     camera,
     height,
@@ -294,30 +409,16 @@ export function CinematicCamera({
     surfaceCameraFrame,
     surfaceFallback,
     width,
+    publishIfReached,
   ]);
-
-  const publishSettled = useCallback(() => {
-    if (
-      manualOverride.current ||
-      configuredPhase.current !== phase ||
-      completedPhase.current === phase
-    ) {
-      return;
-    }
-
-    completedPhase.current = phase;
-    document.documentElement.dataset.universeCameraSettled = phase;
-    document.documentElement.dataset.universeCameraMode = "settled";
-    onPhaseComplete(phase);
-  }, [onPhaseComplete, phase]);
 
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls) return;
-    const handleRest = () => publishSettled();
+    const handleRest = () => publishIfReached();
     controls.addEventListener("rest", handleRest);
     return () => controls.removeEventListener("rest", handleRest);
-  }, [publishSettled]);
+  }, [publishIfReached]);
 
   useFrame(() => {
     const controls = controlsRef.current;
@@ -325,7 +426,9 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : liveSurfaceShot
+          : surfaceCameraFrame
+            ? liveSurfaceShot
+            : null
         : SHOTS[phase];
     if (
       !controls ||
@@ -337,19 +440,7 @@ export function CinematicCamera({
       return;
     }
 
-    controls.getPosition(currentPosition.current, false);
-    controls.getTarget(currentTarget.current, false);
-
-    const positionReached =
-      currentPosition.current.distanceTo(desiredPosition.current) <=
-      shot.positionTolerance;
-    const targetReached =
-      currentTarget.current.distanceTo(desiredTarget.current) <=
-      shot.targetTolerance;
-
-    if (!positionReached || !targetReached) return;
-
-    publishSettled();
+    publishIfReached();
   });
 
   useEffect(
