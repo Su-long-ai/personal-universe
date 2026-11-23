@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
@@ -27,6 +27,9 @@ import type {
 
 const LazyPlanetScene = lazy(() =>
   import("./PlanetScene").then((module) => ({ default: module.PlanetScene })),
+);
+const LazySurfaceScene = lazy(() =>
+  import("./SurfaceScene").then((module) => ({ default: module.SurfaceScene })),
 );
 const LazyYeisGalaxyScene = lazy(() =>
   import("./YeisGalaxyScene").then((module) => ({
@@ -94,6 +97,12 @@ export function UniverseCanvas({
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
   const [surfaceCameraFrame, setSurfaceCameraFrame] =
     useState<SurfaceCameraFrame | null>(null);
+  const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
+
+  useEffect(() => {
+    if (phase === "surface") setSurfaceFallbackPrimed(true);
+  }, [phase]);
+
   const liveWorld =
     Boolean(selectedPlanet) &&
     (phase === "approach" ||
@@ -192,6 +201,17 @@ export function UniverseCanvas({
             />
           )}
       </Suspense>
+
+      {surfaceFallbackPrimed ? (
+        <Suspense fallback={null}>
+          <LazySurfaceScene
+            anchored
+            phase={phase}
+            quality={quality}
+            hasPlanet={Boolean(selectedPlanet)}
+          />
+        </Suspense>
+      ) : null}
 
       <CinematicPipeline
         quality={quality}
