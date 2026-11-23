@@ -1601,6 +1601,31 @@ test("Hero Search produces a reloadable exact world deep link", async ({
   );
   await expect(page.getByText(/LOCK ACQUIRED \/\/ AURORA-01/)).toBeVisible();
 
+  // A cold-reloaded exact world link must rejoin the same scale coordinator;
+  // deep-link entry is not a separate click-only navigation mode.
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  const scaledUrl = new URL(page.url());
+  expect(scaledUrl.searchParams.get("destination")).toBe(destinationId);
+  expect(scaledUrl.searchParams.get("phase")).toBe("orbit");
+
   await runtime.assertClean(testInfo);
 });
 

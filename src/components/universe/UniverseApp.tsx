@@ -1339,6 +1339,8 @@ export default function UniverseApp({
 
       // The v2 rollback path still uses the legacy returning shot. Product
       // world phases no longer auto-chain: wheel scale owns advancement.
+      phaseRef.current = "galaxy";
+      cameraSettledPhaseRef.current = null;
       setPhase("galaxy");
       setActiveDestinationId(null);
       delete document.documentElement.dataset.universeActiveDestination;
@@ -1355,6 +1357,7 @@ export default function UniverseApp({
 
   const handleReturn = useCallback(() => {
     cancelPendingContinuousScaleIntent("return");
+    cameraSettledPhaseRef.current = null;
     setCameraSettledPhase(null);
     journeyNavigationRef.current = false;
     journeyRef.current = null;
@@ -1368,7 +1371,9 @@ export default function UniverseApp({
       setActiveDestinationId(null);
       delete document.documentElement.dataset.universeActiveDestination;
       delete document.documentElement.dataset.universeNavigationTarget;
-      setPhase(activeEngine === "yeis" ? "galaxy" : "returning");
+      const nextPhase = activeEngine === "yeis" ? "galaxy" : "returning";
+      phaseRef.current = nextPhase;
+      setPhase(nextPhase);
       if (activeEngine === "yeis") {
         document.documentElement.dataset.universeNavigationPhase = "galaxy";
         replaceNavigationUrl({
@@ -1385,6 +1390,7 @@ export default function UniverseApp({
     setSelectedPlanet(null);
     if (selectedSystem) {
       const starId = routeStarIdentityForSystem(selectedSystem, galaxy.markers);
+      phaseRef.current = "system";
       setPhase("system");
       setActiveDestinationId(null);
       delete document.documentElement.dataset.universeActiveDestination;
@@ -1414,6 +1420,7 @@ export default function UniverseApp({
       delete document.documentElement.dataset.universeActiveDestination;
       delete document.documentElement.dataset.universeNavigationTarget;
       document.documentElement.dataset.universeNavigationPhase = "galaxy";
+      phaseRef.current = "galaxy";
       setPhase("galaxy");
       replaceNavigationUrl({
         phase: "galaxy",
