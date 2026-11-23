@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "PRODUCT-ZH-EN-LOCALE-001",
+  "approved_at": "2026-11-23T10:26:13.390Z",
+  "baseline_commit": "fa60ee25b7ea243278d116465f45dc9da16166ef",
+  "record_path": "docs/reuse-gate/tasks/PRODUCT-ZH-EN-LOCALE-001.json",
+  "record_sha256": "4056ad79a24e226a38f4f500ae5f1ab5c4e478df5dfea07e40508ba4413fd970",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "i18next": "81c3323127dbc92f864ffcb559d9e101f224adcdc38c35cd7b89fdf37f7bbb7d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing YEIS localization boundary and add a thin product-locale adapter for Chinese/English UI switching without resetting universe state"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/locale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "yeis-plus-product-dictionary"
+  ],
+  "candidate_scores": {
+    "yeis-plus-product-dictionary": 55.5,
+    "i18next-product-runtime": 47,
+    "reload-language-pages": null
+  }
+}
