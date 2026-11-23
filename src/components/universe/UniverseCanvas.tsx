@@ -62,6 +62,12 @@ function RendererPageLifecycle() {
       // standard WEBGL_lose_context wrapper.
       releaseTimer = window.setTimeout(() => {
         releaseTimer = null;
+        // A real discarded document is already owned by the browser/R3F
+        // teardown path. Only force the context when this document is still
+        // live (for example the explicit terminal-release acceptance probe).
+        // This avoids racing Chromium BrowserContext destruction with a late
+        // WEBGL_lose_context task on hosted SwiftShader.
+        if (document.visibilityState !== "visible") return;
         gl.forceContextLoss();
       }, 0);
     };
