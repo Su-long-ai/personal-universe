@@ -1,11 +1,18 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+
+async function openNavigator(page: Page) {
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
 
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
@@ -323,17 +330,14 @@ test("black-hole Search preserves exact native travel identity", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Search keyboard navigation and Places destination both navigate", async ({
+test("Search keyboard navigation reaches personal content", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
-  await expect(dialog).toBeVisible();
-
+  const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Personal Universe");
   await expect
@@ -360,8 +364,15 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     .getAttribute("data-universe-navigation-target");
   expect(personalTarget).toBeTruthy();
 
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  await expect(dialog).toBeVisible();
+  await runtime.assertClean(testInfo);
+});
+
+test("Places featured destination navigates", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
   const featured = page.locator(".navigator-result-row", {
     has: page.locator(".kind-featured"),
   }).first();
@@ -383,20 +394,28 @@ test("Search keyboard navigation and Places destination both navigate", async ({
     .getAttribute("data-universe-navigation-target");
   expect(placeTarget).toBeTruthy();
 
-  // The pinned-MIT English dictionaries and shareable body links should work
-  // through the same navigation surface without a second identity layer.
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
-  await expect(dialog).toBeVisible();
+  await runtime.assertClean(testInfo);
+});
+
+test("Earth body navigation preserves async search and shareable return flow", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const featuredRows = dialog
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-featured") });
+  await expect(featuredRows.first()).toBeVisible();
+
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Earth");
 
-  // Query edits synchronously invalidate the previous Places rows instead of
+  // Query edits synchronously invalidate the prior Places rows instead of
   // leaving them clickable during the async search debounce window.
-  expect(
-    await dialog
-      .locator(".navigator-result-row")
-      .filter({ has: page.locator(".kind-featured") })
-      .count(),
-  ).toBe(0);
+  expect(await featuredRows.count()).toBe(0);
   expect(
     await dialog.locator(".navigator-results").getAttribute("aria-busy"),
   ).toBe("true");
@@ -409,13 +428,8 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await expect(earth).toBeVisible();
   await expect(dialog).not.toContainText("Dünya");
   await earth.locator(".navigator-result-open").click();
-
   await expect(dialog).toBeHidden();
 
-  // Earth is represented in the product system model, so selecting it must
-  // enter the same Approach contract used by canvas/deep-link world travel.
-  // Native body camera fallback is reserved for YEIS bodies that do not map
-  // to a PlanetDefinition (for example moons/spacecraft).
   const html = page.locator("html");
   const earthDestination = "body:c0/earth";
   await expect(html).toHaveAttribute(
