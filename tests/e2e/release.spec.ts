@@ -244,7 +244,7 @@ test("runtime guard detects a critical client bundle failure", async ({
   await runtime.assertDetected(testInfo, "requestfailed");
 });
 
-test("runtime guard detects and recovers from forced WebGL context loss", async ({
+test("runtime guard detects and recovers from forced WebGL context loss @webgl-heavy", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page, {
