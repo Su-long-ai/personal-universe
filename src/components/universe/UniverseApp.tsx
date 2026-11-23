@@ -277,6 +277,27 @@ export default function UniverseApp({
     lastAt: 0,
     cooldownUntil: 0,
   });
+
+  const cancelPendingContinuousScaleIntent = useCallback(
+    (reason: string) => {
+      pendingWorldScaleStepsRef.current = 0;
+      pendingScaleEnterSystemRef.current = null;
+      lockedGalaxyScaleFocusRef.current = null;
+      lockedSystemScaleFocusRef.current = null;
+
+      const wheel = scaleWheelRef.current;
+      wheel.accumulated = 0;
+      wheel.direction = null;
+      wheel.lastAt = 0;
+      wheel.cooldownUntil = 0;
+
+      delete document.documentElement.dataset.universeScaleQueued;
+      delete document.documentElement.dataset.universeScaleDirection;
+      document.documentElement.dataset.universeScaleProgress = "0";
+      document.documentElement.dataset.universeScaleSuperseded = reason;
+    },
+    [],
+  );
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -347,6 +368,11 @@ export default function UniverseApp({
       delete document.documentElement.dataset.universeScaleIndex;
     };
   }, [phase]);
+
+  useEffect(() => {
+    if (!navigatorOpen) return;
+    cancelPendingContinuousScaleIntent("navigator-open");
+  }, [cancelPendingContinuousScaleIntent, navigatorOpen]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
     setLocale(next);
@@ -572,6 +598,7 @@ export default function UniverseApp({
 
   const handleSelectSystem = useCallback(
     (marker: GalaxyMarker) => {
+      cancelPendingContinuousScaleIntent("select-system");
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
@@ -600,11 +627,17 @@ export default function UniverseApp({
         navigationMode: "open",
       });
     },
-    [contentPlacements, ensurePlaying, resolveMarker],
+    [
+      cancelPendingContinuousScaleIntent,
+      contentPlacements,
+      ensurePlaying,
+      resolveMarker,
+    ],
   );
 
   const handleNavigateDestination = useCallback(
     async (destination: UniverseNavigationDestination) => {
+      cancelPendingContinuousScaleIntent("navigate-destination");
       const journeyDriven = journeyNavigationRef.current;
       journeyNavigationRef.current = false;
       if (!journeyDriven) {
@@ -833,6 +866,7 @@ export default function UniverseApp({
     },
     [
       activeEngine,
+      cancelPendingContinuousScaleIntent,
       ensurePlaying,
       galaxy.markers,
       resolveMarker,
@@ -841,6 +875,7 @@ export default function UniverseApp({
 
   const handleLocateDestination = useCallback(
     async (destination: UniverseNavigationDestination) => {
+      cancelPendingContinuousScaleIntent("locate-destination");
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
@@ -898,6 +933,7 @@ export default function UniverseApp({
     },
     [
       activeEngine,
+      cancelPendingContinuousScaleIntent,
       galaxy.markers,
       handleNavigateDestination,
     ],
@@ -909,6 +945,7 @@ export default function UniverseApp({
       destinations: UniverseNavigationDestination[],
     ) => {
       if (!destinations.length) return;
+      cancelPendingContinuousScaleIntent("start-journey");
       const next: UniverseJourneyState = {
         title,
         destinations,
@@ -929,7 +966,7 @@ export default function UniverseApp({
           destinations.length,
       );
     },
-    [handleNavigateDestination],
+    [cancelPendingContinuousScaleIntent, handleNavigateDestination],
   );
 
   const handleJourneyStep = useCallback(
@@ -976,11 +1013,12 @@ export default function UniverseApp({
   }, []);
 
   const handleCinematicUserControlStart = useCallback(() => {
+    cancelPendingContinuousScaleIntent("manual-camera");
     setCameraSettledPhase(null);
     if (!journeyRef.current) return;
     handleStopJourney();
     console.info("[UNIVERSE-JOURNEY] interrupted by manual camera control");
-  }, [handleStopJourney]);
+  }, [cancelPendingContinuousScaleIntent, handleStopJourney]);
 
   const handleContinuousScaleIntentStart = useCallback(() => {
     if (!journeyRef.current) return;
@@ -1176,6 +1214,7 @@ export default function UniverseApp({
       request: UniverseNavigationCameraRequest,
       reason: string,
     ) => {
+      cancelPendingContinuousScaleIntent("navigation-failed");
       setNavigationStatus(null);
       setNavigationRequest(null);
       setPendingDestinationId(null);
@@ -1193,7 +1232,7 @@ export default function UniverseApp({
           reason,
       );
     },
-    [],
+    [cancelPendingContinuousScaleIntent],
   );
 
   const handleNavigationComplete = useCallback(
@@ -1250,6 +1289,7 @@ export default function UniverseApp({
 
   const handleSelectPlanet = useCallback(
     (planet: PlanetDefinition) => {
+      cancelPendingContinuousScaleIntent("select-planet");
       if (activeEngine === "yeis" && selectedSystem) {
         const destination = navigationDestinationForPlanet(
           selectedSystem,
@@ -1273,6 +1313,7 @@ export default function UniverseApp({
     },
     [
       activeEngine,
+      cancelPendingContinuousScaleIntent,
       contentPlacements,
       ensurePlaying,
       galaxy.markers,
@@ -1305,6 +1346,7 @@ export default function UniverseApp({
   );
 
   const handleReturn = useCallback(() => {
+    cancelPendingContinuousScaleIntent("return");
     setCameraSettledPhase(null);
     journeyNavigationRef.current = false;
     journeyRef.current = null;
@@ -1371,7 +1413,13 @@ export default function UniverseApp({
         navigationMode: null,
       });
     }
-  }, [activeEngine, galaxy.markers, phase, selectedSystem]);
+  }, [
+    activeEngine,
+    cancelPendingContinuousScaleIntent,
+    galaxy.markers,
+    phase,
+    selectedSystem,
+  ]);
 
   useEffect(() => {
     if (phase !== "system" || !selectedSystem) return;
