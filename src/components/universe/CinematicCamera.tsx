@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
@@ -144,20 +144,22 @@ export function CinematicCamera({
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
-  const { width, height } = useThree((state) => state.size);
   const gl = useThree((state) => state.gl);
   const camera = useThree((state) => state.camera);
   const surfaceFallback =
     phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
+  const activeSurfaceCameraFrame =
+    phase === "surface" ? surfaceCameraFrame : null;
   const liveSurfaceShot =
-    surfaceCameraFrame && SHOTS.surface
+    activeSurfaceCameraFrame && SHOTS.surface
       ? {
           ...SHOTS.surface,
-          position: surfaceCameraFrame.position,
-          target: surfaceCameraFrame.target,
+          position: activeSurfaceCameraFrame.position,
+          target: activeSurfaceCameraFrame.target,
         }
       : SHOTS.surface;
   const controlsRef = useRef<CameraControlsApi>(null);
+  const [controlsReady, setControlsReady] = useState(false);
   const completedPhase = useRef<UniversePhase | null>(null);
   const configuredPhase = useRef<UniversePhase | null>(null);
   const transitionGeneration = useRef(0);
@@ -169,6 +171,14 @@ export function CinematicCamera({
   const desiredTarget = useRef(new Vector3());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
+
+  const handleControlsRef = useCallback(
+    (controls: CameraControlsApi | null) => {
+      controlsRef.current = controls;
+      setControlsReady(Boolean(controls));
+    },
+    [],
+  );
 
   const manualCameraEnabled =
     phase === "system" || phase === "orbit" || phase === "surface";
@@ -272,16 +282,21 @@ export function CinematicCamera({
       transitionWatchdog.current = null;
     }
     delete document.documentElement.dataset.universeCameraSettled;
+    delete document.documentElement.dataset.universeCameraWatchdog;
     document.documentElement.dataset.universeCameraMode = "cinematic";
     document.documentElement.dataset.universeCameraGeneration =
       String(generation);
     const controls = controlsRef.current;
-    if (!controls) return;
+    if (!controls) {
+      document.documentElement.dataset.universeCameraAwaitingControls = phase;
+      return;
+    }
+    delete document.documentElement.dataset.universeCameraAwaitingControls;
 
     controls.stop();
 
     const desiredNear =
-      phase === "surface" && !surfaceFallback && surfaceCameraFrame
+      phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame
         ? 0.001
         : 0.05;
     if (camera.near !== desiredNear) {
@@ -292,9 +307,9 @@ export function CinematicCamera({
     if (
       phase === "surface" &&
       !surfaceFallback &&
-      surfaceCameraFrame
+      activeSurfaceCameraFrame
     ) {
-      camera.up.set(...surfaceCameraFrame.up).normalize();
+      camera.up.set(...activeSurfaceCameraFrame.up).normalize();
     } else {
       camera.up.set(0, 1, 0);
     }
@@ -319,13 +334,13 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : surfaceCameraFrame
+          : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
         : SHOTS[phase];
     if (!shot) return;
 
-    if (phase === "surface" && !surfaceFallback && surfaceCameraFrame) {
+    if (phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame) {
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
     } else {
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
@@ -379,17 +394,24 @@ export function CinematicCamera({
         return;
       }
 
-      void controls
-        .setLookAt(
-          desiredPosition.current.x,
-          desiredPosition.current.y,
-          desiredPosition.current.z,
-          desiredTarget.current.x,
-          desiredTarget.current.y,
-          desiredTarget.current.z,
-          false,
-        )
-        .then(() => publishIfReached(generation));
+      // camera-controls explicitly guarantees enableTransition=false is an
+      // immediate move. Do not make settlement depend on the R3F frame loop or
+      // on a transition Promise after this point: hosted SwiftShader can stall
+      // both while the page is otherwise still responsive.
+      document.documentElement.dataset.universeCameraWatchdog =
+        phase + ":" + generation;
+      controls.stop();
+      void controls.setLookAt(
+        desiredPosition.current.x,
+        desiredPosition.current.y,
+        desiredPosition.current.z,
+        desiredTarget.current.x,
+        desiredTarget.current.y,
+        desiredTarget.current.z,
+        false,
+      );
+      controls.update(0);
+      publishSettled(generation);
     }, settleGuardMs);
 
     return () => {
@@ -399,15 +421,13 @@ export function CinematicCamera({
       }
     };
   }, [
+    activeSurfaceCameraFrame,
     camera,
-    height,
+    controlsReady,
     phase,
-    quality,
     reducedMotion,
     scrollDepth,
-    surfaceCameraFrame,
     surfaceFallback,
-    width,
     publishIfReached,
   ]);
 
@@ -425,7 +445,7 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : surfaceCameraFrame
+          : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
         : SHOTS[phase];
@@ -448,13 +468,15 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraMode;
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
       delete document.documentElement.dataset.universeCameraGeneration;
+      delete document.documentElement.dataset.universeCameraWatchdog;
+      delete document.documentElement.dataset.universeCameraAwaitingControls;
     },
     [],
   );
 
   return (
     <CameraControls
-      ref={controlsRef}
+      ref={handleControlsRef}
       makeDefault
       dollyToCursor={false}
       onStart={handleUserControlStart}
