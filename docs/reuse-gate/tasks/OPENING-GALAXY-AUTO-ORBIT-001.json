@@ -3,7 +3,7 @@
   "task_id": "OPENING-GALAXY-AUTO-ORBIT-001",
   "title": "Animate the opening Milky Way view with pinned YEIS native auto-orbit",
   "scope": {
-    "level": "component_asset",
+    "level": "subsystem",
     "subject": "Use the pinned MIT YEIS CameraController autoOrbit capability for a subtle opening-galaxy drift without creating a second camera animation authority"
   },
   "policy_change": false,
