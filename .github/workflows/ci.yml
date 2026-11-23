@@ -294,3 +294,12 @@ jobs:
             echo '- Combined report artifact: `personal-universe-playwright-report-${{ github.run_id }}`'
             echo "- Release-shard and WebGL-heavy artifacts retain screenshots, traces, raw reports, and runtime metrics."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Propagate shard failure to combined report status
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ needs.e2e.result }}" != "success" ]; then
+            echo "One or more Playwright shards did not succeed; the combined report was preserved above for diagnosis." >&2
+            exit 1
+          fi
