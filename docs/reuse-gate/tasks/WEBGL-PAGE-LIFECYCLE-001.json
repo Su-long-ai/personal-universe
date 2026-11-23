@@ -8,7 +8,7 @@
   },
   "policy_change": false,
   "researched_at": "2026-11-24",
-  "research_summary": "Hosted evidence now shows browser.newContext timeouts and Chromium SharedImageManager mailbox errors after only a few otherwise ordinary WebGL cases, even after the live Surface visual was isolated. React Three Fiber already owns the single Three.js WebGLRenderer and disposes it on normal React unmount; the gap is abrupt document teardown, where React cleanup is not a reliable release boundary. Reuse the existing R3F renderer through useThree, listen only for non-persisted pagehide, and invoke Three.js forceContextLoss plus dispose at that terminal page boundary. WEBGL_lose_context is specifically documented to destroy the underlying graphics context and graphics resources. Do not add a second renderer, GPU manager, custom animation loop, unload handler, or browser runner. For hosted validation, wrap Playwright's existing page fixture so each test signals that same terminal release contract before the framework closes its BrowserContext; this keeps Playwright as the browser/test lifecycle owner while making GPU release deterministic.",
+  "research_summary": "Hosted evidence now shows browser.newContext timeouts and Chromium SharedImageManager mailbox errors after only a few otherwise ordinary WebGL cases, even after the live Surface visual was isolated. React Three Fiber already owns the single Three.js WebGLRenderer and disposes it on normal React unmount; the gap is abrupt document teardown, where React cleanup is not a reliable release boundary. Reuse the existing R3F renderer through useThree, listen only for non-persisted pagehide, and invoke Three.js forceContextLoss plus dispose at that terminal page boundary. WEBGL_lose_context is specifically documented to destroy the underlying graphics context and graphics resources. Do not add a second renderer, GPU manager, custom animation loop, unload handler, or browser runner. For hosted validation, wrap Playwright's existing page fixture so each test signals that same terminal release contract before the framework closes its BrowserContext; this keeps Playwright as the browser/test lifecycle owner while making GPU release deterministic. Hosted run 45226172693 then isolated a live-Surface teardown regression: the screenshot completed in 37.4 s, but the wrapped page fixture exceeded 75 s while the terminal hook executed forceContextLoss() followed by renderer.dispose(). The standard context-loss primitive already destroys the underlying graphics context and resources; R3F should retain normal renderer.dispose() ownership on React unmount. Therefore the terminal document fast-path must only force context loss, avoiding duplicate renderer disposal while the live ProceduralPlanets object graph is still mounted.",
   "planned_files": [
     "src/components/universe/UniverseCanvas.tsx",
     "tests/e2e/support/test.ts",
@@ -100,7 +100,7 @@
       "source": "Current single Canvas renderer exposed by useThree, with Three.js renderer disposal primitives",
       "license": "MIT",
       "decision": "partial",
-      "reason": "R3F already owns normal unmount disposal; adding one bounded non-persisted pagehide hook closes the abrupt-document teardown gap without creating another renderer or resource manager.",
+      "reason": "R3F already owns normal unmount disposal; a bounded non-persisted pagehide hook should only force the underlying context loss. Hosted live-Surface evidence shows calling renderer.dispose() in the same terminal hook duplicates framework cleanup and can block teardown beyond 75 s.",
       "evaluation": {
         "coverage": 5,
         "integration_cost": 1,
@@ -119,7 +119,7 @@
       "source": "Three.js forceContextLoss backed by WEBGL_lose_context",
       "license": "Web platform API",
       "decision": "reuse",
-      "reason": "It destroys the underlying graphics context and graphics resources at the exact terminal boundary that hosted SwiftShader evidence shows is leaking across BrowserContexts.",
+      "reason": "Use Three.js forceContextLoss (WEBGL_lose_context) at the terminal boundary to destroy the underlying graphics context and resources immediately; leave WebGLRenderer.dispose() to R3F's normal unmount lifecycle.",
       "evaluation": {
         "coverage": 4,
         "integration_cost": 1,
@@ -166,9 +166,9 @@
       "playwright-page-fixture-teardown",
       "webgl-terminal-context-release"
     ],
-    "rationale": "Keep the current single R3F Canvas and all existing per-object disposal. Add one shared terminal-release contract: non-persisted pagehide invokes it in the product, and a wrapped Playwright page fixture invokes the same contract immediately before BrowserContext teardown. The contract force-loses and disposes the existing renderer so SwiftShader resources are destroyed before Chromium reuses the browser process, while persisted bfcache pages and the real-GPU rendering path remain unchanged.",
+    "rationale": "Keep the current single R3F Canvas and all existing per-object disposal. Use one shared terminal-release contract: non-persisted pagehide invokes it in the product, and a wrapped Playwright page fixture invokes the same contract immediately before BrowserContext teardown. The terminal contract force-loses the existing renderer context, which destroys the underlying graphics resources; R3F remains the sole owner of WebGLRenderer.dispose() during normal unmount. This avoids the hosted live-Surface double-cleanup stall while preserving bfcache pages and the real-GPU rendering path.",
     "higher_level_tradeoffs": [],
     "score_overrides": [],
-    "fallback": "If Chromium still accumulates SwiftShader resources after explicit page-terminal release, recycle Playwright worker/browser processes at measured boundaries using native projects rather than serializing the whole suite or adding global timeout."
+    "fallback": "If Chromium still accumulates SwiftShader resources after context-loss-only terminal release, recycle Playwright worker/browser processes at measured boundaries using native projects. Do not re-add renderer.dispose() to terminal pagehide unless a targeted hosted benchmark proves it no longer blocks live-Surface teardown."
   }
 }
