@@ -244,29 +244,69 @@ test("runtime guard detects a critical client bundle failure", async ({
   await runtime.assertDetected(testInfo, "requestfailed");
 });
 
-test("runtime guard detects forced WebGL context loss", async ({
+test("runtime guard detects and recovers from forced WebGL context loss", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page, {
-    allowConsoleErrors: [/^THREE\.WebGLRenderer: Context Lost\.?$/],
+    allowConsoleErrors: [
+      /^THREE\.WebGLRenderer: Context Lost\.?$/,
+      /^THREE\.WebGLRenderer: Context Restored\.?$/,
+    ],
   });
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
-  const forced = await page.evaluate(() => {
+  const recovery = await page.evaluate(async () => {
     const canvas = document.querySelector("canvas");
-    if (!canvas) return false;
+    if (!canvas) return { supported: false, lost: false, restored: false };
     const gl =
       canvas.getContext("webgl2") ??
       canvas.getContext("webgl");
-    if (!gl) return false;
+    if (!gl) return { supported: false, lost: false, restored: false };
     const extension = gl.getExtension("WEBGL_lose_context");
-    if (!extension) return false;
+    if (!extension) {
+      return { supported: false, lost: false, restored: false };
+    }
+
+    const waitFor = (name: "webglcontextlost" | "webglcontextrestored") =>
+      new Promise<boolean>((resolve) => {
+        const timer = window.setTimeout(() => resolve(false), 5_000);
+        canvas.addEventListener(
+          name,
+          () => {
+            window.clearTimeout(timer);
+            resolve(true);
+          },
+          { once: true },
+        );
+      });
+
+    const lostPromise = waitFor("webglcontextlost");
     extension.loseContext();
-    return true;
+    const lost = await lostPromise;
+    if (!lost) return { supported: true, lost: false, restored: false };
+
+    const restoredPromise = waitFor("webglcontextrestored");
+    extension.restoreContext();
+    const restored = await restoredPromise;
+    return {
+      supported: true,
+      lost,
+      restored,
+      contextStillLost: gl.isContextLost(),
+    };
   });
-  expect(forced, "WEBGL_lose_context should be available in Chromium").toBe(
+
+  expect(
+    recovery.supported,
+    "WEBGL_lose_context should be available in Chromium",
+  ).toBe(true);
+  expect(recovery.lost, "forced WebGL loss event should fire").toBe(true);
+  expect(recovery.restored, "forced WebGL restore event should fire").toBe(
     true,
+  );
+  expect(recovery.contextStillLost, "WebGL context should be restored").toBe(
+    false,
   );
 
   await expect
@@ -277,5 +317,8 @@ test("runtime guard detects forced WebGL context loss", async ({
     )
     .toBeTruthy();
 
+  // R3F/Three should keep the native galaxy alive after native context
+  // restoration rather than requiring a page reload or a second Canvas.
+  await waitForYeis(page);
   await runtime.assertDetected(testInfo, "webglcontextlost");
 });
