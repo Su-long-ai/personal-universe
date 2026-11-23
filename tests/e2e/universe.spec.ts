@@ -1300,6 +1300,43 @@ test("Guided Journey auto advance starts only after the destination settles", as
 
   const html = page.locator("html");
   const controls = page.locator(".universe-journey-controls");
+
+  // Measure the two product events on the browser's clock. Hosted SwiftShader
+  // can delay Playwright itself, so a fixed wait that starts after Playwright
+  // notices settlement can race an otherwise correct 6.5 s dwell.
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const timing = {
+      settledAt: null as number | null,
+      completeAt: null as number | null,
+    };
+    Object.assign(window, { __journeySettleTiming: timing });
+
+    const capture = () => {
+      if (
+        timing.settledAt === null &&
+        root.dataset.universeCameraSettled === "approach"
+      ) {
+        timing.settledAt = performance.now();
+      }
+      if (
+        timing.completeAt === null &&
+        root.dataset.universeJourneyComplete === "Featured Journey"
+      ) {
+        timing.completeAt = performance.now();
+      }
+    };
+
+    new MutationObserver(capture).observe(root, {
+      attributes: true,
+      attributeFilter: [
+        "data-universe-camera-settled",
+        "data-universe-journey-complete",
+      ],
+    });
+    capture();
+  });
+
   await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
@@ -1317,23 +1354,28 @@ test("Guided Journey auto advance starts only after the destination settles", as
     "approach",
     { timeout: 15_000 },
   );
-  await expect(controls).toContainText(
-    "DWELLING · AUTO ADVANCE AFTER ARRIVAL",
-  );
-  await expect(controls).not.toContainText("JOURNEY COMPLETE");
-
-  // Dwell is measured from actual camera settlement, not from the earlier
-  // React phase handoff. Keep a conservative window inside the 6.5 s dwell so
-  // assertion/paint overhead cannot make the boundary check flaky.
-  await page.waitForTimeout(4_000);
-  await expect(controls).not.toContainText("JOURNEY COMPLETE");
-  await expect(controls).toContainText("JOURNEY COMPLETE", {
-    timeout: 4_000,
-  });
   await expect(html).toHaveAttribute(
     "data-universe-journey-complete",
     "Featured Journey",
+    { timeout: 15_000 },
   );
+
+  const timing = await page.evaluate(() => {
+    return (
+      window as typeof window & {
+        __journeySettleTiming?: {
+          settledAt: number | null;
+          completeAt: number | null;
+        };
+      }
+    ).__journeySettleTiming;
+  });
+  expect(timing?.settledAt).not.toBeNull();
+  expect(timing?.completeAt).not.toBeNull();
+  expect(timing!.completeAt! - timing!.settledAt!).toBeGreaterThanOrEqual(
+    6_000,
+  );
+  await expect(controls).toContainText("JOURNEY COMPLETE");
 
   await runtime.assertClean(testInfo);
 });
