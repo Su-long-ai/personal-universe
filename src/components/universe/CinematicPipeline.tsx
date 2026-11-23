@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PlanetPass } from "procedural-planets";
@@ -45,13 +45,16 @@ export function CinematicPipeline({
   quality: QualityMode;
   liveWorld: boolean;
 }) {
-  const { gl, scene, camera, size } = useThree();
+  const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorld
     ? liveWorldFallbackReason(gl, quality)
     : null;
   const useLiveWorld = liveWorld && !fallbackReason;
+  const stableFrames = useRef(0);
+  const metricFrame = useRef(0);
+  const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
 
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -65,30 +68,32 @@ export function CinematicPipeline({
           background: "transparent",
           output: "linear",
           impostors: true,
-          impostorPixels: quality === "high" ? 90 : 120,
+          impostorPixels: softwareRenderer
+            ? 180
+            : quality === "high"
+              ? 90
+              : 120,
         })
       : null;
     if (planetPass) next.addPass(planetPass);
-    next.addPass(
-      new UnrealBloomPass(
-        new THREE.Vector2(size.width, size.height),
-        high ? 0.48 : 0.28,
-        high ? 0.48 : 0.36,
-        1.08,
-      ),
-    );
+
+    // SwiftShader already serializes shader compilation and is the slow path
+    // on hosted Linux runners. Preserve the live Planet/PlanetPass contract
+    // there, but skip the expensive full-frame bloom chain. Real GPU HIGH
+    // quality keeps the existing post-processing path unchanged.
+    if (!softwareRenderer) {
+      next.addPass(
+        new UnrealBloomPass(
+          new THREE.Vector2(1, 1),
+          high ? 0.48 : 0.28,
+          high ? 0.48 : 0.36,
+          1.08,
+        ),
+      );
+    }
     next.addPass(new OutputPass());
     return { composer: next, planetPass };
-  }, [
-    camera,
-    gl,
-    high,
-    quality,
-    scene,
-    size.height,
-    size.width,
-    useLiveWorld,
-  ]);
+  }, [camera, gl, high, quality, scene, softwareRenderer, useLiveWorld]);
 
   useEffect(() => {
     if (!liveWorld) {
@@ -132,18 +137,21 @@ export function CinematicPipeline({
   }, [composer, fallbackReason, liveWorld]);
 
   useEffect(() => {
-    composer.composer.setSize(size.width, size.height);
-    // "high" explicitly keeps the live ProceduralPlanets path available, but
-    // a software rasterizer should not also multiply its render target area by
-    // 1.75². Keep renderer identity/terrain semantics intact while bounding the
-    // hosted-runner and CPU-only pixel budget.
+    // R3F owns the renderer DPR. On software WebGL, cap the actual canvas
+    // backing store as well as the EffectComposer targets; otherwise a
+    // 1440x900 screenshot can become a multi-million-pixel SwiftShader render.
+    if (softwareRenderer && gl.getPixelRatio() > 1) {
+      setDpr(1);
+    }
     composer.composer.setPixelRatio(
-      Math.min(gl.getPixelRatio(), softwareRenderer ? 1 : high ? 1.75 : 1),
+      Math.min(gl.getPixelRatio(), pixelRatioCap),
     );
+    composer.composer.setSize(size.width, size.height);
   }, [
     composer,
     gl,
-    high,
+    pixelRatioCap,
+    setDpr,
     size.height,
     size.width,
     softwareRenderer,
@@ -151,6 +159,9 @@ export function CinematicPipeline({
 
   useEffect(() => {
     return () => {
+      stableFrames.current = 0;
+      delete document.documentElement.dataset.universeWorldReady;
+      delete document.documentElement.dataset.universeWorldScreenshotReady;
       composer.planetPass?.dispose();
       composer.composer.dispose();
     };
@@ -159,31 +170,66 @@ export function CinematicPipeline({
   useFrame((_, delta) => {
     composer.composer.render(delta);
 
+    const html = document.documentElement;
+
+    metricFrame.current += 1;
+    if (metricFrame.current >= 30) {
+      metricFrame.current = 0;
+      html.dataset.universeWebglGeometries = String(gl.info.memory.geometries);
+      html.dataset.universeWebglTextures = String(gl.info.memory.textures);
+      html.dataset.universeWebglPrograms = String(gl.info.programs?.length ?? 0);
+      html.dataset.universeWebglCalls = String(gl.info.render.calls);
+      html.dataset.universeWebglTriangles = String(gl.info.render.triangles);
+      html.dataset.universeWebglSoftware = softwareRenderer ? "true" : "false";
+    }
+
+    const cameraReady =
+      html.dataset.universeNavigationPhase !== "surface" ||
+      html.dataset.universeCameraSettled === "surface";
+
     if (!liveWorld) {
-      delete document.documentElement.dataset.universeWorldReady;
+      stableFrames.current = 0;
+      delete html.dataset.universeWorldReady;
+      delete html.dataset.universeWorldScreenshotReady;
       return;
     }
 
     if (fallbackReason) {
-      if (
-        document.documentElement.dataset.universeWorldSceneReady === "true"
-      ) {
-        document.documentElement.dataset.universeWorldReady = "true";
+      const sceneReady = html.dataset.universeWorldSceneReady === "true";
+      if (sceneReady) {
+        html.dataset.universeWorldReady = "true";
       } else {
-        delete document.documentElement.dataset.universeWorldReady;
+        delete html.dataset.universeWorldReady;
+      }
+      if (sceneReady && cameraReady) {
+        html.dataset.universeWorldScreenshotReady = "true";
+      } else {
+        delete html.dataset.universeWorldScreenshotReady;
       }
       return;
     }
 
     const renderer = composer.planetPass?.planetRenderer;
-    if (
+    const frameReady = Boolean(
       renderer &&
       renderer.info.planets > 0 &&
-      renderer.info.pending === 0
-    ) {
-      document.documentElement.dataset.universeWorldReady = "true";
+      renderer.info.pending === 0,
+    );
+    stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
+
+    // A single pending=0 sample is not enough: moving the near-surface camera
+    // can immediately enqueue another LOD generation pass. Require consecutive
+    // settled frames before consumers are allowed to capture the canvas.
+    if (stableFrames.current >= 3) {
+      html.dataset.universeWorldReady = "true";
+      if (cameraReady) {
+        html.dataset.universeWorldScreenshotReady = "true";
+      } else {
+        delete html.dataset.universeWorldScreenshotReady;
+      }
     } else {
-      delete document.documentElement.dataset.universeWorldReady;
+      delete html.dataset.universeWorldReady;
+      delete html.dataset.universeWorldScreenshotReady;
     }
   }, 1);
 
