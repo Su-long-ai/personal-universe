@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
-import { bakePlanet } from "procedural-planets";
+import { Planet } from "procedural-planets";
 import * as THREE from "three";
 import {
   PLANET_ANCHOR,
@@ -11,6 +11,20 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import { liveWorldFallbackReason } from "./CinematicPipeline";
+
+const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
+const LIVE_PLANET_RADIUS = 2000;
+const LIVE_WORLD_RADIUS = PLANET_RENDER_RADIUS;
+const FALLBACK_WORLD_RADIUS = PLANET_RENDER_RADIUS * 0.965;
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 function presetFor(planet: PlanetDefinition) {
   switch (planet.archetype) {
@@ -46,7 +60,9 @@ function fallbackColor(archetype: PlanetArchetype) {
 }
 
 function DeepSky() {
-  const texture = useTexture(`${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`);
+  const texture = useTexture(
+    `${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`,
+  );
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
 
@@ -66,47 +82,33 @@ function DeepSky() {
   );
 }
 
-function rendererLabel(gl: THREE.WebGLRenderer) {
-  const context = gl.getContext();
-  try {
-    const debug = context.getExtension("WEBGL_debug_renderer_info");
-    if (debug) {
-      return String(
-        context.getParameter(debug.UNMASKED_RENDERER_WEBGL) ?? "",
-      );
-    }
-  } catch {
-    // Some privacy-hardened browsers intentionally deny unmasked renderer info.
+function liveQuality(quality: QualityMode) {
+  if (quality === "low") {
+    return {
+      cloudQuality: 32,
+      cloudResolution: 0.35,
+      chunkRes: 16,
+      maxDepth: 4,
+      splitFactor: 2.1,
+    } as const;
   }
-  return String(context.getParameter(context.RENDERER) ?? "");
+  if (quality === "high") {
+    return {
+      cloudQuality: 72,
+      cloudResolution: 0.6,
+      chunkRes: 32,
+      maxDepth: 6,
+      splitFactor: 2.7,
+    } as const;
+  }
+  return {
+    cloudQuality: 56,
+    cloudResolution: 0.5,
+    chunkRes: 24,
+    maxDepth: 5,
+    splitFactor: 2.4,
+  } as const;
 }
-
-function shouldKeepFallback(gl: THREE.WebGLRenderer, quality: QualityMode) {
-  if (quality === "low") return "low-quality";
-  const renderer = rendererLabel(gl);
-  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(renderer)
-    ? "software-renderer"
-    : null;
-}
-
-function disposeBaked(root: THREE.Object3D) {
-  root.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.geometry?.dispose();
-    const materials = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-    for (const material of materials) material?.dispose();
-  });
-}
-
-type IdleWindow = Window & {
-  requestIdleCallback?: (
-    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
-    options?: { timeout: number },
-  ) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
 
 export function PlanetScene({
   planet,
@@ -116,85 +118,46 @@ export function PlanetScene({
   quality: QualityMode;
 }) {
   const { gl } = useThree();
-  const [baked, setBaked] = useState<THREE.Group | null>(null);
-  const fallback = useRef<THREE.Mesh>(null);
-  const radius = 2000;
-
-  const bakeOptions = useMemo(
-    () => ({
-      preset: presetFor(planet),
-      seed: hashSeed(planet.seed),
-      radius,
-      textureSize: quality === "low" ? 256 : quality === "high" ? 1024 : 512,
-    }),
-    [planet, quality],
+  const sunDirection = useMemo(
+    () =>
+      new THREE.Vector3(
+        STAR_POSITION[0] - PLANET_ANCHOR[0],
+        STAR_POSITION[1] - PLANET_ANCHOR[1],
+        STAR_POSITION[2] - PLANET_ANCHOR[2],
+      ).normalize(),
+    [],
   );
+  const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const liveKey = `${planet.id}:${quality}`;
+  const [warmedKey, setWarmedKey] = useState<string | null>(null);
+  const liveEnabled = warmedKey === liveKey && !fallbackReason;
 
   useEffect(() => {
+    if (fallbackReason) return;
+
     let cancelled = false;
-    let created: THREE.Group | null = null;
     let firstFrame = 0;
     let secondFrame = 0;
+    let warmupTimer: number | null = null;
     let idleHandle: number | null = null;
     let fallbackTimer: number | null = null;
-    let warmupTimer: number | null = null;
     const idleWindow = window as IdleWindow;
-    const fallbackReason = shouldKeepFallback(gl, quality);
 
-    if (fallbackReason) {
-      document.documentElement.dataset.planetRenderMode =
-        "fallback-" + fallbackReason;
-      return () => {
-        if (
-          document.documentElement.dataset.planetRenderMode ===
-          "fallback-" + fallbackReason
-        ) {
-          delete document.documentElement.dataset.planetRenderMode;
-        }
-      };
-    }
-
-    document.documentElement.dataset.planetRenderMode = "fallback-warmup";
-
-    const bake = () => {
-      if (cancelled) return;
-
-      document.documentElement.dataset.planetRenderMode = "baking";
-      void bakePlanet(gl, bakeOptions).then((group) => {
-        created = group;
-        if (cancelled) {
-          disposeBaked(group);
-          return;
-        }
-        group.position.set(...PLANET_ANCHOR);
-        group.scale.setScalar(PLANET_RENDER_RADIUS / radius);
-        group.rotation.set(0.08, -0.65, -0.16);
-        group.name = planet.name;
-        setBaked(group);
-        document.documentElement.dataset.planetRenderMode = "baked";
-      }).catch((error) => {
-        document.documentElement.dataset.planetRenderMode = "fallback-error";
-        console.warn("[planet-bake]", planet.name, error);
-      });
+    const enableLive = () => {
+      if (!cancelled) setWarmedKey(liveKey);
     };
 
-    // bakePlanet is deliberately not started in the first arrival commit.
-    // ProceduralPlanets documents baking as GPU-blocking work. Two frames make
-    // the fallback/HUD observable, and a short warmup window lets quick travel
-    // or return actions cancel the expensive work entirely. Software WebGL
-    // renderers never bake: SwiftShader/llvmpipe can block navigation for tens
-    // of seconds, while the fallback remains a complete interactive world.
     firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(() => {
         if (cancelled) return;
         warmupTimer = window.setTimeout(() => {
           if (cancelled) return;
           if (idleWindow.requestIdleCallback) {
-            idleHandle = idleWindow.requestIdleCallback(() => bake(), {
+            idleHandle = idleWindow.requestIdleCallback(enableLive, {
               timeout: 1200,
             });
           } else {
-            fallbackTimer = window.setTimeout(bake, 120);
+            fallbackTimer = window.setTimeout(enableLive, 120);
           }
         }, 1800);
       });
@@ -204,20 +167,57 @@ export function PlanetScene({
       cancelled = true;
       window.cancelAnimationFrame(firstFrame);
       window.cancelAnimationFrame(secondFrame);
+      if (warmupTimer !== null) window.clearTimeout(warmupTimer);
       if (idleHandle !== null && idleWindow.cancelIdleCallback) {
         idleWindow.cancelIdleCallback(idleHandle);
       }
-      if (warmupTimer !== null) window.clearTimeout(warmupTimer);
       if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
-      setBaked(null);
-      if (created) disposeBaked(created);
-      delete document.documentElement.dataset.planetRenderMode;
     };
-  }, [bakeOptions, gl, planet.name, quality]);
+  }, [fallbackReason, liveKey]);
+
+  const livePlanet = useMemo(() => {
+    if (!liveEnabled) return null;
+    return new Planet({
+      preset: presetFor(planet),
+      seed: hashSeed(planet.seed),
+      radius: LIVE_PLANET_RADIUS,
+      lightSource: sunDirection,
+      name: planet.name,
+      ...liveQuality(quality),
+    });
+  }, [liveEnabled, planet, quality, sunDirection]);
+
+  useEffect(() => {
+    return () => {
+      livePlanet?.dispose();
+    };
+  }, [livePlanet]);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeWorldSceneReady = "true";
+    return () => {
+      delete document.documentElement.dataset.universeWorldSceneReady;
+    };
+  }, []);
+
+  useEffect(() => {
+    const mode = livePlanet
+      ? "procedural-planets-live"
+      : fallbackReason
+        ? `procedural-planets-fallback-${fallbackReason}`
+        : "procedural-planets-warmup";
+    document.documentElement.dataset.universeWorldRenderer = mode;
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldRenderer === mode
+      ) {
+        delete document.documentElement.dataset.universeWorldRenderer;
+      }
+    };
+  }, [fallbackReason, livePlanet]);
 
   useFrame((_, delta) => {
-    if (baked) baked.rotation.y += delta * 0.014;
-    if (fallback.current) fallback.current.rotation.y += delta * 0.014;
+    if (livePlanet) livePlanet.rotation.y += delta * 0.014;
   });
 
   return (
@@ -241,7 +241,7 @@ export function PlanetScene({
         color="#ffe0aa"
       />
 
-      <group position={[-12.5, 5.5, -18]}>
+      <group position={STAR_POSITION}>
         <mesh>
           <sphereGeometry args={[1.25, 48, 48]} />
           <meshBasicMaterial toneMapped={false}>
@@ -250,14 +250,11 @@ export function PlanetScene({
         </mesh>
       </group>
 
-      {baked ? (
-        <primitive object={baked} />
-      ) : (
-        <mesh
-          ref={fallback}
-          position={PLANET_ANCHOR}
-          scale={PLANET_RENDER_RADIUS}
-        >
+      <group
+        position={PLANET_ANCHOR}
+        rotation={[0.08, -0.65, -0.16]}
+      >
+        <mesh scale={FALLBACK_WORLD_RADIUS}>
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
             color={fallbackColor(planet.archetype)}
@@ -265,7 +262,13 @@ export function PlanetScene({
             metalness={0.02}
           />
         </mesh>
-      )}
+        {livePlanet ? (
+          <primitive
+            object={livePlanet}
+            scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
+          />
+        ) : null}
+      </group>
     </>
   );
 }
