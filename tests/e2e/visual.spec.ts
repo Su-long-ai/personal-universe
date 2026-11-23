@@ -89,6 +89,26 @@ async function visualCase(
   await exercise();
   await shot(page, testInfo, viewport.name, name);
 
+  const html = page.locator("html");
+  const webgl = {
+    software: await html.getAttribute("data-universe-webgl-software"),
+    geometries: Number(
+      (await html.getAttribute("data-universe-webgl-geometries")) ?? "0",
+    ),
+    textures: Number(
+      (await html.getAttribute("data-universe-webgl-textures")) ?? "0",
+    ),
+    programs: Number(
+      (await html.getAttribute("data-universe-webgl-programs")) ?? "0",
+    ),
+    calls: Number(
+      (await html.getAttribute("data-universe-webgl-calls")) ?? "0",
+    ),
+    triangles: Number(
+      (await html.getAttribute("data-universe-webgl-triangles")) ?? "0",
+    ),
+  };
+
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
       JSON.stringify(
@@ -96,6 +116,7 @@ async function visualCase(
           viewport: viewport.name,
           case: name,
           elapsedMs: Date.now() - startedAt,
+          webgl,
         },
         null,
         2,
@@ -288,6 +309,11 @@ test("visual: desktop Hero surface keeps the live planet renderer", async ({
         { timeout: 60_000 },
       );
       await waitForCameraSettled(page, "surface");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-screenshot-ready",
+        "true",
+        { timeout: 30_000 },
+      );
     },
   );
 });
