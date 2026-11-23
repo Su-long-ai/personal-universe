@@ -270,6 +270,7 @@ export default function UniverseApp({
     useRef<UniverseNavigationDestination | null>(null);
   const galaxySoftFocusAvailableRef = useRef(true);
   const pendingWorldScaleStepsRef = useRef(0);
+  const continuousScaleIntentEpochRef = useRef(0);
   const scaleWheelRef = useRef<{
     accumulated: number;
     direction: ContinuousScaleDirection | null;
@@ -284,6 +285,7 @@ export default function UniverseApp({
 
   const cancelPendingContinuousScaleIntent = useCallback(
     (reason: string) => {
+      continuousScaleIntentEpochRef.current += 1;
       pendingWorldScaleStepsRef.current = 0;
       pendingScaleEnterSystemRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
@@ -1549,7 +1551,15 @@ export default function UniverseApp({
         "world:" + (remaining > 0 ? "+" : "") + String(remaining);
     }
 
+    const sourcePhase = phase;
+    const intentEpoch = continuousScaleIntentEpochRef.current;
     const frame = window.requestAnimationFrame(() => {
+      if (
+        continuousScaleIntentEpochRef.current !== intentEpoch ||
+        phaseRef.current !== sourcePhase
+      ) {
+        return;
+      }
       setWorldScalePhase(nextPhase);
     });
     return () => window.cancelAnimationFrame(frame);
@@ -1572,7 +1582,14 @@ export default function UniverseApp({
         "world:" + String(remaining);
     }
 
+    const intentEpoch = continuousScaleIntentEpochRef.current;
     const frame = window.requestAnimationFrame(() => {
+      if (
+        continuousScaleIntentEpochRef.current !== intentEpoch ||
+        phaseRef.current !== "system"
+      ) {
+        return;
+      }
       handleReturn();
     });
     return () => window.cancelAnimationFrame(frame);
@@ -1719,6 +1736,7 @@ export default function UniverseApp({
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
         if (directionChanged) {
+          continuousScaleIntentEpochRef.current += 1;
           wheel.cooldownUntil = 0;
           pendingWorldScaleStepsRef.current = 0;
           delete document.documentElement.dataset.universeScaleQueued;
