@@ -702,6 +702,7 @@ export default function UniverseApp({
       const spatialTarget = cameraTargetLabel(cameraTarget);
       document.documentElement.dataset.universeNavigationTarget =
         spatialTarget;
+      document.documentElement.dataset.universeNavigationPhase = "galaxy";
       console.info(
         "[UNIVERSE-NAV] travel " +
           destination.kind +
@@ -766,6 +767,7 @@ export default function UniverseApp({
       setNavigationStatus("locating");
       const target = cameraTargetLabel(cameraTarget);
       document.documentElement.dataset.universeNavigationTarget = target;
+      document.documentElement.dataset.universeNavigationPhase = "galaxy";
       console.info(
         "[UNIVERSE-NAV] locate " +
           destination.kind +
