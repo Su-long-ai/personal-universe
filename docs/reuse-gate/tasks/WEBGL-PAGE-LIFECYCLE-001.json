@@ -1,0 +1,144 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-PAGE-LIFECYCLE-001",
+  "title": "Release the R3F WebGL renderer at real page teardown boundaries",
+  "scope": {
+    "level": "implementation",
+    "subject": "Prevent SwiftShader GPU/context accumulation between hosted Playwright BrowserContexts by releasing the existing R3F-owned WebGL renderer when a document is actually discarded"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted evidence now shows browser.newContext timeouts and Chromium SharedImageManager mailbox errors after only a few otherwise ordinary WebGL cases, even after the live Surface visual was isolated. React Three Fiber already owns the single Three.js WebGLRenderer and disposes it on normal React unmount; the gap is abrupt document teardown, where React cleanup is not a reliable release boundary. Reuse the existing R3F renderer through useThree, listen only for non-persisted pagehide, and invoke Three.js forceContextLoss plus dispose at that terminal page boundary. WEBGL_lose_context is specifically documented to destroy the underlying graphics context and graphics resources. Do not add a second renderer, GPU manager, custom animation loop, unload handler, or browser runner.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/webgl-performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/canvas",
+      "finding": "R3F Canvas owns the WebGLRenderer it creates and automatically disposes it on normal unmount; use the existing Canvas renderer instead of creating a second lifecycle owner."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/WebGLRenderer",
+      "finding": "Three.js WebGLRenderer exposes dispose() to free renderer GPU resources and forceContextLoss() to deliberately lose the underlying WebGL context."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_lose_context/loseContext",
+      "finding": "WEBGL_lose_context.loseContext() destroys the underlying graphics context and all graphics resources and is the recommended mechanism for programmatically halting WebGL use."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/pagehide_event",
+      "finding": "pagehide is the browser lifecycle event intended for navigation-away handling and PageTransitionEvent.persisted distinguishes bfcache retention from an actually discarded document."
+    },
+    {
+      "url": "https://threejs.org/manual/pages/how-to-dispose-of-objects.html",
+      "finding": "Three.js GPU allocations are not automatically released for library objects; geometry, material, render-target and pass disposal remains required throughout the normal component lifecycle."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The product already has a single R3F Canvas and renderer; this unit is a terminal lifecycle correction, not a renderer or application replacement."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep R3F as the renderer owner and obtain the already-created Three.js renderer through useThree for page-terminal cleanup."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        4
+      ],
+      "conclusion": "Three.js already exposes the resource disposal primitives, so a separate GPU-resource registry or renderer lifecycle subsystem would duplicate framework ownership."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "webgl-context-loss-api"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Use the standard context-loss extension through Three.js forceContextLoss at non-persisted pagehide, while preserving bfcache pages."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-owned-renderer-pagehide",
+      "name": "Existing R3F-owned WebGLRenderer plus a terminal pagehide lifecycle hook",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current single Canvas renderer exposed by useThree, with Three.js renderer disposal primitives",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "R3F already owns normal unmount disposal; adding one bounded non-persisted pagehide hook closes the abrupt-document teardown gap without creating another renderer or resource manager.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "webgl-terminal-context-release",
+      "name": "Standard WEBGL_lose_context terminal release",
+      "level": "component_asset",
+      "registry_id": "webgl-context-loss-api",
+      "source": "Three.js forceContextLoss backed by WEBGL_lose_context",
+      "license": "Web platform API",
+      "decision": "reuse",
+      "reason": "It destroys the underlying graphics context and graphics resources at the exact terminal boundary that hosted SwiftShader evidence shows is leaking across BrowserContexts.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-gpu-resource-manager",
+      "name": "Project-owned GPU resource registry and browser teardown manager",
+      "level": "subsystem",
+      "source": "New project-owned lifecycle abstraction",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It would duplicate R3F and Three.js ownership, require every renderer asset to register twice, and still rely on the same browser WebGL context at teardown."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "r3f-owned-renderer-pagehide",
+      "webgl-terminal-context-release"
+    ],
+    "rationale": "Keep the current single R3F Canvas and all existing per-object disposal. Add only a non-persisted pagehide guard that force-loses and disposes the R3F-owned renderer so abrupt BrowserContext/page teardown destroys SwiftShader GPU resources before Chromium reuses the browser process. Preserve persisted bfcache pages and do not alter the real-GPU rendering path.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If Chromium still accumulates SwiftShader resources after explicit page-terminal release, recycle Playwright worker/browser processes at measured boundaries using native projects rather than serializing the whole suite or adding global timeout."
+  }
+}
