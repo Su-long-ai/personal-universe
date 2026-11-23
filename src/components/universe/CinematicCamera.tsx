@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
+import CameraControlsImpl from "camera-controls";
 import { Vector3 } from "three";
 import {
   PLANET_ANCHOR,
@@ -13,9 +14,36 @@ type CinematicCameraProps = {
   scrollDepth: number;
   reducedMotion: boolean;
   onPhaseComplete: (phase: UniversePhase) => void;
+  onUserControlStart: () => void;
 };
 
 const WORLD = PLANET_ANCHOR;
+
+const DISABLED_MOUSE = {
+  left: CameraControlsImpl.ACTION.NONE,
+  middle: CameraControlsImpl.ACTION.NONE,
+  right: CameraControlsImpl.ACTION.NONE,
+  wheel: CameraControlsImpl.ACTION.NONE,
+} as const;
+
+const MANUAL_MOUSE = {
+  left: CameraControlsImpl.ACTION.ROTATE,
+  middle: CameraControlsImpl.ACTION.DOLLY,
+  right: CameraControlsImpl.ACTION.NONE,
+  wheel: CameraControlsImpl.ACTION.DOLLY,
+} as const;
+
+const DISABLED_TOUCH = {
+  one: CameraControlsImpl.ACTION.NONE,
+  two: CameraControlsImpl.ACTION.NONE,
+  three: CameraControlsImpl.ACTION.NONE,
+} as const;
+
+const MANUAL_TOUCH = {
+  one: CameraControlsImpl.ACTION.TOUCH_ROTATE,
+  two: CameraControlsImpl.ACTION.TOUCH_DOLLY_ROTATE,
+  three: CameraControlsImpl.ACTION.NONE,
+} as const;
 
 const SHOTS: Partial<
   Record<
@@ -28,9 +56,18 @@ const SHOTS: Partial<
       positionTolerance: number;
       targetTolerance: number;
       frameScale?: number;
+      transition?: boolean;
     }
   >
 > = {
+  system: {
+    position: [0, 8.6, 18.5],
+    target: [0, 0, 0],
+    smoothTime: 0.52,
+    maxSpeed: 28,
+    positionTolerance: 0.16,
+    targetTolerance: 0.1,
+  },
   approach: {
     position: [1.35, 1.15, 13.6],
     target: [WORLD[0] - 0.15, WORLD[1] + 0.15, WORLD[2]],
@@ -57,6 +94,15 @@ const SHOTS: Partial<
     positionTolerance: 0.08,
     targetTolerance: 0.06,
   },
+  surface: {
+    position: [0.5, 22.0, 18.0],
+    target: [0, 8.0, -16.0],
+    smoothTime: 0.38,
+    maxSpeed: 24,
+    positionTolerance: 0.14,
+    targetTolerance: 0.1,
+    transition: false,
+  },
   returning: {
     position: [0, 24, 41],
     target: [0, 0, 0],
@@ -72,17 +118,45 @@ export function CinematicCamera({
   scrollDepth,
   reducedMotion,
   onPhaseComplete,
+  onUserControlStart,
 }: CinematicCameraProps) {
+  const { width, height } = useThree((state) => state.size);
+  const gl = useThree((state) => state.gl);
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
+  const manualOverride = useRef(false);
   const currentPosition = useRef(new Vector3());
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
 
-  useEffect(() => {
+  const manualCameraEnabled =
+    phase === "system" || phase === "orbit" || phase === "surface";
+  const manualMinDistance =
+    phase === "orbit"
+      ? PLANET_RENDER_RADIUS * 1.28
+      : phase === "system"
+        ? 5
+        : phase === "surface"
+          ? 8
+          : 0.3;
+  const manualMaxDistance =
+    phase === "orbit" ? PLANET_RENDER_RADIUS * 7 : phase === "system" ? 55 : 65;
+
+  const handleUserControlStart = useCallback(() => {
+    if (!manualCameraEnabled) return;
+    manualOverride.current = true;
     completedPhase.current = null;
     delete document.documentElement.dataset.universeCameraSettled;
+    document.documentElement.dataset.universeCameraMode = "manual";
+    onUserControlStart();
+  }, [manualCameraEnabled, onUserControlStart]);
+
+  useEffect(() => {
+    completedPhase.current = null;
+    manualOverride.current = false;
+    delete document.documentElement.dataset.universeCameraSettled;
+    document.documentElement.dataset.universeCameraMode = "cinematic";
     const controls = controlsRef.current;
     if (!controls) return;
 
@@ -100,28 +174,6 @@ export function CinematicCamera({
         0,
         !reducedMotion,
       );
-      return;
-    }
-
-    if (phase === "system") {
-      controls.smoothTime = reducedMotion ? 0.05 : 0.52;
-      controls.maxSpeed = 28;
-      void controls.setLookAt(
-        0,
-        8.6,
-        18.5,
-        0,
-        0,
-        0,
-        !reducedMotion,
-      );
-      return;
-    }
-
-    if (phase === "surface") {
-      controls.smoothTime = reducedMotion ? 0.05 : 0.38;
-      controls.maxSpeed = 24;
-      void controls.setLookAt(0.5, 22.0, 18.0, 0, 8.0, -16.0, false);
       return;
     }
 
@@ -151,14 +203,29 @@ export function CinematicCamera({
       desiredTarget.current.x,
       desiredTarget.current.y,
       desiredTarget.current.z,
-      !reducedMotion,
+      shot.transition ?? !reducedMotion,
     );
   }, [height, phase, reducedMotion, scrollDepth, width]);
+
+  useEffect(() => {
+    if (!manualCameraEnabled) return;
+    const canvas = gl.domElement;
+    const onWheel = () => handleUserControlStart();
+    canvas.addEventListener("wheel", onWheel, { passive: true });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [gl, handleUserControlStart, manualCameraEnabled]);
 
   useFrame(() => {
     const controls = controlsRef.current;
     const shot = SHOTS[phase];
-    if (!controls || !shot || completedPhase.current === phase) return;
+    if (
+      !controls ||
+      !shot ||
+      manualOverride.current ||
+      completedPhase.current === phase
+    ) {
+      return;
+    }
 
     controls.getPosition(currentPosition.current, false);
     controls.getTarget(currentTarget.current, false);
@@ -174,12 +241,14 @@ export function CinematicCamera({
 
     completedPhase.current = phase;
     document.documentElement.dataset.universeCameraSettled = phase;
+    document.documentElement.dataset.universeCameraMode = "settled";
     onPhaseComplete(phase);
   });
 
   useEffect(
     () => () => {
       delete document.documentElement.dataset.universeCameraSettled;
+      delete document.documentElement.dataset.universeCameraMode;
     },
     [],
   );
@@ -189,10 +258,11 @@ export function CinematicCamera({
       ref={controlsRef}
       makeDefault
       dollyToCursor={false}
-      mouseButtons={{ left: 0, middle: 0, right: 0, wheel: 0 }}
-      touches={{ one: 0, two: 0, three: 0 }}
-      minDistance={0.3}
-      maxDistance={80}
+      onStart={handleUserControlStart}
+      mouseButtons={manualCameraEnabled ? MANUAL_MOUSE : DISABLED_MOUSE}
+      touches={manualCameraEnabled ? MANUAL_TOUCH : DISABLED_TOUCH}
+      minDistance={manualMinDistance}
+      maxDistance={manualCameraEnabled ? manualMaxDistance : 80}
       restThreshold={0.05}
       minPolarAngle={0.12}
       maxPolarAngle={Math.PI - 0.3}

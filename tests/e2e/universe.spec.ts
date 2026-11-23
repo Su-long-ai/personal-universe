@@ -204,6 +204,73 @@ test("observed NASA exoplanet Search opens the exact observed world", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Chinese Moon alias preserves exact native-body travel identity", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("月球");
+
+  const moon = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ hasText: "Moon" })
+    .first();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  const destinationId = "body:c0/moon";
+  const nativeTarget = "c0/moon";
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute(
+        "data-universe-travel-complete",
+      );
+      return traveling === nativeTarget || complete === nativeTarget;
+    })
+    .toBe(true);
+  await expect(html).toHaveAttribute(
+    "data-universe-travel-complete",
+    nativeTarget,
+    { timeout: 15_000 },
+  );
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toBe(destinationId);
+  expect(url.searchParams.get("phase")).toBeNull();
+  expect(url.searchParams.get("star")).toBeNull();
+  expect(url.searchParams.get("body")).toBeNull();
+  await expect(page.locator(".navigation-failure-notice")).toHaveCount(0);
+  expect(
+    await html.getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("black-hole Search preserves exact native travel identity", async ({
   page,
 }, testInfo) => {
@@ -248,6 +315,10 @@ test("black-hole Search preserves exact native travel identity", async ({
   const url = new URL(page.url());
   expect(url.searchParams.get("destination")).toMatch(/^blackhole:/);
   expect(url.searchParams.get("phase")).toBeNull();
+  await expect(page.locator(".navigation-failure-notice")).toHaveCount(0);
+  expect(
+    await html.getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
 
   await runtime.assertClean(testInfo);
 });
@@ -416,6 +487,122 @@ test("Search keyboard navigation and Places destination both navigate", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Guided Journey auto advance starts only after the destination settles", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  const controls = page.locator(".universe-journey-controls");
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeVisible();
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+  await expect(controls).toContainText(
+    "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL",
+  );
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 15_000 },
+  );
+  await expect(controls).toContainText(
+    "DWELLING · AUTO ADVANCE AFTER ARRIVAL",
+  );
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+
+  // Dwell is measured from actual camera settlement, not from the earlier
+  // React phase handoff. Keep most of the 6.5 s dwell observable before the
+  // single-stop Journey is allowed to enter its finished state.
+  await page.waitForTimeout(6_000);
+  await expect(controls).not.toContainText("JOURNEY COMPLETE");
+  await expect(controls).toContainText("JOURNEY COMPLETE", {
+    timeout: 2_500,
+  });
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-complete",
+    "Featured Journey",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("manual Orbit camera takeover interrupts Journey without changing destination", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  const controls = page.locator(".universe-journey-controls");
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "settled",
+  );
+
+  const destinationId = await html.getAttribute(
+    "data-universe-active-destination",
+  );
+  expect(destinationId).toBeTruthy();
+  const destinationBefore = new URL(page.url()).searchParams.get(
+    "destination",
+  );
+  expect(destinationBefore).toBe(destinationId);
+
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box, "product world canvas should have a drag surface").not.toBeNull();
+  const startX = box!.x + box!.width * 0.62;
+  const startY = box!.y + box!.height * 0.52;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 84, startY + 34, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "manual",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-camera-settled");
+  await expect(controls).toHaveCount(0);
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  await expect(html).not.toHaveAttribute("data-universe-journey-complete");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  expect(new URL(page.url()).searchParams.get("destination")).toBe(
+    destinationBefore,
+  );
+  expect(new URL(page.url()).searchParams.get("phase")).toBe("orbit");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Guided Journey completes visibly and competing navigation interrupts", async ({
   page,
 }, testInfo) => {
@@ -450,7 +637,9 @@ test("Guided Journey completes visibly and competing navigation interrupts", asy
 
   await controls.getByRole("button", { name: "DONE" }).click();
   await expect(controls).toContainText("JOURNEY COMPLETE");
-  await expect(controls).toContainText("COMPLETE · CAMERA REMAINS FREE");
+  await expect(controls).toContainText(
+    "COMPLETE · NAVIGATION REMAINS AVAILABLE",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-journey-complete",
     "Featured Journey",
@@ -482,6 +671,175 @@ test("Guided Journey completes visibly and competing navigation interrupts", asy
   await expect(controls).toBeHidden();
   await expect(html).not.toHaveAttribute("data-universe-journey");
   await expect(html).not.toHaveAttribute("data-universe-journey-complete");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Hero Search produces a reloadable exact world deep link", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("AURORA-01");
+
+  const hero = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-hero") })
+    .filter({ hasText: "AURORA-01" })
+    .first();
+  await expect(hero).toBeVisible();
+  await hero.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  const destinationId = "hero:aurora-01";
+  const nativeTarget = "h-aurora/aurora-01";
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ AURORA-01/)).toBeVisible();
+
+  const sharedUrl = new URL(page.url());
+  expect(sharedUrl.searchParams.get("destination")).toBe(destinationId);
+  expect(sharedUrl.searchParams.get("star")).toBe("h-aurora");
+  expect(sharedUrl.searchParams.get("body")).toBe("aurora-01");
+  expect(sharedUrl.searchParams.get("phase")).toBe("approach");
+
+  await page.goto(sharedUrl.toString());
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    destinationId,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    nativeTarget,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.getByText(/LOCK ACQUIRED \/\/ AURORA-01/)).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Chinese Andromeda alias starts the exact galaxy travel contract", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("仙女座");
+
+  const galaxy = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-galaxy") })
+    .filter({ hasText: "Andromeda" })
+    .first();
+  await expect(galaxy).toBeVisible();
+  await galaxy.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    /^galaxy:\d+$/,
+  );
+  const destinationId = await html.getAttribute(
+    "data-universe-active-destination",
+  );
+  expect(destinationId).toMatch(/^galaxy:\d+$/);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    destinationId!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute(
+        "data-universe-travel-complete",
+      );
+      return traveling === destinationId || complete === destinationId;
+    })
+    .toBe(true);
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("destination")).toBe(destinationId);
+  expect(url.searchParams.get("phase")).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Locate then real canvas click reuses the same landmark destination", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Orion Nebula");
+
+  const landmark = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-landmark") })
+    .filter({ hasText: "Orion" })
+    .first();
+  await expect(landmark).toBeVisible();
+  await landmark.locator(".navigator-locate").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-locate-complete",
+    /^landmark:\d+$/,
+  );
+
+  const canvas = page.locator("canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box, "native YEIS canvas should have a clickable viewport").not.toBeNull();
+  await page.mouse.click(
+    box!.x + box!.width / 2,
+    box!.y + box!.height / 2,
+  );
+
+  await expect(html).toHaveAttribute(
+    "data-yeis-picked-target",
+    "landmark:l-m42",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "landmark:l-m42",
+  );
+  expect(new URL(page.url()).searchParams.get("destination")).toBe(
+    "landmark:l-m42",
+  );
 
   await runtime.assertClean(testInfo);
 });

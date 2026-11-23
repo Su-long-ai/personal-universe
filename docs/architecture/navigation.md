@@ -67,6 +67,27 @@ astronomy. The keyboard contract is:
 The vendored YEIS `Input.isTyping()` check prevents the 3D hotkey layer from
 claiming keystrokes while the input is focused.
 
+## Navigation failure recovery
+
+Native YEIS camera failures remain part of the same shared destination
+execution path. `UniverseApp` preserves the exact failed
+`UniverseNavigationCameraRequest` and renders one persistent, non-modal
+recovery notice rather than falling back to console-only diagnostics.
+
+The notice follows the pinned-MIT YEIS single-notification concept without
+copying the legacy UI implementation. It is announced as an ARIA alert, does
+not take focus, and does not auto-dismiss. `RETRY` only refreshes
+`requestId` and reissues the same camera target/mode through
+`YeisGalaxyScene`; it does not re-resolve to a different destination or
+create another navigation authority. `DISMISS` clears only the active error
+feedback. Any new Search/Places/Canvas navigation or a successful native
+arrival clears stale failure state.
+
+A full toast queue/provider was intentionally not introduced: the product has
+one authoritative native navigation request at a time, so Radix/React Aria
+toast machinery would add queue and focus infrastructure without improving the
+destination contract.
+
 ## Navigator interaction lifecycle
 
 The Navigator keeps YEIS/shared destination resolution authoritative while the
@@ -228,6 +249,32 @@ the shot tolerances before the root publishes
 captured. This prevents a transition command from being mistaken for a settled
 camera simply because camera-controls has already stored its destination.
 
+## Manual product-world camera takeover
+
+Product-world exploration reuses the same `camera-controls` instance that owns
+cinematic shots. No `OrbitControls`, second camera, or parallel navigation
+authority is mounted.
+
+Manual input is intentionally available only after the visitor reaches a stable
+`system`, `orbit`, or `surface` phase:
+
+- left-drag rotates around the current destination target;
+- mouse wheel / middle drag dollies within phase-specific distance bounds;
+- one-finger touch rotates;
+- two-finger touch dollies and rotates;
+- right drag and truck/pan remain disabled, so manual exploration cannot drift
+  the authoritative destination target away from the selected world/system.
+
+`approach`, `atmosphere`, and `returning` remain cinematic transitions.
+When manual control starts, the current shot is marked overridden, settled
+evidence is cleared, and the root publishes
+`data-universe-camera-mode="manual"`. The current destination, phase and deep
+link stay unchanged.
+
+If a Guided Journey is active, direct camera takeover stops that Journey
+immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
+intent wins, and orchestration must not fight the visitor for the same camera.
+
 ## Canvas picking
 
 Both galaxy-scale and system-scale canvas interactions route back into the
@@ -359,13 +406,26 @@ Behavior:
 
 - manual Search/Places/Canvas navigation, Locate, Return or Stop interrupts the
   journey immediately;
-- camera controls remain available;
-- ordinary mode advances only after navigation has settled and the
-  current product phase remains stable for the journey dwell;
+- the Journey adds no extra navigation lock: Search/Places, Canvas and Return
+  remain available while it is active;
+- ordinary mode advances only after the current destination has physically
+  settled. Product System/Approach/Orbit/Atmosphere/Surface use the existing
+  camera-controls current-position/current-target acceptance; native YEIS
+  spatial travel uses its existing arrived/located callback;
+- the 6.5 s destination dwell begins only after that settled signal. A
+  single-stop Journey therefore enters its visible completion state
+  automatically after one settled dwell instead of requiring a special DONE
+  click in ordinary motion;
 - `prefers-reduced-motion` disables automatic advance and keeps Prev/Next
   manual controls;
 - a Journey never invents content: if the relevant Content Collection group is
   empty, the corresponding journey is disabled.
+
+This closes a former semantic mismatch where the React phase could switch to
+`approach` or `system` before the camera had actually arrived, allowing the
+dwell timer to start during flight. The implementation retains only a local
+`cameraSettledPhase` latch; it does not port TourPlayer's narration/cue state
+machine or create another destination executor.
 
 ## Reuse Gate
 
@@ -373,8 +433,13 @@ The navigation mainline retains the frozen `YEIS-FULL-PLACES-TRAVEL-001`
 approval for its original protected closure. Later productization units use
 independent immutable task approvals, including
 `PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
-`NAVIGATOR-INTERACTION-LIFECYCLE-001`, and
-`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`.
+`NAVIGATOR-INTERACTION-LIFECYCLE-001`,
+`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
+`NAVIGATION-FAILURE-RECOVERY-001`,
+`JOURNEY-SETTLED-ORCHESTRATION-001`,
+`NATIVE-BODY-ACCEPTANCE-001`,
+`NAVIGATION-ENTRY-COVERAGE-001`, and
+`WORLD-CAMERA-MANUAL-OVERRIDE-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -388,15 +453,22 @@ against a production build:
 
 - Search groups, title/summary/tag matching and keyboard behavior;
 - Personal Signal Open reaches the exact attached planet;
-- Places product Open, observed exoplanet Open, and native body fallback;
+- Places product Open, observed exoplanet Open, and native body fallback,
+  including `月球` → `body:c0/moon` → native `c0/moon` travel;
 - observed-host/exoplanet Locate, including a HIP-less physical point;
-- star/system, body, black-hole, landmark and galaxy navigation;
-- Canvas picks route through the same destinations;
-- destination deep links;
+- star/system, body, black-hole, landmark and galaxy navigation,
+  including Chinese `仙女座` → exact galaxy native travel;
+- real WebGL Canvas picks route through the same destinations after native
+  Locate, without a test-only picking API;
+- destination deep links, including Search → `hero:aurora-01` → exact Hero
+  world → cold reload of the same world identity;
 - galaxy → system → planet → approach → orbit → return → galaxy;
 - landmark sprite/photo counts and all 15 photograph requests;
 - mobile navigator/Journey layout;
-- Journey interruption and reduced-motion manual mode;
+- Journey interruption, settled-before-dwell auto advance, visible completion,
+  and reduced-motion manual mode;
+- stable System/Orbit/Surface manual camera takeover preserves destination and
+  deep-link identity while interrupting an active Journey;
 - native galaxy camera persistence after returning from a product scene.
 
 ### Cloud acceptance evidence — 2026-11-23
@@ -461,3 +533,16 @@ reference frames or native body identity.
 
 If a stale/invalid body id is ever requested, the runtime records a diagnostic
 fallback/error instead of silently substituting a different celestial body.
+
+Browser acceptance now keeps this asymmetric contract explicit with the Moon:
+the Chinese alias `月球` resolves through the real Navigator to
+`body:c0/moon`; because moons are intentionally not mapped into
+`PlanetDefinition`, the shared executor must retain native target `c0/moon`
+through YEIS autopilot completion instead of opening a React product planet.
+
+A companion entry-point acceptance unit also exercises the real WebGL surface:
+Orion Nebula is first centered through the existing Locate action, then an
+actual pointer click at the canvas center must be resolved by the native
+landmark picker as `landmark:l-m42` and continue through the same shared
+destination executor. Hero and galaxy coverage likewise use the real Navigator
+and deep-link/native-travel paths rather than calling internal resolvers.

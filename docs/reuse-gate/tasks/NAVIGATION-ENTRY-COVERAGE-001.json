@@ -1,0 +1,135 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATION-ENTRY-COVERAGE-001",
+  "title": "Close Hero, galaxy and canvas-picking browser acceptance gaps",
+  "scope": {
+    "level": "implementation",
+    "subject": "Prove Hero deep links, Chinese galaxy Search travel and actual WebGL canvas picking all converge on the existing shared destination model"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The cloud suite already proves Personal Signal, observed exoplanet, native Moon, black hole, Earth, landmark, Search/Places, deep link and Journey contracts, but does not independently exercise Hero, galaxy or an actual WebGL pick. No production subsystem is missing: navigation.ts already resolves hero:aurora-01 and Chinese galaxy aliases, while YeisGalaxyScene already records data-yeis-picked-target whenever its real Input.onClick picker selects a destination. Reuse the existing Playwright harness and native Locate behavior. A deep-sky landmark can first be LOCATEd so the native controller centers it; after data-universe-locate-complete confirms settlement, a real pointer click at the canvas center should be resolved by the existing landmark sprite picker and route through onNavigateDestination. This avoids exposing test-only projection coordinates or invoking internal navigation functions.",
+  "planned_files": [
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the native camera/input universe used by the existing destination and picking adapters; no alternative picker or navigation path is needed."
+    },
+    {
+      "url": "https://playwright.dev/docs/actionability",
+      "finding": "Playwright locator and mouse actions use the real browser input path and auto-wait for actionability, making them appropriate for acceptance of the actual WebGL interaction surface."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Playwright retrying locator assertions and expect.poll can wait on runtime evidence such as locate/travel completion without replacing product timing with arbitrary sleeps."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the existing YEIS native universe/input/navigation backbone; this task closes acceptance gaps around already-implemented destination types."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Reuse the existing Playwright browser harness for real keyboard/pointer/deep-link interaction and asynchronous runtime assertions."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yeis-native-travel-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse native locate/travel and the existing canvas picker; do not add a diagnostic navigation API just for tests."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "No additional component is required. Tests interact with the real Navigator and WebGL canvas."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-shared-entry-paths",
+      "name": "Existing YEIS Hero/galaxy/canvas entry paths",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current navigation.ts plus YeisGalaxyScene adapters",
+      "license": "Pinned MIT YEIS plus project-owned glue",
+      "decision": "reuse",
+      "reason": "All requested entry points already resolve into UniverseNavigationDestination; the missing work is browser proof rather than a new implementation authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-real-entry-acceptance",
+      "name": "Existing Playwright real-input acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current cloud E2E harness",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Covers URL reloads, keyboard Search, native locate settlement, real pointer input, runtime datasets and traces in the same harness already used for the rest of the product.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "test-only-pick-api",
+      "name": "New test-only picking/projection API",
+      "level": "component_asset",
+      "source": "Project-specific diagnostic endpoint",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would bypass the actual Input.onClick and sprite picking path, weakening rather than strengthening canvas acceptance."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-shared-entry-paths",
+      "playwright-real-entry-acceptance"
+    ],
+    "rationale": "Add no production navigation code. Prove Hero with a shareable destination deep link, galaxy with the Chinese 仙女座 Search alias and actual native travel, and Canvas by centering a real deep-sky landmark through Locate then clicking the rendered canvas center and asserting data-yeis-picked-target plus the same destination executor.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a landmark's projected center is occluded by a higher-priority pick target, use another curated deep-sky landmark with no overlapping marker; do not add test-only production picking hooks."
+  }
+}

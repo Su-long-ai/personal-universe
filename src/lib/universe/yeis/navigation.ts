@@ -87,6 +87,7 @@ export interface UniverseNavigationSection {
 
 export interface UniverseNavigationCameraRequest {
   requestId: number;
+  destinationId: string;
   mode: "locate" | "travel";
   target: UniverseNavigationCameraTarget;
   title: string;

@@ -1,0 +1,134 @@
+{
+  "schema": 2,
+  "task_id": "WORLD-CAMERA-MANUAL-OVERRIDE-001",
+  "title": "Let users take over product-world camera without adding another camera authority",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing camera-controls input/actions and controlstart lifecycle so System/Orbit/Surface become manually explorable and user camera input interrupts an active Journey"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Personal Universe already uses @react-three/drei CameraControls backed by camera-controls v3.1.2 for all product-world cinematic shots, but CinematicCamera explicitly maps every mouse/touch action to NONE. This prevents manual exploration after arrival and means Journey can be interruptible through navigation buttons but not through direct camera takeover. The installed camera-controls implementation already provides ACTION.ROTATE/DOLLY/TOUCH_DOLLY_ROTATE, a controlstart event, and—critically—its drag start code stops the relevant in-progress rotate/dolly movement by synchronizing end state to the current camera state. Drei v9.122.0 directly forwards camera-controls controlstart/controlend as onStart/onEnd. Reuse this same controller rather than add OrbitControls: enable target-preserving rotate/dolly input for stable System/Orbit/Surface phases, mark the cinematic shot as manually overridden on controlstart, clear settled evidence, and notify UniverseApp to stop any active Journey. Approach/Atmosphere/Returning remain cinematic so manual input cannot leave a half-completed cross-scale transition.",
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The exact installed camera-controls version exposes ACTION input mappings and controlstart; startDragging synchronizes active rotate/dolly end state to current state, naturally interrupting the corresponding programmed movement instead of requiring another controller."
+    },
+    {
+      "url": "https://github.com/pmndrs/drei/blob/v9.122.0/src/core/CameraControls.tsx",
+      "finding": "The exact installed Drei CameraControls wrapper forwards controlstart/controlend to onStart/onEnd and mounts the same CameraControlsImpl instance used for programmatic transitions."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "finding": "Pinned MIT TourPlayer treats competing camera navigation as tour interruption, supporting the product rule that explicit user camera takeover should stop Journey orchestration rather than fight it."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber remains the single shared Canvas/camera host; manual control must stay on that camera rather than create another render or navigation surface."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the existing YEIS/Personal Universe spatial product and reuse its interruption principle; the product-world camera itself is already intentionally owned by the R3F layer."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Keep the single R3F Canvas and camera lifecycle."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yeis-tourplayer-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse TourPlayer's user-navigation-interrupts-tour semantic; do not port its old state machine or UI."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse the exact existing CameraControls instance, ACTION mappings and onStart event. Adding OrbitControls or a second camera component would create competing camera state."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-camera-controls-manual-input",
+      "name": "Existing camera-controls v3.1.2 manual input on the same cinematic controller",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Current CinematicCamera via Drei CameraControls",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already owns all product-world camera transitions and directly provides rotate/dolly/touch input plus user-control events; using it preserves one camera state and lets user input naturally interrupt current movement.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "drei-orbit-controls-second-controller",
+      "name": "Add Drei OrbitControls beside CinematicCamera",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Additional Three.js orbit controller",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Would create a second controller mutating the same camera, duplicate target/distance state and require arbitration with existing cinematic transitions."
+    },
+    {
+      "id": "custom-pointer-orbit",
+      "name": "Project-owned pointer/touch orbit implementation",
+      "level": "component_asset",
+      "source": "New custom camera interaction math",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates mature camera-controls pointer, touch, damping, distance and transition-interruption logic already shipped."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-camera-controls-manual-input"
+    ],
+    "rationale": "Enable only the existing CameraControls instance. System/Orbit/Surface get left-drag rotate, wheel/middle dolly and touch rotate/pinch-rotate with no truck/pan so the destination target remains authoritative. controlstart marks the current cinematic shot as manually overridden, removes settled evidence and notifies UniverseApp; an active Journey is stopped immediately so orchestration never fights the user. Approach/Atmosphere/Returning remain input-disabled cinematic transitions.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If free dolly proves too permissive in runtime visuals, narrow min/maxDistance per phase while keeping the same CameraControls authority; do not add another controller."
+  }
+}

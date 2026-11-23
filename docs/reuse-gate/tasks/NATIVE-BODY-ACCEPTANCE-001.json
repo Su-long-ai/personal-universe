@@ -1,0 +1,144 @@
+{
+  "schema": 2,
+  "task_id": "NATIVE-BODY-ACCEPTANCE-001",
+  "title": "Restore exact native-body acceptance through the shared Navigator",
+  "scope": {
+    "level": "implementation",
+    "subject": "Prove a non-PlanetDefinition YEIS body keeps exact native identity from Chinese Search alias through shared destination execution and deep-link state"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Earth is correctly represented as a product PlanetDefinition, so the earlier Earth-native assertion had to be removed. That correction left the cloud suite without an independent exact-native-body case even though the product still supports moons, spacecraft and other YEIS bodies outside the React planet model. Reuse the existing exact-native-travel subsystem and the adopted Playwright browser suite. The Moon is a stable Solar System target: navigation.ts already curates Moon, Chinese aliases map 月球/月亮 to moon, and bridge.ts intentionally maps only planet/dwarf bodies into PlanetDefinition while moons remain native. One E2E case can therefore prove alias normalization, grouped Search, exact body:c0/moon destination identity, c0/moon camera target, native travel completion and shareable URL without adding production logic.",
+  "planned_files": [
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the native universe/body identity and camera authority used by the existing exact-travel subsystem."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Playwright's auto-retrying locator assertions and expect.poll are the adopted way to verify asynchronous browser state without fixed arbitrary waits."
+    },
+    {
+      "url": "https://playwright.dev/docs/actionability",
+      "finding": "Playwright locator actions already auto-wait for actionability, so the acceptance case can use the actual Navigator controls rather than bypassing product interaction."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep pinned MIT YEIS as the native-body product authority; this unit validates the already-selected solution rather than adding another body model."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Reuse the existing Playwright Test browser harness and its retrying assertions/actionability instead of creating a custom runtime probe."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yeis-native-travel-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The already-adopted exact native travel adapter is the subsystem under acceptance; no alternate camera or coordinate path is introduced."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "No additional component is needed; the acceptance path uses the real Navigator input/result/action elements and root runtime evidence."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-yeis-native-body-path",
+      "name": "Existing pinned YEIS exact native-body path",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseNavigationDestination plus YeisGalaxyScene native travel",
+      "license": "MIT source at pinned commit",
+      "decision": "reuse",
+      "reason": "The production path already exists; the gap is explicit browser acceptance after Earth returned to product-world semantics.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-native-body-acceptance",
+      "name": "Existing Playwright cloud browser acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current tests/e2e/universe.spec.ts harness",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Uses the same browser/runtime evidence and CI artifact pipeline already adopted for Search, Places, black holes, landmarks and deep links.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-native-probe",
+      "name": "Custom native-body smoke script",
+      "level": "component_asset",
+      "source": "New bespoke browser/runtime script",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate Playwright browser lifecycle, waiting, traces and failure diagnostics while bypassing the actual Navigator surface the user interacts with.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-yeis-native-body-path",
+      "playwright-native-body-acceptance"
+    ],
+    "rationale": "Add no production path. Use the real Navigator with the existing Chinese alias map to select Moon, then assert the existing shared destination/native camera/deep-link contract through Playwright's retrying browser assertions.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If Moon ever becomes a product PlanetDefinition, move this acceptance to another curated non-product native body such as a spacecraft rather than weakening exact-native-travel coverage."
+  }
+}

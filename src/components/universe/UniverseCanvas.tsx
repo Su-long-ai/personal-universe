@@ -52,6 +52,7 @@ export function UniverseCanvas({
   scrollDepth,
   reducedMotion,
   onCinematicPhaseComplete,
+  onCinematicUserControlStart,
 }: {
   phase: UniversePhase;
   engineMode: UniverseEngine;
@@ -75,6 +76,7 @@ export function UniverseCanvas({
   scrollDepth: number;
   reducedMotion: boolean;
   onCinematicPhaseComplete: (phase: UniversePhase) => void;
+  onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
 
@@ -90,10 +92,11 @@ export function UniverseCanvas({
     >
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
-        phase={phase}
-        scrollDepth={scrollDepth}
-        reducedMotion={reducedMotion}
-        onPhaseComplete={onCinematicPhaseComplete}
+          phase={phase}
+          scrollDepth={scrollDepth}
+          reducedMotion={reducedMotion}
+          onPhaseComplete={onCinematicPhaseComplete}
+          onUserControlStart={onCinematicUserControlStart}
         />
       )}
 

@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "NAVIGATION-ENTRY-COVERAGE-001",
+  "approved_at": "2026-11-22T21:02:30.000Z",
+  "baseline_commit": "d86183cd848c6b87f92b7b50608a024629fe39ac",
+  "record_path": "docs/reuse-gate/tasks/NAVIGATION-ENTRY-COVERAGE-001.json",
+  "record_sha256": "402ac04d86573ee3f43d4855f29c970c4b1931e6298b046bfaea9d967d139f25",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "yeis-native-travel-e520568": "c3ded8d14bd098a8bf2ef129c09c5dd48ada0e7a8b525494fc861ca7d95b6073",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Prove Hero deep links, Chinese galaxy Search travel and actual WebGL canvas picking all converge on the existing shared destination model"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "existing-shared-entry-paths",
+    "playwright-real-entry-acceptance"
+  ],
+  "candidate_scores": {
+    "existing-shared-entry-paths": 54,
+    "playwright-real-entry-acceptance": 57,
+    "test-only-pick-api": 29
+  }
+}

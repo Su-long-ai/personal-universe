@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "NATIVE-BODY-ACCEPTANCE-001",
+  "approved_at": "2026-11-22T21:02:00.000Z",
+  "baseline_commit": "3b0958c89dd2c2a2b47bb24e58339de8e0c694d7",
+  "record_path": "docs/reuse-gate/tasks/NATIVE-BODY-ACCEPTANCE-001.json",
+  "record_sha256": "22010c55676307ba05556e2fceef80b603e78e3b33962be12838bc60524b4124",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "yeis-native-travel-e520568": "c3ded8d14bd098a8bf2ef129c09c5dd48ada0e7a8b525494fc861ca7d95b6073",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Prove a non-PlanetDefinition YEIS body keeps exact native identity from Chinese Search alias through shared destination execution and deep-link state"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "existing-yeis-native-body-path",
+    "playwright-native-body-acceptance"
+  ],
+  "candidate_scores": {
+    "existing-yeis-native-body-path": 54,
+    "playwright-native-body-acceptance": 57,
+    "custom-native-probe": 33
+  }
+}

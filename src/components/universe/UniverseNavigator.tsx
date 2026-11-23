@@ -18,6 +18,8 @@ export function UniverseNavigator({
   placements,
   currentSystem,
   activeDestinationId,
+  pendingDestinationId,
+  pendingDestinationMode,
   onClose,
   onNavigate,
   onLocate,
@@ -28,6 +30,8 @@ export function UniverseNavigator({
   placements: UniverseContentPlacement[];
   currentSystem?: SystemDefinition | null;
   activeDestinationId?: string | null;
+  pendingDestinationId?: string | null;
+  pendingDestinationMode?: "locating" | "traveling" | null;
   onClose: () => void;
   onNavigate: (
     destination: UniverseNavigationDestination,
@@ -385,14 +389,19 @@ export function UniverseNavigator({
                 const index = flatIndex;
                 const isKeyboardActive = index === activeIndex;
                 const isCurrent = result.id === activeDestinationId;
+                const isPendingDestination =
+                  result.id === pendingDestinationId;
                 const spatial =
                   result.target.kind === "galaxy" ||
                   result.target.kind === "landmark" ||
                   result.target.kind === "blackhole";
-                const pendingMode =
+                const localPendingMode =
                   pendingAction?.destinationId === result.id
                     ? pendingAction.mode
                     : null;
+                const routePendingMode = isPendingDestination
+                  ? pendingDestinationMode
+                  : null;
 
                 return (
                   <div
@@ -405,7 +414,8 @@ export function UniverseNavigator({
                     className={
                       "navigator-result-row" +
                       (isKeyboardActive ? " is-active" : "") +
-                      (isCurrent ? " is-current" : "")
+                      (isCurrent ? " is-current" : "") +
+                      (isPendingDestination ? " is-pending" : "")
                     }
                     role="option"
                     aria-selected={isKeyboardActive}
@@ -426,15 +436,19 @@ export function UniverseNavigator({
                         <small>{result.detail}</small>
                       </span>
                       <span className="navigator-open">
-                        {pendingMode === "open"
+                        {localPendingMode === "open"
                           ? spatial
                             ? "TRAVELING…"
                             : "OPENING…"
-                          : isCurrent
-                            ? "ACTIVE"
-                            : spatial
-                              ? "TRAVEL →"
-                              : "OPEN →"}
+                          : routePendingMode === "traveling"
+                            ? "TRAVELING…"
+                            : routePendingMode === "locating"
+                              ? "LOCATING…"
+                              : isCurrent
+                                ? "ACTIVE"
+                                : spatial
+                                  ? "TRAVEL →"
+                                  : "OPEN →"}
                       </span>
                     </button>
                     <button
@@ -444,7 +458,10 @@ export function UniverseNavigator({
                       aria-label={"Locate " + result.title + " in galaxy"}
                       disabled={pendingAction !== null}
                     >
-                      {pendingMode === "locate" ? "LOCATING…" : "LOCATE"}
+                      {localPendingMode === "locate" ||
+                      routePendingMode === "locating"
+                        ? "LOCATING…"
+                        : "LOCATE"}
                     </button>
                   </div>
                 );
