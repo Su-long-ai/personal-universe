@@ -329,7 +329,6 @@ export function CinematicCamera({
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
     } else {
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
-      delete document.documentElement.dataset.universeCameraGeneration;
     }
 
     controls.smoothTime = reducedMotion ? 0.05 : shot.smoothTime;
@@ -448,6 +447,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraSettled;
       delete document.documentElement.dataset.universeCameraMode;
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
+      delete document.documentElement.dataset.universeCameraGeneration;
     },
     [],
   );
