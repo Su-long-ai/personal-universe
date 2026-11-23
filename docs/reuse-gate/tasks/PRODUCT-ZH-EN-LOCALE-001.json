@@ -174,6 +174,10 @@
       {
         "candidate_id": "i18next-product-runtime",
         "reason": "i18next is mature, but its global runtime is unnecessary here because YEIS already owns astronomical translations and only the product chrome lacks Chinese."
+      },
+      {
+        "candidate_id": "reload-language-pages",
+        "reason": "A separate /zh and /en route tree is broader, but it loses globally because switching routes reloads the app and discards camera, destination, world and Journey state while duplicating page chrome. The product requires an in-place language toggle inside one persistent universe session."
       }
     ],
     "score_overrides": [],
