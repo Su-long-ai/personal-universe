@@ -121,6 +121,7 @@ export function UniverseCanvas({
             onNavigateDestination={onNavigateDestination}
             onSignalHover={onSignalHover}
             quality={quality}
+            reducedMotion={reducedMotion}
             viewStateRef={yeisViewStateRef}
           />
         </Suspense>

@@ -62,6 +62,7 @@ type NativeGalaxyState = {
   observedCount: number;
   contentSky: Points;
   contentCount: number;
+  openingMotionArmed: boolean;
   disposed: boolean;
 };
 
@@ -96,6 +97,7 @@ export function YeisGalaxyScene({
   onNavigateDestination,
   onSignalHover,
   quality,
+  reducedMotion,
   viewStateRef,
 }: {
   markers: GalaxyMarker[];
@@ -111,6 +113,7 @@ export function YeisGalaxyScene({
   ) => Promise<void> | void;
   onSignalHover: (hover: YeisSignalHover) => void;
   quality: QualityMode;
+  reducedMotion: boolean;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
   const { gl, scene, camera, size } = useThree();
@@ -274,6 +277,21 @@ export function YeisGalaxyScene({
           controller.position.copy(cameraPc).multiplyScalar(PARSEC_KM);
           controller.orbitPoint(orbitCenterKm, orbitRadiusKm, "Milky Way");
         }
+
+        const motionFrozen =
+          new URLSearchParams(window.location.search).get("freeze") === "1";
+        const openingMotionArmed =
+          !savedView && !reducedMotion && !motionFrozen;
+        controller.autoOrbit = openingMotionArmed ? 0.018 : 0;
+        document.documentElement.dataset.yeisOpeningMotion =
+          openingMotionArmed
+            ? "auto-orbit"
+            : motionFrozen
+              ? "frozen"
+              : reducedMotion
+                ? "reduced"
+                : "restored";
+
         console.info(
           `[YEIS-NATIVE-VIEW] restored=${savedView ? "1" : "0"} ` +
             `distanceKm=${controller.position.length().toExponential(8)}`,
@@ -304,6 +322,7 @@ export function YeisGalaxyScene({
           observedCount: 0,
           contentSky,
           contentCount: 0,
+          openingMotionArmed,
           currentGalaxy: null,
           galaxyAcc: 1,
           disposed: false,
@@ -689,10 +708,11 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.personalSignalCapacity;
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
+      delete document.documentElement.dataset.yeisOpeningMotion;
       delete document.documentElement.dataset.universeTraveling;
       delete document.documentElement.dataset.universeTravelArrivalRatio;
     };
-  }, [gl, perspective, quality, scene, viewStateRef]);
+  }, [gl, perspective, quality, reducedMotion, scene, viewStateRef]);
 
   useFrame((_, delta) => {
     const state = stateRef.current;
@@ -719,6 +739,14 @@ export function YeisGalaxyScene({
       size.height,
       fovRad,
     );
+
+    if (
+      state.openingMotionArmed &&
+      state.controller.autoOrbit === 0 &&
+      document.documentElement.dataset.yeisOpeningMotion === "auto-orbit"
+    ) {
+      document.documentElement.dataset.yeisOpeningMotion = "stopped";
+    }
 
     perspective.position.set(0, 0, 0);
     perspective.quaternion.copy(state.controller.quaternion);

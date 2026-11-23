@@ -34,6 +34,11 @@ test("default YEIS boots with native galaxy and personal signals", async ({
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "frozen",
+  );
+
   await expect
     .poll(
       async () =>
@@ -98,6 +103,44 @@ test("default YEIS boots with native galaxy and personal signals", async ({
     body: Buffer.from(JSON.stringify(metrics, null, 2)),
     contentType: "application/json",
   });
+  await runtime.assertClean(testInfo);
+});
+
+test("opening galaxy auto-orbits until the visitor takes control", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "auto-orbit",
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).toBeTruthy();
+  const centerX = box!.x + box!.width * 0.5;
+  const centerY = box!.y + box!.height * 0.5;
+  await page.mouse.move(centerX, centerY);
+  await page.mouse.down();
+  await page.mouse.move(centerX + 36, centerY + 12, { steps: 4 });
+  await page.mouse.up();
+
+  await expect
+    .poll(() => html.getAttribute("data-yeis-opening-motion"))
+    .toBe("stopped");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await waitForYeis(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "reduced",
+  );
+
   await runtime.assertClean(testInfo);
 });
 
