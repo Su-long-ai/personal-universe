@@ -982,6 +982,12 @@ export default function UniverseApp({
     console.info("[UNIVERSE-JOURNEY] interrupted by manual camera control");
   }, [handleStopJourney]);
 
+  const handleContinuousScaleIntentStart = useCallback(() => {
+    if (!journeyRef.current) return;
+    handleStopJourney();
+    console.info("[UNIVERSE-JOURNEY] interrupted by manual scale intent");
+  }, [handleStopJourney]);
+
   const handleGalaxyScaleFocus = useCallback(
     (destination: UniverseNavigationDestination | null) => {
       if (pinnedGalaxyScaleFocusRef.current) return;
@@ -1616,12 +1622,20 @@ export default function UniverseApp({
       const direction = continuousScaleDirection(event.deltaY);
       if (!direction) return;
 
+      // Manual scale intent owns navigation immediately, even before a small
+      // trackpad delta crosses the phase threshold. This stops Journey
+      // auto-advance without clearing the current camera-settled contract.
+      handleContinuousScaleIntentStart();
+
       const now = performance.now();
       const wheel = scaleWheelRef.current;
-      if (now < wheel.cooldownUntil) return;
-
       const directionChanged =
         wheel.direction !== null && wheel.direction !== direction;
+
+      // Same-direction bursts respect the short cooldown, but a reversal is a
+      // higher-priority manual intent and must never be swallowed by it.
+      if (now < wheel.cooldownUntil && !directionChanged) return;
+
       if (
         directionChanged ||
         now - wheel.lastAt > CONTINUOUS_SCALE_RESET_MS
@@ -1631,6 +1645,7 @@ export default function UniverseApp({
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
         if (directionChanged) {
+          wheel.cooldownUntil = 0;
           pendingWorldScaleStepsRef.current = 0;
           delete document.documentElement.dataset.universeScaleQueued;
         }
@@ -1655,7 +1670,6 @@ export default function UniverseApp({
         scalePhaseIndex(phase),
       );
       delete document.documentElement.dataset.universeScaleBlocked;
-      handleCinematicUserControlStart();
 
       if (
         phase !== "galaxy" &&
@@ -1843,7 +1857,7 @@ export default function UniverseApp({
       defaultGalaxyScaleFocus,
       enterScaleFocusedSystem,
       galaxy.markers,
-      handleCinematicUserControlStart,
+      handleContinuousScaleIntentStart,
       handleNavigateDestination,
       handleReturn,
       navigationFailure,
