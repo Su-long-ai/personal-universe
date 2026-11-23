@@ -341,9 +341,10 @@ test("continuous wheel intent carries across unsettled world transitions", async
     box!.y + box!.height * 0.5,
   );
 
-  // Keep scrolling while the previous camera transition is still running,
-  // including inside the one-notch cooldown window. Continued input is intent
-  // for the next layer and must queue rather than disappear.
+  // Keep scrolling while the previous camera transition is still running.
+  // Continued input is committed scale intent: unsettled camera work must
+  // queue it, while a quickly settled software fallback must not discard a
+  // distinct event just because the events are close together in wall time.
   await page.mouse.wheel(0, -120);
   await page.waitForTimeout(60);
   await page.mouse.wheel(0, -120);
