@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "STALE-APPROVAL-ISOLATION-V3-001",
+  "approved_at": "2026-11-23T05:24:47.945Z",
+  "baseline_commit": "038a422bc7c50397f63ac3cae43a513a7a303198",
+  "record_path": "docs/reuse-gate/tasks/STALE-APPROVAL-ISOLATION-V3-001.json",
+  "record_sha256": "1aae42c5271bd6c11c40bd0e923d9e46738b3cfe836121d42f0264ca55c24cc4",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "backstage-catalog": "dfb85f48072da4bc24da6d385618b9039c863b71b08b29b9ffab4b24ec27b213",
+    "git-hooks": "38e92e0cf551070b1ba2f565d193e71d2be7951d8281898010bdcc0b21c6a2d0",
+    "github-actions-pr-diff-gate": "3765dfd501ff4aaa27d657f4dda850f6f6f0ea8bb212ba95fe78bcab487fcf5d",
+    "opa-conftest": "f2b6f73af6d2f54b7283bb006c433641e187e07bcf25d92e37ad456a366d443c"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Machine Reuse Gate approval candidate isolation while preserving per-file prior-approval enforcement"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "scripts/reuse-gate.mjs"
+  ],
+  "selected_ids": [
+    "node-gate-valid-candidate-isolation"
+  ],
+  "candidate_scores": {
+    "node-gate-valid-candidate-isolation": 57,
+    "opa-token-selection": 45.5,
+    "backstage-token-governance": 33,
+    "git-ancestry-only": 47
+  }
+}
