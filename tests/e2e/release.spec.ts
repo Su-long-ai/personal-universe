@@ -281,10 +281,24 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
         );
       });
 
+    // WEBGL_lose_context only permits synthetic restoration when the
+    // context-lost event is cancelled. Make that precondition explicit in the
+    // probe instead of relying on renderer listener ordering.
+    canvas.addEventListener(
+      "webglcontextlost",
+      (event) => event.preventDefault(),
+      { once: true },
+    );
+
     const lostPromise = waitFor("webglcontextlost");
     extension.loseContext();
     const lost = await lostPromise;
     if (!lost) return { supported: true, lost: false, restored: false };
+
+    // restoreContext() is invalid until the context-lost event has completed.
+    // Cross a task boundary so the synthetic restore follows the WebGL spec
+    // rather than racing event dispatch on software-rendered runners.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
     const restoredPromise = waitFor("webglcontextrestored");
     extension.restoreContext();
