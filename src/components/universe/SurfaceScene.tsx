@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import { liveWorldFallbackReason } from "./CinematicPipeline";
 import { SurfaceTerrain } from "./SurfaceTerrain";
 
 function ArrivalBeacon({ active, onToggle, height }: { active: boolean; onToggle: () => void; height: number }) {
@@ -67,9 +69,25 @@ function DistantMoon() {
   );
 }
 
-export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
-  const [active, setActive] = useState(false);
+export function SurfaceScene({
+  anchored = false,
+  phase,
+  quality,
+  hasPlanet,
+}: {
+  anchored?: boolean;
+  phase: UniversePhase;
+  quality: QualityMode;
+  hasPlanet: boolean;
+}) {
+  const { gl } = useThree();
+  const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
+  const active =
+    anchored &&
+    hasPlanet &&
+    phase === "surface" &&
+    Boolean(liveWorldFallbackReason(gl, quality));
   const content = (
     <>
       <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
@@ -81,26 +99,29 @@ export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
       />
       <pointLight
         position={[0.4, anchorHeight + 1.0, -5.4]}
-        intensity={active ? 7 : 2.8}
+        intensity={beaconActive ? 7 : 2.8}
         distance={11}
-        color={active ? "#ffb46d" : "#74d8ff"}
+        color={beaconActive ? "#ffb46d" : "#74d8ff"}
       />
 
       <Suspense fallback={null}>
-        <SurfaceTerrain onAnchorHeight={setAnchorHeight} />
+        <SurfaceTerrain
+          active={active}
+          onAnchorHeight={setAnchorHeight}
+        />
       </Suspense>
 
       <DistantMoon />
       <ArrivalBeacon
-        active={active}
+        active={beaconActive}
         height={anchorHeight}
-        onToggle={() => setActive((value) => !value)}
+        onToggle={() => setBeaconActive((value) => !value)}
       />
     </>
   );
 
   useEffect(() => {
-    if (!anchored) return;
+    if (!active) return;
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-terrains-fallback";
     return () => {
@@ -111,13 +132,17 @@ export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
         delete document.documentElement.dataset.universeSurfaceRenderer;
       }
     };
-  }, [anchored]);
+  }, [active]);
 
   return (
     <>
-      <color attach="background" args={["#030b12"]} />
-      <fog attach="fog" args={["#07141d", 34, 118]} />
-      {content}
+      {active ? (
+        <>
+          <color attach="background" args={["#030b12"]} />
+          <fog attach="fog" args={["#07141d", 34, 118]} />
+        </>
+      ) : null}
+      <group visible={active}>{content}</group>
     </>
   );
 }
