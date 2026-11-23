@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-PAGEHIDE-NONBLOCKING-001",
+  "approved_at": "2026-11-23T18:45:00.000Z",
+  "baseline_commit": "642529c911eae560397616a972dce7036ac1b49d",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-PAGEHIDE-NONBLOCKING-001.json",
+  "record_sha256": "b09bc0c81d010cbda5a26a778c35fdf4b28f1656bd7e811f1c454bbc5338208e",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "webgl-context-loss-api": "a45251980adfd9d57c8b12d69893587dbd7a30f754c06091169068aaa3d1c740"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Remove the synchronous synthetic pagehide teardown bottleneck while preserving terminal context-loss coverage and native BrowserContext cleanup"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/support/test.ts",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "selected_ids": [
+    "r3f-browser-owned-terminal-lifecycle",
+    "playwright-native-context-teardown",
+    "deferred-webgl-context-loss"
+  ],
+  "candidate_scores": {
+    "r3f-browser-owned-terminal-lifecycle": 57,
+    "playwright-native-context-teardown": 57,
+    "deferred-webgl-context-loss": 53,
+    "custom-gpu-teardown-orchestrator": null
+  }
+}

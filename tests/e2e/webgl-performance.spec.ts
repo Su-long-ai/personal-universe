@@ -44,11 +44,17 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
   });
   expect(initiallyLost).toBe(false);
 
-  await firstPage.evaluate(() => {
+  const terminalDispatchMs = await firstPage.evaluate(() => {
+    const startedAt = performance.now();
     window.dispatchEvent(
       new PageTransitionEvent("pagehide", { persisted: false }),
     );
+    return performance.now() - startedAt;
   });
+  expect(
+    terminalDispatchMs,
+    "terminal pagehide must return without waiting for context loss",
+  ).toBeLessThan(1_000);
   await expect(firstHtml).toHaveAttribute(
     "data-universe-webgl-lifecycle",
     "released",
@@ -79,10 +85,7 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
     "active",
   );
 
-  await secondPage.evaluate(() => {
-    window.dispatchEvent(
-      new PageTransitionEvent("pagehide", { persisted: false }),
-    );
-  });
+  // Leave final teardown to Playwright/browser ownership. The preceding
+  // context-loss assertion covers the explicit product terminal contract.
   await second.close();
 });

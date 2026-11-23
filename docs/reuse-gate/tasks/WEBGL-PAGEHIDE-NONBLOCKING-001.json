@@ -1,0 +1,168 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-PAGEHIDE-NONBLOCKING-001",
+  "title": "Make terminal WebGL pagehide release non-blocking and return test teardown to Playwright",
+  "scope": {
+    "level": "implementation",
+    "subject": "Remove the synchronous synthetic pagehide teardown bottleneck while preserving terminal context-loss coverage and native BrowserContext cleanup"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted run 45240075499 proves the Surface live screenshot completes, but the wrapped Playwright page fixture can spend the entire 75 second teardown budget inside a synthetic non-persisted pagehide whose R3F handler synchronously calls WebGLRenderer.forceContextLoss under SwiftShader. The same worker then successfully creates and boots a fresh BrowserContext, while all four ordinary release shards pass, so mandatory pre-close synthetic context loss is no longer justified. Reuse Playwright's native per-test page/BrowserContext teardown as the primary test lifecycle owner, keep R3F as renderer owner, and make the real product pagehide path bounded: mark terminal release synchronously, schedule Three.js forceContextLoss on the next task only while the page remains alive, and cancel that scheduled attempt if React unmount cleanup wins first. Keep explicit terminal/context-loss tests to verify the standard WEBGL_lose_context path; do not add a custom GPU manager or browser launcher.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/support/test.ts",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/canvas",
+      "finding": "React Three Fiber Canvas owns the WebGLRenderer and normal React unmount disposal, so the project should not add a second renderer lifecycle owner."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/pagehide_event",
+      "finding": "pagehide is appropriate for navigation-away lifecycle handling and remains bfcache compatible through PageTransitionEvent.persisted, but it is not guaranteed as a universal shutdown primitive."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/WebGLRenderer.html#forceContextLoss",
+      "finding": "Three.js exposes forceContextLoss as the standard wrapper around WEBGL_lose_context for deliberately losing the current WebGL context."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-fixtures",
+      "finding": "Playwright owns fixture teardown and browser-context lifecycle; built-in page/context fixtures already provide isolation and should remain the primary test cleanup mechanism."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Execution_model",
+      "finding": "JavaScript event handlers run to completion on the event loop; a long synchronous platform call inside pagehide can therefore delay the page lifecycle and subsequent navigation/teardown."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "This is a bounded lifecycle correction inside the already-selected R3F and Playwright stack, not a replacement application, renderer, or test platform."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "Retain R3F for renderer/unmount ownership and Playwright for page and BrowserContext teardown instead of wrapping every successful test with a project-owned terminal lifecycle event."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        3,
+        4
+      ],
+      "conclusion": "No extra GPU lifecycle subsystem is needed; the observed bottleneck is caused by duplicating framework teardown work synchronously rather than by a missing resource manager."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "webgl-context-loss-api"
+      ],
+      "source_refs": [
+        1,
+        2,
+        4
+      ],
+      "conclusion": "Keep the standard WEBGL_lose_context primitive through Three.js, but invoke it as a bounded best-effort terminal task rather than synchronously blocking pagehide."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-browser-owned-terminal-lifecycle",
+      "name": "R3F unmount plus browser-owned terminal document teardown",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing single Canvas renderer and browser document lifecycle",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "R3F already disposes renderer state on normal unmount and the browser destroys discarded document contexts; keep pagehide work bounded rather than duplicating full teardown synchronously.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-native-context-teardown",
+      "name": "Playwright built-in page and BrowserContext lifecycle",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Existing Playwright fixtures and one-worker-per-hosted-runner execution",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Hosted evidence shows a fresh BrowserContext still boots after the heavy Surface case even when the synthetic pagehide teardown times out, so native Playwright cleanup should be the default instead of a custom wrapper.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "deferred-webgl-context-loss",
+      "name": "Three.js forceContextLoss scheduled after terminal pagehide returns",
+      "level": "component_asset",
+      "registry_id": "webgl-context-loss-api",
+      "source": "Existing Three.js WEBGL_lose_context wrapper",
+      "license": "Web platform API",
+      "decision": "reuse",
+      "reason": "Preserves explicit context-loss release when the outgoing page remains runnable, while preventing the pagehide event itself from waiting on a potentially expensive SwiftShader context-loss call.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-gpu-teardown-orchestrator",
+      "name": "Project-owned GPU teardown queue or browser manager",
+      "level": "subsystem",
+      "source": "New project-specific teardown scheduler and GPU resource registry",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It would duplicate R3F, Three.js, browser, and Playwright ownership and increase the chance of exactly the double-cleanup and teardown stalls already observed on hosted SwiftShader."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "r3f-browser-owned-terminal-lifecycle",
+      "playwright-native-context-teardown",
+      "deferred-webgl-context-loss"
+    ],
+    "rationale": "Remove the custom synthetic pagehide from the shared Playwright page fixture so native page/BrowserContext teardown is again authoritative. In the product, keep non-persisted pagehide as the terminal signal but make it bounded: record release synchronously, then schedule forceContextLoss on the next task and cancel the timer if normal React unmount cleanup happens first. Explicit WebGL lifecycle tests continue to wait for actual context loss, so this does not weaken acceptance; it removes only the blocking duplicate cleanup path that hosted evidence proved harmful.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If fresh BrowserContext creation regresses after removing the synthetic fixture, isolate or recycle the affected native Playwright project/worker at measured boundaries before considering any new GPU teardown manager."
+  }
+}
