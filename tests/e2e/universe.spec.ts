@@ -448,23 +448,13 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     box!.y + box!.height * 0.5,
   );
 
-  for (let index = 0; index < 4; index += 1) {
+  // Every delta is individually below the 72px phase threshold. Keep all
+  // five inside one 260ms gesture window so the test measures accumulation,
+  // not an assertion-induced second gesture.
+  for (let index = 0; index < 5; index += 1) {
     await page.mouse.wheel(0, -16);
     await page.waitForTimeout(20);
   }
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "approach",
-  );
-  await expect
-    .poll(async () =>
-      Number(
-        (await html.getAttribute("data-universe-scale-progress")) ?? "0",
-      ),
-    )
-    .toBeGreaterThan(0);
-
-  await page.mouse.wheel(0, -16);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
@@ -494,6 +484,11 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
     "surface",
     { timeout: 15_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 15_000 },
+  );
 
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute(
@@ -519,6 +514,10 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
       "data-universe-camera-settled",
       phase,
       { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "parked",
     );
   }
 
@@ -1434,9 +1433,10 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     destinationBefore,
   );
 
-  // Continue the same gesture until the accumulated intent crosses the phase
-  // threshold; the manual takeover must now advance normally.
-  for (let index = 0; index < 4; index += 1) {
+  // The identity assertions above are allowed to exceed the 260ms gesture
+  // reset. Start a fresh trackpad-like gesture and cross the threshold inside
+  // one reset window; Journey must stay stopped while manual scale resumes.
+  for (let index = 0; index < 5; index += 1) {
     await page.mouse.wheel(0, -16);
     await page.waitForTimeout(20);
   }
