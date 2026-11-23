@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
@@ -41,6 +41,39 @@ const LazyYeisSystemScene = lazy(() =>
     default: module.YeisSystemScene,
   })),
 );
+
+function RendererPageLifecycle() {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    let released = false;
+    const html = document.documentElement;
+    html.dataset.universeWebglLifecycle = "active";
+
+    const onPageHide = (event: PageTransitionEvent) => {
+      if (event.persisted || released) return;
+      released = true;
+      html.dataset.universeWebglLifecycle = "released";
+
+      // R3F owns WebGLRenderer.dispose() on normal Canvas unmount. At the
+      // terminal document boundary only force the underlying context loss:
+      // WEBGL_lose_context destroys the graphics resources immediately, while
+      // avoiding a second synchronous renderer disposal over a still-mounted
+      // live ProceduralPlanets graph.
+      gl.forceContextLoss();
+    };
+
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      if (html.dataset.universeWebglLifecycle === "active") {
+        delete html.dataset.universeWebglLifecycle;
+      }
+    };
+  }, [gl]);
+
+  return null;
+}
 
 export function UniverseCanvas({
   phase,
@@ -120,6 +153,7 @@ export function UniverseCanvas({
         logarithmicDepthBuffer: engineMode === "yeis",
       }}
     >
+      <RendererPageLifecycle />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}

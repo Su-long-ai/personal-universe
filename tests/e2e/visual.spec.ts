@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { test, expect, type Page, type TestInfo } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "./support/test";
 import {
   observeRuntime,
   waitForYeis,
@@ -257,7 +257,7 @@ test("visual: desktop Hero world high-quality live renderer", async ({
   );
 });
 
-test("visual: desktop Hero surface keeps the live planet renderer", async ({
+test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy", async ({
   page,
 }, testInfo) => {
   await visualCase(

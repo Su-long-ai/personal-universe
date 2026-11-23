@@ -20,6 +20,17 @@ export default defineConfig({
         ["json", { outputFile: "test-results/results.json" }],
       ]
     : [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
+  projects: [
+    {
+      name: "release",
+      grepInvert: /@webgl-heavy/,
+    },
+    {
+      name: "webgl-heavy",
+      grep: /@webgl-heavy/,
+      fullyParallel: false,
+    },
+  ],
   use: {
     baseURL: "http://127.0.0.1:4321",
     headless: true,

@@ -359,15 +359,23 @@ export default function UniverseApp({
   }, []);
 
   useEffect(() => {
+    // Phase changes are also published synchronously by the scale coordinator.
+    // Do not delete those values in the previous phase effect's cleanup: React
+    // may run that cleanup after the coordinator has already published the
+    // next phase, producing a transient missing contract on slower WebGL hosts.
     document.documentElement.dataset.universeNavigationPhase = phase;
     document.documentElement.dataset.universeScaleIndex = String(
       scalePhaseIndex(phase),
     );
-    return () => {
+  }, [phase]);
+
+  useEffect(
+    () => () => {
       delete document.documentElement.dataset.universeNavigationPhase;
       delete document.documentElement.dataset.universeScaleIndex;
-    };
-  }, [phase]);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!navigatorOpen) return;

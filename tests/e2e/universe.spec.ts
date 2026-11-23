@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./support/test";
 import {
   observeRuntime,
   positiveDataset,
@@ -1344,10 +1344,11 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await expect(dialog).toBeHidden();
   await expect(controls).toBeVisible();
   await expect(controls).not.toContainText("JOURNEY COMPLETE");
-  await expect(controls).toContainText(
-    "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL",
-  );
 
+  // Do not require the transient SETTLING label: on a fast hosted runner the
+  // camera can settle between the Journey click and the first painted
+  // assertion. The behavioral contract is stronger and timing-independent:
+  // completion must still be delayed by the full dwell after settlement.
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
     "approach",

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./support/test";
 import {
   observeRuntime,
   waitForYeis,
@@ -244,7 +244,7 @@ test("runtime guard detects a critical client bundle failure", async ({
   await runtime.assertDetected(testInfo, "requestfailed");
 });
 
-test("runtime guard detects and recovers from forced WebGL context loss", async ({
+test("runtime guard detects and recovers from forced WebGL context loss @webgl-heavy", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page, {
@@ -281,10 +281,24 @@ test("runtime guard detects and recovers from forced WebGL context loss", async 
         );
       });
 
+    // WEBGL_lose_context only permits synthetic restoration when the
+    // context-lost event is cancelled. Make that precondition explicit in the
+    // probe instead of relying on renderer listener ordering.
+    canvas.addEventListener(
+      "webglcontextlost",
+      (event) => event.preventDefault(),
+      { once: true },
+    );
+
     const lostPromise = waitFor("webglcontextlost");
     extension.loseContext();
     const lost = await lostPromise;
     if (!lost) return { supported: true, lost: false, restored: false };
+
+    // restoreContext() is invalid until the context-lost event has completed.
+    // Cross a task boundary so the synthetic restore follows the WebGL spec
+    // rather than racing event dispatch on software-rendered runners.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
     const restoredPromise = waitFor("webglcontextrestored");
     extension.restoreContext();

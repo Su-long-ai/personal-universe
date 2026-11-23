@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-PAGE-LIFECYCLE-001",
+  "approved_at": "2026-11-24T01:27:00+08:00",
+  "baseline_commit": "5103322f04c326b71d3b6fedfe1614fc78d1b526",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-PAGE-LIFECYCLE-001.json",
+  "record_sha256": "802383879b046b9de55fe39cb847b191a85875b3a8b30a08b2c20a47988c518c",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "webgl-context-loss-api": "a45251980adfd9d57c8b12d69893587dbd7a30f754c06091169068aaa3d1c740",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Prevent SwiftShader GPU/context accumulation between hosted Playwright BrowserContexts by releasing the existing R3F-owned WebGL renderer when a document is actually discarded"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/support/test.ts",
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
+    "tests/e2e/webgl-performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "selected_ids": [
+    "r3f-owned-renderer-pagehide",
+    "playwright-page-fixture-teardown",
+    "webgl-terminal-context-release"
+  ],
+  "candidate_scores": {
+    "r3f-owned-renderer-pagehide": 57,
+    "webgl-terminal-context-release": 53,
+    "custom-gpu-resource-manager": null,
+    "playwright-page-fixture-teardown": 53.5
+  }
+}
