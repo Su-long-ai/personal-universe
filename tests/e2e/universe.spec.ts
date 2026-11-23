@@ -144,6 +144,66 @@ test("opening galaxy auto-orbits until the visitor takes control", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Chinese and English switch in place and persist", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  let mainFrameNavigations = 0;
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) mainFrameNavigations += 1;
+  });
+
+  await page.getByRole("button", { name: "Switch language to Chinese" }).click();
+
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-locale",
+    "zh",
+  );
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(
+    page.getByRole("heading", {
+      name: "一张连接真实观测与想象世界的动态地图。",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /搜索 \/ 地点/ }),
+  ).toBeVisible();
+  expect(mainFrameNavigations).toBe(0);
+
+  await page.getByRole("button", { name: /搜索 \/ 地点/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "宇宙导航" }),
+  ).toBeVisible();
+  await expect(
+    page.getByPlaceholder("搜索个人信号、行星、恒星、天体地标、星系…"),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.reload();
+  await waitForYeis(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-locale",
+    "zh",
+  );
+
+  await page.getByRole("button", { name: "切换语言为英文" }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-locale",
+    "en",
+  );
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.getByRole("heading", {
+      name: "A living map of observed and imagined worlds.",
+    }),
+  ).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("v2 query remains a healthy rollback path", async ({ page }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?engine=v2&freeze=1");

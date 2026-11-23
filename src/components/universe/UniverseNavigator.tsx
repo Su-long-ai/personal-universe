@@ -5,6 +5,15 @@ import type {
 } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
+  astronomicalName,
+  journeyTitle,
+  kindLabel,
+  navigationDetail,
+  navigationGroupLabel,
+  text,
+  type ProductLocale,
+} from "../../lib/universe/locale";
+import {
   loadUniverseNavigation,
   loadUniversePlaces,
   navigationSectionsForResults,
@@ -24,6 +33,7 @@ export function UniverseNavigator({
   onNavigate,
   onLocate,
   onStartJourney,
+  locale,
 }: {
   open: boolean;
   markers: GalaxyMarker[];
@@ -43,6 +53,7 @@ export function UniverseNavigator({
     title: string,
     destinations: UniverseNavigationDestination[],
   ) => void;
+  locale: ProductLocale;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef(new Map<number, HTMLDivElement>());
@@ -212,7 +223,11 @@ export function UniverseNavigator({
     } catch (error) {
       console.error("[UNIVERSE-NAV] destination activation failed", error);
       setPendingAction(null);
-      setActionError("Could not open " + destination.title + ". Try again.");
+      setActionError(
+        text(locale, "couldNotOpen", {
+          title: astronomicalName(locale, destination.title),
+        }),
+      );
     }
   };
 
@@ -227,7 +242,11 @@ export function UniverseNavigator({
     } catch (error) {
       console.error("[UNIVERSE-NAV] destination locate failed", error);
       setPendingAction(null);
-      setActionError("Could not locate " + destination.title + ". Try again.");
+      setActionError(
+        text(locale, "couldNotLocate", {
+          title: astronomicalName(locale, destination.title),
+        }),
+      );
     }
   };
 
@@ -244,14 +263,18 @@ export function UniverseNavigator({
         className="universe-navigator"
         role="dialog"
         aria-modal="true"
-        aria-label="Universe navigator"
+        aria-label={text(locale, "universeNavigator")}
       >
         <header className="navigator-header">
           <div>
-            <span>YEIS NAVIGATION // SEARCH + PLACES</span>
-            <strong>Universe Navigator</strong>
+            <span>{text(locale, "navigationKicker")}</span>
+            <strong>{text(locale, "universeNavigator")}</strong>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close navigator">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={text(locale, "closeNavigator")}
+          >
             ESC
           </button>
         </header>
@@ -288,8 +311,8 @@ export function UniverseNavigator({
                 else activate(result);
               }
             }}
-            placeholder="Search personal signals, planets, stars, landmarks, galaxies…"
-            aria-label="Search universe"
+            placeholder={text(locale, "searchPlaceholder")}
+            aria-label={text(locale, "searchUniverse")}
             role="combobox"
             aria-autocomplete="list"
             aria-expanded="true"
@@ -306,17 +329,26 @@ export function UniverseNavigator({
         </div>
 
         <div className="navigator-section-label">
-          <span>{query.trim() ? "SEARCH RESULTS" : "PLACES / DESTINATIONS"}</span>
+          <span>
+            {query.trim()
+              ? text(locale, "searchResults")
+              : text(locale, "placesDestinations")}
+          </span>
           <small>
             {status === "loading"
-              ? "SCANNING…"
-              : String(results.length) + " DESTINATIONS"}
+              ? text(locale, "scanning")
+              : String(results.length) + " " + text(locale, "destinations")}
           </small>
         </div>
 
         {!query.trim() && onStartJourney && (
-          <div className="navigator-journeys" aria-label="Guided journeys">
-            <span className="navigator-journeys-label">GUIDED JOURNEYS</span>
+          <div
+            className="navigator-journeys"
+            aria-label={text(locale, "guidedJourneys")}
+          >
+            <span className="navigator-journeys-label">
+              {text(locale, "guidedJourneys")}
+            </span>
             <div>
               {journeyOptions.map((journey) => (
                 <button
@@ -329,11 +361,13 @@ export function UniverseNavigator({
                     onClose();
                   }}
                 >
-                  <strong>{journey.title}</strong>
+                  <strong>{journeyTitle(locale, journey.title)}</strong>
                   <small>
                     {journey.destinations.length
-                      ? journey.destinations.length + " STOPS"
-                      : "NO SIGNALS YET"}
+                      ? journey.destinations.length +
+                        " " +
+                        text(locale, "stops")
+                      : text(locale, "noSignalsYet")}
                   </small>
                 </button>
               ))}
@@ -355,13 +389,13 @@ export function UniverseNavigator({
 
           {status === "loading" && (
             <div className="navigator-empty is-loading" role="status">
-              Scanning destinations…
+              {text(locale, "scanningDestinations")}
             </div>
           )}
 
           {status === "error" && (
             <div className="navigator-empty">
-              YEIS navigation index unavailable.
+              {text(locale, "navigationUnavailable")}
             </div>
           )}
 
@@ -369,7 +403,7 @@ export function UniverseNavigator({
             status !== "loading" &&
             results.length === 0 && (
               <div className="navigator-empty">
-                No destination matched this signal.
+                {text(locale, "noDestination")}
               </div>
             )}
 
@@ -377,10 +411,12 @@ export function UniverseNavigator({
             <section
               className="navigator-result-group"
               key={section.id}
-              aria-label={section.title}
+              aria-label={navigationGroupLabel(locale, section.id, section.title)}
             >
               <header className="navigator-result-group-title">
-                <span>{section.title}</span>
+                <span>
+                  {navigationGroupLabel(locale, section.id, section.title)}
+                </span>
                 <small>{section.destinations.length}</small>
               </header>
 
@@ -429,39 +465,43 @@ export function UniverseNavigator({
                       disabled={pendingAction !== null}
                     >
                       <span className={"navigator-kind kind-" + result.kind}>
-                        {result.kind}
+                        {kindLabel(locale, result.kind)}
                       </span>
                       <span className="navigator-result-main">
-                        <strong>{result.title}</strong>
-                        <small>{result.detail}</small>
+                        <strong>
+                          {astronomicalName(locale, result.title)}
+                        </strong>
+                        <small>{navigationDetail(locale, result.detail)}</small>
                       </span>
                       <span className="navigator-open">
                         {localPendingMode === "open"
                           ? spatial
-                            ? "TRAVELING…"
-                            : "OPENING…"
+                            ? text(locale, "traveling")
+                            : text(locale, "opening")
                           : routePendingMode === "traveling"
-                            ? "TRAVELING…"
+                            ? text(locale, "traveling")
                             : routePendingMode === "locating"
-                              ? "LOCATING…"
+                              ? text(locale, "locating")
                               : isCurrent
-                                ? "ACTIVE"
+                                ? text(locale, "active")
                                 : spatial
-                                  ? "TRAVEL →"
-                                  : "OPEN →"}
+                                  ? text(locale, "travel")
+                                  : text(locale, "openAction")}
                       </span>
                     </button>
                     <button
                       type="button"
                       className="navigator-locate"
                       onClick={() => void locate(result)}
-                      aria-label={"Locate " + result.title + " in galaxy"}
+                      aria-label={text(locale, "locateInGalaxy", {
+                        title: astronomicalName(locale, result.title),
+                      })}
                       disabled={pendingAction !== null}
                     >
                       {localPendingMode === "locate" ||
                       routePendingMode === "locating"
-                        ? "LOCATING…"
-                        : "LOCATE"}
+                        ? text(locale, "locating")
+                        : text(locale, "locate")}
                     </button>
                   </div>
                 );
@@ -471,10 +511,10 @@ export function UniverseNavigator({
         </div>
 
         <footer className="navigator-footer">
-          <span>↑↓ SELECT</span>
-          <span>ENTER OPEN / TRAVEL</span>
-          <span>SHIFT+ENTER LOCATE</span>
-          <span>ESC CLOSE</span>
+          <span>{text(locale, "selectHint")}</span>
+          <span>{text(locale, "openHint")}</span>
+          <span>{text(locale, "locateHint")}</span>
+          <span>{text(locale, "closeHint")}</span>
         </footer>
       </section>
     </div>

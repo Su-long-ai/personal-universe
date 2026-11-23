@@ -22,6 +22,15 @@ import {
   type UniverseContentEntry,
 } from "../../lib/universe/content";
 import {
+  applyProductLocale,
+  astronomicalName,
+  detectProductLocale,
+  journeyTitle,
+  kindLabel,
+  text,
+  type ProductLocale,
+} from "../../lib/universe/locale";
+import {
   navigationCameraTarget,
   navigationDestinationForMarker,
   navigationDestinationForPlanet,
@@ -173,6 +182,7 @@ export default function UniverseApp({
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
+  const [locale, setLocale] = useState<ProductLocale>("en");
   const [scrollDepth, setScrollDepth] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] =
@@ -233,6 +243,17 @@ export default function UniverseApp({
     phase === "galaxy"
       ? navigationStatus === "arrived" || navigationStatus === "located"
       : phase !== "returning" && cameraSettledPhase === phase;
+
+  useEffect(() => {
+    const detected = detectProductLocale();
+    setLocale(detected);
+    applyProductLocale(detected);
+  }, []);
+
+  const handleLocaleChange = useCallback((next: ProductLocale) => {
+    setLocale(next);
+    applyProductLocale(next);
+  }, []);
 
   useEffect(() => {
     if (activeEngine !== "yeis") {
@@ -1252,7 +1273,9 @@ export default function UniverseApp({
               top: Math.min(signalHover.clientY + 16, window.innerHeight - 92),
             }}
           >
-            <span>PERSONAL SIGNAL · {signalHover.kind.toUpperCase()}</span>
+            <span>
+              {text(locale, "personalSignal")} · {kindLabel(locale, signalHover.kind)}
+            </span>
             <strong>{signalHover.title}</strong>
           </aside>
         )}
@@ -1285,15 +1308,19 @@ export default function UniverseApp({
         <aside className="universe-journey-controls">
           <header>
             <div>
-              <span>{journey.completed ? "JOURNEY COMPLETE" : "GUIDED JOURNEY"}</span>
-              <strong>{journey.title}</strong>
+              <span>
+                {journey.completed
+                  ? text(locale, "journeyComplete")
+                  : text(locale, "guidedJourney")}
+              </span>
+              <strong>{journeyTitle(locale, journey.title)}</strong>
             </div>
             <button
               type="button"
               onClick={handleStopJourney}
-              aria-label="Stop guided journey"
+              aria-label={text(locale, "stopJourney")}
             >
-              STOP
+              {text(locale, "stop")}
             </button>
           </header>
           <div className="journey-current">
@@ -1321,14 +1348,16 @@ export default function UniverseApp({
               disabled={journey.index === 0}
               onClick={() => handleJourneyStep(-1)}
             >
-              ← PREV
+              {text(locale, "prev")}
             </button>
             {!journey.completed && (
               <button
                 type="button"
                 onClick={handleToggleJourneyPause}
               >
-                {journey.paused ? "RESUME" : "PAUSE"}
+                {journey.paused
+                  ? text(locale, "resume")
+                  : text(locale, "pause")}
               </button>
             )}
             <button
@@ -1340,22 +1369,22 @@ export default function UniverseApp({
               }
             >
               {journey.completed
-                ? "CLOSE"
+                ? text(locale, "close")
                 : journey.index >= journey.destinations.length - 1
-                  ? "DONE"
-                  : "NEXT →"}
+                  ? text(locale, "done")
+                  : text(locale, "next")}
             </button>
           </div>
           <small className="journey-mode">
             {journey.completed
-              ? "COMPLETE · NAVIGATION REMAINS AVAILABLE"
+              ? text(locale, "completeMode")
               : reducedMotion
-                ? "REDUCED MOTION · MANUAL ADVANCE"
+                ? text(locale, "reducedMode")
                 : journey.paused
-                  ? "PAUSED · NAVIGATION REMAINS AVAILABLE"
+                  ? text(locale, "pausedMode")
                   : journeyDestinationSettled
-                    ? "DWELLING · AUTO ADVANCE AFTER ARRIVAL"
-                    : "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL"}
+                    ? text(locale, "dwellingMode")
+                    : text(locale, "settlingMode")}
           </small>
         </aside>
       )}
@@ -1377,6 +1406,8 @@ export default function UniverseApp({
         onOpenNavigator={() => setNavigatorOpen(true)}
         navigatorAvailable={activeEngine === "yeis"}
         onReturn={handleReturn}
+        locale={locale}
+        onLocaleChange={handleLocaleChange}
       />
 
       <UniverseNavigator
@@ -1391,6 +1422,7 @@ export default function UniverseApp({
         onNavigate={handleNavigateDestination}
         onLocate={handleLocateDestination}
         onStartJourney={handleStartJourney}
+        locale={locale}
       />
 
       {navigationFailure && (
@@ -1402,22 +1434,21 @@ export default function UniverseApp({
           )}
         >
           <div className="navigation-failure-copy">
-            <span>ROUTE INTERRUPTED</span>
+            <span>{text(locale, "routeInterrupted")}</span>
             <strong>{navigationFailure.request.title}</strong>
             <small>
-              The universe camera could not complete this route. Retry keeps
-              the same destination.
+              {text(locale, "routeFailure")}
             </small>
           </div>
           <div className="navigation-failure-actions">
             <button type="button" onClick={handleRetryNavigation}>
-              RETRY
+              {text(locale, "retry")}
             </button>
             <button
               type="button"
               onClick={handleDismissNavigationFailure}
             >
-              DISMISS
+              {text(locale, "dismiss")}
             </button>
           </div>
         </aside>
@@ -1426,23 +1457,26 @@ export default function UniverseApp({
       {phase === "galaxy" && navigationRequest && (
         <div className="galaxy-locate-caption">
           {navigationStatus === "arrived"
-            ? "ARRIVED"
+            ? text(locale, "arrived")
             : navigationStatus === "located"
-              ? "LOCATED"
+              ? text(locale, "located")
               : navigationRequest.mode === "travel"
-                ? "NAVIGATING"
-                : "LOCATING"} //{" "}
-          {navigationRequest.title}
+                ? text(locale, "navigating")
+                : text(locale, "locating")} //{" "}
+          {astronomicalName(locale, navigationRequest.title)}
         </div>
       )}
 
       {phase === "galaxy" && (
         <section className="hero-copy">
-          <span className="eyebrow">PERSONAL UNIVERSE // GALACTIC INDEX</span>
-          <h1>A living map of observed and imagined worlds.</h1>
+          <span className="eyebrow">{text(locale, "heroEyebrow")}</span>
+          <h1>{text(locale, "heroTitle")}</h1>
           <p>
-            {contentPlacements.length} personal {contentPlacements.length === 1 ? "signal is" : "signals are"} mapped onto stable stellar addresses.
-            Observed and procedural worlds remain astronomical until real content is attached.
+            {locale === "zh"
+              ? `${contentPlacements.length} 个个人信号已映射到稳定的恒星地址。观测世界与程序化世界保持天文属性，直到真实内容与其关联。`
+              : `${contentPlacements.length} personal ${
+                  contentPlacements.length === 1 ? "signal is" : "signals are"
+                } mapped onto stable stellar addresses. Observed and procedural worlds remain astronomical until real content is attached.`}
           </p>
         </section>
       )}
@@ -1450,18 +1484,31 @@ export default function UniverseApp({
       {phase === "system" && selectedSystem && (
         <section className="system-copy">
           <span>
-            {selectedSystem.source.toUpperCase()} SYSTEM // {selectedSystem.star.spectralType}
+            {selectedSystem.source.toUpperCase()} {text(locale, "systemWord")} // {selectedSystem.star.spectralType}
           </span>
-          <strong>{selectedSystem.name}</strong>
+          <strong>{astronomicalName(locale, selectedSystem.name)}</strong>
           <small>
-            {selectedSystem.planets.length} worlds.
+            {locale === "zh"
+              ? `${selectedSystem.planets.length} ${text(locale, "worlds")}。`
+              : `${selectedSystem.planets.length} worlds.`}
             {selectedSystem.content?.length
-              ? ` ${selectedSystem.content.length} personal signal${selectedSystem.content.length === 1 ? "" : "s"} detected; the linked world is highlighted.`
-              : " Select a planet to approach it. Ordinary worlds remain orbital; Hero worlds may continue below the clouds."}
+              ? locale === "zh"
+                ? ` ${selectedSystem.content.length} ${text(
+                    locale,
+                    selectedSystem.content.length === 1
+                      ? "personalSignalDetected"
+                      : "personalSignalsDetected",
+                  )}；${text(locale, "linkedWorldHighlighted")}`
+                : ` ${selectedSystem.content.length} personal signal${
+                    selectedSystem.content.length === 1 ? "" : "s"
+                  } detected; ${text(locale, "linkedWorldHighlighted")}`
+              : " " + text(locale, "selectPlanet")}
           </small>
           {selectedSystem.content?.map((entry) => (
             <div className="content-signal-card" key={entry.id}>
-              <span>PERSONAL SIGNAL // {entry.kind.toUpperCase()}</span>
+              <span>
+                {text(locale, "contentSignal")} // {kindLabel(locale, entry.kind)}
+              </span>
               <b>{entry.title}</b>
               <small>{entry.summary}</small>
             </div>
@@ -1473,7 +1520,9 @@ export default function UniverseApp({
         phase !== "system" &&
         selectedPlanet?.content?.map((entry) => (
           <section className="world-content-card" key={entry.id}>
-            <span>WORLD SIGNAL // {entry.kind.toUpperCase()}</span>
+            <span>
+              {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
+            </span>
             <strong>{entry.title}</strong>
             <small>{entry.summary}</small>
             {entry.tags.length > 0 && (
@@ -1484,29 +1533,31 @@ export default function UniverseApp({
 
       {phase === "surface" && selectedPlanet && (
         <section className="surface-copy">
-          <span>HERO WORLD // SURFACE MODULE</span>
-          <strong>{selectedPlanet.name}</strong>
-          <small>
-            Custom surfaces are overrides. The procedural universe does not require every
-            generated planet to carry a handcrafted world.
-          </small>
+          <span>{text(locale, "heroSurface")}</span>
+          <strong>{astronomicalName(locale, selectedPlanet.name)}</strong>
+          <small>{text(locale, "surfaceDescription")}</small>
         </section>
       )}
 
       {phase === "approach" && selectedPlanet && (
         <div className="travel-caption">
-          LOCK ACQUIRED // {selectedPlanet.name}
+          {text(locale, "lockAcquired")} //{" "}
+          {astronomicalName(locale, selectedPlanet.name)}
         </div>
       )}
       {phase === "orbit" && selectedPlanet && (
         <div className="travel-caption">
-          ORBIT // {selectedPlanet.name}
-          {selectedPlanet.surfaceMode === "none" ? " // SCAN MODE" : ""}
+          {text(locale, "orbit")} //{" "}
+          {astronomicalName(locale, selectedPlanet.name)}
+          {selectedPlanet.surfaceMode === "none"
+            ? " // " + text(locale, "scanMode")
+            : ""}
         </div>
       )}
       {phase === "atmosphere" && selectedPlanet && (
         <div className="travel-caption">
-          ATMOSPHERIC ENTRY // {selectedPlanet.name}
+          {text(locale, "atmosphericEntry")} //{" "}
+          {astronomicalName(locale, selectedPlanet.name)}
         </div>
       )}
     </main>
