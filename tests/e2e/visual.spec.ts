@@ -257,7 +257,7 @@ test("visual: desktop Hero world high-quality live renderer", async ({
   );
 });
 
-test("visual: desktop Hero surface keeps the live planet renderer", async ({
+test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy", async ({
   page,
 }, testInfo) => {
   await visualCase(
