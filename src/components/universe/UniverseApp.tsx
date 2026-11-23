@@ -1100,6 +1100,7 @@ export default function UniverseApp({
       else if (completed === "returning") nextPhase = "galaxy";
 
       setPhase(nextPhase);
+      document.documentElement.dataset.universeNavigationPhase = nextPhase;
 
       if (nextPhase === "galaxy") {
         setActiveDestinationId(null);
