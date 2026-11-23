@@ -272,6 +272,20 @@ export function CinematicCamera({
   }, [manualCameraEnabled, onUserControlStart]);
 
   useEffect(() => {
+    if (!manualCameraEnabled) return;
+
+    // Wheel belongs exclusively to the continuous-scale coordinator. Listen
+    // for an actual pointer/touch press instead of camera-controls' generic
+    // controlstart event so a wheel gesture can never be misclassified as a
+    // manual camera takeover and cancel an in-flight scale intent.
+    const element = gl.domElement;
+    const handlePointerDown = () => handleUserControlStart();
+    element.addEventListener("pointerdown", handlePointerDown, true);
+    return () =>
+      element.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [gl, handleUserControlStart, manualCameraEnabled]);
+
+  useEffect(() => {
     completedPhase.current = null;
     configuredPhase.current = null;
     manualOverride.current = false;
@@ -484,7 +498,6 @@ export function CinematicCamera({
       ref={handleControlsRef}
       makeDefault
       dollyToCursor={false}
-      onStart={handleUserControlStart}
       mouseButtons={manualCameraEnabled ? MANUAL_MOUSE : DISABLED_MOUSE}
       touches={manualCameraEnabled ? MANUAL_TOUCH : DISABLED_TOUCH}
       minDistance={manualMinDistance}
