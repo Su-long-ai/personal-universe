@@ -9,7 +9,10 @@ import {
   type QualityMode,
   type UniversePhase,
 } from "../../lib/universe/types";
-import { liveWorldFallbackReason } from "./CinematicPipeline";
+import {
+  isSoftwareRenderer,
+  liveWorldFallbackReason,
+} from "./CinematicPipeline";
 
 export type SurfaceCameraFrame = {
   position: [number, number, number];
@@ -146,6 +149,7 @@ export function CinematicCamera({
 }: CinematicCameraProps) {
   const gl = useThree((state) => state.gl);
   const camera = useThree((state) => state.camera);
+  const softwareRenderer = isSoftwareRenderer(gl);
   const surfaceFallback =
     phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
   const activeSurfaceCameraFrame =
@@ -272,6 +276,20 @@ export function CinematicCamera({
   }, [manualCameraEnabled, onUserControlStart]);
 
   useEffect(() => {
+    if (!manualCameraEnabled) return;
+
+    // Wheel belongs exclusively to the continuous-scale coordinator. Listen
+    // for an actual pointer/touch press instead of camera-controls' generic
+    // controlstart event so a wheel gesture can never be misclassified as a
+    // manual camera takeover and cancel an in-flight scale intent.
+    const element = gl.domElement;
+    const handlePointerDown = () => handleUserControlStart();
+    element.addEventListener("pointerdown", handlePointerDown, true);
+    return () =>
+      element.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [gl, handleUserControlStart, manualCameraEnabled]);
+
+  useEffect(() => {
     completedPhase.current = null;
     configuredPhase.current = null;
     manualOverride.current = false;
@@ -365,26 +383,36 @@ export function CinematicCamera({
     }
 
     configuredPhase.current = phase;
-    void controls
-      .setLookAt(
-        desiredPosition.current.x,
-        desiredPosition.current.y,
-        desiredPosition.current.z,
-        desiredTarget.current.x,
-        desiredTarget.current.y,
-        desiredTarget.current.z,
-        shot.transition ?? !reducedMotion,
-      )
-      .then(() => publishIfReached(generation));
+    const enableTransition =
+      shot.transition ?? (!reducedMotion && !softwareRenderer);
+    const transition = controls.setLookAt(
+      desiredPosition.current.x,
+      desiredPosition.current.y,
+      desiredPosition.current.z,
+      desiredTarget.current.x,
+      desiredTarget.current.y,
+      desiredTarget.current.z,
+      enableTransition,
+    );
+
+    if (!enableTransition) {
+      // camera-controls guarantees this path applies the end state
+      // immediately. Validate and publish from that same authority without
+      // waiting for an R3F frame that software WebGL may deliver very late.
+      controls.update(0);
+      publishIfReached(generation);
+    }
+    void transition.then(() => publishIfReached(generation));
 
     // camera-controls is the transition executor, but on heavily throttled
     // software-rendered runners a smooth transition can otherwise remain in
     // motion indefinitely. Bound the product contract: if the same generation
     // is still active after several smooth-time constants, snap the exact
     // requested shot and publish settlement from the same target/tolerance.
-    const settleGuardMs = reducedMotion
-      ? 250
-      : Math.max(1200, Math.min(4000, Math.round(shot.smoothTime * 3000)));
+    const settleGuardMs =
+      reducedMotion || softwareRenderer
+        ? 250
+        : Math.max(1200, Math.min(4000, Math.round(shot.smoothTime * 3000)));
     const watchdogId = window.setTimeout(() => {
       if (
         transitionGeneration.current !== generation ||
@@ -432,6 +460,7 @@ export function CinematicCamera({
     phase,
     reducedMotion,
     scrollDepth,
+    softwareRenderer,
     surfaceFallback,
     publishIfReached,
   ]);
@@ -484,7 +513,6 @@ export function CinematicCamera({
       ref={handleControlsRef}
       makeDefault
       dollyToCursor={false}
-      onStart={handleUserControlStart}
       mouseButtons={manualCameraEnabled ? MANUAL_MOUSE : DISABLED_MOUSE}
       touches={manualCameraEnabled ? MANUAL_TOUCH : DISABLED_TOUCH}
       minDistance={manualMinDistance}
