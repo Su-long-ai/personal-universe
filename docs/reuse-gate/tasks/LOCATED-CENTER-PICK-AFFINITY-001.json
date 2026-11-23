@@ -1,0 +1,180 @@
+{
+  "schema": 2,
+  "task_id": "LOCATED-CENTER-PICK-AFFINITY-001",
+  "title": "Preserve exact located target at the canvas center",
+  "scope": {
+    "level": "implementation",
+    "subject": "Make a completed YEIS Locate own a bounded center-click affinity without replacing the existing picker priority or camera authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The existing pinned YEIS CameraController correctly centers Locate targets, but the Personal Universe adapter then resolves a center click through independent projected overlays before the native landmark picker. Runtime probing after locating Orion Nebula showed unrelated Personal Signal, Hero and observed-host overlays can all project within the generic desktop pick radius near the exact center, so shrinking individual hitboxes only moves the false winner. Reuse the existing YEIS Locate request/settlement state and shared destination executor: after a Locate completes, retain the exact located destination identity as a bounded center-click affinity. A click within the normal center hit radius opens that located destination; clicks away from center continue through the existing Personal Signal -> Hero -> observed -> landmark -> galaxy -> star picker order. Clear the affinity on a new navigation request or manual camera takeover so it cannot become a stale second navigation authority.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS already owns CameraController centering/autopilot and the imperative Input click path; the fix should preserve that authority and adapt only post-Locate click resolution."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/math/Vector3.project",
+      "finding": "Three.js projection remains the existing screen-space primitive for overlay hit testing, but projection alone cannot encode the semantic fact that a user deliberately centered a Locate target."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls",
+      "finding": "camera-controls supplies generic smooth Three.js camera controls but does not own YEIS reference frames, Locate identity, or the existing native picker; introducing it would create competing camera/navigation authority."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "conclusion": "A separate spatial-navigation or annotation product would duplicate the existing YEIS universe, destination model and canvas picker for a single post-Locate interaction gap.",
+      "source_refs": [],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "React Three Fiber already hosts the canvas and pointer surface; replacing the imperative YEIS picker with a second R3F interaction graph solely for post-Locate center clicks would duplicate native renderer ownership.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "react-three-fiber"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Pinned YEIS CameraController/Input plus the existing Personal Universe navigation request state already contain the exact target and settlement boundary needed for center affinity.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "yeis-native-travel-e520568"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Three.js Vector3 projection is retained for normal overlay picking, while camera-controls is rejected because it would add a competing camera authority rather than solve semantic post-Locate identity.",
+      "source_refs": [
+        1,
+        2
+      ],
+      "registry_refs": [
+        "three-vector3-project",
+        "yomotsu-camera-controls"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-located-center-affinity",
+      "name": "Existing YEIS Locate settlement plus destination identity",
+      "level": "subsystem",
+      "registry_id": "yeis-native-travel-e520568",
+      "source": "Pinned MIT YEIS CameraController/Input adapted through the existing navigation request",
+      "license": "MIT at pinned commit e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "reuse",
+      "reason": "It already owns the exact Locate target, camera settlement and native input path; retaining that identity for one bounded center click closes the ambiguity without another camera or picker system.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "r3f-picker-rebuild",
+      "name": "Rebuild picking as React Three Fiber pointer events",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "React Three Fiber event system",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "R3F is already the host, but rebuilding imperative YEIS sky/landmark picking as a second interaction graph is larger than the gap and risks diverging from pinned native Input semantics.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-replacement",
+      "name": "camera-controls replacement camera path",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "camera-controls",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Generic lookAt/fit transitions do not preserve YEIS hierarchical reference frames or native destination identity and would create a second camera authority.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Preserve exact Locate target identity through camera settlement",
+      "importance": "high",
+      "coverage": {
+        "yeis-located-center-affinity": "full",
+        "r3f-picker-rebuild": "partial",
+        "camera-controls-replacement": "none"
+      },
+      "decision": "Reuse the existing YEIS navigation request and settlement state rather than infer the target again from overlapping projected markers."
+    },
+    {
+      "capability": "Keep existing picker priority everywhere away from the deliberate located center",
+      "importance": "high",
+      "coverage": {
+        "yeis-located-center-affinity": "full",
+        "r3f-picker-rebuild": "partial",
+        "camera-controls-replacement": "none"
+      },
+      "decision": "Apply affinity only inside the normal center hit radius and otherwise preserve the existing picker unchanged."
+    },
+    {
+      "capability": "Avoid stale affinity after subsequent navigation or manual camera control",
+      "importance": "high",
+      "coverage": {
+        "yeis-located-center-affinity": "full",
+        "r3f-picker-rebuild": "partial",
+        "camera-controls-replacement": "partial"
+      },
+      "decision": "Clear the retained located target when a new navigation request starts and when native input takes over the camera."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-located-center-affinity"
+    ],
+    "rationale": "Reuse the pinned YEIS Locate/camera/input subsystem and add only a bounded semantic adapter at the existing click dispatcher. This fixes the overlap class globally while preserving the native picker, Personal Signal priority and single camera authority.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "r3f-picker-rebuild",
+        "reason": "A framework-level picker rebuild can cover pointer input but duplicates the already-hosted native YEIS imperative scene and does not inherently know which destination the user intentionally located."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If center affinity proves too sticky in manual validation, clear it on any pointer drag/wheel/key camera input and retain it only until the first post-Locate click."
+  }
+}
