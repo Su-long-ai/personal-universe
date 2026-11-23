@@ -39,7 +39,7 @@ test("black-hole navigation completes native travel", async ({
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const search = page.getByRole("textbox", { name: "Search universe" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Cygnus X-1");
 
   const result = page
@@ -77,7 +77,7 @@ test("deep-sky landmark navigation completes native travel", async ({
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const search = page.getByRole("textbox", { name: "Search universe" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Orion Nebula");
 
   const result = page
@@ -179,7 +179,7 @@ test("mobile navigation reaches an exact body deep link", async ({
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const search = page.getByRole("textbox", { name: "Search universe" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Earth");
 
   const earth = page
