@@ -13,6 +13,11 @@ const ROCKS = [
   { x: 9.6, z: -18.0, scale: 3.3, ry: 0.9, tilt: -0.04 },
 ] as const;
 
+function terrainErrorCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return null;
+  return String((error as { code?: unknown }).code ?? "");
+}
+
 function seededClone(source: THREE.Object3D, index: number) {
   const clone = source.clone(true);
   clone.traverse((child) => {
@@ -34,10 +39,12 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
   useEffect(() => {
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
+    const controller = new AbortController();
 
     void (async () => {
       instance = await createTerrain({
         renderer: gl,
+        signal: controller.signal,
         configuration: {
           layout: {
             chunkCount: 6,
@@ -92,7 +99,7 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
         },
       });
 
-      await instance.prepare(camera);
+      await instance.prepare(camera, { signal: controller.signal });
 
       if (cancelled) {
         instance.dispose();
@@ -101,12 +108,22 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
       setTerrain(instance);
       onAnchorHeight?.((instance.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
     })().catch((error) => {
-      console.error("[surface-terrain]", error);
-      instance?.dispose();
+      const code = terrainErrorCode(error);
+      const expectedTeardown =
+        cancelled &&
+        (code === "TERRAIN_CANCELLED" || code === "TERRAIN_DISPOSED");
+
+      if (!expectedTeardown) {
+        console.error("[surface-terrain]", error);
+      }
+      if (!cancelled) {
+        instance?.dispose();
+      }
     });
 
     return () => {
       cancelled = true;
+      controller.abort();
       setTerrain(null);
       instance?.dispose();
     };
