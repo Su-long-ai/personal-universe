@@ -297,6 +297,15 @@ Signal clicks therefore open the exact content planet. Landmark and galaxy
 picking use the pinned MIT renderers' pick APIs instead of a second spatial
 index.
 
+A completed **Locate** adds one bounded semantic exception without changing
+that global priority: while the native camera remains untouched after settling,
+a click inside the normal canvas-center hit radius resolves to the exact
+destination that was just located. This prevents unrelated sky overlays that
+happen to project near the same center pixel from stealing the deliberate
+Locate target. The affinity is one-shot and is cleared by a new navigation
+request or any manual camera input; clicks away from center continue through
+the priority list above.
+
 ## Personal Signal semantics
 
 Signals remain generated from Content Collections; no fake biography/project

@@ -16,6 +16,7 @@ import {
   navigationDestinationForLandmark,
   navigationDestinationForMarker,
   navigationDestinationForPlacement,
+  resolveUniverseNavigationDestination,
   type UniverseNavigationCameraRequest,
   type UniverseNavigationDestination,
 } from "../../lib/universe/yeis/navigation";
@@ -127,6 +128,7 @@ export function YeisGalaxyScene({
   >(null);
   const pendingNavigationRef =
     useRef<UniverseNavigationCameraRequest | null>(null);
+  const locatedDestinationIdRef = useRef<string | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
   const navigationFailureRef = useRef(onNavigationFailed);
   const navigateRef = useRef(onNavigateDestination);
@@ -341,6 +343,26 @@ export function YeisGalaxyScene({
           const pickRadius = state.input.coarse ? 24 : 17;
           const signalPickRadius = state.input.coarse ? 18 : 10;
           const heroPickRadius = state.input.coarse ? 18 : 8;
+
+          const locatedDestinationId = locatedDestinationIdRef.current;
+          if (
+            locatedDestinationId &&
+            Math.hypot(x - width / 2, y - height / 2) <= pickRadius
+          ) {
+            locatedDestinationIdRef.current = null;
+            void resolveUniverseNavigationDestination(
+              locatedDestinationId,
+              contentPlacementsRef.current,
+              markersRef.current,
+            ).then((destination) => {
+              if (!destination) return;
+              console.info(
+                `[YEIS-LOCATED-PICK] ${locatedDestinationId} -> ${destination.id}`,
+              );
+              navigateDestination(destination);
+            });
+            return;
+          }
 
           const markerById = new Map(
             markersRef.current.map((marker) => [marker.id, marker]),
@@ -679,6 +701,16 @@ export function YeisGalaxyScene({
 
     runtime.universe.update(2451545.0, performance.now() / 1000);
 
+    const manualCameraInput =
+      state.input.dragX !== 0 ||
+      state.input.dragY !== 0 ||
+      state.input.wheel !== 0 ||
+      state.input.pinch !== 0 ||
+      state.input.panX !== 0 ||
+      state.input.panY !== 0 ||
+      state.input.keys.size > 0;
+    if (manualCameraInput) locatedDestinationIdRef.current = null;
+
     const fovRad = perspective.fov * DEG;
     state.controller.update(
       delta,
@@ -714,6 +746,7 @@ export function YeisGalaxyScene({
       navigationStartPositionRef.current =
         state.controller.position.toArray() as [number, number, number];
       pendingNavigationRef.current = null;
+      locatedDestinationIdRef.current = null;
       lastNavigationRequestRef.current = request.requestId;
 
       if (request.mode === "locate") {
@@ -962,6 +995,7 @@ export function YeisGalaxyScene({
         document.documentElement.dataset.universeLocateComplete = targetKey;
         document.documentElement.dataset.universeLocateDeltaRad =
           deltaRad.toFixed(6);
+        locatedDestinationIdRef.current = pendingNavigation.destinationId;
         console.info(
           "[YEIS-NATIVE-LOCATE] complete " +
             targetKey +
