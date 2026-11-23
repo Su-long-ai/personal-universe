@@ -11,7 +11,7 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
-import { liveWorldFallbackReason } from "./CinematicPipeline";
+import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import { SurfaceScene } from "./SurfaceScene";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
@@ -208,7 +208,10 @@ function DeepSky() {
   );
 }
 
-function liveQuality(quality: QualityMode) {
+function liveQuality(
+  quality: QualityMode,
+  softwareRenderer: boolean,
+) {
   if (quality === "low") {
     return {
       cloudQuality: 32,
@@ -218,6 +221,20 @@ function liveQuality(quality: QualityMode) {
       splitFactor: 2.1,
     } as const;
   }
+
+  // HIGH remains a live ProceduralPlanets renderer under SwiftShader, but
+  // software rasterizers get a conservative terrain budget so hosted Linux
+  // can reach a stable landing frame without starving browser teardown.
+  if (softwareRenderer) {
+    return {
+      cloudQuality: 32,
+      cloudResolution: 0.35,
+      chunkRes: 16,
+      maxDepth: 5,
+      splitFactor: 2.3,
+    } as const;
+  }
+
   if (quality === "high") {
     return {
       cloudQuality: 72,
@@ -257,8 +274,9 @@ export function PlanetScene({
       ).normalize(),
     [],
   );
+  const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
-  const liveKey = `${planet.id}:${quality}`;
+  const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
   const liveEnabled = warmedKey === liveKey && !fallbackReason;
 
@@ -313,9 +331,9 @@ export function PlanetScene({
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      ...liveQuality(quality),
+      ...liveQuality(quality, softwareRenderer),
     });
-  }, [liveEnabled, planet, quality, sunDirection]);
+  }, [liveEnabled, planet, quality, softwareRenderer, sunDirection]);
 
   useEffect(() => {
     return () => {
@@ -365,11 +383,11 @@ export function PlanetScene({
       <Stars
         radius={78}
         depth={30}
-        count={quality === "low" ? 600 : 1400}
+        count={softwareRenderer ? 600 : quality === "low" ? 600 : 1400}
         factor={1.6}
         saturation={0.16}
         fade
-        speed={0.08}
+        speed={phase === "surface" ? 0 : 0.08}
       />
 
       <ambientLight intensity={0.34} />
