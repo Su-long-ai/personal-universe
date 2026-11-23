@@ -341,12 +341,13 @@ test("continuous wheel intent carries across unsettled world transitions", async
     box!.y + box!.height * 0.5,
   );
 
-  // Keep scrolling while the previous camera transition is still running.
-  // The extra intents must queue rather than disappear.
+  // Keep scrolling while the previous camera transition is still running,
+  // including inside the one-notch cooldown window. Continued input is intent
+  // for the next layer and must queue rather than disappear.
   await page.mouse.wheel(0, -120);
-  await page.waitForTimeout(240);
+  await page.waitForTimeout(60);
   await page.mouse.wheel(0, -120);
-  await page.waitForTimeout(240);
+  await page.waitForTimeout(60);
   await page.mouse.wheel(0, -120);
 
   await expect(html).toHaveAttribute(
@@ -1344,8 +1345,12 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await expect(dialog).toBeHidden();
   await expect(controls).toBeVisible();
   await expect(controls).not.toContainText("JOURNEY COMPLETE");
+  // On a fast or software-fallback camera the destination can settle before
+  // Playwright observes this intermediate label. Either pre-arrival SETTLING
+  // or post-arrival DWELLING is valid here; the browser-clock assertion below
+  // is the release contract that proves dwell never starts before settlement.
   await expect(controls).toContainText(
-    "SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL",
+    /SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL|DWELLING · AUTO ADVANCE AFTER ARRIVAL/,
   );
 
   await expect(html).toHaveAttribute(
@@ -1441,6 +1446,10 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     await page.waitForTimeout(20);
   }
 
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-superseded",
+    "manual-camera",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
