@@ -1,0 +1,249 @@
+{
+  "schema": 2,
+  "task_id": "CONTINUOUS-SCALE-WHEEL-NAV-001",
+  "title": "Continuous wheel navigation from galaxy to system to world surface",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse YEIS center picking, existing camera-controls transitions, and ProceduralPlanets world tiers behind one wheel-driven scale coordinator with focus lock and hysteresis"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Personal Universe already owns every required lower layer: pinned MIT YEIS provides galaxy-scale picking, camera-relative/floating-origin navigation and native system/body identity; existing Drei camera-controls owns smooth product-world lookAt transitions and manual rotation; ProceduralPlanets owns live close-world LOD/rendering. The missing product behavior is only orchestration: resolve the object nearest the screen center, lock that focus, accumulate wheel motion with hysteresis, and advance/retreat the existing phase ladder without clicks. Wheel must be removed from native YEIS speed/dolly and camera-controls dolly so exactly one input authority drives scale. No second camera, renderer, spatial model or routing authority is introduced.",
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS already provides the selected hierarchical universe model, camera-relative coordinates, galaxy/star picking, native system/body identity and CameraController; it remains the high-level spatial authority."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
+      "finding": "YEIS CameraController already owns orbit/free-flight/autopilot and currently consumes wheel for native dolly/speed. A product-level continuous scale wheel must suppress only that wheel accumulator while retaining the same controller for drag/orbit and travel."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The exact installed camera-controls provides smooth target-preserving lookAt transitions and independent ACTION mappings, so wheel dolly can be disabled while retaining pointer rotation on the same camera authority."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "The already adopted ProceduralPlanets live world path supplies close-world rendering, logarithmic-depth compatibility and planet LOD/impostor behavior inside the existing Three/R3F host."
+    },
+    {
+      "url": "https://docs.openspaceproject.com/latest/getting-started/navigation/index.html",
+      "finding": "OpenSpace demonstrates the proven product pattern of focus-object navigation across large scale ranges; use only the interaction concept, not code, to justify center focus plus continuous zoom semantics."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep pinned MIT YEIS as the single large-scale universe/camera authority; do not replace it with another universe engine merely to change input semantics."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "Keep the existing single R3F Canvas and renderer lifecycle; continuous navigation must coordinate existing scenes rather than create a second WebGL host."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Reuse ProceduralPlanets for the close-world tier and its existing warm/fallback behavior; the scale coordinator only selects when that tier becomes active."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse the installed CameraControls instance for smooth system/world camera transitions while disabling its wheel ACTION so wheel belongs exclusively to scale navigation."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "compose-existing-scale-stack",
+      "name": "YEIS focus/picking + current phase model + camera-controls + ProceduralPlanets",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current Personal Universe selected stack",
+      "license": "MIT pinned YEIS + MIT camera-controls + MIT ProceduralPlanets + project orchestration",
+      "decision": "reuse",
+      "reason": "All rendering and camera layers already exist; only focus/scale orchestration is missing. This preserves one camera/navigation/content authority and minimizes integration risk.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "replace-with-cesium-or-openspace",
+      "name": "Replace universe interaction stack with Cesium/OpenSpace-style navigation",
+      "level": "full_solution",
+      "source": "External full navigation engines",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "They prove the interaction model but replacing the current selected YEIS/R3F/ProceduralPlanets stack would duplicate or discard already-complete navigation, content binding and renderer work."
+    },
+    {
+      "id": "parallel-scroll-camera",
+      "name": "Custom independent scroll camera/RAF controller",
+      "level": "component_asset",
+      "source": "New project-owned camera controller",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would fight YEIS CameraController and camera-controls, creating exactly the second camera authority the architecture forbids."
+    },
+    {
+      "id": "existing-camera-controls-scale",
+      "name": "Existing camera-controls v3.1.2 as product-world smooth transition executor",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Current CinematicCamera",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already owns system/world camera movement; keep rotate/touch behavior and use programmatic shots while reserving wheel for the scale coordinator.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-planets-close-world",
+      "name": "Existing ProceduralPlanets live close-world tier",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Current PlanetScene/CinematicPipeline integration",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already handles the high-value close-world visual tier; continuous scale navigation should activate it rather than implement another planet/terrain renderer.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Galaxy center focus without click",
+      "importance": "high",
+      "coverage": {
+        "compose-existing-scale-stack": "full",
+        "replace-with-cesium-or-openspace": "full",
+        "parallel-scroll-camera": "partial",
+        "existing-camera-controls-scale": "none",
+        "procedural-planets-close-world": "none"
+      },
+      "decision": "Reuse the existing YEIS projection/pick primitives at the viewport center and expose the resolved destination to the product coordinator."
+    },
+    {
+      "capability": "System planet center focus without click",
+      "importance": "high",
+      "coverage": {
+        "compose-existing-scale-stack": "full",
+        "replace-with-cesium-or-openspace": "full",
+        "parallel-scroll-camera": "partial",
+        "existing-camera-controls-scale": "partial",
+        "procedural-planets-close-world": "none"
+      },
+      "decision": "Project existing rendered product planet positions to screen center and report the nearest eligible planet; no new spatial database."
+    },
+    {
+      "capability": "One wheel controls all scale transitions",
+      "importance": "high",
+      "coverage": {
+        "compose-existing-scale-stack": "full",
+        "replace-with-cesium-or-openspace": "full",
+        "parallel-scroll-camera": "full",
+        "existing-camera-controls-scale": "partial",
+        "procedural-planets-close-world": "none"
+      },
+      "decision": "Coordinator consumes wheel with accumulation/hysteresis; native YEIS wheel and camera-controls wheel dolly are suppressed so there is one input authority."
+    },
+    {
+      "capability": "Smooth camera movement and reversible scale ladder",
+      "importance": "high",
+      "coverage": {
+        "compose-existing-scale-stack": "full",
+        "replace-with-cesium-or-openspace": "full",
+        "parallel-scroll-camera": "partial",
+        "existing-camera-controls-scale": "full",
+        "procedural-planets-close-world": "partial"
+      },
+      "decision": "Reuse current CameraControls cinematic shots and existing phase scenes, but make phase advancement wheel-driven and reversible instead of automatic."
+    },
+    {
+      "capability": "Close-world LOD/performance fallback",
+      "importance": "high",
+      "coverage": {
+        "compose-existing-scale-stack": "full",
+        "replace-with-cesium-or-openspace": "full",
+        "parallel-scroll-camera": "none",
+        "existing-camera-controls-scale": "none",
+        "procedural-planets-close-world": "full"
+      },
+      "decision": "Keep current ProceduralPlanets live/fallback quality tiers unchanged."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "compose-existing-scale-stack",
+      "existing-camera-controls-scale",
+      "procedural-planets-close-world"
+    ],
+    "rationale": "Add only a small continuous-scale coordinator and center-focus reporting. YEIS remains the large-scale camera/picking authority, CameraControls remains the system/world camera executor, ProceduralPlanets remains the close-world renderer, and destination/deep-link/Journey remain product authorities. Wheel is centralized and phase advancement becomes explicit/reversible.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "replace-with-cesium-or-openspace",
+        "reason": "A wholesale engine replacement could supply continuous zoom, but loses globally by duplicating or discarding the completed YEIS navigation/content system, current R3F host and ProceduralPlanets integration."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If center-focus confidence is insufficient in a given layer, hold the current scale and surface a focus hint rather than guessing a destination. Preserve Search/Places/click navigation as alternate entry paths; do not reintroduce wheel ownership to multiple camera controllers."
+  }
+}
