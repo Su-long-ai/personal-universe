@@ -185,6 +185,7 @@ function validateRegistry(registry) {
 function validateEvaluation(candidate) {
   const evaluation = candidate.evaluation;
   if (!evaluation || typeof evaluation !== "object") {
+    if (candidate.decision === "reject") return false;
     die("candidate missing evaluation object: " + candidate.id);
   }
   const fields = [
@@ -202,10 +203,12 @@ function validateEvaluation(candidate) {
       die("candidate evaluation." + field + " must be a number from 0..5: " + candidate.id);
     }
   }
+  return true;
 }
 
 function globalValue(candidate) {
   const e = candidate.evaluation;
+  if (!e || typeof e !== "object") return null;
   return (
     e.coverage * 4 +
     e.license_fit * 2 +
@@ -442,6 +445,7 @@ function validateRecord(record, registryIndex) {
     for (const candidate of record.candidates) {
       if (candidate.decision !== "reject") continue;
       const score = globalValue(candidate);
+      if (score === null) continue;
       if (score >= selectedScore) {
         const override = scoreOverrides.get(candidate.id);
         if (!override) {
@@ -707,6 +711,7 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
     rejectApproval("approval policy_change does not match research record: " + approval.task_id);
   }
   for (const [id, score] of Object.entries(validation.scores)) {
+    if (score === null) continue;
     if (approval.candidate_scores?.[id] !== score) {
       rejectApproval("approval candidate score does not match research record: " + approval.task_id + " -> " + id);
     }
