@@ -3,7 +3,7 @@
   "task_id": "PRODUCT-ZH-EN-LOCALE-001",
   "title": "Add in-place Chinese and English switching to Personal Universe",
   "scope": {
-    "level": "subsystem",
+    "level": "implementation",
     "subject": "Reuse the existing YEIS localization boundary and add a thin product-locale adapter for Chinese/English UI switching without resetting universe state"
   },
   "policy_change": false,
