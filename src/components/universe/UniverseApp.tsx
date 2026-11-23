@@ -29,7 +29,7 @@ import {
   type UniverseContentEntry,
 } from "../../lib/universe/content";
 import {
-  CONTINUOUS_SCALE_COOLDOWN_MS,
+  CONTINUOUS_SCALE_ACTIVE_RESET_MS,
   CONTINUOUS_SCALE_RESET_MS,
   CONTINUOUS_SCALE_WHEEL_THRESHOLD,
   continuousScaleDelta,
@@ -275,12 +275,12 @@ export default function UniverseApp({
     accumulated: number;
     direction: ContinuousScaleDirection | null;
     lastAt: number;
-    cooldownUntil: number;
+    samples: number;
   }>({
     accumulated: 0,
     direction: null,
     lastAt: 0,
-    cooldownUntil: 0,
+    samples: 0,
   });
 
   const cancelPendingContinuousScaleIntent = useCallback(
@@ -295,7 +295,7 @@ export default function UniverseApp({
       wheel.accumulated = 0;
       wheel.direction = null;
       wheel.lastAt = 0;
-      wheel.cooldownUntil = 0;
+      wheel.samples = 0;
 
       delete document.documentElement.dataset.universeScaleQueued;
       delete document.documentElement.dataset.universeScaleDirection;
@@ -1714,43 +1714,40 @@ export default function UniverseApp({
       const directionChanged =
         wheel.direction !== null && wheel.direction !== direction;
 
-      // Same-direction bursts respect the short cooldown, but a reversal is a
-      // higher-priority manual intent and must never be swallowed by it.
       const worldTransitionUnsettled =
         currentPhase !== "galaxy" &&
         currentPhase !== "system" &&
         currentPhase !== "returning" &&
         settledPhase !== currentPhase;
 
-      // Cooldown prevents one physical wheel notch from double-stepping a
-      // settled layer. Once a world transition is in flight, however,
-      // continuing same-direction input is intent for the next layer and
-      // must be accumulated/queued instead of discarded.
-      if (
-        now < wheel.cooldownUntil &&
-        !directionChanged &&
-        !worldTransitionUnsettled
-      ) {
-        return;
-      }
+      // Do not discard committed wheel samples merely because the previous
+      // phase settled quickly. On SwiftShader a 220ms time cooldown caused
+      // distinct wheel events in one sustained gesture to disappear. The
+      // threshold already limits each browser event to at most one boundary,
+      // while unsettled phases serialize extra steps through the existing
+      // queue.
+      const resetWindow =
+        wheel.samples >= 2
+          ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
+          : CONTINUOUS_SCALE_RESET_MS;
+      const gestureExpired =
+        wheel.direction !== null && now - wheel.lastAt > resetWindow;
 
-      if (
-        directionChanged ||
-        now - wheel.lastAt > CONTINUOUS_SCALE_RESET_MS
-      ) {
+      if (directionChanged || gestureExpired) {
         wheel.accumulated = 0;
+        wheel.samples = 0;
         wheel.direction = direction;
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
         if (directionChanged) {
           continuousScaleIntentEpochRef.current += 1;
-          wheel.cooldownUntil = 0;
           pendingWorldScaleStepsRef.current = 0;
           delete document.documentElement.dataset.universeScaleQueued;
         }
       }
 
       wheel.lastAt = now;
+      wheel.samples = Math.min(8, wheel.samples + 1);
       wheel.accumulated += Math.abs(continuousScaleDelta(event.deltaY));
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = String(
@@ -1763,7 +1760,6 @@ export default function UniverseApp({
       if (wheel.accumulated < CONTINUOUS_SCALE_WHEEL_THRESHOLD) return;
 
       wheel.accumulated = 0;
-      wheel.cooldownUntil = now + CONTINUOUS_SCALE_COOLDOWN_MS;
       document.documentElement.dataset.universeScaleProgress = "0";
       document.documentElement.dataset.universeScaleIndex = String(
         scalePhaseIndex(currentPhase),

@@ -449,13 +449,30 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     box!.y + box!.height * 0.5,
   );
 
-  // Every delta is individually below the 72px phase threshold. Keep all
-  // five inside one 260ms gesture window so the test measures accumulation,
-  // not an assertion-induced second gesture.
-  for (let index = 0; index < 5; index += 1) {
+  // A lone tiny sample still expires quickly as noise.
+  await page.mouse.wheel(0, -16);
+  await page.waitForTimeout(320);
+  await page.mouse.wheel(0, -16);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-progress",
+    "0.222",
+  );
+
+  // Once repeated same-direction samples establish a gesture, partial intent
+  // survives a scheduler/render stall longer than the single-sample reset.
+  // This models the hosted SwiftShader trace where a nominal 20ms wait took
+  // ~1s while the browser remained inside one continuous trackpad gesture.
+  for (let index = 0; index < 3; index += 1) {
     await page.mouse.wheel(0, -16);
     await page.waitForTimeout(20);
   }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-progress",
+    "0.889",
+  );
+  await page.waitForTimeout(600);
+  await page.mouse.wheel(0, -16);
+
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",

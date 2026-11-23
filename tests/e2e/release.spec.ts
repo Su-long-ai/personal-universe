@@ -273,7 +273,13 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
         const timer = window.setTimeout(() => resolve(false), 5_000);
         canvas.addEventListener(
           name,
-          () => {
+          (event) => {
+            if (name === "webglcontextlost") {
+              // WebGL only marks a lost context restorable when the loss event
+              // is cancelled. Make the recovery precondition explicit instead
+              // of relying on Three's listener ordering.
+              event.preventDefault();
+            }
             window.clearTimeout(timer);
             resolve(true);
           },
