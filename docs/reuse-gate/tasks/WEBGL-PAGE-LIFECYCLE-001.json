@@ -8,9 +8,13 @@
   },
   "policy_change": false,
   "researched_at": "2026-11-24",
-  "research_summary": "Hosted evidence now shows browser.newContext timeouts and Chromium SharedImageManager mailbox errors after only a few otherwise ordinary WebGL cases, even after the live Surface visual was isolated. React Three Fiber already owns the single Three.js WebGLRenderer and disposes it on normal React unmount; the gap is abrupt document teardown, where React cleanup is not a reliable release boundary. Reuse the existing R3F renderer through useThree, listen only for non-persisted pagehide, and invoke Three.js forceContextLoss plus dispose at that terminal page boundary. WEBGL_lose_context is specifically documented to destroy the underlying graphics context and graphics resources. Do not add a second renderer, GPU manager, custom animation loop, unload handler, or browser runner.",
+  "research_summary": "Hosted evidence now shows browser.newContext timeouts and Chromium SharedImageManager mailbox errors after only a few otherwise ordinary WebGL cases, even after the live Surface visual was isolated. React Three Fiber already owns the single Three.js WebGLRenderer and disposes it on normal React unmount; the gap is abrupt document teardown, where React cleanup is not a reliable release boundary. Reuse the existing R3F renderer through useThree, listen only for non-persisted pagehide, and invoke Three.js forceContextLoss plus dispose at that terminal page boundary. WEBGL_lose_context is specifically documented to destroy the underlying graphics context and graphics resources. Do not add a second renderer, GPU manager, custom animation loop, unload handler, or browser runner. For hosted validation, wrap Playwright's existing page fixture so each test signals that same terminal release contract before the framework closes its BrowserContext; this keeps Playwright as the browser/test lifecycle owner while making GPU release deterministic.",
   "planned_files": [
     "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/support/test.ts",
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
     "tests/e2e/webgl-performance.spec.ts",
     "docs/development/cloud-workflow.md"
   ],
@@ -34,6 +38,10 @@
     {
       "url": "https://threejs.org/manual/pages/how-to-dispose-of-objects.html",
       "finding": "Three.js GPU allocations are not automatically released for library objects; geometry, material, render-target and pass disposal remains required throughout the normal component lifecycle."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-fixtures",
+      "finding": "Playwright fixtures can wrap built-in fixtures and execute deterministic teardown after the test body while leaving browser and BrowserContext ownership with Playwright."
     }
   ],
   "search_ladder": [
@@ -50,13 +58,15 @@
       "level": "framework_engine",
       "status": "found",
       "registry_refs": [
-        "react-three-fiber"
+        "react-three-fiber",
+        "playwright-test"
       ],
       "source_refs": [
         0,
-        1
+        1,
+        5
       ],
-      "conclusion": "Keep R3F as the renderer owner and obtain the already-created Three.js renderer through useThree for page-terminal cleanup."
+      "conclusion": "Keep R3F as renderer owner and Playwright as browser owner: useThree supplies the existing renderer, while a wrapped page fixture invokes the product terminal-release contract before BrowserContext teardown."
     },
     {
       "level": "subsystem",
@@ -121,6 +131,25 @@
       }
     },
     {
+      "id": "playwright-page-fixture-teardown",
+      "name": "Playwright wrapped page fixture for deterministic pre-context GPU release",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Existing Playwright Test fixture system",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "It runs teardown before Playwright closes the BrowserContext, giving the application a deterministic terminal lifecycle signal without manually launching Chromium or replacing native context isolation.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
       "id": "custom-gpu-resource-manager",
       "name": "Project-owned GPU resource registry and browser teardown manager",
       "level": "subsystem",
@@ -134,9 +163,10 @@
     "mode": "partial",
     "selected_ids": [
       "r3f-owned-renderer-pagehide",
+      "playwright-page-fixture-teardown",
       "webgl-terminal-context-release"
     ],
-    "rationale": "Keep the current single R3F Canvas and all existing per-object disposal. Add only a non-persisted pagehide guard that force-loses and disposes the R3F-owned renderer so abrupt BrowserContext/page teardown destroys SwiftShader GPU resources before Chromium reuses the browser process. Preserve persisted bfcache pages and do not alter the real-GPU rendering path.",
+    "rationale": "Keep the current single R3F Canvas and all existing per-object disposal. Add one shared terminal-release contract: non-persisted pagehide invokes it in the product, and a wrapped Playwright page fixture invokes the same contract immediately before BrowserContext teardown. The contract force-loses and disposes the existing renderer so SwiftShader resources are destroyed before Chromium reuses the browser process, while persisted bfcache pages and the real-GPU rendering path remain unchanged.",
     "higher_level_tradeoffs": [],
     "score_overrides": [],
     "fallback": "If Chromium still accumulates SwiftShader resources after explicit page-terminal release, recycle Playwright worker/browser processes at measured boundaries using native projects rather than serializing the whole suite or adding global timeout."
