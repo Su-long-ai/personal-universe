@@ -96,6 +96,8 @@ export function YeisGalaxyScene({
   onNavigationFailed,
   onNavigateDestination,
   onSignalHover,
+  onScaleFocus,
+  onScaleManualTakeover,
   quality,
   reducedMotion,
   viewStateRef,
@@ -112,6 +114,8 @@ export function YeisGalaxyScene({
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
   onSignalHover: (hover: YeisSignalHover) => void;
+  onScaleFocus?: (destination: UniverseNavigationDestination | null) => void;
+  onScaleManualTakeover?: () => void;
   quality: QualityMode;
   reducedMotion: boolean;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -132,10 +136,17 @@ export function YeisGalaxyScene({
   const pendingNavigationRef =
     useRef<UniverseNavigationCameraRequest | null>(null);
   const locatedDestinationIdRef = useRef<string | null>(null);
+  const locatedScaleFocusRef =
+    useRef<UniverseNavigationDestination | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
   const navigationFailureRef = useRef(onNavigationFailed);
   const navigateRef = useRef(onNavigateDestination);
   const signalHoverRef = useRef(onSignalHover);
+  const scaleFocusRef = useRef(onScaleFocus);
+  const scaleManualTakeoverRef = useRef(onScaleManualTakeover);
+  const scaleManualTakeoverReportedRef = useRef(false);
+  const scaleFocusIdRef = useRef<string | null>(null);
+  const scaleFocusFrameRef = useRef(0);
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
@@ -144,10 +155,13 @@ export function YeisGalaxyScene({
   navigationFailureRef.current = onNavigationFailed;
   navigateRef.current = onNavigateDestination;
   signalHoverRef.current = onSignalHover;
+  scaleFocusRef.current = onScaleFocus;
+  scaleManualTakeoverRef.current = onScaleManualTakeover;
 
   useEffect(() => {
     let cancelled = false;
     let removeHoverListeners: (() => void) | null = null;
+    let removeScaleWheelListener: (() => void) | null = null;
     const previousNear = perspective.near;
     const previousFar = perspective.far;
     const previousPosition = perspective.position.clone();
@@ -258,6 +272,23 @@ export function YeisGalaxyScene({
 
         const input = new Input(gl.domElement);
         const controller = new CameraController(runtime.universe);
+        const onScaleWheel = () => {
+          if (controller.autoOrbit !== 0) {
+            controller.autoOrbit = 0;
+            if (
+              document.documentElement.dataset.yeisOpeningMotion ===
+              "auto-orbit"
+            ) {
+              document.documentElement.dataset.yeisOpeningMotion = "stopped";
+            }
+          }
+        };
+        gl.domElement.addEventListener("wheel", onScaleWheel, {
+          passive: true,
+        });
+        removeScaleWheelListener = () => {
+          gl.domElement.removeEventListener("wheel", onScaleWheel);
+        };
 
         const viewLocal = new Vector3(
           milkyWay.radius * 0.08,
@@ -369,6 +400,7 @@ export function YeisGalaxyScene({
             Math.hypot(x - width / 2, y - height / 2) <= pickRadius
           ) {
             locatedDestinationIdRef.current = null;
+            locatedScaleFocusRef.current = null;
             void resolveUniverseNavigationDestination(
               locatedDestinationId,
               contentPlacementsRef.current,
@@ -658,6 +690,7 @@ export function YeisGalaxyScene({
     return () => {
       cancelled = true;
       removeHoverListeners?.();
+      removeScaleWheelListener?.();
       const state = stateRef.current;
       if (state) {
         viewStateRef.current = {
@@ -709,6 +742,11 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.yeisOpeningMotion;
+      locatedScaleFocusRef.current = null;
+      if (scaleFocusIdRef.current !== null) {
+        scaleFocusIdRef.current = null;
+        scaleFocusRef.current?.(null);
+      }
       delete document.documentElement.dataset.universeTraveling;
       delete document.documentElement.dataset.universeTravelArrivalRatio;
     };
@@ -724,14 +762,30 @@ export function YeisGalaxyScene({
     const manualCameraInput =
       state.input.dragX !== 0 ||
       state.input.dragY !== 0 ||
-      state.input.wheel !== 0 ||
       state.input.pinch !== 0 ||
       state.input.panX !== 0 ||
       state.input.panY !== 0 ||
       state.input.keys.size > 0;
-    if (manualCameraInput) locatedDestinationIdRef.current = null;
+    if (manualCameraInput) {
+      locatedDestinationIdRef.current = null;
+      locatedScaleFocusRef.current = null;
+    }
 
     const fovRad = perspective.fov * DEG;
+    // Product-level continuous scale navigation owns mouse-wheel scale.
+    // Preserve YEIS drag/orbit/autopilot while suppressing its wheel dolly/speed.
+    const manualScaleTakeover =
+      Math.abs(state.input.dragX) > 0.01 ||
+      Math.abs(state.input.dragY) > 0.01 ||
+      Math.abs(state.input.pinch) > 0.0001 ||
+      Math.abs(state.input.panX) > 0.01 ||
+      Math.abs(state.input.panY) > 0.01 ||
+      state.input.keys.size > 0;
+    if (manualScaleTakeover && !scaleManualTakeoverReportedRef.current) {
+      scaleManualTakeoverReportedRef.current = true;
+      scaleManualTakeoverRef.current?.();
+    }
+    state.input.wheel = 0;
     state.controller.update(
       delta,
       state.input,
@@ -742,6 +796,13 @@ export function YeisGalaxyScene({
 
     if (
       state.openingMotionArmed &&
+      document.documentElement.dataset.universeScaleDirection
+    ) {
+      state.controller.autoOrbit = 0;
+      state.openingMotionArmed = false;
+    }
+
+    if (
       state.controller.autoOrbit === 0 &&
       document.documentElement.dataset.yeisOpeningMotion === "auto-orbit"
     ) {
@@ -756,6 +817,172 @@ export function YeisGalaxyScene({
       state.controller.position,
       state.cameraPc,
     );
+
+    if (scaleFocusRef.current) {
+      scaleFocusFrameRef.current = (scaleFocusFrameRef.current + 1) % 6;
+      if (scaleFocusFrameRef.current === 0) {
+        const width = size.width;
+        const height = size.height;
+        const cx = width / 2;
+        const cy = height / 2;
+        const focusRadius = state.input.coarse ? 54 : 42;
+        const signalRadius = state.input.coarse ? 44 : 34;
+        let focused: UniverseNavigationDestination | null =
+          locatedScaleFocusRef.current;
+
+        const markerById = new Map(
+          markersRef.current.map((marker) => [marker.id, marker]),
+        );
+        let nearestSignal:
+          | { placement: UniverseContentPlacement; distance: number }
+          | null = null;
+
+        for (const placement of contentPlacementsRef.current) {
+          const marker = markerById.get(placement.markerId);
+          const nativeId = placement.nativeId ?? marker?.nativeId;
+          if (!nativeId) continue;
+          const starPc = runtime.universe.starPositionPc(nativeId);
+          contentDirection.copy(starPc).sub(state.cameraPc);
+          if (contentDirection.lengthSq() <= 1e-12) continue;
+          contentDirection
+            .normalize()
+            .multiplyScalar(SKY_RADIUS_KM * 0.992);
+          contentProjection.copy(contentDirection).project(perspective);
+          if (contentProjection.z < -1 || contentProjection.z > 1) continue;
+          const sx = (contentProjection.x * 0.5 + 0.5) * width;
+          const sy = (-contentProjection.y * 0.5 + 0.5) * height;
+          const distance = Math.hypot(sx - cx, sy - cy);
+          if (
+            distance <= signalRadius &&
+            (!nearestSignal || distance < nearestSignal.distance)
+          ) {
+            nearestSignal = { placement, distance };
+          }
+        }
+
+        if (nearestSignal) {
+          focused = navigationDestinationForPlacement(
+            nearestSignal.placement,
+            markersRef.current,
+          );
+        }
+
+        if (!focused) {
+          heroProjection.copy(state.heroSkyPosition).project(perspective);
+          if (heroProjection.z >= -1 && heroProjection.z <= 1) {
+            const hx = (heroProjection.x * 0.5 + 0.5) * width;
+            const hy = (-heroProjection.y * 0.5 + 0.5) * height;
+            if (Math.hypot(hx - cx, hy - cy) <= signalRadius) {
+              const hero = markersRef.current.find(
+                (marker) => marker.source === "hero",
+              );
+              if (hero) {
+                focused = navigationDestinationForMarker(
+                  hero,
+                  contentPlacementsRef.current,
+                );
+              }
+            }
+          }
+        }
+
+        if (!focused) {
+          let nearestObserved:
+            | { marker: GalaxyMarker; distance: number }
+            | null = null;
+          for (const marker of markersRef.current) {
+            const physical = marker.physicalPositionPc;
+            if (
+              marker.source !== "catalog" ||
+              marker.engine !== "v2" ||
+              marker.nativeId ||
+              !physical
+            ) {
+              continue;
+            }
+            observedDirection
+              .set(physical[0], physical[1], physical[2])
+              .sub(state.cameraPc);
+            if (observedDirection.lengthSq() <= 1e-12) continue;
+            observedDirection
+              .normalize()
+              .multiplyScalar(SKY_RADIUS_KM * 0.985);
+            observedProjection.copy(observedDirection).project(perspective);
+            if (observedProjection.z < -1 || observedProjection.z > 1) continue;
+            const ox = (observedProjection.x * 0.5 + 0.5) * width;
+            const oy = (-observedProjection.y * 0.5 + 0.5) * height;
+            const distance = Math.hypot(ox - cx, oy - cy);
+            if (
+              distance <= focusRadius &&
+              (!nearestObserved || distance < nearestObserved.distance)
+            ) {
+              nearestObserved = { marker, distance };
+            }
+          }
+          if (nearestObserved) {
+            focused = navigationDestinationForMarker(
+              nearestObserved.marker,
+              contentPlacementsRef.current,
+            );
+          }
+        }
+
+        if (!focused) {
+          const catalogIndex = state.starPoints.pick(
+            cx,
+            cy,
+            perspective,
+            width,
+            height,
+            runtime.universe.current.catalogIndex,
+            focusRadius,
+            7.2,
+          );
+          if (catalogIndex !== null) {
+            const starId = `c${catalogIndex}`;
+            const marker = markerForYeisStarId(
+              runtime,
+              markersRef.current,
+              starId,
+            );
+            focused = navigationDestinationForMarker(
+              marker,
+              contentPlacementsRef.current,
+            );
+          }
+        }
+
+        if (!focused) {
+          const proceduralId = state.procPoints.pick(
+            cx,
+            cy,
+            perspective,
+            width,
+            height,
+            runtime.universe.current.starId,
+            focusRadius,
+            7.2,
+          );
+          if (proceduralId) {
+            const marker = markerForYeisStarId(
+              runtime,
+              markersRef.current,
+              proceduralId,
+            );
+            focused = navigationDestinationForMarker(
+              marker,
+              contentPlacementsRef.current,
+            );
+          }
+        }
+
+        const nextId = focused?.id ?? null;
+        if (nextId !== scaleFocusIdRef.current) {
+          scaleFocusIdRef.current = nextId;
+          scaleFocusRef.current(focused);
+        }
+      }
+    }
 
     const request = navigationRequestRef.current;
     if (
@@ -775,6 +1002,7 @@ export function YeisGalaxyScene({
         state.controller.position.toArray() as [number, number, number];
       pendingNavigationRef.current = null;
       locatedDestinationIdRef.current = null;
+      locatedScaleFocusRef.current = null;
       lastNavigationRequestRef.current = request.requestId;
 
       if (request.mode === "locate") {
@@ -1024,6 +1252,16 @@ export function YeisGalaxyScene({
         document.documentElement.dataset.universeLocateDeltaRad =
           deltaRad.toFixed(6);
         locatedDestinationIdRef.current = pendingNavigation.destinationId;
+        void resolveUniverseNavigationDestination(
+          pendingNavigation.destinationId,
+          contentPlacementsRef.current,
+          markersRef.current,
+        ).then((destination) => {
+          if (state.disposed || !destination) return;
+          locatedScaleFocusRef.current = destination;
+          scaleFocusIdRef.current = destination.id;
+          scaleFocusRef.current?.(destination);
+        });
         console.info(
           "[YEIS-NATIVE-LOCATE] complete " +
             targetKey +

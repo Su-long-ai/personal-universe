@@ -52,6 +52,9 @@ export function UniverseCanvas({
   onSelectSystem,
   onNavigateDestination,
   onSignalHover,
+  onScaleFocusDestination,
+  onScaleManualTakeover,
+  onScaleFocusPlanet,
   onSelectPlanet,
   quality,
   scrollDepth,
@@ -76,6 +79,11 @@ export function UniverseCanvas({
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
   onSignalHover: (hover: YeisSignalHover) => void;
+  onScaleFocusDestination: (
+    destination: UniverseNavigationDestination | null,
+  ) => void;
+  onScaleManualTakeover: () => void;
+  onScaleFocusPlanet: (planet: PlanetDefinition | null) => void;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   quality: QualityMode;
   scrollDepth: number;
@@ -120,6 +128,8 @@ export function UniverseCanvas({
             onNavigationFailed={onNavigationFailed}
             onNavigateDestination={onNavigateDestination}
             onSignalHover={onSignalHover}
+            onScaleFocus={onScaleFocusDestination}
+            onScaleManualTakeover={onScaleManualTakeover}
             quality={quality}
             reducedMotion={reducedMotion}
             viewStateRef={yeisViewStateRef}
@@ -144,12 +154,14 @@ export function UniverseCanvas({
               <SystemScene
                 system={selectedSystem}
                 onSelectPlanet={onSelectPlanet}
+                onScaleFocus={onScaleFocusPlanet}
               />
             }
           >
             <LazyYeisSystemScene
               system={selectedSystem}
               onSelectPlanet={onSelectPlanet}
+              onScaleFocus={onScaleFocusPlanet}
               quality={quality}
             />
           </Suspense>
@@ -157,6 +169,7 @@ export function UniverseCanvas({
           <SystemScene
             system={selectedSystem}
             onSelectPlanet={onSelectPlanet}
+            onScaleFocus={onScaleFocusPlanet}
           />
         )
       )}

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type WheelEvent as ReactWheelEvent,
+} from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
 import { UniverseNavigator } from "./UniverseNavigator";
@@ -22,6 +29,16 @@ import {
   type UniverseContentEntry,
 } from "../../lib/universe/content";
 import {
+  CONTINUOUS_SCALE_COOLDOWN_MS,
+  CONTINUOUS_SCALE_RESET_MS,
+  CONTINUOUS_SCALE_WHEEL_THRESHOLD,
+  continuousScaleDelta,
+  continuousScaleDirection,
+  nextWorldScalePhase,
+  scalePhaseIndex,
+  type ContinuousScaleDirection,
+} from "../../lib/universe/continuousScale";
+import {
   applyProductLocale,
   astronomicalName,
   detectProductLocale,
@@ -33,6 +50,7 @@ import {
 import {
   navigationCameraTarget,
   navigationDestinationForMarker,
+  navigationDestinationForPlacement,
   navigationDestinationForPlanet,
   navigationMarker,
   resolveUniverseNavigationDestination,
@@ -169,6 +187,23 @@ function cameraTargetLabel(
   return target.kind + ":" + target.index;
 }
 
+function scaleSystemDestinationForMarker(
+  marker: GalaxyMarker,
+): UniverseNavigationDestination {
+  if (marker.nativeId) {
+    return {
+      id: "star:" + marker.nativeId,
+      kind: "star",
+      group: "stars",
+      title: marker.name,
+      detail: (marker.spectralType || "STAR") + " · YEIS SYSTEM",
+      target: { kind: "star", nativeId: marker.nativeId },
+      markerId: marker.id,
+    };
+  }
+  return navigationDestinationForMarker(marker, []);
+}
+
 export default function UniverseApp({
   contentEntries = [],
 }: {
@@ -217,6 +252,31 @@ export default function UniverseApp({
   const openedWorldDestinationRef = useRef<string | null>(null);
   const journeyNavigationRef = useRef(false);
   const journeyRef = useRef<UniverseJourneyState | null>(null);
+  const galaxyScaleFocusRef =
+    useRef<UniverseNavigationDestination | null>(null);
+  const systemScaleFocusRef = useRef<PlanetDefinition | null>(null);
+  const lockedGalaxyScaleFocusRef =
+    useRef<UniverseNavigationDestination | null>(null);
+  const pinnedGalaxyScaleFocusRef =
+    useRef<UniverseNavigationDestination | null>(null);
+  const lockedSystemScaleFocusRef = useRef<PlanetDefinition | null>(null);
+  const preferredSystemScaleDestinationRef =
+    useRef<UniverseNavigationDestination | null>(null);
+  const pendingScaleEnterSystemRef =
+    useRef<UniverseNavigationDestination | null>(null);
+  const galaxySoftFocusAvailableRef = useRef(true);
+  const pendingWorldScaleStepsRef = useRef(0);
+  const scaleWheelRef = useRef<{
+    accumulated: number;
+    direction: ContinuousScaleDirection | null;
+    lastAt: number;
+    cooldownUntil: number;
+  }>({
+    accumulated: 0,
+    direction: null,
+    lastAt: 0,
+    cooldownUntil: 0,
+  });
   const [coreDiagnostic, setCoreDiagnostic] = useState<{
     status: "loading" | "ready" | "error";
     detail: string;
@@ -234,6 +294,29 @@ export default function UniverseApp({
     () => placeUniverseContent(contentEntries, galaxy.markers),
     [contentEntries, galaxy.markers],
   );
+  const defaultGalaxyScaleFocus = useMemo(() => {
+    for (const placement of contentPlacements) {
+      const destination = navigationDestinationForPlacement(
+        placement,
+        galaxy.markers,
+      );
+      if (destination) return destination;
+    }
+
+    const hero = galaxy.markers.find((marker) => marker.source === "hero");
+    if (hero) {
+      return navigationDestinationForMarker(hero, contentPlacements);
+    }
+
+    const nativeStar = galaxy.markers.find(
+      (marker) =>
+        Boolean(marker.nativeId) &&
+        marker.source === "catalog",
+    );
+    return nativeStar
+      ? navigationDestinationForMarker(nativeStar, contentPlacements)
+      : null;
+  }, [contentPlacements, galaxy.markers]);
   const reducedMotion = useReducedMotion();
   const { ensurePlaying } = useAmbientAudio(muted, phase);
   const debugFreeze =
@@ -248,7 +331,22 @@ export default function UniverseApp({
     const detected = detectProductLocale();
     setLocale(detected);
     applyProductLocale(detected);
+    document.documentElement.dataset.universeScaleSoftFocus = "available";
+    return () => {
+      delete document.documentElement.dataset.universeScaleSoftFocus;
+    };
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeNavigationPhase = phase;
+    document.documentElement.dataset.universeScaleIndex = String(
+      scalePhaseIndex(phase),
+    );
+    return () => {
+      delete document.documentElement.dataset.universeNavigationPhase;
+      delete document.documentElement.dataset.universeScaleIndex;
+    };
+  }, [phase]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
     setLocale(next);
@@ -884,6 +982,75 @@ export default function UniverseApp({
     console.info("[UNIVERSE-JOURNEY] interrupted by manual camera control");
   }, [handleStopJourney]);
 
+  const handleGalaxyScaleFocus = useCallback(
+    (destination: UniverseNavigationDestination | null) => {
+      if (pinnedGalaxyScaleFocusRef.current) return;
+      galaxyScaleFocusRef.current = destination;
+      if (destination) {
+        document.documentElement.dataset.universeScaleFocus = destination.id;
+        document.documentElement.dataset.universeScaleFocusLayer = "galaxy";
+      } else if (
+        document.documentElement.dataset.universeScaleFocusLayer === "galaxy"
+      ) {
+        delete document.documentElement.dataset.universeScaleFocus;
+        delete document.documentElement.dataset.universeScaleFocusLayer;
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (phase !== "galaxy" || !activeDestinationId) {
+      pinnedGalaxyScaleFocusRef.current = null;
+      return;
+    }
+
+    void resolveUniverseNavigationDestination(
+      activeDestinationId,
+      contentPlacements,
+      galaxy.markers,
+    ).then((destination) => {
+      if (cancelled || !destination) return;
+      pinnedGalaxyScaleFocusRef.current = destination;
+      galaxyScaleFocusRef.current = destination;
+      document.documentElement.dataset.universeScaleFocus = destination.id;
+      document.documentElement.dataset.universeScaleFocusLayer = "galaxy";
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeDestinationId,
+    contentPlacements,
+    galaxy.markers,
+    phase,
+  ]);
+
+  const handleGalaxyScaleManualTakeover = useCallback(() => {
+    galaxySoftFocusAvailableRef.current = false;
+    document.documentElement.dataset.universeScaleSoftFocus = "disabled";
+  }, []);
+
+  const handleSystemScaleFocus = useCallback(
+    (planet: PlanetDefinition | null) => {
+      systemScaleFocusRef.current = planet;
+      if (preferredSystemScaleDestinationRef.current) return;
+      if (planet) {
+        document.documentElement.dataset.universeScaleFocus =
+          "planet:" + planet.id;
+        document.documentElement.dataset.universeScaleFocusLayer = "system";
+      } else if (
+        document.documentElement.dataset.universeScaleFocusLayer === "system"
+      ) {
+        delete document.documentElement.dataset.universeScaleFocus;
+        delete document.documentElement.dataset.universeScaleFocusLayer;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     journeyRef.current = journey;
   }, [journey]);
@@ -1112,44 +1279,23 @@ export default function UniverseApp({
     (completed: UniversePhase) => {
       if (phase !== completed) return;
       setCameraSettledPhase(completed);
-      if (debugFreeze) return;
+      document.documentElement.dataset.universeScaleSettled = completed;
+      if (debugFreeze || completed !== "returning") return;
 
-      let nextPhase = completed;
-      if (completed === "approach") nextPhase = "orbit";
-      else if (completed === "orbit") {
-        nextPhase =
-          selectedPlanet?.surfaceMode === "none" ? "orbit" : "atmosphere";
-      } else if (completed === "atmosphere") nextPhase = "surface";
-      else if (completed === "returning") nextPhase = "galaxy";
-
-      setPhase(nextPhase);
-      document.documentElement.dataset.universeNavigationPhase = nextPhase;
-
-      if (nextPhase === "galaxy") {
-        setActiveDestinationId(null);
-        delete document.documentElement.dataset.universeActiveDestination;
-        document.documentElement.dataset.universeNavigationPhase = "galaxy";
-        delete document.documentElement.dataset.universeNavigationTarget;
-        replaceNavigationUrl({
-          phase: "galaxy",
-          destinationId: null,
-          navigationMode: null,
-        });
-        return;
-      }
-
-      const starId = selectedSystem
-        ? routeStarIdentityForSystem(selectedSystem, galaxy.markers)
-        : null;
-      if (starId && selectedPlanet) {
-        replaceNavigationUrl({
-          phase: nextPhase,
-          starId,
-          bodyId: nativePlanetId(selectedPlanet),
-        });
-      }
+      // The v2 rollback path still uses the legacy returning shot. Product
+      // world phases no longer auto-chain: wheel scale owns advancement.
+      setPhase("galaxy");
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      document.documentElement.dataset.universeNavigationPhase = "galaxy";
+      delete document.documentElement.dataset.universeNavigationTarget;
+      replaceNavigationUrl({
+        phase: "galaxy",
+        destinationId: null,
+        navigationMode: null,
+      });
     },
-    [debugFreeze, galaxy.markers, phase, selectedPlanet, selectedSystem],
+    [debugFreeze, phase],
   );
 
   const handleReturn = useCallback(() => {
@@ -1221,6 +1367,495 @@ export default function UniverseApp({
     }
   }, [activeEngine, galaxy.markers, phase, selectedSystem]);
 
+  useEffect(() => {
+    if (phase !== "system" || !selectedSystem) return;
+    const preferred = preferredSystemScaleDestinationRef.current;
+    if (!preferred) return;
+
+    let planet: PlanetDefinition | null = null;
+    if (preferred.target.kind === "body") {
+      planet =
+        selectedSystem.planets.find(
+          (candidate) =>
+            candidate.id === preferred.target.bodyId ||
+            nativePlanetId(candidate) === preferred.target.bodyId,
+        ) ?? null;
+    } else if (preferred.target.kind === "observed-body") {
+      planet =
+        selectedSystem.planets.find(
+          (candidate) =>
+            candidate.id === preferred.target.bodyId ||
+            nativePlanetId(candidate) === preferred.target.bodyId,
+        ) ?? null;
+    } else if (preferred.target.kind === "content") {
+      planet =
+        selectedSystem.planets.find((candidate) =>
+          candidate.content?.some(
+            (entry) => entry.id === preferred.target.entryId,
+          ),
+        ) ?? null;
+    }
+
+    if (!planet) return;
+    document.documentElement.dataset.universeScaleFocus =
+      "planet:" + planet.id;
+    document.documentElement.dataset.universeScaleFocusLayer = "system";
+    document.documentElement.dataset.universeScalePreferred =
+      preferred.id;
+  }, [phase, selectedSystem]);
+
+  const setWorldScalePhase = useCallback(
+    (nextPhase: UniversePhase) => {
+      setCameraSettledPhase(null);
+      delete document.documentElement.dataset.universeScaleSettled;
+      setPhase(nextPhase);
+      document.documentElement.dataset.universeNavigationPhase = nextPhase;
+      document.documentElement.dataset.universeScaleIndex = String(
+        scalePhaseIndex(nextPhase),
+      );
+
+      const starId = selectedSystem
+        ? routeStarIdentityForSystem(selectedSystem, galaxy.markers)
+        : null;
+
+      if (nextPhase === "system") {
+        setSelectedPlanet(null);
+        setActiveDestinationId(null);
+        delete document.documentElement.dataset.universeActiveDestination;
+        if (starId) {
+          document.documentElement.dataset.universeNavigationTarget = starId;
+        }
+        replaceNavigationUrl({
+          phase: "system",
+          starId,
+          bodyId: null,
+          destinationId: null,
+          navigationMode: null,
+        });
+        return;
+      }
+
+      if (starId && selectedPlanet) {
+        replaceNavigationUrl({
+          phase: nextPhase,
+          starId,
+          bodyId: nativePlanetId(selectedPlanet),
+        });
+      }
+    },
+    [galaxy.markers, selectedPlanet, selectedSystem],
+  );
+
+  useEffect(() => {
+    if (
+      pendingWorldScaleStepsRef.current === 0 ||
+      cameraSettledPhase !== phase ||
+      !selectedPlanet ||
+      phase === "galaxy" ||
+      phase === "system" ||
+      phase === "returning"
+    ) {
+      return;
+    }
+
+    const queued = pendingWorldScaleStepsRef.current;
+    const direction: ContinuousScaleDirection = queued > 0 ? "in" : "out";
+    const nextPhase = nextWorldScalePhase(
+      phase,
+      direction,
+      selectedPlanet.surfaceMode,
+    );
+
+    if (!nextPhase) {
+      pendingWorldScaleStepsRef.current = 0;
+      delete document.documentElement.dataset.universeScaleQueued;
+      document.documentElement.dataset.universeScaleBlocked =
+        direction === "in" && phase !== "surface"
+          ? "no-surface"
+          : direction === "in"
+            ? "surface-limit"
+            : "system-limit";
+      return;
+    }
+
+    pendingWorldScaleStepsRef.current += direction === "in" ? -1 : 1;
+    const remaining = pendingWorldScaleStepsRef.current;
+    if (remaining === 0) {
+      delete document.documentElement.dataset.universeScaleQueued;
+    } else {
+      document.documentElement.dataset.universeScaleQueued =
+        "world:" + (remaining > 0 ? "+" : "") + String(remaining);
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      setWorldScalePhase(nextPhase);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    cameraSettledPhase,
+    phase,
+    selectedPlanet,
+    setWorldScalePhase,
+  ]);
+
+  useEffect(() => {
+    if (phase !== "system" || pendingWorldScaleStepsRef.current >= 0) return;
+
+    pendingWorldScaleStepsRef.current += 1;
+    const remaining = pendingWorldScaleStepsRef.current;
+    if (remaining === 0) {
+      delete document.documentElement.dataset.universeScaleQueued;
+    } else {
+      document.documentElement.dataset.universeScaleQueued =
+        "world:" + String(remaining);
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      handleReturn();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [handleReturn, phase]);
+
+  const beginGalaxyScaleTravel = useCallback(
+    (destination: UniverseNavigationDestination) => {
+      const cameraTarget = navigationCameraTarget(
+        destination,
+        galaxy.markers,
+      );
+      if (!cameraTarget) {
+        void handleNavigateDestination(destination);
+        return;
+      }
+
+      navigationRequestSeq.current += 1;
+      setCameraSettledPhase(null);
+      setNavigationFailure(null);
+      delete document.documentElement.dataset.universeNavigationError;
+      setSelectedSystem(null);
+      setSelectedPlanet(null);
+      setPhase("galaxy");
+      setActiveDestinationId(null);
+      delete document.documentElement.dataset.universeActiveDestination;
+      setPendingDestinationId(destination.id);
+      setPendingDestinationMode("traveling");
+      document.documentElement.dataset.universePendingDestination =
+        destination.id;
+      setNavigationRequest({
+        requestId: navigationRequestSeq.current,
+        destinationId: destination.id,
+        mode: "travel",
+        target: cameraTarget,
+        title: destination.title,
+      });
+      setNavigationStatus("traveling");
+      document.documentElement.dataset.universeNavigationTarget =
+        cameraTargetLabel(cameraTarget);
+      document.documentElement.dataset.universeNavigationPhase = "galaxy";
+      document.documentElement.dataset.universeScaleMode = "travel";
+      deepLinkHandledRef.current = deepLinkNavigationKey(
+        destination.id,
+        "open",
+        "galaxy",
+      );
+      replaceNavigationUrl({
+        phase: "galaxy",
+        destinationId: destination.id,
+        navigationMode: "open",
+      });
+      console.info(
+        "[UNIVERSE-SCALE] travel " +
+          destination.title +
+          " -> " +
+          cameraTargetLabel(cameraTarget),
+      );
+    },
+    [galaxy.markers, handleNavigateDestination],
+  );
+
+  const enterScaleFocusedSystem = useCallback(
+    async (focus: UniverseNavigationDestination) => {
+      preferredSystemScaleDestinationRef.current = focus;
+      const marker = await navigationMarker(focus, galaxy.markers);
+      await handleNavigateDestination(scaleSystemDestinationForMarker(marker));
+    },
+    [galaxy.markers, handleNavigateDestination],
+  );
+
+  useEffect(() => {
+    const queued = pendingScaleEnterSystemRef.current;
+    if (!queued || phase !== "galaxy") return;
+    if (activeDestinationId !== queued.id) return;
+    if (pendingDestinationId === queued.id) return;
+
+    pendingScaleEnterSystemRef.current = null;
+    delete document.documentElement.dataset.universeScaleQueued;
+    void enterScaleFocusedSystem(queued);
+  }, [
+    activeDestinationId,
+    enterScaleFocusedSystem,
+    pendingDestinationId,
+    phase,
+  ]);
+
+  const handleContinuousScaleWheel = useCallback(
+    (event: ReactWheelEvent<HTMLElement>) => {
+      if (navigatorOpen || navigationFailure) return;
+
+      if (activeEngine !== "yeis") {
+        if (phase === "galaxy") {
+          setScrollDepth((value) =>
+            Math.max(
+              -3.5,
+              Math.min(4.5, value + Math.sign(event.deltaY) * 0.42),
+            ),
+          );
+        }
+        return;
+      }
+
+      const direction = continuousScaleDirection(event.deltaY);
+      if (!direction) return;
+
+      const now = performance.now();
+      const wheel = scaleWheelRef.current;
+      if (now < wheel.cooldownUntil) return;
+
+      const directionChanged =
+        wheel.direction !== null && wheel.direction !== direction;
+      if (
+        directionChanged ||
+        now - wheel.lastAt > CONTINUOUS_SCALE_RESET_MS
+      ) {
+        wheel.accumulated = 0;
+        wheel.direction = direction;
+        lockedGalaxyScaleFocusRef.current = null;
+        lockedSystemScaleFocusRef.current = null;
+        if (directionChanged) {
+          pendingWorldScaleStepsRef.current = 0;
+          delete document.documentElement.dataset.universeScaleQueued;
+        }
+      }
+
+      wheel.lastAt = now;
+      wheel.accumulated += Math.abs(continuousScaleDelta(event.deltaY));
+      document.documentElement.dataset.universeScaleDirection = direction;
+      document.documentElement.dataset.universeScaleProgress = String(
+        Math.min(
+          1,
+          wheel.accumulated / CONTINUOUS_SCALE_WHEEL_THRESHOLD,
+        ).toFixed(3),
+      );
+
+      if (wheel.accumulated < CONTINUOUS_SCALE_WHEEL_THRESHOLD) return;
+
+      wheel.accumulated = 0;
+      wheel.cooldownUntil = now + CONTINUOUS_SCALE_COOLDOWN_MS;
+      document.documentElement.dataset.universeScaleProgress = "0";
+      document.documentElement.dataset.universeScaleIndex = String(
+        scalePhaseIndex(phase),
+      );
+      delete document.documentElement.dataset.universeScaleBlocked;
+      handleCinematicUserControlStart();
+
+      if (
+        phase !== "galaxy" &&
+        phase !== "system" &&
+        phase !== "returning" &&
+        cameraSettledPhase !== phase
+      ) {
+        if (directionChanged && selectedPlanet) {
+          pendingWorldScaleStepsRef.current = 0;
+          delete document.documentElement.dataset.universeScaleQueued;
+          const reversePhase = nextWorldScalePhase(
+            phase,
+            direction,
+            selectedPlanet.surfaceMode,
+          );
+          if (reversePhase) {
+            setWorldScalePhase(reversePhase);
+          }
+          return;
+        }
+
+        const step = direction === "in" ? 1 : -1;
+        pendingWorldScaleStepsRef.current = Math.max(
+          -6,
+          Math.min(6, pendingWorldScaleStepsRef.current + step),
+        );
+        const queued = pendingWorldScaleStepsRef.current;
+        document.documentElement.dataset.universeScaleQueued =
+          "world:" + (queued > 0 ? "+" : "") + String(queued);
+        return;
+      }
+
+      if (direction === "in") {
+        if (phase === "galaxy") {
+          const centerFocus =
+            lockedGalaxyScaleFocusRef.current ??
+            galaxyScaleFocusRef.current;
+          const focus =
+            centerFocus ??
+            (galaxySoftFocusAvailableRef.current
+              ? defaultGalaxyScaleFocus
+              : null);
+          if (!focus) {
+            document.documentElement.dataset.universeScaleBlocked =
+              "no-galaxy-focus";
+            return;
+          }
+          if (galaxySoftFocusAvailableRef.current) {
+            galaxySoftFocusAvailableRef.current = false;
+            document.documentElement.dataset.universeScaleSoftFocus =
+              centerFocus ? "consumed-center" : "consumed-fallback";
+          }
+          lockedGalaxyScaleFocusRef.current = focus;
+
+          // The frozen pending/current contract promotes activeDestinationId
+          // only after native locate/travel has completed. Current wins over
+          // any stale pending render from the same completion batch.
+          if (activeDestinationId === focus.id) {
+            void enterScaleFocusedSystem(focus);
+            return;
+          }
+
+          if (pendingDestinationId === focus.id) {
+            pendingScaleEnterSystemRef.current = focus;
+            document.documentElement.dataset.universeScaleQueued =
+              "enter-system:" + focus.id;
+            return;
+          }
+
+          beginGalaxyScaleTravel(focus);
+          return;
+        }
+
+        if (phase === "system") {
+          const preferred = preferredSystemScaleDestinationRef.current;
+          let preferredPlanet: PlanetDefinition | null = null;
+          if (preferred?.target.kind === "body") {
+            preferredPlanet =
+              selectedSystem?.planets.find(
+                (candidate) =>
+                  candidate.id === preferred.target.bodyId ||
+                  nativePlanetId(candidate) === preferred.target.bodyId,
+              ) ?? null;
+          } else if (preferred?.target.kind === "observed-body") {
+            preferredPlanet =
+              selectedSystem?.planets.find(
+                (candidate) =>
+                  candidate.id === preferred.target.bodyId ||
+                  nativePlanetId(candidate) === preferred.target.bodyId,
+              ) ?? null;
+          } else if (preferred?.target.kind === "content") {
+            preferredPlanet =
+              selectedSystem?.planets.find((candidate) =>
+                candidate.content?.some(
+                  (entry) => entry.id === preferred.target.entryId,
+                ),
+              ) ?? null;
+          }
+          const planet =
+            preferredPlanet ??
+            lockedSystemScaleFocusRef.current ??
+            systemScaleFocusRef.current;
+          if (!planet || !selectedSystem) {
+            document.documentElement.dataset.universeScaleBlocked =
+              "no-planet-focus";
+            return;
+          }
+          lockedSystemScaleFocusRef.current = planet;
+          const destination = navigationDestinationForPlanet(
+            selectedSystem,
+            planet,
+            galaxy.markers,
+            contentPlacements,
+          );
+          preferredSystemScaleDestinationRef.current = null;
+          delete document.documentElement.dataset.universeScalePreferred;
+          if (destination) {
+            void handleNavigateDestination(destination);
+          } else {
+            setSelectedPlanet(planet);
+            setWorldScalePhase("approach");
+          }
+          return;
+        }
+
+        if (selectedPlanet) {
+          const nextPhase = nextWorldScalePhase(
+            phase,
+            "in",
+            selectedPlanet.surfaceMode,
+          );
+          if (nextPhase) {
+            setWorldScalePhase(nextPhase);
+          } else {
+            document.documentElement.dataset.universeScaleBlocked =
+              phase === "surface" ? "surface-limit" : "no-surface";
+          }
+        }
+        return;
+      }
+
+      if (phase === "galaxy") {
+        pendingScaleEnterSystemRef.current = null;
+        delete document.documentElement.dataset.universeScaleQueued;
+        if (
+          activeDestinationId === "galaxy:0" &&
+          navigationStatus === "arrived"
+        ) {
+          document.documentElement.dataset.universeScaleBlocked =
+            "galaxy-limit";
+          return;
+        }
+        void resolveUniverseNavigationDestination(
+          "galaxy:0",
+          contentPlacements,
+          galaxy.markers,
+        ).then((homeGalaxy) => {
+          if (homeGalaxy) beginGalaxyScaleTravel(homeGalaxy);
+        });
+        return;
+      }
+
+      if (phase === "system") {
+        preferredSystemScaleDestinationRef.current = null;
+        delete document.documentElement.dataset.universeScalePreferred;
+        handleReturn();
+        return;
+      }
+
+      if (selectedPlanet) {
+        const nextPhase = nextWorldScalePhase(
+          phase,
+          "out",
+          selectedPlanet.surfaceMode,
+        );
+        if (nextPhase) setWorldScalePhase(nextPhase);
+      }
+    },
+    [
+      activeDestinationId,
+      activeEngine,
+      beginGalaxyScaleTravel,
+      cameraSettledPhase,
+      contentPlacements,
+      defaultGalaxyScaleFocus,
+      enterScaleFocusedSystem,
+      galaxy.markers,
+      handleCinematicUserControlStart,
+      handleNavigateDestination,
+      handleReturn,
+      navigationFailure,
+      navigationStatus,
+      navigatorOpen,
+      phase,
+      selectedPlanet,
+      selectedSystem,
+      setWorldScalePhase,
+    ],
+  );
+
   const transitionClass = useMemo(() => {
     if (phase === "atmosphere") return "transition-atmosphere";
     if (phase === "surface") return "transition-surface";
@@ -1230,12 +1865,7 @@ export default function UniverseApp({
   return (
     <main
       className={`universe-root ${transitionClass}`}
-      onWheel={(event) => {
-        if (phase !== "galaxy" || activeEngine === "yeis") return;
-        setScrollDepth((value) =>
-          Math.max(-3.5, Math.min(4.5, value + Math.sign(event.deltaY) * 0.42)),
-        );
-      }}
+      onWheel={handleContinuousScaleWheel}
     >
       <div className="universe-canvas">
         <UniverseCanvas
@@ -1251,6 +1881,9 @@ export default function UniverseApp({
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
           onSignalHover={setSignalHover}
+          onScaleFocusDestination={handleGalaxyScaleFocus}
+          onScaleManualTakeover={handleGalaxyScaleManualTakeover}
+          onScaleFocusPlanet={handleSystemScaleFocus}
           onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}

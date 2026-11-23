@@ -1,5 +1,5 @@
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { PlanetArchetype, PlanetDefinition, SystemDefinition } from "../../lib/universe/types";
@@ -107,11 +107,66 @@ function PlanetBody({
 export function SystemScene({
   system,
   onSelectPlanet,
+  onScaleFocus,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
+  onScaleFocus?: (planet: PlanetDefinition | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
+  const { camera, size } = useThree();
+  const focusFrameRef = useRef(0);
+  const focusedIdRef = useRef<string | null>(null);
+  const focusPositionRef = useRef(new THREE.Vector3());
+  const focusProjectionRef = useRef(new THREE.Vector3());
+  const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
+
+  useFrame((state) => {
+    if (!onScaleFocus) return;
+    focusFrameRef.current = (focusFrameRef.current + 1) % 6;
+    if (focusFrameRef.current !== 0) return;
+
+    let best: { planet: PlanetDefinition; distance: number } | null = null;
+    for (let index = 0; index < system.planets.length; index += 1) {
+      const planet = system.planets[index];
+      const orbit = compressedOrbit(planet, index);
+      const period = Math.max(0.45, planet.orbitalPeriodYears);
+      const phase =
+        ((hashSeed(planet.seed) % 1000) / 1000) * Math.PI * 2 +
+        state.clock.elapsedTime * (0.055 / Math.sqrt(period));
+      const projected = focusProjectionRef.current
+        .copy(
+          focusPositionRef.current.set(
+            Math.cos(phase) * orbit,
+            0,
+            -Math.sin(phase) * orbit,
+          ),
+        )
+        .applyEuler(systemTiltRef.current)
+        .project(camera);
+
+      if (projected.z < -1 || projected.z > 1) continue;
+      const distance = Math.hypot(
+        projected.x * size.width * 0.5,
+        projected.y * size.height * 0.5,
+      );
+      if (distance <= 92 && (!best || distance < best.distance)) {
+        best = { planet, distance };
+      }
+    }
+
+    const nextId = best?.planet.id ?? null;
+    if (focusedIdRef.current === nextId) return;
+    focusedIdRef.current = nextId;
+    onScaleFocus(best?.planet ?? null);
+  });
+
+  useEffect(
+    () => () => {
+      if (focusedIdRef.current !== null) onScaleFocus?.(null);
+    },
+    [onScaleFocus],
+  );
 
   return (
     <>

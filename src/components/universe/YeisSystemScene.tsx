@@ -250,16 +250,21 @@ function ProductPlanetTarget({
 export function YeisSystemScene({
   system,
   onSelectPlanet,
+  onScaleFocus,
   quality,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
+  onScaleFocus?: (planet: PlanetDefinition | null) => void;
   quality: QualityMode;
 }) {
   const { gl, camera, size } = useThree();
   const [resources, setResources] = useState<NativeResources | null>(null);
   const [failed, setFailed] = useState(false);
   const starId = nativeStarId(system);
+  const focusFrameRef = useRef(0);
+  const focusedIdRef = useRef<string | null>(null);
+  const focusProjectionRef = useRef(new THREE.Vector3());
 
   useEffect(() => {
     let active = true;
@@ -376,10 +381,51 @@ export function YeisSystemScene({
       (id) => resources.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
       null,
     );
+
+    if (onScaleFocus) {
+      focusFrameRef.current = (focusFrameRef.current + 1) % 6;
+      if (focusFrameRef.current === 0) {
+        let best: { planet: PlanetDefinition; distance: number } | null = null;
+        for (const planet of system.planets) {
+          const body = native.get(nativePlanetId(planet));
+          if (!body) continue;
+          const projected = focusProjectionRef.current
+            .copy(body.position)
+            .project(camera as THREE.PerspectiveCamera);
+          if (projected.z < -1 || projected.z > 1) continue;
+          const distance = Math.hypot(
+            projected.x * size.width * 0.5,
+            projected.y * size.height * 0.5,
+          );
+          if (distance <= 92 && (!best || distance < best.distance)) {
+            best = { planet, distance };
+          }
+        }
+
+        const nextId = best?.planet.id ?? null;
+        if (focusedIdRef.current !== nextId) {
+          focusedIdRef.current = nextId;
+          onScaleFocus(best?.planet ?? null);
+        }
+      }
+    }
   });
 
+  useEffect(
+    () => () => {
+      if (focusedIdRef.current !== null) onScaleFocus?.(null);
+    },
+    [onScaleFocus],
+  );
+
   if (!starId || failed || !resources) {
-    return <SystemScene system={system} onSelectPlanet={onSelectPlanet} />;
+    return (
+      <SystemScene
+        system={system}
+        onSelectPlanet={onSelectPlanet}
+        onScaleFocus={onScaleFocus}
+      />
+    );
   }
 
   return (

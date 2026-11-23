@@ -30,7 +30,7 @@ const MANUAL_MOUSE = {
   left: CameraControlsImpl.ACTION.ROTATE,
   middle: CameraControlsImpl.ACTION.DOLLY,
   right: CameraControlsImpl.ACTION.NONE,
-  wheel: CameraControlsImpl.ACTION.DOLLY,
+  wheel: CameraControlsImpl.ACTION.NONE,
 } as const;
 
 const DISABLED_TOUCH = {
@@ -124,6 +124,7 @@ export function CinematicCamera({
   const gl = useThree((state) => state.gl);
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
+  const configuredPhase = useRef<UniversePhase | null>(null);
   const manualOverride = useRef(false);
   const currentPosition = useRef(new Vector3());
   const currentTarget = useRef(new Vector3());
@@ -154,6 +155,7 @@ export function CinematicCamera({
 
   useEffect(() => {
     completedPhase.current = null;
+    configuredPhase.current = null;
     manualOverride.current = false;
     delete document.documentElement.dataset.universeCameraSettled;
     document.documentElement.dataset.universeCameraMode = "cinematic";
@@ -205,15 +207,31 @@ export function CinematicCamera({
       desiredTarget.current.z,
       shot.transition ?? !reducedMotion,
     );
+    configuredPhase.current = phase;
   }, [height, phase, reducedMotion, scrollDepth, width]);
 
+  const publishSettled = useCallback(() => {
+    if (
+      manualOverride.current ||
+      configuredPhase.current !== phase ||
+      completedPhase.current === phase
+    ) {
+      return;
+    }
+
+    completedPhase.current = phase;
+    document.documentElement.dataset.universeCameraSettled = phase;
+    document.documentElement.dataset.universeCameraMode = "settled";
+    onPhaseComplete(phase);
+  }, [onPhaseComplete, phase]);
+
   useEffect(() => {
-    if (!manualCameraEnabled) return;
-    const canvas = gl.domElement;
-    const onWheel = () => handleUserControlStart();
-    canvas.addEventListener("wheel", onWheel, { passive: true });
-    return () => canvas.removeEventListener("wheel", onWheel);
-  }, [gl, handleUserControlStart, manualCameraEnabled]);
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const handleRest = () => publishSettled();
+    controls.addEventListener("rest", handleRest);
+    return () => controls.removeEventListener("rest", handleRest);
+  }, [publishSettled]);
 
   useFrame(() => {
     const controls = controlsRef.current;
@@ -221,6 +239,7 @@ export function CinematicCamera({
     if (
       !controls ||
       !shot ||
+      configuredPhase.current !== phase ||
       manualOverride.current ||
       completedPhase.current === phase
     ) {
@@ -239,10 +258,7 @@ export function CinematicCamera({
 
     if (!positionReached || !targetReached) return;
 
-    completedPhase.current = phase;
-    document.documentElement.dataset.universeCameraSettled = phase;
-    document.documentElement.dataset.universeCameraMode = "settled";
-    onPhaseComplete(phase);
+    publishSettled();
   });
 
   useEffect(

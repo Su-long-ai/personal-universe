@@ -259,21 +259,156 @@ Manual input is intentionally available only after the visitor reaches a stable
 `system`, `orbit`, or `surface` phase:
 
 - left-drag rotates around the current destination target;
-- mouse wheel / middle drag dollies within phase-specific distance bounds;
+- middle drag may dolly inside the stable product-world phase;
 - one-finger touch rotates;
-- two-finger touch dollies and rotates;
+- two-finger touch keeps the existing touch exploration behavior;
 - right drag and truck/pan remain disabled, so manual exploration cannot drift
   the authoritative destination target away from the selected world/system.
 
+The **mouse wheel is no longer a local camera dolly**. It is reserved for the
+continuous-scale coordinator described below, so YEIS, camera-controls and the
+product shell cannot interpret the same wheel event as three different camera
+commands.
+
 `approach`, `atmosphere`, and `returning` remain cinematic transitions.
-When manual control starts, the current shot is marked overridden, settled
-evidence is cleared, and the root publishes
+When drag/touch manual control starts, the current shot is marked overridden,
+settled evidence is cleared, and the root publishes
 `data-universe-camera-mode="manual"`. The current destination, phase and deep
 link stay unchanged.
 
 If a Guided Journey is active, direct camera takeover stops that Journey
 immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
 intent wins, and orchestration must not fight the visitor for the same camera.
+
+## Continuous wheel scale navigation
+
+Implemented under task `CONTINUOUS-SCALE-WHEEL-NAV-001`.
+
+The default YEIS product now treats the mouse wheel as one **continuous scale
+intent**, not as a free-flight speed control in the galaxy plus a second dolly
+control in product-world scenes.
+
+The retained stack remains unchanged:
+
+- pinned MIT YEIS owns galaxy-scale coordinates, camera travel, catalogue
+  picking and native system/body identity;
+- the existing product destination model owns what a target means;
+- the existing `camera-controls` instance owns smooth System/Approach/Orbit/
+  Atmosphere/Surface camera shots;
+- ProceduralPlanets owns the close-world visual tier where that world supports
+  it.
+
+Personal Universe adds only a coordinator that converts wheel gestures into
+focus-preserving scale transitions. No second camera, RAF loop, renderer,
+spatial index or router is introduced.
+
+### Focus
+
+At galaxy scale, the scene reuses existing YEIS projection/picking primitives
+at the viewport centre. Explicit centre focus wins, with eligible priority:
+
+1. Personal Signal;
+2. Hero world;
+3. observed host;
+4. catalogue star;
+5. procedural star.
+
+The fresh opening view also has one **soft focus** fallback so a visitor can
+start diving with the wheel even when the auto-orbit composition has no object
+inside the centre-pick radius. That fallback prefers the first Personal Signal,
+then the Hero world, then a native catalogue star. It is consumed by the first
+scale-in gesture and is permanently disabled as soon as drag, touch, pinch,
+pan or keyboard camera input shows that the visitor has taken spatial control.
+After takeover, an empty centre remains empty instead of snapping back to a
+product-selected target.
+
+A completed **Locate** has affinity over coincident centre-screen overlays until
+the visitor manually changes the camera. This reuses the same pending/current
+semantics as Search/Places/Canvas navigation.
+
+At system scale, the already-rendered planet positions are projected to the
+viewport centre. The nearest eligible planet inside the bounded focus radius is
+reported to the coordinator. No separate planet-position database is built.
+
+For Hero/Personal destinations, the galaxy-scale destination is carried into
+the opened system as a preferred planet intent. This means the visitor does not
+have to reacquire AURORA-01 after crossing from the galaxy into HELION.
+
+### Scale ladder
+
+Wheel-in and wheel-out are reversible over the existing product ladder:
+
+```text
+Galaxy
+  ↕
+YEIS native star travel / focus
+  ↕
+Stellar System
+  ↕
+Approach
+  ↕
+Orbit
+  ↕
+Atmosphere
+  ↕
+Surface
+```
+
+The first inward wheel gesture on a centred galaxy target uses existing YEIS
+native camera travel. A further inward gesture after that target is promoted to
+the current destination enters the stellar-system renderer. If the visitor
+continues scrolling while native locate/travel is still settling, one
+enter-system intent is queued and consumed only after the existing destination
+becomes current; a competing camera request is not created.
+
+Inside the system, an inward gesture opens the current/preferred planet at
+`approach`. Product-world scale then advances over the same phase ladder, but
+wheel input is not discarded while a cinematic shot is moving. Additional
+same-direction threshold crossings are queued as scale intent and consumed as
+soon as each camera boundary settles, so a sustained wheel gesture can flow
+through Orbit and Atmosphere without requiring stop-scroll-stop repetition.
+Changing direction clears the queued intent and retargets one phase in the
+opposite direction immediately.
+
+Wheel-out performs the exact reverse ladder. At System it returns to the
+retained YEIS galaxy view; farther out it can travel back toward the Milky Way
+overview.
+
+### Wheel ownership and hysteresis
+
+Exactly one layer owns mouse-wheel scale input:
+
+- YEIS `Input.wheel` is zeroed before the native CameraController update;
+- camera-controls has its wheel ACTION disabled;
+- the product coordinator accumulates small trackpad deltas, applies a
+  direction reset window, and uses a short post-transition cooldown.
+
+Traditional mouse-wheel notches therefore feel immediate while fine trackpad
+noise must accumulate before a scale boundary is crossed. Changing wheel
+direction resets the gesture lock.
+
+Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
+gesture is still processed as scale intent. Manual spatial takeover disables
+the opening soft-focus fallback so subsequent wheel navigation follows only
+what is actually centred.
+
+### Surface capability boundary
+
+Continuous navigation does not claim every generated body has a terrain
+surface. `PlanetSurfaceMode` remains authoritative.
+
+- `surface-terrain` / `custom` worlds may continue through Atmosphere to
+  Surface;
+- `none` worlds stop at Orbit and publish a blocked scale boundary rather
+  than inventing terrain.
+
+Today AURORA-01 is the canonical full Galaxy → System → Planet → Surface
+acceptance path. Ordinary generated and observed worlds remain astronomically
+valid even when their current product representation stops at Orbit.
+
+Search, Places, canvas clicks, deep links and Guided Journeys remain direct
+entry paths into the same destinations. Continuous wheel navigation changes
+interaction continuity, not destination identity.
 
 ## Canvas picking
 

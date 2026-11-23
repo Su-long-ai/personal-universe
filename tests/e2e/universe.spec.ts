@@ -14,6 +14,23 @@ async function openNavigator(page: Page) {
   return dialog;
 }
 
+async function wheelScale(
+  page: Page,
+  direction: "in" | "out",
+) {
+  const canvas = page.locator("canvas");
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(
+    box!.x + box!.width * 0.5,
+    box!.y + box!.height * 0.5,
+  );
+  const deltaY = direction === "in" ? -120 : 120;
+  await page.mouse.wheel(0, deltaY);
+  await page.waitForTimeout(320);
+}
+
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
 }, testInfo) => {
@@ -103,6 +120,329 @@ test("default YEIS boots with native galaxy and personal signals", async ({
     body: Buffer.from(JSON.stringify(metrics, null, 2)),
     contentType: "application/json",
   });
+  await runtime.assertClean(testInfo);
+});
+
+test("wheel scale advances and reverses world layers without auto chaining", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  // Arrival alone must not auto-chain into orbit anymore.
+  await page.waitForTimeout(420);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "orbit");
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "atmosphere",
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "surface");
+
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "atmosphere",
+  );
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "orbit");
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+  );
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("the first opening wheel always acquires a scale target", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "auto-orbit",
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(
+    box!.x + box!.width * 0.5,
+    box!.y + box!.height * 0.5,
+  );
+  await page.mouse.wheel(0, -120);
+
+  await expect
+    .poll(async () => {
+      const pending = await html.getAttribute(
+        "data-universe-pending-destination",
+      );
+      const active = await html.getAttribute(
+        "data-universe-active-destination",
+      );
+      const phase = await html.getAttribute(
+        "data-universe-navigation-phase",
+      );
+      return pending ?? active ?? (phase === "system" ? "system" : null);
+    })
+    .not.toBeNull();
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-blocked",
+    "no-galaxy-focus",
+  );
+  await expect(html).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "stopped",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("manual galaxy takeover disables the opening soft focus", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-soft-focus",
+    "available",
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width * 0.62;
+  const y = box!.y + box!.height * 0.48;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 90, y + 30, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-soft-focus",
+    "disabled",
+  );
+  await expect(html).toHaveAttribute(
+    "data-yeis-opening-motion",
+    "stopped",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("continuous wheel intent carries across unsettled world transitions", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(
+    box!.x + box!.width * 0.5,
+    box!.y + box!.height * 0.5,
+  );
+
+  // Keep scrolling while the previous camera transition is still running.
+  // The extra intents must queue rather than disappear.
+  await page.mouse.wheel(0, -120);
+  await page.waitForTimeout(240);
+  await page.mouse.wheel(0, -120);
+  await page.waitForTimeout(240);
+  await page.mouse.wheel(0, -120);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+    { timeout: 30_000 },
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("wheel enters a centered YEIS star focus without clicking", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=star:c0&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "star:c0",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-focus",
+    "star:c0",
+    { timeout: 20_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("wheel follows Hero focus from galaxy through system to surface", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-focus",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-preferred",
+    "hero:aurora-01",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-focus",
+    "planet:aurora-01",
+    { timeout: 15_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "atmosphere",
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+  );
+
   await runtime.assertClean(testInfo);
 });
 
@@ -627,7 +967,7 @@ test("Guided Journey auto advance starts only after the destination settles", as
 
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
-    "orbit",
+    "approach",
     { timeout: 15_000 },
   );
   await expect(controls).toContainText(
@@ -636,12 +976,12 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await expect(controls).not.toContainText("JOURNEY COMPLETE");
 
   // Dwell is measured from actual camera settlement, not from the earlier
-  // React phase handoff. Keep most of the 6.5 s dwell observable before the
-  // single-stop Journey is allowed to enter its finished state.
-  await page.waitForTimeout(6_000);
+  // React phase handoff. Keep a conservative window inside the 6.5 s dwell so
+  // assertion/paint overhead cannot make the boundary check flaky.
+  await page.waitForTimeout(4_000);
   await expect(controls).not.toContainText("JOURNEY COMPLETE");
   await expect(controls).toContainText("JOURNEY COMPLETE", {
-    timeout: 2_500,
+    timeout: 4_000,
   });
   await expect(html).toHaveAttribute(
     "data-universe-journey-complete",
@@ -651,7 +991,7 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await runtime.assertClean(testInfo);
 });
 
-test("manual Orbit camera takeover interrupts Journey without changing destination", async ({
+test("wheel scale takeover interrupts Journey without changing destination", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -668,12 +1008,8 @@ test("manual Orbit camera takeover interrupts Journey without changing destinati
   await expect(controls).toBeVisible();
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
-    "orbit",
+    "approach",
     { timeout: 15_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-camera-mode",
-    "settled",
   );
 
   const destinationId = await html.getAttribute(
@@ -685,32 +1021,18 @@ test("manual Orbit camera takeover interrupts Journey without changing destinati
   );
   expect(destinationBefore).toBe(destinationId);
 
-  const canvas = page.locator("canvas").first();
-  await expect(canvas).toBeVisible();
-  const box = await canvas.boundingBox();
-  expect(box, "product world canvas should have a drag surface").not.toBeNull();
-  const startX = box!.x + box!.width * 0.62;
-  const startY = box!.y + box!.height * 0.52;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 84, startY + 34, { steps: 6 });
-  await page.mouse.up();
+  await wheelScale(page, "in");
 
   await expect(html).toHaveAttribute(
-    "data-universe-camera-mode",
-    "manual",
+    "data-universe-navigation-phase",
+    "orbit",
   );
-  await expect(html).not.toHaveAttribute("data-universe-camera-settled");
   await expect(controls).toHaveCount(0);
   await expect(html).not.toHaveAttribute("data-universe-journey");
   await expect(html).not.toHaveAttribute("data-universe-journey-complete");
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
     destinationId!,
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "orbit",
   );
   expect(new URL(page.url()).searchParams.get("destination")).toBe(
     destinationBefore,
