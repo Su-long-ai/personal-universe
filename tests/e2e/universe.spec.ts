@@ -448,8 +448,8 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     box!.y + box!.height * 0.5,
   );
 
-  for (let index = 0; index < 5; index += 1) {
-    await page.mouse.wheel(0, -12);
+  for (let index = 0; index < 4; index += 1) {
+    await page.mouse.wheel(0, -16);
     await page.waitForTimeout(20);
   }
   await expect(html).toHaveAttribute(
@@ -464,7 +464,7 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     )
     .toBeGreaterThan(0);
 
-  await page.mouse.wheel(0, -12);
+  await page.mouse.wheel(0, -16);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
@@ -1378,7 +1378,7 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
 
   // Even a sub-threshold trackpad intent is manual navigation and must stop
   // Journey auto-advance immediately without changing destination identity.
-  await page.mouse.wheel(0, -12);
+  await page.mouse.wheel(0, -16);
   await expect(controls).toHaveCount(0);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -1394,8 +1394,8 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
 
   // Continue the same gesture until the accumulated intent crosses the phase
   // threshold; the manual takeover must now advance normally.
-  for (let index = 0; index < 5; index += 1) {
-    await page.mouse.wheel(0, -12);
+  for (let index = 0; index < 4; index += 1) {
+    await page.mouse.wheel(0, -16);
     await page.waitForTimeout(20);
   }
 
