@@ -52,11 +52,12 @@ function RendererPageLifecycle() {
       released = true;
       html.dataset.universeWebglLifecycle = "released";
 
-      // R3F owns normal Canvas unmount disposal. This terminal path exists for
-      // document teardown, where React cleanup is not guaranteed to run before
-      // Chromium reuses the browser process (notably with SwiftShader in CI).
+      // R3F owns WebGLRenderer.dispose() on normal Canvas unmount. At the
+      // terminal document boundary only force the underlying context loss:
+      // WEBGL_lose_context destroys the graphics resources immediately, while
+      // avoiding a second synchronous renderer disposal over a still-mounted
+      // live ProceduralPlanets graph.
       gl.forceContextLoss();
-      gl.dispose();
     };
 
     window.addEventListener("pagehide", onPageHide);
