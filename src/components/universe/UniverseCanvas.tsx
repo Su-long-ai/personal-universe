@@ -44,6 +44,7 @@ function RendererPageLifecycle() {
 
   useEffect(() => {
     let released = false;
+    let releaseTimer: number | null = null;
     const html = document.documentElement;
     html.dataset.universeWebglLifecycle = "active";
 
@@ -52,17 +53,23 @@ function RendererPageLifecycle() {
       released = true;
       html.dataset.universeWebglLifecycle = "released";
 
-      // R3F owns WebGLRenderer.dispose() on normal Canvas unmount. At the
-      // terminal document boundary only force the underlying context loss:
-      // WEBGL_lose_context destroys the graphics resources immediately, while
-      // avoiding a second synchronous renderer disposal over a still-mounted
-      // live ProceduralPlanets graph.
-      gl.forceContextLoss();
+      // Keep pagehide itself bounded. R3F/browser teardown remains the primary
+      // owner at a discarded document boundary; if this page remains runnable
+      // long enough, lose the context on the next task through Three.js'
+      // standard WEBGL_lose_context wrapper.
+      releaseTimer = window.setTimeout(() => {
+        releaseTimer = null;
+        gl.forceContextLoss();
+      }, 0);
     };
 
     window.addEventListener("pagehide", onPageHide);
     return () => {
       window.removeEventListener("pagehide", onPageHide);
+      if (releaseTimer !== null) {
+        window.clearTimeout(releaseTimer);
+        releaseTimer = null;
+      }
       if (html.dataset.universeWebglLifecycle === "active") {
         delete html.dataset.universeWebglLifecycle;
       }
