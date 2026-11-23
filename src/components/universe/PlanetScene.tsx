@@ -13,21 +13,32 @@ import {
 import { hashSeed } from "../../lib/universe/generation";
 import { liveWorldFallbackReason } from "./CinematicPipeline";
 import { SurfaceScene } from "./SurfaceScene";
+import type { SurfaceCameraFrame } from "./CinematicCamera";
 
 const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
 const LIVE_PLANET_RADIUS = 2000;
 const LIVE_WORLD_RADIUS = PLANET_RENDER_RADIUS;
 const FALLBACK_WORLD_RADIUS = PLANET_RENDER_RADIUS * 0.965;
 
+// Keep the canonical landing patch on the lit hemisphere. This direction
+// has a strong positive dot product with the current product sun vector,
+ // so Surface reads as terrain rather than a black planet limb.
 const SURFACE_WORLD_NORMAL = new THREE.Vector3(
-  0.120283,
-  0.200472,
-  0.972288,
+  -0.10013,
+  0.350456,
+  -0.931211,
 ).normalize();
 const SURFACE_UP = new THREE.Vector3(0, 1, 0);
 
-function LiveSurfaceAnchor({ planet }: { planet: Planet }) {
+function LiveSurfaceAnchor({
+  planet,
+  onCameraFrame,
+}: {
+  planet: Planet;
+  onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
+}) {
   const group = useRef<THREE.Group>(null);
+  const cameraFramePublished = useRef(false);
   const scratch = useMemo(
     () => ({
       center: new THREE.Vector3(),
@@ -37,6 +48,9 @@ function LiveSurfaceAnchor({ planet }: { planet: Planet }) {
       worldQuaternion: new THREE.Quaternion(),
       inverseQuaternion: new THREE.Quaternion(),
       anchorQuaternion: new THREE.Quaternion(),
+      tangent: new THREE.Vector3(),
+      cameraPosition: new THREE.Vector3(),
+      cameraTarget: new THREE.Vector3(),
     }),
     [],
   );
@@ -52,8 +66,10 @@ function LiveSurfaceAnchor({ planet }: { planet: Planet }) {
         delete document.documentElement.dataset.universeSurfaceRenderer;
       }
       delete document.documentElement.dataset.universeSurfaceAnchorReady;
+      delete document.documentElement.dataset.universeSurfaceCameraFrame;
+      onCameraFrame(null);
     };
-  }, []);
+  }, [onCameraFrame]);
 
   useFrame(() => {
     if (!group.current) return;
@@ -80,29 +96,48 @@ function LiveSurfaceAnchor({ planet }: { planet: Planet }) {
       scratch.normal,
     );
     group.current.quaternion.copy(scratch.anchorQuaternion);
+
+    if (!cameraFramePublished.current) {
+      scratch.tangent.crossVectors(SURFACE_UP, scratch.normal);
+      if (scratch.tangent.lengthSq() < 1e-6) {
+        scratch.tangent.set(1, 0, 0);
+      } else {
+        scratch.tangent.normalize();
+      }
+
+      // Derive the landing view from the actual displaced terrain point,
+      // not from the nominal sphere radius. This keeps the camera above the
+      // rendered ground even when the procedural height field changes.
+      scratch.cameraPosition
+        .copy(scratch.point)
+        .addScaledVector(scratch.normal, 0.012)
+        .addScaledVector(scratch.tangent, -0.012);
+      scratch.cameraTarget
+        .copy(scratch.point)
+        .addScaledVector(scratch.tangent, 0.18)
+        .addScaledVector(scratch.normal, 0.008);
+
+      onCameraFrame({
+        position: scratch.cameraPosition.toArray() as [number, number, number],
+        target: scratch.cameraTarget.toArray() as [number, number, number],
+        up: scratch.normal.toArray() as [number, number, number],
+      });
+      cameraFramePublished.current = true;
+      document.documentElement.dataset.universeSurfaceCameraFrame = "ready";
+    }
+
     document.documentElement.dataset.universeSurfaceAnchorReady = "true";
   });
 
   return (
     <group ref={group} name="live-surface-anchor">
-      <mesh position={[0, 0.13, 0]}>
-        <cylinderGeometry args={[0.035, 0.05, 0.26, 18]} />
-        <meshStandardMaterial
-          color="#a9edff"
-          emissive="#4fdcff"
-          emissiveIntensity={3.2}
-          roughness={0.25}
-          metalness={0.5}
-        />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
-        <ringGeometry args={[0.12, 0.19, 36]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+        <ringGeometry args={[0.035, 0.065, 28]} />
         <meshBasicMaterial
           color="#76e6ff"
           transparent
-          opacity={0.42}
+          opacity={0.24}
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </group>
@@ -205,10 +240,12 @@ export function PlanetScene({
   planet,
   quality,
   phase,
+  onSurfaceCameraFrame,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
   phase: UniversePhase;
+  onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
@@ -310,7 +347,11 @@ export function PlanetScene({
   }, [fallbackReason, livePlanet]);
 
   useFrame((_, delta) => {
-    if (livePlanet) livePlanet.rotation.y += delta * 0.014;
+    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
+    // retain the subtle planetary rotation.
+    if (livePlanet && phase !== "surface") {
+      livePlanet.rotation.y += delta * 0.014;
+    }
   });
 
   if (phase === "surface" && fallbackReason) {
@@ -368,7 +409,10 @@ export function PlanetScene({
       </group>
 
       {phase === "surface" && livePlanet ? (
-        <LiveSurfaceAnchor planet={livePlanet} />
+        <LiveSurfaceAnchor
+          planet={livePlanet}
+          onCameraFrame={onSurfaceCameraFrame}
+        />
       ) : null}
     </>
   );

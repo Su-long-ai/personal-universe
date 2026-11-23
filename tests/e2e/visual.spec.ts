@@ -277,6 +277,17 @@ test("visual: desktop Hero surface keeps the live planet renderer", async ({
         "true",
         { timeout: 60_000 },
       );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-frame",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-applied",
+        "true",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
     },
   );
 });

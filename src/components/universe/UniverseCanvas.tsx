@@ -1,9 +1,12 @@
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
-import { CinematicCamera } from "./CinematicCamera";
+import {
+  CinematicCamera,
+  type SurfaceCameraFrame,
+} from "./CinematicCamera";
 import type {
   YeisGalaxyViewState,
   YeisSignalHover,
@@ -89,6 +92,8 @@ export function UniverseCanvas({
   onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
+  const [surfaceCameraFrame, setSurfaceCameraFrame] =
+    useState<SurfaceCameraFrame | null>(null);
   const liveWorld =
     Boolean(selectedPlanet) &&
     (phase === "approach" ||
@@ -112,6 +117,7 @@ export function UniverseCanvas({
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           quality={quality}
+          surfaceCameraFrame={surfaceCameraFrame}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -182,6 +188,7 @@ export function UniverseCanvas({
               planet={selectedPlanet}
               quality={quality}
               phase={phase}
+              onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}
       </Suspense>

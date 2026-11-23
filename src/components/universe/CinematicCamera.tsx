@@ -11,11 +11,18 @@ import {
 } from "../../lib/universe/types";
 import { liveWorldFallbackReason } from "./CinematicPipeline";
 
+export type SurfaceCameraFrame = {
+  position: [number, number, number];
+  target: [number, number, number];
+  up: [number, number, number];
+};
+
 type CinematicCameraProps = {
   phase: UniversePhase;
   scrollDepth: number;
   reducedMotion: boolean;
   quality: QualityMode;
+  surfaceCameraFrame: SurfaceCameraFrame | null;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -108,12 +115,15 @@ const SHOTS: Partial<
     targetTolerance: 0.06,
   },
   surface: {
-    position: [8.049, 1.021, 3.983],
-    target: [5.755, 0.976, 3.762],
-    smoothTime: 0.62,
-    maxSpeed: 8,
-    positionTolerance: 0.05,
-    targetTolerance: 0.04,
+    // Tangent-to-surface landing view at the canonical live terrain anchor.
+    // The camera sits just above the same globe used in Orbit/Atmosphere and
+    // looks along the spherical terrain instead of back through the planet.
+    position: [6.463, 1.654, -3.884],
+    target: [5.316, 1.456, -3.228],
+    smoothTime: 0.58,
+    maxSpeed: 6,
+    positionTolerance: 0.035,
+    targetTolerance: 0.03,
   },
   returning: {
     position: [0, 24, 41],
@@ -130,13 +140,23 @@ export function CinematicCamera({
   scrollDepth,
   reducedMotion,
   quality,
+  surfaceCameraFrame,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
   const { width, height } = useThree((state) => state.size);
   const gl = useThree((state) => state.gl);
+  const camera = useThree((state) => state.camera);
   const surfaceFallback =
     phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
+  const liveSurfaceShot =
+    surfaceCameraFrame && SHOTS.surface
+      ? {
+          ...SHOTS.surface,
+          position: surfaceCameraFrame.position,
+          target: surfaceCameraFrame.target,
+        }
+      : SHOTS.surface;
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
   const configuredPhase = useRef<UniversePhase | null>(null);
@@ -156,7 +176,7 @@ export function CinematicCamera({
         : phase === "surface"
           ? surfaceFallback
             ? 8
-            : 0.35
+            : 0.015
           : 0.3;
   const manualMaxDistance =
     phase === "orbit"
@@ -166,7 +186,7 @@ export function CinematicCamera({
         : phase === "surface"
           ? surfaceFallback
             ? 65
-            : 6
+            : 1.4
           : 65;
 
   const handleUserControlStart = useCallback(() => {
@@ -189,6 +209,26 @@ export function CinematicCamera({
 
     controls.stop();
 
+    const desiredNear =
+      phase === "surface" && !surfaceFallback && surfaceCameraFrame
+        ? 0.001
+        : 0.05;
+    if (camera.near !== desiredNear) {
+      camera.near = desiredNear;
+      camera.updateProjectionMatrix();
+    }
+
+    if (
+      phase === "surface" &&
+      !surfaceFallback &&
+      surfaceCameraFrame
+    ) {
+      camera.up.set(...surfaceCameraFrame.up).normalize();
+    } else {
+      camera.up.set(0, 1, 0);
+    }
+    controls.updateCameraUp();
+
     if (phase === "galaxy") {
       controls.smoothTime = reducedMotion ? 0.05 : 0.58;
       controls.maxSpeed = 38;
@@ -205,10 +245,18 @@ export function CinematicCamera({
     }
 
     const shot =
-      phase === "surface" && surfaceFallback
-        ? FALLBACK_SURFACE_SHOT
+      phase === "surface"
+        ? surfaceFallback
+          ? FALLBACK_SURFACE_SHOT
+          : liveSurfaceShot
         : SHOTS[phase];
     if (!shot) return;
+
+    if (phase === "surface" && !surfaceFallback && surfaceCameraFrame) {
+      document.documentElement.dataset.universeSurfaceCameraApplied = "true";
+    } else {
+      delete document.documentElement.dataset.universeSurfaceCameraApplied;
+    }
 
     controls.smoothTime = reducedMotion ? 0.05 : shot.smoothTime;
     controls.maxSpeed = reducedMotion ? 1000 : shot.maxSpeed;
@@ -237,11 +285,13 @@ export function CinematicCamera({
     );
     configuredPhase.current = phase;
   }, [
+    camera,
     height,
     phase,
     quality,
     reducedMotion,
     scrollDepth,
+    surfaceCameraFrame,
     surfaceFallback,
     width,
   ]);
@@ -272,8 +322,10 @@ export function CinematicCamera({
   useFrame(() => {
     const controls = controlsRef.current;
     const shot =
-      phase === "surface" && surfaceFallback
-        ? FALLBACK_SURFACE_SHOT
+      phase === "surface"
+        ? surfaceFallback
+          ? FALLBACK_SURFACE_SHOT
+          : liveSurfaceShot
         : SHOTS[phase];
     if (
       !controls ||
@@ -304,6 +356,7 @@ export function CinematicCamera({
     () => () => {
       delete document.documentElement.dataset.universeCameraSettled;
       delete document.documentElement.dataset.universeCameraMode;
+      delete document.documentElement.dataset.universeSurfaceCameraApplied;
     },
     [],
   );
