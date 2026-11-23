@@ -273,7 +273,13 @@ test("runtime guard detects and recovers from forced WebGL context loss", async 
         const timer = window.setTimeout(() => resolve(false), 5_000);
         canvas.addEventListener(
           name,
-          () => {
+          (event) => {
+            if (name === "webglcontextlost") {
+              // WebGL only marks a lost context restorable when the loss event
+              // is cancelled. Make the recovery precondition explicit instead
+              // of relying on Three's listener ordering.
+              event.preventDefault();
+            }
             window.clearTimeout(timer);
             resolve(true);
           },
@@ -286,6 +292,9 @@ test("runtime guard detects and recovers from forced WebGL context loss", async 
     const lost = await lostPromise;
     if (!lost) return { supported: true, lost: false, restored: false };
 
+    // Yield one task so the cancelable loss event has fully completed;
+    // restoreContext is invalid while that dispatch is still in progress.
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
     const restoredPromise = waitFor("webglcontextrestored");
     extension.restoreContext();
     const restored = await restoredPromise;
