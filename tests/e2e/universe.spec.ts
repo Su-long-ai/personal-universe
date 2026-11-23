@@ -580,6 +580,86 @@ test("reduced motion keeps continuous scale reversible and settled", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Search takeover cancels queued world scale intent", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(
+    box!.x + box!.width * 0.5,
+    box!.y + box!.height * 0.5,
+  );
+
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+  );
+
+  // Cross the wheel cooldown while Orbit is still transitioning, then queue
+  // one more inward step. Search is a higher-priority manual authority and
+  // must invalidate this queued intent instead of letting it fire later.
+  await page.waitForTimeout(230);
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-queued",
+    "world:+1",
+  );
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  await expect(dialog).toBeVisible();
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-superseded",
+    "navigator-open",
+  );
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "atmosphere",
+    { timeout: 10_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel enters a centered YEIS star focus without clicking", async ({
   page,
 }, testInfo) => {
@@ -894,6 +974,28 @@ test("observed NASA exoplanet Search opens the exact observed world", async ({
   expect(url.searchParams.get("destination")).toMatch(/^exoplanet:/);
   expect(url.searchParams.get("body")).toBe(
     "catalog:Gliese 12:Gliese 12 b",
+  );
+
+  // Search/deep-link entry must hand off to the same continuous-scale
+  // coordinator instead of becoming a click-only dead end.
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 10_000 },
+  );
+  expect(new URL(page.url()).searchParams.get("destination")).toMatch(
+    /^exoplanet:/,
   );
 
   await runtime.assertClean(testInfo);
