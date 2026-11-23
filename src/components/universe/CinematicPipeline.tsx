@@ -23,17 +23,19 @@ function rendererLabel(gl: THREE.WebGLRenderer) {
   return String(context.getParameter(context.RENDERER) ?? "");
 }
 
+export function isSoftwareRenderer(gl: THREE.WebGLRenderer) {
+  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
+    rendererLabel(gl),
+  );
+}
+
 export function liveWorldFallbackReason(
   gl: THREE.WebGLRenderer,
   quality: QualityMode,
 ) {
   if (quality === "low") return "low-quality";
   if (quality === "high") return null;
-  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
-    rendererLabel(gl),
-  )
-    ? "software-renderer"
-    : null;
+  return isSoftwareRenderer(gl) ? "software-renderer" : null;
 }
 
 export function CinematicPipeline({
@@ -45,6 +47,7 @@ export function CinematicPipeline({
 }) {
   const { gl, scene, camera, size } = useThree();
   const high = quality !== "low";
+  const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorld
     ? liveWorldFallbackReason(gl, quality)
     : null;
@@ -130,10 +133,21 @@ export function CinematicPipeline({
 
   useEffect(() => {
     composer.composer.setSize(size.width, size.height);
+    // "high" explicitly keeps the live ProceduralPlanets path available, but
+    // a software rasterizer should not also multiply its render target area by
+    // 1.75². Keep renderer identity/terrain semantics intact while bounding the
+    // hosted-runner and CPU-only pixel budget.
     composer.composer.setPixelRatio(
-      Math.min(gl.getPixelRatio(), high ? 1.75 : 1),
+      Math.min(gl.getPixelRatio(), softwareRenderer ? 1 : high ? 1.75 : 1),
     );
-  }, [composer, gl, high, size.height, size.width]);
+  }, [
+    composer,
+    gl,
+    high,
+    size.height,
+    size.width,
+    softwareRenderer,
+  ]);
 
   useEffect(() => {
     return () => {
