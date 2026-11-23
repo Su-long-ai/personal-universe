@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { SurfaceTerrain } from "./SurfaceTerrain";
@@ -67,15 +67,11 @@ function DistantMoon() {
   );
 }
 
-export function SurfaceScene() {
+export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
   const [active, setActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
-
-  return (
+  const content = (
     <>
-      <color attach="background" args={["#030b12"]} />
-      <fog attach="fog" args={["#07141d", 34, 118]} />
-
       <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
       <directionalLight
         position={[-12, 9, 4]}
@@ -83,14 +79,45 @@ export function SurfaceScene() {
         color="#ffc27d"
         castShadow
       />
-      <pointLight position={[0.4, anchorHeight + 1.0, -5.4]} intensity={active ? 7 : 2.8} distance={11} color={active ? "#ffb46d" : "#74d8ff"} />
+      <pointLight
+        position={[0.4, anchorHeight + 1.0, -5.4]}
+        intensity={active ? 7 : 2.8}
+        distance={11}
+        color={active ? "#ffb46d" : "#74d8ff"}
+      />
 
       <Suspense fallback={null}>
         <SurfaceTerrain onAnchorHeight={setAnchorHeight} />
       </Suspense>
 
       <DistantMoon />
-      <ArrivalBeacon active={active} height={anchorHeight} onToggle={() => setActive((value) => !value)} />
+      <ArrivalBeacon
+        active={active}
+        height={anchorHeight}
+        onToggle={() => setActive((value) => !value)}
+      />
+    </>
+  );
+
+  useEffect(() => {
+    if (!anchored) return;
+    document.documentElement.dataset.universeSurfaceRenderer =
+      "procedural-terrains-fallback";
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceRenderer ===
+        "procedural-terrains-fallback"
+      ) {
+        delete document.documentElement.dataset.universeSurfaceRenderer;
+      }
+    };
+  }, [anchored]);
+
+  return (
+    <>
+      <color attach="background" args={["#030b12"]} />
+      <fog attach="fog" args={["#07141d", 34, 118]} />
+      {content}
     </>
   );
 }

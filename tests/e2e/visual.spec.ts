@@ -48,7 +48,7 @@ async function shot(
 
 async function waitForCameraSettled(
   page: Page,
-  phase: "approach" | "orbit" | "atmosphere" | "returning",
+  phase: "approach" | "orbit" | "atmosphere" | "surface" | "returning",
 ) {
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-camera-settled",
@@ -229,6 +229,51 @@ test("visual: desktop Hero world high-quality live renderer", async ({
       );
       await expect(page.locator("html")).toHaveAttribute(
         "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+    },
+  );
+});
+
+test("visual: desktop Hero surface keeps the live planet renderer", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-surface-live-high",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      await waitForCameraSettled(page, "surface");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "procedural-planets-pass",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-renderer",
+        "procedural-planets-live-surface",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-anchor-ready",
         "true",
         { timeout: 60_000 },
       );

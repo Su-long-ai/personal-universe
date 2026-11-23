@@ -205,6 +205,35 @@ test("wheel scale advances and reverses world layers without auto chaining", asy
   await runtime.assertClean(testInfo);
 });
 
+test("low-quality Surface retains the existing terrain fallback", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 15_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("the first opening wheel always acquires a scale target", async ({
   page,
 }, testInfo) => {

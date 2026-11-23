@@ -10,8 +10,8 @@ of becoming competing application shells.
 | --- | --- | --- |
 | Galaxy / deep sky | Pinned MIT YEIS | Shared destination model, Search / Places, Personal Signals, Journey |
 | Native stellar system | Pinned MIT YEIS BodyRenderer / BodyPoints / OrbitLines | Product phase, camera, destination identity, content binding, click intent |
-| Close world (Approach / Orbit / Atmosphere) | ProceduralPlanets `Planet` + `PlanetPass` when supported | Product camera, phase progression, world identity, content cards |
-| Surface | Existing product surface scene | Product camera and content |
+| Close world (Approach / Orbit / Atmosphere / Surface) | ProceduralPlanets `Planet` + `PlanetPass` when supported | Product camera, phase progression, world identity, content cards |
+| Surface fallback | Existing ProceduralTerrains product surface scene | Product camera and content |
 | V2 rollback / non-native system | Existing product renderer | Existing product model |
 
 The reusable YEIS source boundary is fixed at
@@ -79,6 +79,35 @@ A live HIGH world is accepted only when the renderer reports
 `procedural-planets-live`, the pipeline reports
 `procedural-planets-pass`, and `data-universe-world-ready="true"`.
 
+## Surface continuity
+
+Task `PROCEDURAL-PLANET-SURFACE-HANDOFF-001` removes the primary-path
+renderer swap at the final scale boundary.
+
+For a live-capable terrestrial world, `PlanetScene` and the same
+`PlanetPass` now stay mounted from Approach through Orbit and Atmosphere into
+Surface. The surface camera moves into a near-ground tangent frame while the
+same ProceduralPlanets cube-sphere quadtree continues refining underneath it.
+No replacement globe or second spherical terrain engine is created.
+
+Product-specific objects are ordinary Three.js overlays. Their live surface
+anchor is derived through `Planet.getSurfacePoint()`, so the product marker is
+placed against the terrain owned by ProceduralPlanets rather than against a
+separate guessed sphere. The package's own geomorphed quadtree remains the
+visual terrain authority.
+
+Runtime evidence:
+
+- `data-universe-surface-renderer="procedural-planets-live-surface"`
+- `data-universe-surface-anchor-ready="true"`
+- the existing `data-universe-world-renderer="procedural-planets-live"`
+- the existing `data-universe-world-pipeline="procedural-planets-pass"`
+
+If live rendering is intentionally disabled by LOW quality or an AUTO software
+renderer, the existing ProceduralTerrains scene is retained and moved into the
+same near-surface product frame. That fallback publishes
+`data-universe-surface-renderer="procedural-terrains-fallback"`.
+
 ## Fallback rules
 
 Fallbacks are product behavior, not hidden test exceptions:
@@ -89,16 +118,28 @@ Fallbacks are product behavior, not hidden test exceptions:
 3. If the native system adapter fails at runtime, it reports
    `prototype-fallback` and retains the existing system scene.
 4. If live close-world rendering is unsuitable for the current quality/hardware
-   tier, the lightweight world remains visible and signals readiness through
-   the fallback pipeline.
+   tier, Approach/Orbit/Atmosphere retain the lightweight world and Surface uses
+   the existing anchored ProceduralTerrains scene.
 5. No fallback may create a second navigation/destination authority.
 
 ## Lifecycle and loading
 
 Large renderer paths are lazy-loaded. Native system resources are constructed
-only in the system phase and disposed on unmount. Close-world renderer resources
-exist only in close-world phases. Galaxy rendering, native system rendering and
-live close-world rendering therefore do not need to remain resident together.
+only in the system phase and disposed on unmount. Close-world renderer resources exist only in close-world phases, now including
+Surface. Crucially, the live `Planet` is not disposed and recreated at the
+Atmosphere → Surface boundary; React keeps the same close-world component and
+the same compositor path alive. Galaxy rendering, native system rendering and
+live close-world rendering therefore still do not need to remain resident
+together.
 
 The product release gate validates both semantic arrival and renderer readiness;
 screenshots remain evidence, not the authority for navigation state.
+
+### Surface fallback transform boundary
+
+ProceduralTerrains currently requires its terrain world transform to remain the
+identity matrix. The fallback Surface path therefore stays at its native world
+origin and reuses the legacy fallback camera shot. It is not parented, rotated
+or scaled onto the live globe. The primary high-quality path remains the
+continuous ProceduralPlanets globe; the fallback prioritizes correctness and
+availability over pretending to share the live globe frame.

@@ -25,9 +25,6 @@ import type {
 const LazyPlanetScene = lazy(() =>
   import("./PlanetScene").then((module) => ({ default: module.PlanetScene })),
 );
-const LazySurfaceScene = lazy(() =>
-  import("./SurfaceScene").then((module) => ({ default: module.SurfaceScene })),
-);
 const LazyYeisGalaxyScene = lazy(() =>
   import("./YeisGalaxyScene").then((module) => ({
     default: module.YeisGalaxyScene,
@@ -96,7 +93,8 @@ export function UniverseCanvas({
     Boolean(selectedPlanet) &&
     (phase === "approach" ||
       phase === "orbit" ||
-      phase === "atmosphere");
+      phase === "atmosphere" ||
+      phase === "surface");
 
   return (
     <Canvas
@@ -113,6 +111,7 @@ export function UniverseCanvas({
           phase={phase}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
+          quality={quality}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -175,19 +174,19 @@ export function UniverseCanvas({
       )}
 
       <Suspense fallback={null}>
-        {phase === "surface" && <LazySurfaceScene />}
-
         {phase !== "galaxy" &&
           phase !== "system" &&
-          phase !== "surface" &&
           phase !== "returning" &&
           selectedPlanet && (
-            <LazyPlanetScene planet={selectedPlanet} quality={quality} />
+            <LazyPlanetScene
+              planet={selectedPlanet}
+              quality={quality}
+              phase={phase}
+            />
           )}
       </Suspense>
 
       <CinematicPipeline
-        key={phase}
         quality={quality}
         liveWorld={liveWorld}
       />

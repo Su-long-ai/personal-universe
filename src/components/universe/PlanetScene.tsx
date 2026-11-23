@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
@@ -12,11 +12,102 @@ import {
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
 import { liveWorldFallbackReason } from "./CinematicPipeline";
+import { SurfaceScene } from "./SurfaceScene";
 
 const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
 const LIVE_PLANET_RADIUS = 2000;
 const LIVE_WORLD_RADIUS = PLANET_RENDER_RADIUS;
 const FALLBACK_WORLD_RADIUS = PLANET_RENDER_RADIUS * 0.965;
+
+const SURFACE_WORLD_NORMAL = new THREE.Vector3(
+  0.120283,
+  0.200472,
+  0.972288,
+).normalize();
+const SURFACE_UP = new THREE.Vector3(0, 1, 0);
+
+function LiveSurfaceAnchor({ planet }: { planet: Planet }) {
+  const group = useRef<THREE.Group>(null);
+  const scratch = useMemo(
+    () => ({
+      center: new THREE.Vector3(),
+      point: new THREE.Vector3(),
+      normal: new THREE.Vector3(),
+      localDirection: new THREE.Vector3(),
+      worldQuaternion: new THREE.Quaternion(),
+      inverseQuaternion: new THREE.Quaternion(),
+      anchorQuaternion: new THREE.Quaternion(),
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceRenderer =
+      "procedural-planets-live-surface";
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceRenderer ===
+        "procedural-planets-live-surface"
+      ) {
+        delete document.documentElement.dataset.universeSurfaceRenderer;
+      }
+      delete document.documentElement.dataset.universeSurfaceAnchorReady;
+    };
+  }, []);
+
+  useFrame(() => {
+    if (!group.current) return;
+
+    planet.updateWorldMatrix(true, false);
+    planet.getWorldPosition(scratch.center);
+    planet.getWorldQuaternion(scratch.worldQuaternion);
+    scratch.inverseQuaternion.copy(scratch.worldQuaternion).invert();
+    scratch.localDirection
+      .copy(SURFACE_WORLD_NORMAL)
+      .applyQuaternion(scratch.inverseQuaternion)
+      .normalize();
+    planet.getSurfacePoint(scratch.localDirection, scratch.point);
+    scratch.normal
+      .copy(scratch.point)
+      .sub(scratch.center)
+      .normalize();
+
+    group.current.position
+      .copy(scratch.point)
+      .addScaledVector(scratch.normal, 0.035);
+    scratch.anchorQuaternion.setFromUnitVectors(
+      SURFACE_UP,
+      scratch.normal,
+    );
+    group.current.quaternion.copy(scratch.anchorQuaternion);
+    document.documentElement.dataset.universeSurfaceAnchorReady = "true";
+  });
+
+  return (
+    <group ref={group} name="live-surface-anchor">
+      <mesh position={[0, 0.13, 0]}>
+        <cylinderGeometry args={[0.035, 0.05, 0.26, 18]} />
+        <meshStandardMaterial
+          color="#a9edff"
+          emissive="#4fdcff"
+          emissiveIntensity={3.2}
+          roughness={0.25}
+          metalness={0.5}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <ringGeometry args={[0.12, 0.19, 36]} />
+        <meshBasicMaterial
+          color="#76e6ff"
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </group>
+  );
+}
 
 type IdleWindow = Window & {
   requestIdleCallback?: (
@@ -113,9 +204,11 @@ function liveQuality(quality: QualityMode) {
 export function PlanetScene({
   planet,
   quality,
+  phase,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
+  phase: UniversePhase;
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
@@ -220,6 +313,10 @@ export function PlanetScene({
     if (livePlanet) livePlanet.rotation.y += delta * 0.014;
   });
 
+  if (phase === "surface" && fallbackReason) {
+    return <SurfaceScene anchored />;
+  }
+
   return (
     <>
       <color attach="background" args={["#000106"]} />
@@ -269,6 +366,10 @@ export function PlanetScene({
           />
         ) : null}
       </group>
+
+      {phase === "surface" && livePlanet ? (
+        <LiveSurfaceAnchor planet={livePlanet} />
+      ) : null}
     </>
   );
 }

@@ -6,13 +6,16 @@ import { Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
+  type QualityMode,
   type UniversePhase,
 } from "../../lib/universe/types";
+import { liveWorldFallbackReason } from "./CinematicPipeline";
 
 type CinematicCameraProps = {
   phase: UniversePhase;
   scrollDepth: number;
   reducedMotion: boolean;
+  quality: QualityMode;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -44,6 +47,16 @@ const MANUAL_TOUCH = {
   two: CameraControlsImpl.ACTION.TOUCH_DOLLY_ROTATE,
   three: CameraControlsImpl.ACTION.NONE,
 } as const;
+
+const FALLBACK_SURFACE_SHOT = {
+  position: [0.5, 22.0, 18.0] as [number, number, number],
+  target: [0, 8.0, -16.0] as [number, number, number],
+  smoothTime: 0.38,
+  maxSpeed: 24,
+  positionTolerance: 0.14,
+  targetTolerance: 0.1,
+  transition: false,
+};
 
 const SHOTS: Partial<
   Record<
@@ -87,21 +100,20 @@ const SHOTS: Partial<
     frameScale: 1.28,
   },
   atmosphere: {
-    position: [7.12, 0.9, 3.42],
-    target: [WORLD[0] - 0.18, WORLD[1] - 0.24, WORLD[2] - 0.08],
+    position: [7.3, 1.2, 4.8],
+    target: [6.75, 0.45, 1.2],
     smoothTime: 0.68,
     maxSpeed: 12,
     positionTolerance: 0.08,
     targetTolerance: 0.06,
   },
   surface: {
-    position: [0.5, 22.0, 18.0],
-    target: [0, 8.0, -16.0],
-    smoothTime: 0.38,
-    maxSpeed: 24,
-    positionTolerance: 0.14,
-    targetTolerance: 0.1,
-    transition: false,
+    position: [8.049, 1.021, 3.983],
+    target: [5.755, 0.976, 3.762],
+    smoothTime: 0.62,
+    maxSpeed: 8,
+    positionTolerance: 0.05,
+    targetTolerance: 0.04,
   },
   returning: {
     position: [0, 24, 41],
@@ -117,11 +129,14 @@ export function CinematicCamera({
   phase,
   scrollDepth,
   reducedMotion,
+  quality,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
   const { width, height } = useThree((state) => state.size);
   const gl = useThree((state) => state.gl);
+  const surfaceFallback =
+    phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
   const controlsRef = useRef<CameraControlsApi>(null);
   const completedPhase = useRef<UniversePhase | null>(null);
   const configuredPhase = useRef<UniversePhase | null>(null);
@@ -139,10 +154,20 @@ export function CinematicCamera({
       : phase === "system"
         ? 5
         : phase === "surface"
-          ? 8
+          ? surfaceFallback
+            ? 8
+            : 0.35
           : 0.3;
   const manualMaxDistance =
-    phase === "orbit" ? PLANET_RENDER_RADIUS * 7 : phase === "system" ? 55 : 65;
+    phase === "orbit"
+      ? PLANET_RENDER_RADIUS * 7
+      : phase === "system"
+        ? 55
+        : phase === "surface"
+          ? surfaceFallback
+            ? 65
+            : 6
+          : 65;
 
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
@@ -179,7 +204,10 @@ export function CinematicCamera({
       return;
     }
 
-    const shot = SHOTS[phase];
+    const shot =
+      phase === "surface" && surfaceFallback
+        ? FALLBACK_SURFACE_SHOT
+        : SHOTS[phase];
     if (!shot) return;
 
     controls.smoothTime = reducedMotion ? 0.05 : shot.smoothTime;
@@ -208,7 +236,15 @@ export function CinematicCamera({
       shot.transition ?? !reducedMotion,
     );
     configuredPhase.current = phase;
-  }, [height, phase, reducedMotion, scrollDepth, width]);
+  }, [
+    height,
+    phase,
+    quality,
+    reducedMotion,
+    scrollDepth,
+    surfaceFallback,
+    width,
+  ]);
 
   const publishSettled = useCallback(() => {
     if (
@@ -235,7 +271,10 @@ export function CinematicCamera({
 
   useFrame(() => {
     const controls = controlsRef.current;
-    const shot = SHOTS[phase];
+    const shot =
+      phase === "surface" && surfaceFallback
+        ? FALLBACK_SURFACE_SHOT
+        : SHOTS[phase];
     if (
       !controls ||
       !shot ||
