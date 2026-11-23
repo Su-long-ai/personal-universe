@@ -339,6 +339,7 @@ export function YeisGalaxyScene({
           const width = rect.width;
           const height = rect.height;
           const pickRadius = state.input.coarse ? 24 : 17;
+          const signalPickRadius = state.input.coarse ? 18 : 10;
 
           const markerById = new Map(
             markersRef.current.map((marker) => [marker.id, marker]),
@@ -362,7 +363,7 @@ export function YeisGalaxyScene({
             const sy = (-contentProjection.y * 0.5 + 0.5) * height;
             const distance = Math.hypot(sx - x, sy - y);
             if (
-              distance <= pickRadius &&
+              distance <= signalPickRadius &&
               (!nearestSignal || distance < nearestSignal.distance)
             ) {
               nearestSignal = { placement, distance };
