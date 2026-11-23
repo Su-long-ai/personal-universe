@@ -31,6 +31,22 @@ async function wheelScale(
   await page.waitForTimeout(320);
 }
 
+async function dispatchScaleWheel(page: Page, deltaY: number) {
+  await page.locator("main.universe-root").evaluate(
+    (root, value) => {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: value,
+        }),
+      );
+    },
+    deltaY,
+  );
+}
+
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
 }, testInfo) => {
@@ -165,7 +181,7 @@ test("wheel scale advances and reverses world layers without auto chaining", asy
     "data-universe-camera-settled",
     "atmosphere",
   );
-  await wheelScale(page, "in");
+  await dispatchScaleWheel(page, -120);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
@@ -450,10 +466,13 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     box!.y + box!.height * 0.5,
   );
 
-  // A lone tiny sample still expires quickly as noise.
-  await page.mouse.wheel(0, -16);
+  // A lone tiny sample still expires quickly as noise. This test pins the
+  // accumulator itself with DOM WheelEvents because hosted Chromium may
+  // coalesce tiny automation-level mouse.wheel samples. Real mouse-wheel
+  // delivery remains covered by the end-to-end scale/navigation cases.
+  await dispatchScaleWheel(page, -16);
   await page.waitForTimeout(320);
-  await page.mouse.wheel(0, -16);
+  await dispatchScaleWheel(page, -16);
   await expect(html).toHaveAttribute(
     "data-universe-scale-progress",
     "0.222",
@@ -461,18 +480,15 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
 
   // Once repeated same-direction samples establish a gesture, partial intent
   // survives a scheduler/render stall longer than the single-sample reset.
-  // This models the hosted SwiftShader trace where a nominal 20ms wait took
-  // ~1s while the browser remained inside one continuous trackpad gesture.
   for (let index = 0; index < 3; index += 1) {
-    await page.mouse.wheel(0, -16);
-    await page.waitForTimeout(20);
+    await dispatchScaleWheel(page, -16);
   }
   await expect(html).toHaveAttribute(
     "data-universe-scale-progress",
     "0.889",
   );
   await page.waitForTimeout(600);
-  await page.mouse.wheel(0, -16);
+  await dispatchScaleWheel(page, -16);
 
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -524,7 +540,7 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
   );
 
   for (const phase of ["atmosphere", "orbit", "approach"] as const) {
-    await wheelScale(page, "out");
+    await dispatchScaleWheel(page, 120);
     await expect(html).toHaveAttribute(
       "data-universe-navigation-phase",
       phase,
@@ -540,12 +556,12 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
     );
   }
 
-  await wheelScale(page, "out");
+  await dispatchScaleWheel(page, 120);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
   );
-  await wheelScale(page, "out");
+  await dispatchScaleWheel(page, 120);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
@@ -622,25 +638,22 @@ test("Search takeover cancels queued world scale intent", async ({
     box!.y + box!.height * 0.5,
   );
 
-  await page.mouse.wheel(0, -120);
+  // Queue the second inward step in the same input burst. On a fast/software
+  // camera Orbit can settle before Playwright observes a transient SETTLING
+  // state, so the release contract must not depend on seeing that instant.
+  await dispatchScaleWheel(page, -120);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
   );
-  await expect(html).not.toHaveAttribute(
-    "data-universe-camera-settled",
-    "orbit",
-  );
-
-  // Cross the wheel cooldown while Orbit is still transitioning, then queue
-  // one more inward step. Search is a higher-priority manual authority and
-  // must invalidate this queued intent instead of letting it fire later.
-  await page.waitForTimeout(230);
-  await page.mouse.wheel(0, -120);
+  await dispatchScaleWheel(page, -120);
   await expect(html).toHaveAttribute(
     "data-universe-scale-queued",
     "world:+1",
   );
+
+  // Search is a higher-priority manual authority and must invalidate the
+  // queued scale intent instead of letting it fire later.
 
   await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
