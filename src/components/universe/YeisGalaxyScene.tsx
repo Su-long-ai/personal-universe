@@ -1264,7 +1264,7 @@ function cameraTargetKey(
   if (target.kind === "star") return target.nativeId;
   if (target.kind === "point") return "point:" + target.id;
   if (target.kind === "body") {
-    return "body:" + target.starId + "/" + target.bodyId;
+    return target.starId + "/" + target.bodyId;
   }
   if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;

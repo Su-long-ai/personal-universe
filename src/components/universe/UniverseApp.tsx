@@ -154,7 +154,7 @@ function cameraTargetLabel(
   if (target.kind === "star") return target.nativeId;
   if (target.kind === "point") return "point:" + target.id;
   if (target.kind === "body") {
-    return "body:" + target.starId + "/" + target.bodyId;
+    return target.starId + "/" + target.bodyId;
   }
   if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
@@ -225,7 +225,7 @@ export default function UniverseApp({
     [contentEntries, galaxy.markers],
   );
   const reducedMotion = useReducedMotion();
-  const ambient = useAmbientAudio(muted, phase);
+  const { ensurePlaying } = useAmbientAudio(muted, phase);
   const debugFreeze =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("freeze") === "1";
@@ -471,7 +471,7 @@ export default function UniverseApp({
       setActiveDestinationId(destination.id);
       document.documentElement.dataset.universeActiveDestination =
         destination.id;
-      ambient.ensurePlaying();
+      ensurePlaying();
       setPhase("system");
       replaceNavigationUrl({
         phase: "system",
@@ -481,7 +481,7 @@ export default function UniverseApp({
         navigationMode: "open",
       });
     },
-    [ambient, contentPlacements, resolveMarker],
+    [contentPlacements, ensurePlaying, resolveMarker],
   );
 
   const handleNavigateDestination = useCallback(
@@ -609,7 +609,7 @@ export default function UniverseApp({
         openedWorldDestinationRef.current = planet ? destination.id : null;
         setScrollDepth(0);
         delete document.documentElement.dataset.universeLocated;
-        ambient.ensurePlaying();
+        ensurePlaying();
         const nextPhase: UniversePhase = planet ? "approach" : "system";
         setPhase(nextPhase);
 
@@ -713,7 +713,7 @@ export default function UniverseApp({
     },
     [
       activeEngine,
-      ambient,
+      ensurePlaying,
       galaxy.markers,
       resolveMarker,
     ],
@@ -1072,13 +1072,13 @@ export default function UniverseApp({
       setJourney(null);
       setCameraSettledPhase(null);
       setSelectedPlanet(planet);
-      ambient.ensurePlaying();
+      ensurePlaying();
       setPhase("approach");
     },
     [
       activeEngine,
-      ambient,
       contentPlacements,
+      ensurePlaying,
       galaxy.markers,
       handleNavigateDestination,
       selectedSystem,
@@ -1366,7 +1366,7 @@ export default function UniverseApp({
         onToggleCollapsed={() => setCollapsed((value) => !value)}
         muted={muted}
         onToggleMuted={() => {
-          if (muted) ambient.ensurePlaying();
+          if (muted) ensurePlaying();
           setMuted((value) => !value);
         }}
         quality={quality}
