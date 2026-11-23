@@ -1,0 +1,40 @@
+{
+  "schema": 3,
+  "task_id": "PROCEDURAL-PLANET-SURFACE-HANDOFF-001",
+  "approved_at": "2026-11-23T13:05:33.420Z",
+  "baseline_commit": "3f6080792100c6486e86405e5b8bde0416edd4b5",
+  "record_path": "docs/reuse-gate/tasks/PROCEDURAL-PLANET-SURFACE-HANDOFF-001.json",
+  "record_sha256": "edadf5ae9cd3446143586bbeff1ae566be1881200d4e20c8646acfea13df2d02",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing ProceduralPlanets quadtree terrain and surface-point APIs so Surface remains the same live planet instead of swapping to a separate world renderer"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "procedural-planets-same-world-surface",
+    "procedural-terrains-fallback"
+  ],
+  "candidate_scores": {
+    "procedural-planets-same-world-surface": 52,
+    "procedural-terrains-fallback": 49,
+    "crossfade-scene-swap": null,
+    "new-custom-spherical-terrain": null
+  }
+}
