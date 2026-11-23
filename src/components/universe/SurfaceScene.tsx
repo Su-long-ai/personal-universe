@@ -1,7 +1,15 @@
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { SurfaceTerrain } from "./SurfaceTerrain";
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: () => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 function ArrivalBeacon({ active, onToggle, height }: { active: boolean; onToggle: () => void; height: number }) {
   const beacon = useRef<THREE.Group>(null);
@@ -70,6 +78,53 @@ function DistantMoon() {
 export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
   const [active, setActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
+  const [terrainEnabled, setTerrainEnabled] = useState(!anchored);
+
+  const handleAnchorHeight = useCallback((height: number) => {
+    setAnchorHeight(height);
+    document.documentElement.dataset.universeSurfaceTerrainState = "ready";
+  }, []);
+
+  useEffect(() => {
+    if (!anchored) {
+      setTerrainEnabled(true);
+      return;
+    }
+
+    // ProceduralTerrains preparation can synchronously monopolize SwiftShader.
+    // Give the landing frame and a possible immediate reverse-scale gesture a
+    // stable window first. If Surface remains active, progressively start the
+    // existing terrain fallback during browser idle time.
+    const idleWindow = window as IdleWindow;
+    let cancelled = false;
+    let idleHandle: number | null = null;
+    document.documentElement.dataset.universeSurfaceTerrainState = "deferred";
+
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      const enable = () => {
+        if (cancelled) return;
+        document.documentElement.dataset.universeSurfaceTerrainState =
+          "preparing";
+        setTerrainEnabled(true);
+      };
+      if (idleWindow.requestIdleCallback) {
+        idleHandle = idleWindow.requestIdleCallback(enable, { timeout: 650 });
+      } else {
+        enable();
+      }
+    }, 480);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleHandle);
+      }
+      delete document.documentElement.dataset.universeSurfaceTerrainState;
+    };
+  }, [anchored]);
+
   const content = (
     <>
       <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
@@ -87,7 +142,9 @@ export function SurfaceScene({ anchored = false }: { anchored?: boolean }) {
       />
 
       <Suspense fallback={null}>
-        <SurfaceTerrain onAnchorHeight={setAnchorHeight} />
+        {terrainEnabled ? (
+          <SurfaceTerrain onAnchorHeight={handleAnchorHeight} />
+        ) : null}
       </Suspense>
 
       <DistantMoon />
