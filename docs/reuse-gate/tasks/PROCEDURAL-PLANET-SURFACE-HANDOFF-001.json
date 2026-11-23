@@ -1,0 +1,201 @@
+{
+  "schema": 2,
+  "task_id": "PROCEDURAL-PLANET-SURFACE-HANDOFF-001",
+  "title": "Keep the live ProceduralPlanets world through atmosphere-to-surface handoff",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing ProceduralPlanets quadtree terrain and surface-point APIs so Surface remains the same live planet instead of swapping to a separate world renderer"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "ProceduralPlanets 0.5.1 already renders terrestrial terrain with cube-sphere quadtree LOD and geomorphing, supports cameras inside atmosphere and near the surface, writes correct surface depth into the host renderer, and exposes getSurfacePoint/getSurfaceRadius for placing ordinary Three.js product objects on its terrain. The current product unnecessarily unmounts PlanetScene/PlanetPass at Surface and replaces it with a finite planar SurfaceScene, creating the last obvious visual scene switch. Preserve the same Planet and PlanetPass across Approach/Orbit/Atmosphere/Surface, move the surface camera into the live planet's near-surface frame, and anchor only product-specific surface content to the live globe. Keep the existing finite SurfaceScene solely as a hardware/quality fallback.",
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "ProceduralPlanets supports camera-inside-atmosphere rendering, logarithmic depth, geomorphed terrain LOD without visible chunk pops, and getSurfacePoint/getSurfaceRadius for placing host Three.js objects directly on the rendered planet."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/exploration.md",
+      "finding": "The package's own infinite exploration mode reuses Planet/PlanetRenderer with floating coordinates and the existing terrain LOD from astronomical approach down to close terrain; it does not introduce a second terrain renderer."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains",
+      "finding": "The existing finite SurfaceScene already reuses ProceduralTerrains and remains a valid low-quality/software fallback, but it should not replace the live globe on the primary path."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Extend the already-adopted ProceduralPlanets live world through Surface; its own exploration architecture proves the same renderer is intended to span astronomical-to-near-surface viewing."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the single existing R3F Canvas and EffectComposer; no second rendering host is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets",
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "ProceduralPlanets is the primary continuous surface renderer; retain ProceduralTerrains only for the already-existing fallback scene."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse the existing camera-controls transition executor to move into a near-surface camera frame while the same live Planet stays mounted."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "procedural-planets-same-world-surface",
+      "name": "Keep the existing ProceduralPlanets Planet/PlanetPass mounted through Surface",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Installed ProceduralPlanets 0.5.1",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already owns quadtree terrain, atmosphere, depth, near-surface precision and surface queries; this removes the renderer swap instead of hiding it.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "procedural-terrains-fallback",
+      "name": "Existing finite ProceduralTerrains SurfaceScene",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Current SurfaceTerrain/SurfaceScene",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Retain as fallback when live ProceduralPlanets is disabled by quality or renderer capability, but do not make it the primary handoff."
+    },
+    {
+      "id": "crossfade-scene-swap",
+      "name": "Mask the existing planet-to-surface renderer swap with CSS/cinematic fade",
+      "level": "component_asset",
+      "source": "Project-owned transition mask",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Can hide a discontinuity but does not make the spatial/rendering path continuous, and duplicates work already solved by ProceduralPlanets terrain LOD."
+    },
+    {
+      "id": "new-custom-spherical-terrain",
+      "name": "Build a new spherical terrain/LOD renderer for Surface",
+      "level": "subsystem",
+      "source": "New project implementation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Recreates quadtree terrain, floating precision and surface queries already provided by the selected MIT dependency."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Same planet remains visible from Orbit through Surface",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-same-world-surface": "full",
+        "procedural-terrains-fallback": "none",
+        "crossfade-scene-swap": "partial",
+        "new-custom-spherical-terrain": "full"
+      },
+      "decision": "Keep PlanetScene and PlanetPass mounted across all close-world phases."
+    },
+    {
+      "capability": "Near-surface terrain LOD without visible chunk pops",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-same-world-surface": "full",
+        "procedural-terrains-fallback": "partial",
+        "crossfade-scene-swap": "none",
+        "new-custom-spherical-terrain": "unknown"
+      },
+      "decision": "Reuse ProceduralPlanets cube-sphere quadtree geomorphing."
+    },
+    {
+      "capability": "Attach product-specific surface objects to terrain",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-same-world-surface": "full",
+        "procedural-terrains-fallback": "full",
+        "crossfade-scene-swap": "partial",
+        "new-custom-spherical-terrain": "partial"
+      },
+      "decision": "Use Planet.getSurfacePoint/getSurfaceRadius for live surface anchors; retain current finite scene for fallback."
+    },
+    {
+      "capability": "Low-quality/software fallback",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-same-world-surface": "partial",
+        "procedural-terrains-fallback": "full",
+        "crossfade-scene-swap": "partial",
+        "new-custom-spherical-terrain": "unknown"
+      },
+      "decision": "Keep the existing finite ProceduralTerrains surface path only when the live planet renderer is intentionally unavailable."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "procedural-planets-same-world-surface",
+      "procedural-terrains-fallback"
+    ],
+    "rationale": "Make the primary Surface phase a continuation of the already-mounted live ProceduralPlanets world and use its own terrain/surface APIs for product anchors. Preserve the existing ProceduralTerrains scene strictly as fallback. This removes the renderer swap rather than adding another visual masking system.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "new-custom-spherical-terrain",
+        "reason": "A custom spherical terrain stack could be tailored further, but loses globally because ProceduralPlanets already supplies the exact terrain LOD, atmosphere, precision and placement capabilities needed."
+      },
+      {
+        "candidate_id": "crossfade-scene-swap",
+        "reason": "A crossfade is cheaper locally, but it preserves the underlying scene discontinuity and adds transition-specific complexity that becomes unnecessary when the selected live renderer already spans the surface."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If live ProceduralPlanets cannot render on the selected hardware/quality tier, keep the existing finite ProceduralTerrains SurfaceScene and its current product content; do not invent a third renderer."
+  }
+}
