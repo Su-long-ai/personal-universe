@@ -295,11 +295,11 @@ jobs:
             echo "- Release-shard and WebGL-heavy artifacts retain screenshots, traces, raw reports, and runtime metrics."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Propagate shard failure to combined report status
+      - name: Propagate browser validation failures
         if: always()
         shell: bash
         run: |
-          if [ "${{ needs.e2e.result }}" != "success" ]; then
-            echo "One or more Playwright shards did not succeed; the combined report was preserved above for diagnosis." >&2
+          if [ "${{ needs.e2e.result }}" != "success" ] || [ "${{ needs.webgl-heavy.result }}" != "success" ]; then
+            echo "Browser validation did not fully succeed; merged diagnostics were preserved above." >&2
             exit 1
           fi
