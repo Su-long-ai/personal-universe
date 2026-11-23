@@ -340,6 +340,7 @@ export function YeisGalaxyScene({
           const height = rect.height;
           const pickRadius = state.input.coarse ? 24 : 17;
           const signalPickRadius = state.input.coarse ? 18 : 10;
+          const heroPickRadius = state.input.coarse ? 18 : 8;
 
           const markerById = new Map(
             markersRef.current.map((marker) => [marker.id, marker]),
@@ -388,7 +389,7 @@ export function YeisGalaxyScene({
           if (heroProjection.z >= -1 && heroProjection.z <= 1) {
             const hx = (heroProjection.x * 0.5 + 0.5) * width;
             const hy = (-heroProjection.y * 0.5 + 0.5) * height;
-            if (Math.hypot(hx - x, hy - y) <= pickRadius) {
+            if (Math.hypot(hx - x, hy - y) <= heroPickRadius) {
               const hero = markersRef.current.find(
                 (marker) => marker.source === "hero",
               );
