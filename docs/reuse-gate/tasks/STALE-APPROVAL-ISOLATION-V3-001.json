@@ -1,0 +1,212 @@
+{
+  "schema": 2,
+  "task_id": "STALE-APPROVAL-ISOLATION-V3-001",
+  "title": "Isolate stale reuse approvals from unrelated valid coverage",
+  "scope": {
+    "level": "architecture",
+    "subject": "Machine Reuse Gate approval candidate isolation while preserving per-file prior-approval enforcement"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "The v3 gate currently validates every approval whose planned_files overlap any changed protected path before per-file coverage selection. A historical approval whose research record later changed can therefore terminate the entire gate even when that token is not needed and another frozen prior approval validly covers the implementation. Keep the existing repository-local Node gate as the single policy authority, but treat token-specific staleness as candidate invalidation; malformed current policy metadata remains fatal, and every protected file must still have at least one valid approval committed before its first change.",
+  "planned_files": [
+    "scripts/reuse-gate.mjs"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.github.com/en/actions",
+      "finding": "GitHub Actions remains the authoritative remote execution surface for the repository-local policy gate; no second CI policy engine is required for candidate selection."
+    },
+    {
+      "url": "https://www.openpolicyagent.org/docs",
+      "finding": "OPA supports explicit policy evaluation and denial reasons, but introducing Rego solely to isolate invalid approval candidates would duplicate the existing Node gate."
+    },
+    {
+      "url": "https://backstage.io/docs/features/software-catalog/",
+      "finding": "Backstage provides organization-scale governance and catalog policy surfaces far broader than this repository-local approval-selection defect."
+    },
+    {
+      "url": "https://git-scm.com/docs/git-merge-base",
+      "finding": "Git ancestry remains the correct primitive for proving that a selected approval commit precedes a protected implementation commit."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "conclusion": "Backstage can centralize governance but is disproportionate to a local approval-candidate selection defect.",
+      "source_refs": [
+        2
+      ],
+      "registry_refs": [
+        "backstage-catalog"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "OPA/Conftest could model candidate validity, but a second policy runtime would duplicate the existing gate and its Git provenance semantics.",
+      "source_refs": [
+        1
+      ],
+      "registry_refs": [
+        "opa-conftest"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "The existing Node Machine Reuse Gate already owns task records, token freezing, Git ancestry and per-file coverage; fix candidate isolation inside that subsystem.",
+      "source_refs": [
+        0,
+        3
+      ],
+      "registry_refs": [
+        "github-actions-pr-diff-gate"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Git merge-base ancestry checks already prove approval-before-implementation ordering; retain them unchanged for every selected valid token.",
+      "source_refs": [
+        3
+      ],
+      "registry_refs": [
+        "git-hooks"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "node-gate-valid-candidate-isolation",
+      "name": "Existing Node gate with invalid-token candidate isolation",
+      "level": "subsystem",
+      "registry_id": "github-actions-pr-diff-gate",
+      "source": "Repository-local Machine Reuse Gate",
+      "license": "Project code",
+      "decision": "reuse",
+      "reason": "Fixes the actual selection bug while preserving one policy authority, current task schema, registry evidence and Git ancestry enforcement.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "opa-token-selection",
+      "name": "OPA / Conftest approval selection",
+      "level": "framework_engine",
+      "registry_id": "opa-conftest",
+      "source": "OPA / Conftest",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Would require translating the existing approval and Git-provenance model into a second policy language for no additional enforcement coverage.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "backstage-token-governance",
+      "name": "Backstage governance platform",
+      "level": "full_solution",
+      "registry_id": "backstage-catalog",
+      "source": "Backstage",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Organization-scale governance is much larger than this repository-local candidate validity problem.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "git-ancestry-only",
+      "name": "Git ancestry checks without token isolation",
+      "level": "component_asset",
+      "registry_id": "git-hooks",
+      "source": "Git merge-base ancestry",
+      "license": "Git tooling",
+      "decision": "partial",
+      "reason": "Ancestry remains necessary to prove prior approval, but by itself does not prevent one stale unused token from terminating candidate evaluation.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Stale historical token cannot poison an unrelated valid approval candidate for the same broad file path",
+      "importance": "high",
+      "coverage": {
+        "node-gate-valid-candidate-isolation": "full",
+        "opa-token-selection": "full",
+        "backstage-token-governance": "partial",
+        "git-ancestry-only": "none"
+      },
+      "decision": "Evaluate token-specific staleness as candidate invalidation rather than terminating the whole check before per-file coverage selection."
+    },
+    {
+      "capability": "Every protected file still requires at least one valid approval committed before its first implementation change",
+      "importance": "high",
+      "coverage": {
+        "node-gate-valid-candidate-isolation": "full",
+        "opa-token-selection": "full",
+        "backstage-token-governance": "partial",
+        "git-ancestry-only": "full"
+      },
+      "decision": "Keep the existing firstChangeCommit plus merge-base ancestry proof unchanged for selected valid candidates."
+    },
+    {
+      "capability": "Malformed current policy metadata remains fail-closed",
+      "importance": "high",
+      "coverage": {
+        "node-gate-valid-candidate-isolation": "full",
+        "opa-token-selection": "full",
+        "backstage-token-governance": "partial",
+        "git-ancestry-only": "none"
+      },
+      "decision": "Only token-specific frozen-state/provenance failures become candidate rejection; invalid JSON, invalid research schema or registry corruption still terminate the gate."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "node-gate-valid-candidate-isolation"
+    ],
+    "rationale": "Retain the existing Node gate and its strict per-file prior-approval proof. Change only approval-candidate evaluation so a stale historical token is ignored when another valid prior token covers the file; if no valid candidate remains, the gate still blocks.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "backstage-token-governance",
+        "reason": "Broader governance capability does not justify replacing a working repository-local gate for one candidate-selection defect."
+      },
+      {
+        "candidate_id": "opa-token-selection",
+        "reason": "OPA is mature but would duplicate the current policy language, registry model and Git-history proof rather than improving coverage."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If token invalidity classes become more complex, extract approval validation into a pure result-returning module with fixture tests; do not weaken per-file coverage or ancestry requirements."
+  }
+}
