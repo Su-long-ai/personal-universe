@@ -26,12 +26,25 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
-export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: number) => void }) {
+export function SurfaceTerrain({
+  active,
+  onAnchorHeight,
+}: {
+  active: boolean;
+  onAnchorHeight?: (height: number) => void;
+}) {
   const { gl, camera } = useThree();
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
+  const [activated, setActivated] = useState(active);
 
   useEffect(() => {
+    if (active) setActivated(true);
+  }, [active]);
+
+  useEffect(() => {
+    if (!activated) return;
+
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
 
@@ -107,12 +120,33 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
 
     return () => {
       cancelled = true;
-      setTerrain(null);
       instance?.dispose();
     };
-  }, [camera, gl, onAnchorHeight]);
+  }, [activated, camera, gl, onAnchorHeight]);
+
+  useEffect(() => {
+    const lifecycle = !activated
+      ? "idle"
+      : !terrain
+        ? "preparing"
+        : active
+          ? "active"
+          : "parked";
+    document.documentElement.dataset.universeSurfaceTerrainLifecycle =
+      lifecycle;
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceTerrainLifecycle ===
+        lifecycle
+      ) {
+        delete document.documentElement.dataset
+          .universeSurfaceTerrainLifecycle;
+      }
+    };
+  }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
+    if (!active) return;
     terrain?.update(delta, { camera });
   });
 

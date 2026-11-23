@@ -12,7 +12,6 @@ import {
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
-import { SurfaceScene } from "./SurfaceScene";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
 const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
@@ -373,7 +372,10 @@ export function PlanetScene({
   });
 
   if (phase === "surface" && fallbackReason) {
-    return <SurfaceScene anchored />;
+    // UniverseCanvas owns the longer-lived fallback SurfaceScene. Keeping
+    // that host mounted across phase changes prevents FiniteTerrain.dispose()
+    // from landing on the Surface -> Atmosphere input-critical path.
+    return null;
   }
 
   return (

@@ -108,6 +108,20 @@ renderer, the existing ProceduralTerrains scene is retained and moved into the
 same near-surface product frame. That fallback publishes
 `data-universe-surface-renderer="procedural-terrains-fallback"`.
 
+Task `SURFACE-FALLBACK-LIFETIME-001` makes that fallback resource follow the
+Canvas lifetime instead of the Surface phase lifetime. The first fallback
+Surface visit creates the existing `FiniteTerrain`; leaving Surface hides the
+same scene and pauses its `terrain.update` call, but does not synchronously
+dispose GPU/chunk resources on the wheel transition path. The retained instance
+is disposed only when its R3F Canvas host is actually destroyed. This is a
+bounded one-instance residency tradeoff, not a terrain cache and not a second
+renderer or navigation authority.
+
+Runtime evidence:
+
+- `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
+- `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive.
+
 ## Fallback rules
 
 Fallbacks are product behavior, not hidden test exceptions:
@@ -125,12 +139,16 @@ Fallbacks are product behavior, not hidden test exceptions:
 ## Lifecycle and loading
 
 Large renderer paths are lazy-loaded. Native system resources are constructed
-only in the system phase and disposed on unmount. Close-world renderer resources exist only in close-world phases, now including
+only in the system phase and disposed on unmount. Live close-world
+ProceduralPlanets resources exist only in close-world phases, now including
 Surface. Crucially, the live `Planet` is not disposed and recreated at the
 Atmosphere → Surface boundary; React keeps the same close-world component and
-the same compositor path alive. Galaxy rendering, native system rendering and
-live close-world rendering therefore still do not need to remain resident
-together.
+the same compositor path alive. The software/LOW Surface fallback is the one
+intentional exception: after its first use, one generic ProceduralTerrains
+instance remains parked under the shared Canvas so Surface → Atmosphere does not
+perform synchronous resource destruction in the input-critical path. Galaxy,
+system and live close-world rendering still do not need to remain resident
+together, and no additional camera or destination authority is introduced.
 
 The product release gate validates both semantic arrival and renderer readiness;
 screenshots remain evidence, not the authority for navigation state.

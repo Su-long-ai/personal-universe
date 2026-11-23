@@ -1,0 +1,174 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-FALLBACK-LIFETIME-001",
+  "title": "Keep fallback surface terrain alive across continuous-scale phase exits",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing ProceduralTerrains instance across Surface-to-world phase changes so synchronous terrain destruction cannot block camera settlement or wheel reversal"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted Linux traces show the Surface-to-Atmosphere transition arms the current camera watchdog, then the browser main thread is blocked long enough that neither the watchdog nor Playwright polling can run. The existing fallback Surface unmount synchronously disposes its FiniteTerrain at that phase boundary. ProceduralTerrains documents a caller-owned runtime whose host owns the renderer, camera, scene and loop, with explicit idempotent dispose for destruction; R3F already supplies the shared Canvas lifecycle and useFrame subscription. Retain the one existing fallback terrain inside that Canvas after first Surface activation, hide it and skip terrain.update while inactive, and dispose it only when the Canvas host actually unmounts. This preserves the selected renderer and camera stack and adds no cache, second terrain authority or parallel scene.",
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
+      "finding": "ProceduralTerrains 2.0 documents createTerrain as a caller-owned runtime: the host owns renderer, camera, scene and animation loop, calls update during its loop, and calls idempotent dispose when destroying the terrain. Destruction releases owned resources and detaches the group."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber documents useFrame as a subscription to the shared Canvas render loop and automatically unsubscribes it only when the component unmounts, so an inactive retained component can stay in the existing Canvas while its update work is explicitly skipped."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT YEIS snapshot remains the selected navigation and scale backbone; fixing terrain teardown latency must not introduce a new camera, destination or scale authority."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the pinned MIT YEIS continuous spatial product semantics intact; the failure occurs after the correct Surface-to-Atmosphere phase handoff and does not justify replacing navigation."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Reuse the existing R3F Canvas as the longer-lived resource host and keep the same shared render loop rather than introducing a second scene or resource manager."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse the existing FiniteTerrain instance and its documented explicit host-owned lifecycle; park it between visual phases and reserve dispose for actual host destruction."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use existing React state/effect primitives only to latch first activation and visibility; no cache library, scheduler or new lifecycle framework is warranted."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-scale-backbone",
+      "name": "Pinned MIT YEIS scale/navigation backbone",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing Personal Universe YEIS integration",
+      "license": "MIT at pinned commit e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "partial",
+      "reason": "Retains authoritative phase, destination and camera semantics; it does not own the fallback terrain resource that blocks the browser on Surface exit.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 3,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "r3f-canvas-resource-host",
+      "name": "Existing React Three Fiber Canvas lifecycle",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current shared UniverseCanvas and useFrame loop",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "The existing Canvas already outlives individual universe phases and is the correct owner boundary for a retained render resource without creating another scene or render loop.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-terrains-host-owned-lifetime",
+      "name": "ProceduralTerrains caller-owned FiniteTerrain lifecycle",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "procedural-terrains@2.0.0 runtime already integrated by SurfaceTerrain",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Its documented API already separates repeated update calls from explicit destruction. Retaining one instance and skipping update while hidden removes phase-boundary destruction without changing the terrain implementation.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "react-latched-activation",
+      "name": "React core hooks for latched activation and visibility",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Existing React 18 hooks",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "A tiny latched mounted/active state is sufficient to keep the existing terrain alive after first Surface use and pause work when hidden; no cache or lifecycle package is necessary.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-scale-backbone",
+      "r3f-canvas-resource-host",
+      "procedural-terrains-host-owned-lifetime",
+      "react-latched-activation"
+    ],
+    "rationale": "Keep YEIS navigation authoritative, keep the existing R3F Canvas and procedural-terrains fallback, and change only ownership duration: activate the existing fallback terrain on first Surface use, keep it mounted and invisible with update paused across Atmosphere/Orbit/Approach/System/Galaxy, and dispose only with the Canvas host. This directly removes the synchronous destroy from the continuous-scale critical path without adding a second renderer, cache, spatial index or camera authority.",
+    "higher_level_tradeoffs": [
+      "One fallback terrain remains resident after first Surface visit until Canvas teardown, trading bounded resident GPU/CPU memory for responsive reversible navigation.",
+      "The current fallback terrain is already generic rather than planet-specific, so reusing the same resident instance does not reduce per-planet identity relative to the existing behavior."
+    ],
+    "score_overrides": [],
+    "fallback": "If a retained single fallback terrain still blocks hosted Linux, profile its active update/prepare path separately; do not reintroduce per-phase dispose or replace the renderer before measuring that path."
+  }
+}
