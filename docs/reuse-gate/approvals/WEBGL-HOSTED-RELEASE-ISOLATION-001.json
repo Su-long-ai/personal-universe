@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-HOSTED-RELEASE-ISOLATION-001",
+  "approved_at": "2026-11-24T00:44:00+08:00",
+  "baseline_commit": "c0af2d1fe83a0199cf8396b807766fdda83d723c",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-HOSTED-RELEASE-ISOLATION-001.json",
+  "record_sha256": "f486110b86bd9da4bf5329e8e45eac254b2d30fd2d6e84ce0a19174364fff3d9",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-actions-matrix": "6686d9fcb00d4643c27f293fb2237c655d8f6d1eaa34c15435d444e592ee65fe",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "webgl-context-loss-api": "a45251980adfd9d57c8b12d69893587dbd7a30f754c06091169068aaa3d1c740"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Hosted-runner WebGL lifecycle, heavy visual isolation, native sharding, artifacts, and release validation without replacing Playwright or GitHub Actions"
+  },
+  "policy_change": true,
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    "playwright.config.ts",
+    "tests/e2e/visual.spec.ts",
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/webgl-performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "selected_ids": [
+    "native-playwright-github-release-lanes",
+    "playwright-project-worker-isolation"
+  ],
+  "candidate_scores": {
+    "native-playwright-github-release-lanes": 54.5,
+    "playwright-project-worker-isolation": 51.5,
+    "custom-webgl-ci-orchestrator": null,
+    "serialize-entire-release-suite": null
+  }
+}
