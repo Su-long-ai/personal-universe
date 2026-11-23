@@ -111,7 +111,16 @@
       "source": "Current SurfaceTerrain/SurfaceScene",
       "license": "MIT",
       "decision": "reuse",
-      "reason": "Retain as fallback when live ProceduralPlanets is disabled by quality or renderer capability, but do not make it the primary handoff."
+      "reason": "Retain as fallback when live ProceduralPlanets is disabled by quality or renderer capability, but do not make it the primary handoff.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
     },
     {
       "id": "crossfade-scene-swap",
