@@ -149,12 +149,17 @@ export function CinematicCamera({
   const camera = useThree((state) => state.camera);
   const surfaceFallback =
     phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
+  // ProceduralPlanet can refine its terrain-derived landing frame while the
+  // visitor is still in Approach/Orbit/Atmosphere. Those updates are irrelevant
+  // outside Surface and must not restart the active camera transition.
+  const activeSurfaceCameraFrame =
+    phase === "surface" ? surfaceCameraFrame : null;
   const liveSurfaceShot =
-    surfaceCameraFrame && SHOTS.surface
+    activeSurfaceCameraFrame && SHOTS.surface
       ? {
           ...SHOTS.surface,
-          position: surfaceCameraFrame.position,
-          target: surfaceCameraFrame.target,
+          position: activeSurfaceCameraFrame.position,
+          target: activeSurfaceCameraFrame.target,
         }
       : SHOTS.surface;
   const controlsRef = useRef<CameraControlsApi>(null);
@@ -281,7 +286,7 @@ export function CinematicCamera({
     controls.stop();
 
     const desiredNear =
-      phase === "surface" && !surfaceFallback && surfaceCameraFrame
+      phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame
         ? 0.001
         : 0.05;
     if (camera.near !== desiredNear) {
@@ -292,9 +297,9 @@ export function CinematicCamera({
     if (
       phase === "surface" &&
       !surfaceFallback &&
-      surfaceCameraFrame
+      activeSurfaceCameraFrame
     ) {
-      camera.up.set(...surfaceCameraFrame.up).normalize();
+      camera.up.set(...activeSurfaceCameraFrame.up).normalize();
     } else {
       camera.up.set(0, 1, 0);
     }
@@ -319,13 +324,17 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : surfaceCameraFrame
+          : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
         : SHOTS[phase];
     if (!shot) return;
 
-    if (phase === "surface" && !surfaceFallback && surfaceCameraFrame) {
+    if (
+      phase === "surface" &&
+      !surfaceFallback &&
+      activeSurfaceCameraFrame
+    ) {
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
     } else {
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
@@ -405,7 +414,7 @@ export function CinematicCamera({
     quality,
     reducedMotion,
     scrollDepth,
-    surfaceCameraFrame,
+    activeSurfaceCameraFrame,
     surfaceFallback,
     width,
     publishIfReached,
@@ -425,7 +434,7 @@ export function CinematicCamera({
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
-          : surfaceCameraFrame
+          : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
         : SHOTS[phase];
