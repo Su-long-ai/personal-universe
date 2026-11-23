@@ -79,7 +79,7 @@ The exact per-image credit lines are retained in `landmarkImages.ts` and in
 
 ## Native system renderer closure
 
-Vendored verbatim from the fixed MIT boundary
+Vendored from the fixed MIT boundary
 `e52056897364e060fbd6d00951628f163b57d7a1`:
 
 - `src/render/BodyRenderer.ts` → `render/BodyRenderer.ts`
@@ -96,3 +96,10 @@ upstream main is included. Project-specific host adaptation must remain
 outside this closure where possible; any necessary vendor patch must be
 listed below before release.
 
+
+
+7. `render/BodyRenderer.ts`
+   - Replaces the upstream Vite-injected `__BUILD_ID__` model cache key with
+     the same pinned source identifier `e520568` already used by `StarCatalog`.
+   - Rendering, body materials, loading semantics and model selection remain
+     the pinned MIT implementation.

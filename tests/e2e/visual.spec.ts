@@ -161,6 +161,16 @@ test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
         `/?phase=system&star=${encodeURIComponent(target)}&freeze=1`,
       );
       await waitForYeisEngine(page);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-system-renderer",
+        "yeis-native",
+        { timeout: 30_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-system-ready",
+        "true",
+        { timeout: 30_000 },
+      );
       await expect(page.locator(".content-signal-card")).toBeVisible();
     },
   );
@@ -192,6 +202,38 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await waitForCameraSettled(page, "orbit");
   });
+});
+
+test("visual: desktop Hero world high-quality live renderer", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-world-live-high",
+    async () => {
+      await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
+      await waitForYeisEngine(page);
+      await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+      await page.getByLabel("QUALITY").selectOption("high");
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "procedural-planets-pass",
+        { timeout: 60_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+    },
+  );
 });
 
 for (const viewport of [TABLET, MOBILE]) {

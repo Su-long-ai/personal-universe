@@ -33,6 +33,11 @@ const LazyYeisGalaxyScene = lazy(() =>
     default: module.YeisGalaxyScene,
   })),
 );
+const LazyYeisSystemScene = lazy(() =>
+  import("./YeisSystemScene").then((module) => ({
+    default: module.YeisSystemScene,
+  })),
+);
 
 export function UniverseCanvas({
   phase,
@@ -132,7 +137,27 @@ export function UniverseCanvas({
       )}
 
       {phase === "system" && selectedSystem && (
-        <SystemScene system={selectedSystem} onSelectPlanet={onSelectPlanet} />
+        selectedSystem.id.startsWith("yeis-system:") ? (
+          <Suspense
+            fallback={
+              <SystemScene
+                system={selectedSystem}
+                onSelectPlanet={onSelectPlanet}
+              />
+            }
+          >
+            <LazyYeisSystemScene
+              system={selectedSystem}
+              onSelectPlanet={onSelectPlanet}
+              quality={quality}
+            />
+          </Suspense>
+        ) : (
+          <SystemScene
+            system={selectedSystem}
+            onSelectPlanet={onSelectPlanet}
+          />
+        )
       )}
 
       <Suspense fallback={null}>

@@ -159,6 +159,11 @@ test("guided Journey stays manual under reduced motion", async ({
     await page.getByRole("button", { name: "Stop guided journey" }).click();
   } else {
     await page.getByRole("button", { name: "DONE" }).click();
+    await expect(page.getByText("JOURNEY COMPLETE")).toBeVisible();
+    await expect(page.locator(".journey-mode")).toHaveText(
+      "COMPLETE · NAVIGATION REMAINS AVAILABLE",
+    );
+    await page.getByRole("button", { name: "CLOSE" }).click();
   }
 
   await expect(controls).toBeHidden();

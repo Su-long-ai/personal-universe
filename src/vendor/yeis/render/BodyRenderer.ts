@@ -84,7 +84,7 @@ function loadModel(url: string): Promise<Group> {
   if (!p) {
     p = new Promise<Group>((resolve, reject) => {
       // /models/* is served with an immutable cache; the build id busts it on redeploy
-      gltfLoader.load(`${url}?v=${__BUILD_ID__}`, (gltf) => resolve(gltf.scene), undefined, (err) => reject(err));
+      gltfLoader.load(`${url}?v=e520568`, (gltf) => resolve(gltf.scene), undefined, (err) => reject(err));
     });
     modelCache.set(url, p);
   }
