@@ -1663,6 +1663,7 @@ export default function UniverseApp({
     (event: ReactWheelEvent<HTMLElement>) => {
       if (navigatorOpen || navigationFailure) return;
 
+      const currentPhase = phaseRef.current;
       if (activeEngine !== "yeis") {
         if (currentPhase === "galaxy") {
           setScrollDepth((value) =>
@@ -1677,7 +1678,6 @@ export default function UniverseApp({
 
       const direction = continuousScaleDirection(event.deltaY);
       if (!direction) return;
-      const currentPhase = phaseRef.current;
       const settledPhase = cameraSettledPhaseRef.current;
 
       // Manual scale intent owns navigation immediately, even before a small
