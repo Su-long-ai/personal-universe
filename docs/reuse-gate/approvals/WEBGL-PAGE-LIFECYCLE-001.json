@@ -1,10 +1,10 @@
 {
   "schema": 3,
   "task_id": "WEBGL-PAGE-LIFECYCLE-001",
-  "approved_at": "2026-11-24T01:12:00+08:00",
-  "baseline_commit": "97f30d98592ecd59819edf7fbb25e48e36af6940",
+  "approved_at": "2026-11-24T01:27:00+08:00",
+  "baseline_commit": "5103322f04c326b71d3b6fedfe1614fc78d1b526",
   "record_path": "docs/reuse-gate/tasks/WEBGL-PAGE-LIFECYCLE-001.json",
-  "record_sha256": "0e7ff4301a9255aac89c1b390a29065b8ba4a750ee19f8fd539b2e109122a4bb",
+  "record_sha256": "802383879b046b9de55fe39cb847b191a85875b3a8b30a08b2c20a47988c518c",
   "registry_path": "docs/reuse-gate/registry.json",
   "registry_entry_hashes": {
     "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
