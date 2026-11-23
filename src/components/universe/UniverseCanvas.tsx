@@ -4,9 +4,15 @@ import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import { CinematicCamera } from "./CinematicCamera";
-import type { YeisGalaxyViewState, YeisSignalHover } from "./YeisGalaxyScene";
+import type {
+  YeisGalaxyViewState,
+  YeisSignalHover,
+} from "./YeisGalaxyScene";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
-import type { UniverseNavigationCameraRequest } from "../../lib/universe/yeis/navigation";
+import type {
+  UniverseNavigationCameraRequest,
+  UniverseNavigationDestination,
+} from "../../lib/universe/yeis/navigation";
 import type {
   GalaxyMarker,
   PlanetDefinition,
@@ -35,10 +41,12 @@ export function UniverseCanvas({
   contentPlacements,
   navigationRequest,
   onNavigationComplete,
-  onSignalHover,
+  onNavigationFailed,
   selectedSystem,
   selectedPlanet,
   onSelectSystem,
+  onNavigateDestination,
+  onSignalHover,
   onSelectPlanet,
   quality,
   scrollDepth,
@@ -51,10 +59,17 @@ export function UniverseCanvas({
   contentPlacements: UniverseContentPlacement[];
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
-  onSignalHover: (hover: YeisSignalHover) => void;
+  onNavigationFailed: (
+    request: UniverseNavigationCameraRequest,
+    reason: string,
+  ) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
+  onNavigateDestination: (
+    destination: UniverseNavigationDestination,
+  ) => Promise<void> | void;
+  onSignalHover: (hover: YeisSignalHover) => void;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   quality: QualityMode;
   scrollDepth: number;
@@ -89,7 +104,8 @@ export function UniverseCanvas({
             contentPlacements={contentPlacements}
             navigationRequest={navigationRequest}
             onNavigationComplete={onNavigationComplete}
-            onSelectSystem={onSelectSystem}
+            onNavigationFailed={onNavigationFailed}
+            onNavigateDestination={onNavigateDestination}
             onSignalHover={onSignalHover}
             quality={quality}
             viewStateRef={yeisViewStateRef}

@@ -36,6 +36,11 @@ export class LandmarkSprites {
   private readonly mat: ShaderMaterial;
   private readonly camPc = new Vector3();
   private readonly pool: LandmarkScreen[] = [];
+  private atlasRequested = 0;
+  private atlasLoaded = 0;
+  private atlasFailed = 0;
+  private atlasComplete = false;
+  private disposed = false;
 
   constructor(readonly landmarks: Landmark[], scene: Scene) {
     const n = landmarks.length;
@@ -96,8 +101,15 @@ export class LandmarkSprites {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -11;
     scene.add(this.mesh);
+    this.atlasRequested = files.length;
     // photographs are a progressive enhancement: procedural sprites until the atlas is in
-    if (files.length && typeof document !== 'undefined') setTimeout(() => this.loadAtlas(files), 1500);
+    if (files.length && typeof document !== 'undefined') {
+      setTimeout(() => {
+        if (!this.disposed) this.loadAtlas(files);
+      }, 1500);
+    } else {
+      this.atlasComplete = true;
+    }
   }
 
   /** Compose the landmark photographs into one atlas texture (grid of square slots). */
@@ -106,15 +118,34 @@ export class LandmarkSprites {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = G * S;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let loaded = 0;
-    Promise.all(files.map((file, s) => new Promise<void>((resolve) => {
+    if (!ctx) {
+      this.atlasFailed = files.length;
+      this.atlasComplete = true;
+      return;
+    }
+    Promise.all(files.map((file, slot) => new Promise<void>((resolve) => {
       const im = new Image();
-      im.onload = () => { ctx.drawImage(im, (s % G) * S, Math.floor(s / G) * S, S, S); loaded++; resolve(); };
-      im.onerror = () => resolve();
+      im.onload = () => {
+        if (!this.disposed) {
+          ctx.drawImage(
+            im,
+            (slot % G) * S,
+            Math.floor(slot / G) * S,
+            S,
+            S,
+          );
+        }
+        this.atlasLoaded += 1;
+        resolve();
+      };
+      im.onerror = () => {
+        this.atlasFailed += 1;
+        resolve();
+      };
       im.src = `${import.meta.env.BASE_URL}nebulae/${file}.jpg`;
     }))).then(() => {
-      if (!loaded) return;
+      this.atlasComplete = true;
+      if (this.disposed || !this.atlasLoaded) return;
       const tex = new CanvasTexture(canvas);
       tex.colorSpace = NoColorSpace; // raw sRGB bytes; decoded explicitly in the shader
       tex.minFilter = LinearMipmapLinearFilter;
@@ -123,6 +154,21 @@ export class LandmarkSprites {
       this.mat.uniforms.uAtlas.value = tex;
       this.mat.uniforms.uAtlasReady.value = 1;
     });
+  }
+
+  /** Runtime atlas request status for host smoke tests. */
+  get photoLoadStatus(): {
+    requested: number;
+    loaded: number;
+    failed: number;
+    complete: boolean;
+  } {
+    return {
+      requested: this.atlasRequested,
+      loaded: this.atlasLoaded,
+      failed: this.atlasFailed,
+      complete: this.atlasComplete,
+    };
   }
 
   /**
@@ -196,6 +242,7 @@ export class LandmarkSprites {
   }
 
   dispose(scene: Scene): void {
+    this.disposed = true;
     scene.remove(this.mesh);
     this.mesh.geometry.dispose();
     const atlas = this.mat.uniforms.uAtlas.value;

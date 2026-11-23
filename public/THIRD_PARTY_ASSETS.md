@@ -77,19 +77,19 @@
 - Upstream metadata: `src/data/landmarkImages.ts`
 - Use: real-position deep-sky landmark billboard atlas in the pinned MIT `LandmarkSprites` renderer.
 - Licenses: public-domain NASA/ESA/STScI imagery or CC BY 4.0 ESO / ESA-Hubble imagery, as identified by the pinned upstream metadata.
-- Credits:
-  - M42: NASA, ESA, M. Robberto (STScI/ESA), HST Orion Treasury Project
-  - Carina: ESO (CC BY 4.0)
-  - M16: ESO (CC BY 4.0)
-  - M8: ESO / S. Guisard (CC BY 4.0)
-  - M1: NASA, ESA, J. Hester & A. Loll (ASU)
-  - M57: Hubble Heritage Team (AURA/STScI/NASA)
-  - M27: ESO (CC BY 4.0)
-  - Helix: NASA, ESA, C.R. O'Dell (Vanderbilt), NOAO/CTIO
-  - Cassiopeia A: NASA/JPL-Caltech/STScI/CXC/SAO
-  - 30 Doradus: TRAPPIST / E. Jehin / ESO (CC BY 4.0)
-  - SN 1987A: ESA/Hubble & NASA (CC BY 4.0)
-  - NGC 346: ESA/Hubble & NASA, A. Nota, P. Massey, E. Sabbi, C. Murray, M. Zamani (CC BY 4.0)
-  - NGC 604: NASA, Hubble Space Telescope
-  - Pleiades: NASA, ESA, AURA/Caltech, Palomar Observatory
-  - Omega Centauri: ESO (CC BY 4.0)
+- Credits (local atlas source → object → credit):
+  - `m42.jpg` → M42: NASA, ESA, M. Robberto (STScI/ESA), HST Orion Treasury Project
+  - `carina.jpg` → Carina: ESO (CC BY 4.0)
+  - `m16.jpg` → M16: ESO (CC BY 4.0)
+  - `m8.jpg` → M8: ESO / S. Guisard (CC BY 4.0)
+  - `m1.jpg` → M1: NASA, ESA, J. Hester & A. Loll (ASU)
+  - `m57.jpg` → M57: Hubble Heritage Team (AURA/STScI/NASA)
+  - `m27.jpg` → M27: ESO (CC BY 4.0)
+  - `helix.jpg` → Helix: NASA, ESA, C.R. O'Dell (Vanderbilt), NOAO/CTIO
+  - `casa.jpg` → Cassiopeia A: NASA/JPL-Caltech/STScI/CXC/SAO
+  - `30dor.jpg` → 30 Doradus: TRAPPIST / E. Jehin / ESO (CC BY 4.0)
+  - `sn1987a.jpg` → SN 1987A: ESA/Hubble & NASA (CC BY 4.0)
+  - `ngc346.jpg` → NGC 346: ESA/Hubble & NASA, A. Nota, P. Massey, E. Sabbi, C. Murray, M. Zamani (CC BY 4.0)
+  - `ngc604.jpg` → NGC 604: NASA, Hubble Space Telescope
+  - `pleiades.jpg` → Pleiades: NASA, ESA, AURA/Caltech, Palomar Observatory
+  - `omegacen.jpg` → Omega Centauri: ESO (CC BY 4.0)

@@ -5,6 +5,7 @@ import { bakePlanet } from "procedural-planets";
 import * as THREE from "three";
 import {
   PLANET_ANCHOR,
+  PLANET_RENDER_RADIUS,
   type PlanetArchetype,
   type PlanetDefinition,
   type QualityMode,
@@ -65,6 +66,29 @@ function DeepSky() {
   );
 }
 
+function rendererLabel(gl: THREE.WebGLRenderer) {
+  const context = gl.getContext();
+  try {
+    const debug = context.getExtension("WEBGL_debug_renderer_info");
+    if (debug) {
+      return String(
+        context.getParameter(debug.UNMASKED_RENDERER_WEBGL) ?? "",
+      );
+    }
+  } catch {
+    // Some privacy-hardened browsers intentionally deny unmasked renderer info.
+  }
+  return String(context.getParameter(context.RENDERER) ?? "");
+}
+
+function shouldKeepFallback(gl: THREE.WebGLRenderer, quality: QualityMode) {
+  if (quality === "low") return "low-quality";
+  const renderer = rendererLabel(gl);
+  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(renderer)
+    ? "software-renderer"
+    : null;
+}
+
 function disposeBaked(root: THREE.Object3D) {
   root.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
@@ -75,6 +99,14 @@ function disposeBaked(root: THREE.Object3D) {
     for (const material of materials) material?.dispose();
   });
 }
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 export function PlanetScene({
   planet,
@@ -93,7 +125,7 @@ export function PlanetScene({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius,
-      textureSize: quality === "low" ? 512 : quality === "high" ? 1024 : 768,
+      textureSize: quality === "low" ? 256 : quality === "high" ? 1024 : 512,
     }),
     [planet, quality],
   );
@@ -101,28 +133,87 @@ export function PlanetScene({
   useEffect(() => {
     let cancelled = false;
     let created: THREE.Group | null = null;
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let idleHandle: number | null = null;
+    let fallbackTimer: number | null = null;
+    let warmupTimer: number | null = null;
+    const idleWindow = window as IdleWindow;
+    const fallbackReason = shouldKeepFallback(gl, quality);
 
-    void bakePlanet(gl, bakeOptions).then((group) => {
-      created = group;
-      if (cancelled) {
-        disposeBaked(group);
-        return;
-      }
-      group.position.set(...PLANET_ANCHOR);
-      group.scale.setScalar(3.65 / radius);
-      group.rotation.set(0.08, -0.65, -0.16);
-      group.name = planet.name;
-      setBaked(group);
-    }).catch((error) => {
-      console.warn("[planet-bake]", planet.name, error);
+    if (fallbackReason) {
+      document.documentElement.dataset.planetRenderMode =
+        "fallback-" + fallbackReason;
+      return () => {
+        if (
+          document.documentElement.dataset.planetRenderMode ===
+          "fallback-" + fallbackReason
+        ) {
+          delete document.documentElement.dataset.planetRenderMode;
+        }
+      };
+    }
+
+    document.documentElement.dataset.planetRenderMode = "fallback-warmup";
+
+    const bake = () => {
+      if (cancelled) return;
+
+      document.documentElement.dataset.planetRenderMode = "baking";
+      void bakePlanet(gl, bakeOptions).then((group) => {
+        created = group;
+        if (cancelled) {
+          disposeBaked(group);
+          return;
+        }
+        group.position.set(...PLANET_ANCHOR);
+        group.scale.setScalar(PLANET_RENDER_RADIUS / radius);
+        group.rotation.set(0.08, -0.65, -0.16);
+        group.name = planet.name;
+        setBaked(group);
+        document.documentElement.dataset.planetRenderMode = "baked";
+      }).catch((error) => {
+        document.documentElement.dataset.planetRenderMode = "fallback-error";
+        console.warn("[planet-bake]", planet.name, error);
+      });
+    };
+
+    // bakePlanet is deliberately not started in the first arrival commit.
+    // ProceduralPlanets documents baking as GPU-blocking work. Two frames make
+    // the fallback/HUD observable, and a short warmup window lets quick travel
+    // or return actions cancel the expensive work entirely. Software WebGL
+    // renderers never bake: SwiftShader/llvmpipe can block navigation for tens
+    // of seconds, while the fallback remains a complete interactive world.
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        warmupTimer = window.setTimeout(() => {
+          if (cancelled) return;
+          if (idleWindow.requestIdleCallback) {
+            idleHandle = idleWindow.requestIdleCallback(() => bake(), {
+              timeout: 1200,
+            });
+          } else {
+            fallbackTimer = window.setTimeout(bake, 120);
+          }
+        }, 1800);
+      });
     });
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      if (idleHandle !== null && idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(idleHandle);
+      }
+      if (warmupTimer !== null) window.clearTimeout(warmupTimer);
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
       setBaked(null);
       if (created) disposeBaked(created);
+      delete document.documentElement.dataset.planetRenderMode;
     };
-  }, [bakeOptions, gl, planet.name]);
+  }, [bakeOptions, gl, planet.name, quality]);
 
   useFrame((_, delta) => {
     if (baked) baked.rotation.y += delta * 0.014;
@@ -165,7 +256,7 @@ export function PlanetScene({
         <mesh
           ref={fallback}
           position={PLANET_ANCHOR}
-          scale={3.65}
+          scale={PLANET_RENDER_RADIUS}
         >
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial

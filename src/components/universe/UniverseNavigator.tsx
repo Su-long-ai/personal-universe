@@ -1,25 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { GalaxyMarker } from "../../lib/universe/types";
+import type {
+  GalaxyMarker,
+  SystemDefinition,
+} from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
   loadUniverseNavigation,
+  loadUniversePlaces,
+  navigationSectionsForResults,
   type UniverseNavigationDestination,
-  type UniverseNavigationGroup,
+  type UniverseNavigationSection,
 } from "../../lib/universe/yeis/navigation";
-
-const GROUP_LABELS: Record<UniverseNavigationGroup, string> = {
-  personal: "PERSONAL SIGNALS",
-  worlds: "WORLDS",
-  stars: "STARS + SYSTEMS",
-  blackholes: "BLACK HOLES",
-  landmarks: "LANDMARKS",
-  galaxies: "GALAXIES",
-};
 
 export function UniverseNavigator({
   open,
   markers,
   placements,
+  currentSystem,
+  activeDestinationId,
   onClose,
   onNavigate,
   onLocate,
@@ -28,6 +26,8 @@ export function UniverseNavigator({
   open: boolean;
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
+  currentSystem?: SystemDefinition | null;
+  activeDestinationId?: string | null;
   onClose: () => void;
   onNavigate: (
     destination: UniverseNavigationDestination,
@@ -41,29 +41,41 @@ export function UniverseNavigator({
   ) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const resultRefs = useRef(new Map<number, HTMLDivElement>());
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<UniverseNavigationDestination[]>([]);
+  const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [pendingAction, setPendingAction] = useState<{
+    destinationId: string;
+    mode: "open" | "locate";
+  } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const results = useMemo(
+    () => sections.flatMap((section) => section.destinations),
+    [sections],
+  );
 
   const journeyOptions = useMemo(() => {
-    const personal = results.filter(
-      (destination) => destination.kind === "personal" && destination.entryId,
+    const personal =
+      sections.find((section) => section.id === "personal-signals")
+        ?.destinations ?? [];
+    const featuredIds = new Set(
+      (sections.find((section) => section.id === "featured")
+        ?.destinations ?? [])
+        .filter((destination) => destination.entryId)
+        .map((destination) => destination.id),
     );
-    const placementByEntryId = new Map(
-      placements.map((placement) => [placement.entry.id, placement]),
+    const featured = personal.filter((destination) =>
+      featuredIds.has(destination.id),
     );
-    const byKind = (kind: string) =>
-      personal.filter(
-        (destination) =>
-          destination.entryId &&
-          placementByEntryId.get(destination.entryId)?.entry.kind === kind,
-      );
-    const featured = personal.filter(
-      (destination) =>
-        destination.entryId &&
-        placementByEntryId.get(destination.entryId)?.entry.featured,
-    );
+    const projects =
+      sections.find((section) => section.id === "projects")
+        ?.destinations ?? [];
+    const research =
+      sections.find((section) => section.id === "research")
+        ?.destinations ?? [];
 
     return [
       {
@@ -74,20 +86,22 @@ export function UniverseNavigator({
       {
         id: "projects",
         title: "Projects Journey",
-        destinations: byKind("project"),
+        destinations: projects,
       },
       {
         id: "research",
         title: "Research Journey",
-        destinations: byKind("research"),
+        destinations: research,
       },
     ];
-  }, [placements, results]);
+  }, [sections]);
 
   useEffect(() => {
     if (!open) {
       setQuery("");
       setActiveIndex(0);
+      setPendingAction(null);
+      setActionError(null);
       return;
     }
 
@@ -100,46 +114,120 @@ export function UniverseNavigator({
     return () => {
       delete document.documentElement.dataset.universeNavigator;
       delete document.documentElement.dataset.universeNavigatorResults;
+      delete document.documentElement.dataset.universeNavigatorMode;
     };
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let debounceTimer = 0;
     setStatus("loading");
+    setSections([]);
+    setActiveIndex(0);
+    document.documentElement.dataset.universeNavigatorResults = "0";
+    const trimmed = query.trim();
+    document.documentElement.dataset.universeNavigatorMode = trimmed
+      ? "search"
+      : "places";
 
-    void loadUniverseNavigation(query, placements, markers)
-      .then((next) => {
-        if (cancelled) return;
-        setResults(next);
-        setActiveIndex(0);
-        setStatus("idle");
-        document.documentElement.dataset.universeNavigatorResults = String(
-          next.length,
-        );
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("[UNIVERSE-NAV] search failed", error);
-        setResults([]);
-        setStatus("error");
-        document.documentElement.dataset.universeNavigatorResults = "error";
-      });
+    const run = () => {
+      const request = trimmed
+        ? loadUniverseNavigation(
+            trimmed,
+            placements,
+            markers,
+            currentSystem ?? null,
+          ).then(navigationSectionsForResults)
+        : loadUniversePlaces(placements, markers);
+
+      void request
+        .then((next) => {
+          if (cancelled) return;
+          setSections(next);
+          setActiveIndex(0);
+          setStatus("idle");
+          const count = next.reduce(
+            (sum, section) => sum + section.destinations.length,
+            0,
+          );
+          document.documentElement.dataset.universeNavigatorResults =
+            String(count);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("[UNIVERSE-NAV] navigator index failed", error);
+          setSections([]);
+          setStatus("error");
+          document.documentElement.dataset.universeNavigatorResults = "error";
+        });
+    };
+
+    if (trimmed) {
+      debounceTimer = window.setTimeout(run, 90);
+    } else {
+      run();
+    }
 
     return () => {
       cancelled = true;
+      if (debounceTimer) window.clearTimeout(debounceTimer);
     };
-  }, [markers, open, placements, query]);
+  }, [currentSystem, markers, open, placements, query]);
+
+  useEffect(() => {
+    if (!results[activeIndex]) return;
+    resultRefs.current.get(activeIndex)?.scrollIntoView({
+      block: "nearest",
+      behavior: "auto",
+    });
+  }, [activeIndex, results]);
 
   if (!open) return null;
 
-  const activate = (destination: UniverseNavigationDestination) => {
-    void Promise.resolve(onNavigate(destination)).then(onClose);
+  const updateQuery = (value: string) => {
+    setQuery(value);
+    setStatus("loading");
+    setSections([]);
+    setActiveIndex(0);
+    setActionError(null);
+    document.documentElement.dataset.universeNavigatorResults = "0";
+    document.documentElement.dataset.universeNavigatorMode = value.trim()
+      ? "search"
+      : "places";
   };
 
-  const locate = (destination: UniverseNavigationDestination) => {
-    void Promise.resolve(onLocate(destination)).then(onClose);
+  const activate = async (destination: UniverseNavigationDestination) => {
+    if (pendingAction) return;
+    setPendingAction({ destinationId: destination.id, mode: "open" });
+    setActionError(null);
+    try {
+      await Promise.resolve(onNavigate(destination));
+      setPendingAction(null);
+      onClose();
+    } catch (error) {
+      console.error("[UNIVERSE-NAV] destination activation failed", error);
+      setPendingAction(null);
+      setActionError("Could not open " + destination.title + ". Try again.");
+    }
   };
+
+  const locate = async (destination: UniverseNavigationDestination) => {
+    if (pendingAction) return;
+    setPendingAction({ destinationId: destination.id, mode: "locate" });
+    setActionError(null);
+    try {
+      await Promise.resolve(onLocate(destination));
+      setPendingAction(null);
+      onClose();
+    } catch (error) {
+      console.error("[UNIVERSE-NAV] destination locate failed", error);
+      setPendingAction(null);
+      setActionError("Could not locate " + destination.title + ". Try again.");
+    }
+  };
+
+  let flatIndex = -1;
 
   return (
     <div
@@ -169,7 +257,7 @@ export function UniverseNavigator({
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => updateQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
@@ -196,18 +284,25 @@ export function UniverseNavigator({
                 else activate(result);
               }
             }}
-            placeholder="Search projects, stars, galaxies, black holes, landmarks…"
+            placeholder="Search personal signals, planets, stars, landmarks, galaxies…"
             aria-label="Search universe"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls="universe-navigator-results"
+            aria-activedescendant={
+              results[activeIndex]
+                ? "universe-navigator-option-" + activeIndex
+                : undefined
+            }
+            autoComplete="off"
+            spellCheck={false}
           />
           <kbd>CTRL K</kbd>
         </div>
 
         <div className="navigator-section-label">
-          <span>
-            {query.trim()
-              ? "SEARCH RESULTS"
-              : "PERSONAL SIGNALS + FEATURED PLACES"}
-          </span>
+          <span>{query.trim() ? "SEARCH RESULTS" : "PLACES / DESTINATIONS"}</span>
           <small>
             {status === "loading"
               ? "SCANNING…"
@@ -242,12 +337,30 @@ export function UniverseNavigator({
           </div>
         )}
 
-        <div className="navigator-results" role="listbox">
+        <div
+          id="universe-navigator-results"
+          className="navigator-results"
+          role="listbox"
+          aria-busy={status === "loading" || pendingAction !== null}
+        >
+          {actionError && (
+            <div className="navigator-action-error" role="alert">
+              {actionError}
+            </div>
+          )}
+
+          {status === "loading" && (
+            <div className="navigator-empty is-loading" role="status">
+              Scanning destinations…
+            </div>
+          )}
+
           {status === "error" && (
             <div className="navigator-empty">
               YEIS navigation index unavailable.
             </div>
           )}
+
           {status !== "error" &&
             status !== "loading" &&
             results.length === 0 && (
@@ -255,63 +368,89 @@ export function UniverseNavigator({
                 No destination matched this signal.
               </div>
             )}
-          {results.map((result, index) => {
-            const showGroup =
-              index === 0 || results[index - 1]?.group !== result.group;
-            return (
-              <div className="navigator-result-block" key={result.id}>
-                {showGroup && (
+
+          {sections.map((section) => (
+            <section
+              className="navigator-result-group"
+              key={section.id}
+              aria-label={section.title}
+            >
+              <header className="navigator-result-group-title">
+                <span>{section.title}</span>
+                <small>{section.destinations.length}</small>
+              </header>
+
+              {section.destinations.map((result) => {
+                flatIndex += 1;
+                const index = flatIndex;
+                const isKeyboardActive = index === activeIndex;
+                const isCurrent = result.id === activeDestinationId;
+                const spatial =
+                  result.target.kind === "galaxy" ||
+                  result.target.kind === "landmark" ||
+                  result.target.kind === "blackhole";
+                const pendingMode =
+                  pendingAction?.destinationId === result.id
+                    ? pendingAction.mode
+                    : null;
+
+                return (
                   <div
+                    key={section.id + ":" + result.id}
+                    id={"universe-navigator-option-" + index}
+                    ref={(node) => {
+                      if (node) resultRefs.current.set(index, node);
+                      else resultRefs.current.delete(index);
+                    }}
                     className={
-                      "navigator-group-label group-" + result.group
+                      "navigator-result-row" +
+                      (isKeyboardActive ? " is-active" : "") +
+                      (isCurrent ? " is-current" : "")
                     }
+                    role="option"
+                    aria-selected={isKeyboardActive}
+                    aria-current={isCurrent ? "location" : undefined}
+                    onPointerEnter={() => setActiveIndex(index)}
                   >
-                    <span>{GROUP_LABELS[result.group]}</span>
-                    {result.group === "personal" && (
-                      <small>YOUR CONTENT</small>
-                    )}
+                    <button
+                      type="button"
+                      className="navigator-result-open"
+                      onClick={() => void activate(result)}
+                      disabled={pendingAction !== null}
+                    >
+                      <span className={"navigator-kind kind-" + result.kind}>
+                        {result.kind}
+                      </span>
+                      <span className="navigator-result-main">
+                        <strong>{result.title}</strong>
+                        <small>{result.detail}</small>
+                      </span>
+                      <span className="navigator-open">
+                        {pendingMode === "open"
+                          ? spatial
+                            ? "TRAVELING…"
+                            : "OPENING…"
+                          : isCurrent
+                            ? "ACTIVE"
+                            : spatial
+                              ? "TRAVEL →"
+                              : "OPEN →"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="navigator-locate"
+                      onClick={() => void locate(result)}
+                      aria-label={"Locate " + result.title + " in galaxy"}
+                      disabled={pendingAction !== null}
+                    >
+                      {pendingMode === "locate" ? "LOCATING…" : "LOCATE"}
+                    </button>
                   </div>
-                )}
-                <div
-                  className={
-                    "navigator-result-row" +
-                    (index === activeIndex ? " is-active" : "")
-                  }
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  onPointerEnter={() => setActiveIndex(index)}
-                >
-                  <button
-                    type="button"
-                    className="navigator-result-open"
-                    onClick={() => activate(result)}
-                  >
-                    <span className={"navigator-kind kind-" + result.kind}>
-                      {result.kind}
-                    </span>
-                    <span className="navigator-result-main">
-                      <strong>{result.title}</strong>
-                      <small>{result.detail}</small>
-                    </span>
-                    <span className="navigator-open">
-                      {result.target.kind === "star" ||
-                      result.target.kind === "body"
-                        ? "OPEN →"
-                        : "TRAVEL →"}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="navigator-locate"
-                    onClick={() => locate(result)}
-                    aria-label={"Locate " + result.title + " in galaxy"}
-                  >
-                    LOCATE
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </section>
+          ))}
         </div>
 
         <footer className="navigator-footer">

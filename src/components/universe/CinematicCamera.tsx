@@ -1,8 +1,12 @@
 import { useEffect, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import { Vector3 } from "three";
-import { PLANET_ANCHOR, type UniversePhase } from "../../lib/universe/types";
+import {
+  PLANET_ANCHOR,
+  PLANET_RENDER_RADIUS,
+  type UniversePhase,
+} from "../../lib/universe/types";
 
 type CinematicCameraProps = {
   phase: UniversePhase;
@@ -23,6 +27,7 @@ const SHOTS: Partial<
       maxSpeed: number;
       positionTolerance: number;
       targetTolerance: number;
+      frameScale?: number;
     }
   >
 > = {
@@ -33,6 +38,7 @@ const SHOTS: Partial<
     maxSpeed: 28,
     positionTolerance: 0.16,
     targetTolerance: 0.1,
+    frameScale: 1.5,
   },
   orbit: {
     position: [8.65, 1.28, 6.25],
@@ -41,6 +47,7 @@ const SHOTS: Partial<
     maxSpeed: 18,
     positionTolerance: 0.12,
     targetTolerance: 0.08,
+    frameScale: 1.28,
   },
   atmosphere: {
     position: [7.12, 0.9, 3.42],
@@ -75,6 +82,7 @@ export function CinematicCamera({
 
   useEffect(() => {
     completedPhase.current = null;
+    delete document.documentElement.dataset.universeCameraSettled;
     const controls = controlsRef.current;
     if (!controls) return;
 
@@ -122,23 +130,38 @@ export function CinematicCamera({
 
     controls.smoothTime = reducedMotion ? 0.05 : shot.smoothTime;
     controls.maxSpeed = reducedMotion ? 1000 : shot.maxSpeed;
-    desiredPosition.current.set(...shot.position);
+
     desiredTarget.current.set(...shot.target);
+    desiredPosition.current.set(...shot.position);
+
+    if (shot.frameScale) {
+      const distance =
+        controls.getDistanceToFitSphere(PLANET_RENDER_RADIUS) * shot.frameScale;
+      desiredPosition.current
+        .sub(desiredTarget.current)
+        .normalize()
+        .multiplyScalar(distance)
+        .add(desiredTarget.current);
+    }
 
     void controls.setLookAt(
-      ...shot.position,
-      ...shot.target,
+      desiredPosition.current.x,
+      desiredPosition.current.y,
+      desiredPosition.current.z,
+      desiredTarget.current.x,
+      desiredTarget.current.y,
+      desiredTarget.current.z,
       !reducedMotion,
     );
-  }, [phase, reducedMotion, scrollDepth]);
+  }, [height, phase, reducedMotion, scrollDepth, width]);
 
   useFrame(() => {
     const controls = controlsRef.current;
     const shot = SHOTS[phase];
     if (!controls || !shot || completedPhase.current === phase) return;
 
-    controls.getPosition(currentPosition.current);
-    controls.getTarget(currentTarget.current);
+    controls.getPosition(currentPosition.current, false);
+    controls.getTarget(currentTarget.current, false);
 
     const positionReached =
       currentPosition.current.distanceTo(desiredPosition.current) <=
@@ -150,8 +173,16 @@ export function CinematicCamera({
     if (!positionReached || !targetReached) return;
 
     completedPhase.current = phase;
+    document.documentElement.dataset.universeCameraSettled = phase;
     onPhaseComplete(phase);
   });
+
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.universeCameraSettled;
+    },
+    [],
+  );
 
   return (
     <CameraControls

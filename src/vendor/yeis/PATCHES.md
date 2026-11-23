@@ -11,8 +11,8 @@ source boundary.
 
 ## Host patches
 
-The vendored code is kept structurally close to upstream. There are three
-intentional Personal Universe adaptations:
+The vendored code is kept structurally close to upstream. There are six
+intentional Personal Universe host adaptations:
 
 1. `core/Universe.ts`
    - Adds `registerExtraSystem(system)`.
@@ -25,15 +25,17 @@ intentional Personal Universe adaptations:
    - Data format and parsing are unchanged.
 
 3. `i18n/index.ts`
-   - Restores the exact pinned-MIT YEIS runtime translator after visual smoke
-     exposed Turkish source labels leaking through the earlier identity shim.
+   - Restores the exact pinned-MIT YEIS runtime translator after smoke testing
+     exposed localized source labels leaking through the earlier identity shim.
    - Vendors only `locales/en/data.json` and `locales/en/ui.json`; the host
-     calls `initI18n("en")` before constructing `Universe`.
-   - Translation lookup and source keys remain upstream behavior; Personal
-     Universe does not maintain a parallel body-name alias table.
+     initializes `en` before constructing the YEIS universe.
+   - Translation lookup and source keys remain pinned upstream behavior;
+     Personal Universe does not maintain a parallel body-name translation table.
 
-No model, orbital, catalogue, procedural-generation, galaxy, black-hole, or
-stellar algorithms were rewritten in this migration.
+No model, orbital, catalogue, procedural-generation, galaxy, black-hole,
+landmark-navigation, picking, or stellar algorithms were rewritten in this
+migration. Product Search/Places/Journey orchestration lives outside the
+vendored tree in `src/lib/universe/yeis/navigation.ts` and React host code.
 
 ## Data
 
@@ -62,8 +64,10 @@ Fiber.
 6. `render/LandmarkSprites.ts`
    - Adds `dispose(scene)` so the R3F host can remove the instanced landmark
      mesh and release its geometry, shader material, and photo atlas texture.
-   - Rendering, coordinate, LOD, atlas, and picking logic remain the exact
-     pinned MIT implementation.
+   - Exposes read-only atlas request/load/failure counters for host runtime
+     smoke evidence and guards the delayed atlas load after React disposal.
+   - Rendering, coordinate, LOD, atlas composition, and picking semantics remain
+     the pinned MIT implementation.
 
 ## Deep-sky landmark imagery
 

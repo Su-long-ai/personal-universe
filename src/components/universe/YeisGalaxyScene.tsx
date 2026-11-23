@@ -11,7 +11,14 @@ import {
 } from "three";
 import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
-import type { UniverseNavigationCameraRequest } from "../../lib/universe/yeis/navigation";
+import {
+  navigationDestinationForGalaxy,
+  navigationDestinationForLandmark,
+  navigationDestinationForMarker,
+  navigationDestinationForPlacement,
+  type UniverseNavigationCameraRequest,
+  type UniverseNavigationDestination,
+} from "../../lib/universe/yeis/navigation";
 import {
   loadYeisCore,
   HERO_SYSTEM_ID,
@@ -32,6 +39,7 @@ import { ProcStarPoints } from "../../vendor/yeis/render/ProcStarPoints";
 import { GalaxyCloud } from "../../vendor/yeis/render/GalaxyCloud";
 import { GalaxySprites } from "../../vendor/yeis/render/GalaxySprites";
 import { LandmarkSprites } from "../../vendor/yeis/render/LandmarkSprites";
+import { LANDMARK_IMAGES } from "../../vendor/yeis/data/landmarkImages";
 
 type NativeGalaxyState = {
   runtime: YeisCoreRuntime;
@@ -69,8 +77,8 @@ export type YeisSignalHover = {
 } | null;
 
 const heroProjection = new Vector3();
-const observedProjection = new Vector3();
 const contentProjection = new Vector3();
+const observedProjection = new Vector3();
 const observedDirection = new Vector3();
 const contentDirection = new Vector3();
 const navigationDirection = new Vector3();
@@ -78,23 +86,13 @@ const navigationPoint = new Vector3();
 const navigationNormal = new Vector3();
 const navigationOrigin = new Vector3();
 
-function cameraTargetKey(
-  target: UniverseNavigationCameraRequest["target"],
-): string {
-  if (target.kind === "star") return "star:" + target.nativeId;
-  if (target.kind === "body") {
-    return "body:" + target.nativeId + ":" + target.bodyId;
-  }
-  if (target.kind === "blackhole") return "blackhole:" + target.id;
-  return target.kind + ":" + target.index;
-}
-
 export function YeisGalaxyScene({
   markers,
   contentPlacements,
   navigationRequest,
   onNavigationComplete,
-  onSelectSystem,
+  onNavigationFailed,
+  onNavigateDestination,
   onSignalHover,
   quality,
   viewStateRef,
@@ -103,7 +101,13 @@ export function YeisGalaxyScene({
   contentPlacements: UniverseContentPlacement[];
   navigationRequest: UniverseNavigationCameraRequest | null;
   onNavigationComplete: (request: UniverseNavigationCameraRequest) => void;
-  onSelectSystem: (marker: GalaxyMarker) => void;
+  onNavigationFailed: (
+    request: UniverseNavigationCameraRequest,
+    reason: string,
+  ) => void;
+  onNavigateDestination: (
+    destination: UniverseNavigationDestination,
+  ) => Promise<void> | void;
   onSignalHover: (hover: YeisSignalHover) => void;
   quality: QualityMode;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -124,14 +128,16 @@ export function YeisGalaxyScene({
   const pendingNavigationRef =
     useRef<UniverseNavigationCameraRequest | null>(null);
   const navigationCompleteRef = useRef(onNavigationComplete);
-  const selectRef = useRef(onSelectSystem);
+  const navigationFailureRef = useRef(onNavigationFailed);
+  const navigateRef = useRef(onNavigateDestination);
   const signalHoverRef = useRef(onSignalHover);
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
   navigationRequestRef.current = navigationRequest;
   navigationCompleteRef.current = onNavigationComplete;
-  selectRef.current = onSelectSystem;
+  navigationFailureRef.current = onNavigationFailed;
+  navigateRef.current = onNavigateDestination;
   signalHoverRef.current = onSignalHover;
 
   useEffect(() => {
@@ -302,16 +308,27 @@ export function YeisGalaxyScene({
         };
         stateRef.current = state;
 
-        const selectNativeStar = (starId: string) => {
+        const navigateDestination = (
+          destination: UniverseNavigationDestination,
+        ) => {
+          document.documentElement.dataset.yeisPickedTarget = destination.id;
+          void navigateRef.current(destination);
+        };
+
+        const navigateNativeStar = (starId: string) => {
           const marker = markerForYeisStarId(
             runtime,
             markersRef.current,
             starId,
           );
-          console.info(
-            `[YEIS-NATIVE-PICK] star=${starId} marker=${marker.id} engine=${marker.engine ?? "v2"}`,
+          const destination = navigationDestinationForMarker(
+            marker,
+            contentPlacementsRef.current,
           );
-          selectRef.current(marker);
+          console.info(
+            `[YEIS-NATIVE-PICK] star=${starId} marker=${marker.id} destination=${destination.id}`,
+          );
+          navigateDestination(destination);
         };
 
         input.onClick = (clientX, clientY) => {
@@ -321,22 +338,66 @@ export function YeisGalaxyScene({
           const y = clientY - rect.top;
           const width = rect.width;
           const height = rect.height;
+          const pickRadius = state.input.coarse ? 24 : 17;
 
-          heroProjection
-            .copy(state.heroSkyPosition)
-            .project(perspective);
-          if (
-            heroProjection.z >= -1 &&
-            heroProjection.z <= 1
-          ) {
+          const markerById = new Map(
+            markersRef.current.map((marker) => [marker.id, marker]),
+          );
+          let nearestSignal:
+            | { placement: UniverseContentPlacement; distance: number }
+            | null = null;
+          for (const placement of contentPlacementsRef.current) {
+            const marker = markerById.get(placement.markerId);
+            const nativeId = placement.nativeId ?? marker?.nativeId;
+            if (!nativeId) continue;
+            const starPc = runtime.universe.starPositionPc(nativeId);
+            contentDirection.copy(starPc).sub(state.cameraPc);
+            if (contentDirection.lengthSq() <= 1e-12) continue;
+            contentDirection
+              .normalize()
+              .multiplyScalar(SKY_RADIUS_KM * 0.992);
+            contentProjection.copy(contentDirection).project(perspective);
+            if (contentProjection.z < -1 || contentProjection.z > 1) continue;
+            const sx = (contentProjection.x * 0.5 + 0.5) * width;
+            const sy = (-contentProjection.y * 0.5 + 0.5) * height;
+            const distance = Math.hypot(sx - x, sy - y);
+            if (
+              distance <= pickRadius &&
+              (!nearestSignal || distance < nearestSignal.distance)
+            ) {
+              nearestSignal = { placement, distance };
+            }
+          }
+
+          if (nearestSignal) {
+            const destination = navigationDestinationForPlacement(
+              nearestSignal.placement,
+              markersRef.current,
+            );
+            if (destination) {
+              console.info(
+                `[PERSONAL-SIGNAL-PICK] ${nearestSignal.placement.entry.id} -> ${destination.id}`,
+              );
+              navigateDestination(destination);
+              return;
+            }
+          }
+
+          heroProjection.copy(state.heroSkyPosition).project(perspective);
+          if (heroProjection.z >= -1 && heroProjection.z <= 1) {
             const hx = (heroProjection.x * 0.5 + 0.5) * width;
             const hy = (-heroProjection.y * 0.5 + 0.5) * height;
-            if (Math.hypot(hx - x, hy - y) <= 18) {
+            if (Math.hypot(hx - x, hy - y) <= pickRadius) {
               const hero = markersRef.current.find(
                 (marker) => marker.source === "hero",
               );
               if (hero) {
-                selectRef.current(hero);
+                navigateDestination(
+                  navigationDestinationForMarker(
+                    hero,
+                    contentPlacementsRef.current,
+                  ),
+                );
                 return;
               }
             }
@@ -365,10 +426,50 @@ export function YeisGalaxyScene({
 
             const ox = (observedProjection.x * 0.5 + 0.5) * width;
             const oy = (-observedProjection.y * 0.5 + 0.5) * height;
-            if (Math.hypot(ox - x, oy - y) <= 16) {
-              selectRef.current(marker);
+            if (Math.hypot(ox - x, oy - y) <= pickRadius) {
+              navigateDestination(
+                navigationDestinationForMarker(
+                  marker,
+                  contentPlacementsRef.current,
+                ),
+              );
               return;
             }
+          }
+
+          const landmarkIndex = state.landmarkSprites.pick(
+            x,
+            y,
+            perspective,
+            width,
+            height,
+            pickRadius,
+          );
+          if (landmarkIndex !== null) {
+            navigateDestination(
+              navigationDestinationForLandmark(runtime, landmarkIndex),
+            );
+            return;
+          }
+
+          const pxPerRad =
+            height / 2 / Math.tan((perspective.fov * DEG) / 2);
+          const galaxyIndex = state.galaxySprites.pick(
+            x,
+            y,
+            perspective,
+            width,
+            height,
+            pxPerRad,
+            state.galaxyBoost,
+            state.currentGalaxy ?? -1,
+            pickRadius,
+          );
+          if (galaxyIndex !== null) {
+            navigateDestination(
+              navigationDestinationForGalaxy(runtime, galaxyIndex),
+            );
+            return;
           }
 
           const catalogIndex = state.starPoints.pick(
@@ -378,11 +479,11 @@ export function YeisGalaxyScene({
             width,
             height,
             runtime.universe.current.catalogIndex,
-            16,
+            pickRadius,
             7.2,
           );
           if (catalogIndex !== null) {
-            selectNativeStar(`c${catalogIndex}`);
+            navigateNativeStar(`c${catalogIndex}`);
             return;
           }
 
@@ -393,10 +494,10 @@ export function YeisGalaxyScene({
             width,
             height,
             runtime.universe.current.starId,
-            16,
+            pickRadius,
             7.2,
           );
-          if (proceduralId) selectNativeStar(proceduralId);
+          if (proceduralId) navigateNativeStar(proceduralId);
         };
 
         const clearSignalHover = () => {
@@ -425,18 +526,17 @@ export function YeisGalaxyScene({
           const rect = gl.domElement.getBoundingClientRect();
           const x = event.clientX - rect.left;
           const y = event.clientY - rect.top;
-          const markerById = new Map(
-            markersRef.current.map((marker) => [marker.id, marker]),
-          );
           let best:
             | { placement: UniverseContentPlacement; distance: number }
             | null = null;
+          const markerById = new Map(
+            markersRef.current.map((marker) => [marker.id, marker]),
+          );
 
           for (const placement of contentPlacementsRef.current) {
             const marker = markerById.get(placement.markerId);
             const nativeId = placement.nativeId ?? marker?.nativeId;
             if (!nativeId) continue;
-
             const starPc = runtime.universe.starPositionPc(nativeId);
             contentDirection.copy(starPc).sub(state.cameraPc);
             if (contentDirection.lengthSq() <= 1e-12) continue;
@@ -445,7 +545,6 @@ export function YeisGalaxyScene({
               .multiplyScalar(SKY_RADIUS_KM * 0.992);
             contentProjection.copy(contentDirection).project(perspective);
             if (contentProjection.z < -1 || contentProjection.z > 1) continue;
-
             const sx = (contentProjection.x * 0.5 + 0.5) * rect.width;
             const sy = (-contentProjection.y * 0.5 + 0.5) * rect.height;
             const distance = Math.hypot(sx - x, sy - y);
@@ -477,20 +576,33 @@ export function YeisGalaxyScene({
           }
         };
 
-        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
-        gl.domElement.addEventListener("pointerleave", clearSignalHover);
-        removeHoverListeners = () => {
-          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
-          gl.domElement.removeEventListener("pointerleave", clearSignalHover);
+        const onSignalPointerLeave = () => {
+          hoverEvent = null;
           if (hoverFrame) window.cancelAnimationFrame(hoverFrame);
           hoverFrame = 0;
-          hoverEvent = null;
           clearSignalHover();
         };
 
+        gl.domElement.addEventListener("pointermove", onSignalPointerMove);
+        gl.domElement.addEventListener("pointerleave", onSignalPointerLeave);
+        removeHoverListeners = () => {
+          gl.domElement.removeEventListener("pointermove", onSignalPointerMove);
+          gl.domElement.removeEventListener(
+            "pointerleave",
+            onSignalPointerLeave,
+          );
+          onSignalPointerLeave();
+        };
+
         document.documentElement.dataset.yeisNativeGalaxy = "ready";
+        document.documentElement.dataset.yeisLandmarks = String(
+          runtime.universe.landmarks.length,
+        );
+        document.documentElement.dataset.yeisLandmarkPhotos = String(
+          Object.keys(LANDMARK_IMAGES).length,
+        );
         console.info(
-          `[YEIS-NATIVE-GALAXY] READY stars=${runtime.catalog.count} cloud=${quality === "low" ? 90_000 : 180_000}`,
+          `[YEIS-NATIVE-GALAXY] READY stars=${runtime.catalog.count} landmarks=${runtime.universe.landmarks.length} photos=${Object.keys(LANDMARK_IMAGES).length} cloud=${quality === "low" ? 90_000 : 180_000}`,
         );
       })
       .catch((error) => {
@@ -541,10 +653,16 @@ export function YeisGalaxyScene({
       perspective.updateProjectionMatrix();
       perspective.updateMatrixWorld();
       delete document.documentElement.dataset.yeisNativeGalaxy;
+      delete document.documentElement.dataset.yeisLandmarks;
+      delete document.documentElement.dataset.yeisLandmarkPhotos;
+      delete document.documentElement.dataset.yeisLandmarkPhotosRequested;
+      delete document.documentElement.dataset.yeisLandmarkPhotosLoaded;
+      delete document.documentElement.dataset.yeisLandmarkPhotosFailed;
+      delete document.documentElement.dataset.yeisLandmarkPhotosComplete;
+      delete document.documentElement.dataset.yeisPickedTarget;
       delete document.documentElement.dataset.yeisHiplessObserved;
       delete document.documentElement.dataset.personalSignalOverlay;
       delete document.documentElement.dataset.personalSignalCapacity;
-      delete document.documentElement.dataset.personalSignalHover;
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.universeTraveling;
@@ -583,8 +701,6 @@ export function YeisGalaxyScene({
       request.requestId !== lastNavigationRequestRef.current
     ) {
       const targetKey = cameraTargetKey(request.target);
-      delete document.documentElement.dataset.universeNavigationFallback;
-      delete document.documentElement.dataset.universeNavigationError;
 
       navigationStartQuaternionRef.current =
         state.controller.quaternion.toArray() as [
@@ -595,7 +711,7 @@ export function YeisGalaxyScene({
         ];
       navigationStartPositionRef.current =
         state.controller.position.toArray() as [number, number, number];
-      pendingNavigationRef.current = request;
+      pendingNavigationRef.current = null;
       lastNavigationRequestRef.current = request.requestId;
 
       if (request.mode === "locate") {
@@ -604,9 +720,17 @@ export function YeisGalaxyScene({
             request.target.nativeId,
           );
           navigationDirection.copy(targetPc).sub(state.cameraPc);
+        } else if (request.target.kind === "point") {
+          navigationDirection
+            .set(
+              request.target.positionPc[0],
+              request.target.positionPc[1],
+              request.target.positionPc[2],
+            )
+            .sub(state.cameraPc);
         } else if (request.target.kind === "body") {
           const targetPc = runtime.universe.starPositionPc(
-            request.target.nativeId,
+            request.target.starId,
           );
           navigationDirection.copy(targetPc).sub(state.cameraPc);
         } else if (request.target.kind === "blackhole") {
@@ -618,8 +742,6 @@ export function YeisGalaxyScene({
             navigationDirection.copy(targetPc).sub(state.cameraPc);
           } else {
             navigationDirection.set(0, 0, 0);
-            document.documentElement.dataset.universeNavigationError =
-              targetKey;
           }
         } else if (request.target.kind === "galaxy") {
           runtime.universe.galaxyRelative(
@@ -649,18 +771,30 @@ export function YeisGalaxyScene({
           document.documentElement.dataset.universeLocateRequest = String(
             request.requestId,
           );
+          pendingNavigationRef.current = request;
           console.info(
             "[YEIS-NATIVE-LOCATE] " +
               request.title +
               " -> " +
               targetKey,
           );
+        } else {
+          const reason = "locate target has no usable direction";
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-LOCATE] failed " +
+              targetKey +
+              " · " +
+              reason,
+          );
         }
       } else if (request.target.kind === "body") {
-        const nativeId = request.target.nativeId;
-        if (runtime.universe.current.starId !== nativeId) {
+        const starId = request.target.starId;
+        if (runtime.universe.current.starId !== starId) {
           const frameDelta = runtime.universe.switchTo(
-            nativeId,
+            starId,
             2451545.0,
             performance.now() / 1000,
           );
@@ -670,6 +804,7 @@ export function YeisGalaxyScene({
         const body = runtime.universe.get(request.target.bodyId);
         if (body) {
           state.controller.goTo(body, runtime.universe.star.position);
+          pendingNavigationRef.current = request;
           document.documentElement.dataset.universeTraveling = targetKey;
           console.info(
             "[YEIS-NATIVE-BODY] " +
@@ -678,23 +813,20 @@ export function YeisGalaxyScene({
               targetKey,
           );
         } else {
-          runtime.universe.toParsecs(
-            state.controller.position,
-            state.cameraPc,
+          const reason = "native body unavailable";
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-BODY] unavailable " + targetKey,
           );
-          const targetPc = runtime.universe.starPositionPc(nativeId);
-          navigationDirection.copy(targetPc).sub(state.cameraPc);
-          if (navigationDirection.lengthSq() > 1e-12) {
-            state.controller.centerOnDirection(navigationDirection);
-          }
-          document.documentElement.dataset.universeNavigationFallback =
-            "host:" + nativeId;
-          console.warn("[YEIS-NATIVE-BODY] unavailable " + targetKey);
         }
       } else if (request.target.kind === "blackhole") {
         const blackHole = runtime.universe.blackHole(request.target.id);
         if (blackHole) {
-          if (runtime.universe.current.starId !== blackHole.systemStarId) {
+          if (
+            runtime.universe.current.starId !== blackHole.systemStarId
+          ) {
             const frameDelta = runtime.universe.switchTo(
               blackHole.systemStarId,
               2451545.0,
@@ -705,6 +837,7 @@ export function YeisGalaxyScene({
           const body = runtime.universe.get(blackHole.entry.bodyId);
           if (body) {
             state.controller.goTo(body, runtime.universe.star.position);
+            pendingNavigationRef.current = request;
             document.documentElement.dataset.universeTraveling = targetKey;
             console.info(
               "[YEIS-NATIVE-BLACKHOLE] " +
@@ -713,16 +846,22 @@ export function YeisGalaxyScene({
                 targetKey,
             );
           } else {
+            const reason = "black-hole body unavailable";
             document.documentElement.dataset.universeNavigationError =
               targetKey;
-            console.warn(
-              "[YEIS-NATIVE-BLACKHOLE] body unavailable " + targetKey,
+            navigationFailureRef.current(request, reason);
+            console.error(
+              "[YEIS-NATIVE-BLACKHOLE] missing body " + targetKey,
             );
           }
         } else {
+          const reason = "unknown black-hole target";
           document.documentElement.dataset.universeNavigationError =
             targetKey;
-          console.warn("[YEIS-NATIVE-BLACKHOLE] unavailable " + targetKey);
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-BLACKHOLE] unknown " + targetKey,
+          );
         }
       } else if (request.target.kind === "galaxy") {
         const index = request.target.index;
@@ -755,6 +894,7 @@ export function YeisGalaxyScene({
             name: galaxies.name(index),
           },
         );
+        pendingNavigationRef.current = request;
         document.documentElement.dataset.universeTraveling = targetKey;
         console.info(
           "[YEIS-NATIVE-TRAVEL] " +
@@ -765,33 +905,26 @@ export function YeisGalaxyScene({
       } else if (request.target.kind === "landmark") {
         const index = request.target.index;
         const landmark = runtime.universe.landmarks[index];
-        if (landmark.systemId) {
-          const targetPc = runtime.universe.starPositionPc(
-            landmark.systemId,
-          );
-          navigationDirection.copy(targetPc).sub(state.cameraPc);
-          state.controller.centerOnDirection(navigationDirection);
-        } else {
-          runtime.universe.landmarkRelative(
-            index,
-            navigationOrigin,
-            navigationPoint,
-          );
-          const radiusKm = landmark.def.radiusPc * PARSEC_KM;
-          navigationDirection
-            .copy(state.controller.position)
-            .sub(navigationPoint)
-            .normalize();
-          state.controller.goToPoint(
-            navigationPoint,
-            radiusKm * (landmark.def.kind === "remnant" ? 5 : 3.2),
-            navigationDirection,
-            {
-              radius: radiusKm * 0.3,
-              name: landmark.def.name,
-            },
-          );
-        }
+        runtime.universe.landmarkRelative(
+          index,
+          navigationOrigin,
+          navigationPoint,
+        );
+        const radiusKm = landmark.def.radiusPc * PARSEC_KM;
+        navigationDirection
+          .copy(state.controller.position)
+          .sub(navigationPoint)
+          .normalize();
+        state.controller.goToPoint(
+          navigationPoint,
+          radiusKm * (landmark.def.kind === "remnant" ? 5 : 3.2),
+          navigationDirection,
+          {
+            radius: radiusKm * 0.3,
+            name: landmark.def.name,
+          },
+        );
+        pendingNavigationRef.current = request;
         document.documentElement.dataset.universeTraveling = targetKey;
         console.info(
           "[YEIS-NATIVE-TRAVEL] " +
@@ -810,9 +943,7 @@ export function YeisGalaxyScene({
       pendingNavigation.requestId === lastNavigationRequestRef.current &&
       !state.controller.autopilot
     ) {
-      const targetKey = cameraTargetKey(
-        pendingNavigation.target,
-      );
+      const targetKey = cameraTargetKey(pendingNavigation.target);
 
       if (pendingNavigation.mode === "locate" && startQuaternion) {
         const current = state.controller.quaternion.toArray();
@@ -987,6 +1118,16 @@ export function YeisGalaxyScene({
       (index) => state.galaxySprites.apparent(index).ratio,
     );
 
+    const photoStatus = state.landmarkSprites.photoLoadStatus;
+    document.documentElement.dataset.yeisLandmarkPhotosRequested =
+      String(photoStatus.requested);
+    document.documentElement.dataset.yeisLandmarkPhotosLoaded =
+      String(photoStatus.loaded);
+    document.documentElement.dataset.yeisLandmarkPhotosFailed =
+      String(photoStatus.failed);
+    document.documentElement.dataset.yeisLandmarkPhotosComplete =
+      photoStatus.complete ? "1" : "0";
+
     const heroPc = runtime.universe.starPositionPc(HERO_SYSTEM_ID);
     state.heroSkyPosition
       .copy(heroPc)
@@ -1050,6 +1191,12 @@ export function YeisGalaxyScene({
       );
     }
 
+    const contentMaterial = state.contentSky.material as PointsMaterial;
+    const signalPulse = 1 + Math.sin(performance.now() * 0.0032) * 0.12;
+    contentMaterial.size = (quality === "low" ? 8 : 11) * signalPulse;
+    contentMaterial.opacity =
+      0.9 + Math.sin(performance.now() * 0.0026) * 0.08;
+
     let contentPosition = state.contentSky.geometry.getAttribute(
       "position",
     ) as BufferAttribute;
@@ -1059,19 +1206,16 @@ export function YeisGalaxyScene({
         32,
         2 ** Math.ceil(Math.log2(requiredSignalCapacity + 1)),
       );
-      const previousGeometry = state.contentSky.geometry;
-      const nextGeometry = new BufferGeometry();
       contentPosition = new BufferAttribute(
         new Float32Array(nextCapacity * 3),
         3,
       );
-      nextGeometry.setAttribute("position", contentPosition);
-      nextGeometry.setDrawRange(0, 0);
-      state.contentSky.geometry = nextGeometry;
-      previousGeometry.dispose();
+      state.contentSky.geometry.setAttribute("position", contentPosition);
       document.documentElement.dataset.personalSignalCapacity =
         String(nextCapacity);
-      console.info(`[PERSONAL-SIGNALS] capacity=${nextCapacity}`);
+      console.info(
+        `[PERSONAL-SIGNALS] capacity=${nextCapacity}`,
+      );
     }
 
     const markerById = new Map(
@@ -1112,3 +1256,17 @@ export function YeisGalaxyScene({
 
   return <color attach="background" args={["#000005"]} />;
 }
+
+
+function cameraTargetKey(
+  target: UniverseNavigationCameraRequest["target"],
+): string {
+  if (target.kind === "star") return target.nativeId;
+  if (target.kind === "point") return "point:" + target.id;
+  if (target.kind === "body") {
+    return "body:" + target.starId + "/" + target.bodyId;
+  }
+  if (target.kind === "blackhole") return "blackhole:" + target.id;
+  return target.kind + ":" + target.index;
+}
+
