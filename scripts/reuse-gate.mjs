@@ -322,7 +322,7 @@ function validateRecord(record, registryIndex) {
   const candidateIds = new Set();
   const candidatesById = new Map();
   for (const candidate of record.candidates) {
-    for (const key of ["id", "name", "level", "registry_id", "source", "license", "decision", "reason"]) {
+    for (const key of ["id", "name", "level", "source", "license", "decision", "reason"]) {
       requiredText(candidate[key], "candidate " + (candidate.id || "<unknown>") + "." + key);
     }
     if (candidateIds.has(candidate.id)) die("duplicate candidate id: " + candidate.id);
@@ -336,12 +336,17 @@ function validateRecord(record, registryIndex) {
       die("candidate decision must be reuse|partial|reject: " + candidate.id);
     }
 
-    const registryEntry = registryIndex.get(candidate.registry_id);
-    if (!registryEntry) {
-      die("candidate references unknown registry_id: " + candidate.id + " -> " + candidate.registry_id);
+    if (candidate.decision !== "reject") {
+      requiredText(candidate.registry_id, "candidate " + candidate.id + ".registry_id");
     }
-    if (registryEntry.status === "hold" && candidate.decision !== "reject") {
-      die("registry candidate on HOLD cannot be selected/partially reused: " + candidate.registry_id);
+    if (candidate.registry_id) {
+      const registryEntry = registryIndex.get(candidate.registry_id);
+      if (!registryEntry) {
+        die("candidate references unknown registry_id: " + candidate.id + " -> " + candidate.registry_id);
+      }
+      if (registryEntry.status === "hold" && candidate.decision !== "reject") {
+        die("registry candidate on HOLD cannot be selected/partially reused: " + candidate.registry_id);
+      }
     }
 
     validateEvaluation(candidate);
