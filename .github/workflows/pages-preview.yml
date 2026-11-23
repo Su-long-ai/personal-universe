@@ -1,6 +1,9 @@
 name: Pages Preview
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -21,6 +24,7 @@ concurrency:
 env:
   PUBLIC_SITE_URL: https://su-long-ai.github.io
   PUBLIC_BASE_PATH: /personal-universe
+  DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
 jobs:
   build:
@@ -30,11 +34,12 @@ jobs:
       - name: Checkout selected ref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ env.DEPLOY_REF }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Ensure main ref is available
+      - name: Ensure main ref is available for manual preview validation
+        if: github.event_name == 'workflow_dispatch'
         run: git fetch origin main --no-tags
 
       - name: Setup Node
@@ -47,11 +52,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Machine Reuse Gate for selected ref
+      - name: Machine Reuse Gate for deployment ref
         run: npm run gate:reuse:ci
         env:
-          REUSE_GATE_BASE_SHA: origin/main
-          REUSE_GATE_HEAD_SHA: HEAD
+          REUSE_GATE_BASE_SHA: ${{ github.event_name == 'workflow_dispatch' && 'origin/main' || github.event.before }}
+          REUSE_GATE_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && 'HEAD' || github.sha }}
 
       - name: Build repository-subpath site
         run: npm run build
