@@ -380,12 +380,17 @@ Exactly one layer owns mouse-wheel scale input:
 
 - YEIS `Input.wheel` is zeroed before the native CameraController update;
 - camera-controls has its wheel ACTION disabled;
-- the product coordinator accumulates small trackpad deltas, applies a
-  direction reset window, and uses a short post-transition cooldown.
+- the product coordinator accumulates small trackpad deltas and applies
+  two-stage direction hysteresis: a lone tiny sample expires quickly, while an
+  established same-direction gesture keeps its partial progress through short
+  renderer/main-thread stalls.
 
 Traditional mouse-wheel notches therefore feel immediate while fine trackpad
-noise must accumulate before a scale boundary is crossed. Changing wheel
-direction resets the gesture lock.
+noise must accumulate before a scale boundary is crossed. A phase transition
+itself serializes committed steps: extra input is queued while the camera is
+unsettled, but distinct wheel events are never discarded solely because they
+arrived inside a wall-clock cooldown. Changing direction clears queued intent
+and resets the gesture lock.
 
 Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
 gesture is still processed as scale intent. Manual spatial takeover disables

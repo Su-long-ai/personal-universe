@@ -1730,10 +1730,11 @@ export default function UniverseApp({
         wheel.samples >= 2
           ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
           : CONTINUOUS_SCALE_RESET_MS;
+      const newGesture = wheel.direction === null;
       const gestureExpired =
-        wheel.direction !== null && now - wheel.lastAt > resetWindow;
+        !newGesture && now - wheel.lastAt > resetWindow;
 
-      if (directionChanged || gestureExpired) {
+      if (newGesture || directionChanged || gestureExpired) {
         wheel.accumulated = 0;
         wheel.samples = 0;
         wheel.direction = direction;

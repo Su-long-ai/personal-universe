@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { test, expect, type Page } from "./support/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   observeRuntime,
   positiveDataset,
@@ -341,9 +341,10 @@ test("continuous wheel intent carries across unsettled world transitions", async
     box!.y + box!.height * 0.5,
   );
 
-  // Keep scrolling while the previous camera transition is still running,
-  // including inside the one-notch cooldown window. Continued input is intent
-  // for the next layer and must queue rather than disappear.
+  // Keep scrolling while the previous camera transition is still running.
+  // Continued input is committed scale intent: unsettled camera work must
+  // queue it, while a quickly settled software fallback must not discard a
+  // distinct event just because the events are close together in wall time.
   await page.mouse.wheel(0, -120);
   await page.waitForTimeout(60);
   await page.mouse.wheel(0, -120);
@@ -1362,14 +1363,14 @@ test("Guided Journey auto advance starts only after the destination settles", as
   await expect(dialog).toBeHidden();
   await expect(controls).toBeVisible();
   await expect(controls).not.toContainText("JOURNEY COMPLETE");
-  // On fast or software-fallback cameras, settlement can occur before
-  // Playwright observes the transient SETTLING label. The release
-  // contract below is camera settlement plus the full post-settle dwell.
+  // On a fast or software-fallback camera the destination can settle before
+  // Playwright observes this intermediate label. Either pre-arrival SETTLING
+  // or post-arrival DWELLING is valid here; the browser-clock assertion below
+  // is the release contract that proves dwell never starts before settlement.
+  await expect(controls).toContainText(
+    /SETTLING · AUTO ADVANCE WAITS FOR ARRIVAL|DWELLING · AUTO ADVANCE AFTER ARRIVAL/,
+  );
 
-  // Do not require the transient SETTLING label: on a fast hosted runner the
-  // camera can settle between the Journey click and the first painted
-  // assertion. The behavioral contract is stronger and timing-independent:
-  // completion must still be delayed by the full dwell after settlement.
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
     "approach",
