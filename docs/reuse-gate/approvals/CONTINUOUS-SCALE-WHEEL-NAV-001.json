@@ -1,0 +1,43 @@
+{
+  "schema": 3,
+  "task_id": "CONTINUOUS-SCALE-WHEEL-NAV-001",
+  "approved_at": "2026-11-23T10:45:27.742Z",
+  "baseline_commit": "244dfa8dc8fce1350fe689f1a212f2859576f26c",
+  "record_path": "docs/reuse-gate/tasks/CONTINUOUS-SCALE-WHEEL-NAV-001.json",
+  "record_sha256": "bf75ddb6fad56d9c21cb3a13c38027e5825201e3020a9c7b6990af6a06fc8533",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse YEIS center picking, existing camera-controls transitions, and ProceduralPlanets world tiers behind one wheel-driven scale coordinator with focus lock and hysteresis"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "compose-existing-scale-stack",
+    "existing-camera-controls-scale",
+    "procedural-planets-close-world"
+  ],
+  "candidate_scores": {
+    "compose-existing-scale-stack": 54,
+    "replace-with-cesium-or-openspace": null,
+    "parallel-scroll-camera": null,
+    "existing-camera-controls-scale": 53,
+    "procedural-planets-close-world": 55
+  }
+}
