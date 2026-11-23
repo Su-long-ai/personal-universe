@@ -899,7 +899,7 @@ export default function UniverseApp({
   ]);
 
   useEffect(() => {
-    if (activeEngine !== "yeis") return;
+    if (activeEngine !== "yeis" || !yeisResolverRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const destinationId = params.get("destination")?.trim();
     if (!destinationId) {
