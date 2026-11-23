@@ -1,0 +1,40 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-FALLBACK-LIFETIME-001",
+  "approved_at": "2026-11-23T17:26:00.000Z",
+  "baseline_commit": "b7852c398362caacc613b2daedd4dec1d89e5637",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-FALLBACK-LIFETIME-001.json",
+  "record_sha256": "5facc65ba212f31a8ae0a7aebb00c8be1b2fa6aca1f5036d682d351cdb54bfd7",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing ProceduralTerrains instance across Surface-to-world phase changes so synchronous terrain destruction cannot block camera settlement or wheel reversal"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "yeis-scale-backbone",
+    "r3f-canvas-resource-host",
+    "procedural-terrains-host-owned-lifetime",
+    "react-latched-activation"
+  ],
+  "candidate_scores": {
+    "yeis-scale-backbone": 44,
+    "r3f-canvas-resource-host": 57,
+    "procedural-terrains-host-owned-lifetime": 54,
+    "react-latched-activation": 53
+  }
+}
