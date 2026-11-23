@@ -1,0 +1,188 @@
+{
+  "schema": 2,
+  "task_id": "OPENING-GALAXY-AUTO-ORBIT-001",
+  "title": "Animate the opening Milky Way view with pinned YEIS native auto-orbit",
+  "scope": {
+    "level": "component_asset",
+    "subject": "Use the pinned MIT YEIS CameraController autoOrbit capability for a subtle opening-galaxy drift without creating a second camera animation authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The pinned MIT YEIS CameraController already implements slow automatic orbit around an active orbit pivot, explicitly intended for opening backdrops and guided-tour dwell. It automatically cancels on mouse, wheel, touch or keyboard input. The product should activate that native field only on a fresh galaxy view, while preserving the existing controller as the sole camera authority and disabling motion for reduced-motion users and deterministic ?freeze=1 validation.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
+      "finding": "Pinned MIT YEIS CameraController exposes autoOrbit specifically for slow opening-view/tour rotation and cancels it immediately when the visitor takes control."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "The existing R3F frame loop already drives the selected YEIS CameraController, so no second RAF loop or camera system is needed."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse the selected pinned MIT YEIS camera system rather than adding another animation/camera library."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing R3F frame loop; the native controller already updates inside it."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Activate CameraController.autoOrbit on the fresh Milky Way orbit anchor and let its built-in input takeover semantics stop the drift."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "No new component or animation asset is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-auto-orbit",
+      "name": "Pinned MIT YEIS CameraController.autoOrbit",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "YEIS MIT e520568 CameraController",
+      "license": "MIT at pinned commit",
+      "decision": "reuse",
+      "reason": "Already owns the galaxy camera, explicitly supports opening-view drift, and automatically yields to visitor input.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "r3f-custom-camera-drift",
+      "name": "Custom R3F useFrame quaternion/orbit drift",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Project-owned useFrame animation",
+      "license": "MIT framework; custom product code",
+      "decision": "reject",
+      "reason": "Would duplicate behavior already present in the selected YEIS camera authority and risks fighting manual input/autopilot.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "css-canvas-drift",
+      "name": "CSS transform on WebGL canvas",
+      "level": "component_asset",
+      "source": "Custom CSS animation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Moves presentation without moving the spatial camera, so picking, labels and navigation geometry would diverge from what the visitor sees.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Visible slow opening movement",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-auto-orbit": "full",
+        "r3f-custom-camera-drift": "full",
+        "css-canvas-drift": "partial"
+      },
+      "decision": "Use native autoOrbit at a subtle rate."
+    },
+    {
+      "capability": "Immediate manual takeover",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-auto-orbit": "full",
+        "r3f-custom-camera-drift": "partial",
+        "css-canvas-drift": "partial"
+      },
+      "decision": "Reuse CameraController's existing automatic cancellation on pointer, wheel, touch and keyboard input."
+    },
+    {
+      "capability": "Preserve one camera/navigation authority",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-auto-orbit": "full",
+        "r3f-custom-camera-drift": "partial",
+        "css-canvas-drift": "none"
+      },
+      "decision": "Do not add a parallel animation loop or DOM transform."
+    },
+    {
+      "capability": "Reduced-motion and deterministic visual tests",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-auto-orbit": "full",
+        "r3f-custom-camera-drift": "full",
+        "css-canvas-drift": "full"
+      },
+      "decision": "Gate activation with reducedMotion and ?freeze=1."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-native-auto-orbit"
+    ],
+    "rationale": "Activate the pinned MIT YEIS autoOrbit field only for a fresh opening Milky Way view. Keep CameraController as sole spatial authority, stop automatically on visitor control, and suppress the motion for reduced-motion/frozen validation.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "r3f-custom-camera-drift",
+        "reason": "R3F can implement the same motion, but doing so would recreate controller behavior that YEIS already supplies and complicate takeover/autopilot ownership."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If opening auto-orbit harms interaction or composition, set the activation speed to zero and retain the existing static YEIS opening view; do not introduce another camera animation system."
+  }
+}
