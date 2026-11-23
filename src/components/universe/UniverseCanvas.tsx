@@ -1,5 +1,5 @@
-import { lazy, Suspense, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
@@ -38,6 +38,38 @@ const LazyYeisSystemScene = lazy(() =>
     default: module.YeisSystemScene,
   })),
 );
+
+function RendererPageLifecycle() {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    let released = false;
+    const html = document.documentElement;
+    html.dataset.universeWebglLifecycle = "active";
+
+    const onPageHide = (event: PageTransitionEvent) => {
+      if (event.persisted || released) return;
+      released = true;
+      html.dataset.universeWebglLifecycle = "released";
+
+      // R3F owns normal Canvas unmount disposal. This terminal path exists for
+      // document teardown, where React cleanup is not guaranteed to run before
+      // Chromium reuses the browser process (notably with SwiftShader in CI).
+      gl.forceContextLoss();
+      gl.dispose();
+    };
+
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      if (html.dataset.universeWebglLifecycle === "active") {
+        delete html.dataset.universeWebglLifecycle;
+      }
+    };
+  }, [gl]);
+
+  return null;
+}
 
 export function UniverseCanvas({
   phase,
@@ -111,6 +143,7 @@ export function UniverseCanvas({
         logarithmicDepthBuffer: engineMode === "yeis",
       }}
     >
+      <RendererPageLifecycle />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
