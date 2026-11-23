@@ -1434,12 +1434,11 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     destinationBefore,
   );
 
-  // Continue the same gesture until the accumulated intent crosses the phase
-  // threshold; the manual takeover must now advance normally.
-  for (let index = 0; index < 5; index += 1) {
-    await page.mouse.wheel(0, -12);
-    await page.waitForTimeout(20);
-  }
+  // The sub-threshold event above owns Journey takeover. A normal inward
+  // wheel gesture must still advance afterward. Trackpad accumulation itself
+  // is covered separately so hosted-renderer stalls cannot turn this Journey
+  // contract into a duplicate timing test.
+  await wheelScale(page, "in");
 
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
