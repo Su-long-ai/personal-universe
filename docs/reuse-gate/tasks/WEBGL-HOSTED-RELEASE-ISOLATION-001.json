@@ -1,0 +1,215 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-HOSTED-RELEASE-ISOLATION-001",
+  "title": "Stabilize hosted WebGL release validation with native Playwright isolation and GitHub Actions sharding",
+  "scope": {
+    "level": "architecture",
+    "subject": "Hosted-runner WebGL lifecycle, heavy visual isolation, native sharding, artifacts, and release validation without replacing Playwright or GitHub Actions"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-24",
+  "research_summary": "The current four-way GitHub Actions sharding is already the correct top-level CI primitive, but the WebGL-heavy visual surface case shares a long-lived Playwright worker/browser with ordinary cases and can saturate SwiftShader before screenshot or context teardown. Official Playwright guidance keeps test isolation in BrowserContexts, uses worker processes as the browser-process boundary, supports projects for groups with distinct execution policy, and recommends native sharding plus blob-report merging on GitHub Actions. Reuse those primitives: keep four hosted shards for normal release coverage, isolate renderer-heavy visual work in a dedicated Playwright project/job with one worker, preserve blob/trace/screenshot artifacts and Combined Report, and enable this exact agent branch to run full hosted validation while the workstream is active. Do not serialize the whole suite and do not build a custom browser/test orchestrator.",
+  "planned_files": [
+    ".github/workflows/ci.yml",
+    "playwright.config.ts",
+    "tests/e2e/visual.spec.ts",
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/webgl-performance.spec.ts",
+    "docs/development/cloud-workflow.md"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-sharding",
+      "finding": "Playwright officially supports multi-machine sharding, recommends fullyParallel for balanced test-level distribution, and documents blob-report merging across GitHub Actions shards."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-projects",
+      "finding": "Playwright projects are the native way to group tests with distinct configuration and execution policy, including separate timeout or environment behavior."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-parallel",
+      "finding": "Each Playwright worker is an independent OS process with its own browser; workers are reused for efficiency and are torn down after failures, making the worker boundary appropriate for isolating GPU-heavy browser state."
+    },
+    {
+      "url": "https://playwright.dev/docs/browser-contexts",
+      "finding": "BrowserContexts provide clean per-test state isolation inside a browser, so ordinary tests should keep native context isolation rather than custom browser reuse logic."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs",
+      "finding": "GitHub Actions matrix jobs are the native hosted-runner distribution primitive and support independent shard jobs without custom orchestration."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_lose_context",
+      "finding": "The standard WEBGL_lose_context extension provides deterministic loseContext and restoreContext operations for validating native WebGL recovery."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "playwright-ci-sharding",
+        "github-actions-matrix"
+      ],
+      "source_refs": [
+        0,
+        4
+      ],
+      "conclusion": "Keep the existing Playwright plus GitHub Actions release architecture and extend its documented native sharding/report-merging pattern rather than introducing another CI or browser runner."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test",
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Use Playwright projects and workers as the heavy-test process boundary while retaining R3F as the single renderer lifecycle host inside the product."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "playwright-ci-sharding",
+        "github-actions-matrix"
+      ],
+      "source_refs": [
+        0,
+        2,
+        4
+      ],
+      "conclusion": "Preserve four-way native sharding for the normal suite and place renderer-heavy validation in a separately scheduled one-worker lane whose blob artifacts still merge into the release report."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "webgl-context-loss-api"
+      ],
+      "source_refs": [
+        5
+      ],
+      "conclusion": "Use the browser-native context-loss extension for deterministic recovery validation instead of adding a dedicated WebGL test framework."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "native-playwright-github-release-lanes",
+      "name": "Playwright native sharding plus dedicated heavy-renderer lane on GitHub Actions",
+      "level": "full_solution",
+      "registry_id": "playwright-ci-sharding",
+      "source": "Official Playwright sharding/projects guidance plus the existing GitHub Actions matrix workflow",
+      "license": "Apache-2.0 Playwright tooling and GitHub hosted service",
+      "decision": "reuse",
+      "reason": "It preserves the already-working four-runner release architecture, isolates the GPU-heavy browser process only where needed, and keeps native blob-report merging and artifacts.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-project-worker-isolation",
+      "name": "Playwright project and worker process isolation for heavy WebGL cases",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Installed Playwright Test runner and official projects/parallelism model",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Projects and workers provide the required browser-process boundary without bypassing BrowserContext isolation or implementing manual Chromium lifecycle management.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-webgl-ci-orchestrator",
+      "name": "Custom Node or shell orchestrator that manually launches Chromium for WebGL cases",
+      "level": "full_solution",
+      "source": "New project-owned CI and browser lifecycle code",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It duplicates Playwright worker/browser management, sharding, retries, reports and teardown while increasing maintenance and reducing diagnostic integration."
+    },
+    {
+      "id": "serialize-entire-release-suite",
+      "name": "Run every release and visual case serially in one browser lane",
+      "level": "subsystem",
+      "source": "Workflow-only serialization",
+      "license": "Project configuration",
+      "decision": "reject",
+      "reason": "It reduces concurrency globally and increases wall-clock cost even though only a small renderer-heavy subset needs a stricter browser-process boundary."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Keep four-way hosted parallelism for ordinary release coverage",
+      "importance": "high",
+      "coverage": {
+        "native-playwright-github-release-lanes": "full",
+        "playwright-project-worker-isolation": "partial",
+        "custom-webgl-ci-orchestrator": "partial",
+        "serialize-entire-release-suite": "none"
+      },
+      "decision": "Retain the existing four-way GitHub Actions matrix and native Playwright --shard distribution for normal cases."
+    },
+    {
+      "capability": "Prevent heavy SwiftShader state from starving later browser contexts",
+      "importance": "high",
+      "coverage": {
+        "native-playwright-github-release-lanes": "full",
+        "playwright-project-worker-isolation": "full",
+        "custom-webgl-ci-orchestrator": "full",
+        "serialize-entire-release-suite": "partial"
+      },
+      "decision": "Give renderer-heavy cases an independent Playwright worker/browser process instead of reusing the ordinary shard worker after expensive surface rendering."
+    },
+    {
+      "capability": "Preserve traces screenshots blob reports and Combined Report",
+      "importance": "high",
+      "coverage": {
+        "native-playwright-github-release-lanes": "full",
+        "playwright-project-worker-isolation": "full",
+        "custom-webgl-ci-orchestrator": "partial",
+        "serialize-entire-release-suite": "full"
+      },
+      "decision": "Keep Playwright reporters and merge-reports as the single reporting path for both normal shards and the heavy lane."
+    },
+    {
+      "capability": "Avoid hiding product failures behind global timeout inflation",
+      "importance": "high",
+      "coverage": {
+        "native-playwright-github-release-lanes": "full",
+        "playwright-project-worker-isolation": "full",
+        "custom-webgl-ci-orchestrator": "partial",
+        "serialize-entire-release-suite": "partial"
+      },
+      "decision": "Keep the existing global timeout and allow only evidence-based per-case exceptions after renderer lifecycle and workload fixes."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "native-playwright-github-release-lanes",
+      "playwright-project-worker-isolation"
+    ],
+    "rationale": "Use Playwright and GitHub Actions exactly where they are strongest: native BrowserContext isolation for ordinary tests, dedicated worker/browser-process isolation for the small WebGL-heavy subset, four-way hosted sharding for parallel release coverage, and blob-report merging for one Combined Report. This addresses GPU-process accumulation without serializing the whole suite or creating a second test runner.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If the dedicated heavy lane still exceeds hosted-runner limits after product-side renderer optimization, give only the proven heavy Surface case a precise timeout and preserve the same project/job isolation; do not raise the global timeout."
+  }
+}
