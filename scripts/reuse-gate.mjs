@@ -49,6 +49,14 @@ function gitRaw(args) {
   }
 }
 
+function gitBytes(args) {
+  try {
+    return execFileSync("git", args, { cwd: ROOT });
+  } catch (error) {
+    die("git " + args.join(" ") + " failed: " + error.message);
+  }
+}
+
 function gitOk(args) {
   try {
     execFileSync("git", args, { cwd: ROOT, stdio: "ignore" });
@@ -62,8 +70,9 @@ function normalize(path) {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
-function sha256(path) {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
+function sha256GitPath(ref, path) {
+  const rel = normalize(relative(ROOT, path));
+  return createHash("sha256").update(gitBytes(["show", ref + ":" + rel])).digest("hex");
 }
 
 function sha256Text(text) {
@@ -574,7 +583,7 @@ function approve(recordPathArg) {
     approved_at: new Date().toISOString(),
     baseline_commit: git(["rev-parse", "HEAD"]),
     record_path: normalize(relative(ROOT, recordPath)),
-    record_sha256: sha256(recordPath),
+    record_sha256: sha256GitPath("HEAD", recordPath),
     registry_path: normalize(relative(ROOT, REGISTRY_PATH)),
     registry_entry_hashes: registryEntryHashes(record, registryIndex),
     scope: record.scope,
@@ -624,7 +633,7 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
   if (approval.task_id !== record.task_id) {
     rejectApproval("approval task_id does not match research record: " + approval.task_id);
   }
-  if (approval.record_sha256 !== sha256(recordPath)) {
+  if (approval.record_sha256 !== sha256GitPath(head, recordPath)) {
     rejectApproval("research record changed after approval: " + approval.task_id);
   }
   if (!gitOk(["merge-base", "--is-ancestor", approval.baseline_commit, head])) {
@@ -637,7 +646,7 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
   }
 
   if (approval.schema === 2) {
-    if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
+    if (approval.registry_sha256 !== sha256GitPath(head, REGISTRY_PATH)) {
       const tokenRegistry = JSON.parse(
         gitRaw(["show", tokenCommit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
       );
