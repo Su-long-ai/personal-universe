@@ -228,25 +228,21 @@ async function visualCase(
   await exercise();
   await shot(page, testInfo, viewport.name, name);
 
-  const html = page.locator("html");
-  const webgl = {
-    software: await html.getAttribute("data-universe-webgl-software"),
-    geometries: Number(
-      (await html.getAttribute("data-universe-webgl-geometries")) ?? "0",
-    ),
-    textures: Number(
-      (await html.getAttribute("data-universe-webgl-textures")) ?? "0",
-    ),
-    programs: Number(
-      (await html.getAttribute("data-universe-webgl-programs")) ?? "0",
-    ),
-    calls: Number(
-      (await html.getAttribute("data-universe-webgl-calls")) ?? "0",
-    ),
-    triangles: Number(
-      (await html.getAttribute("data-universe-webgl-triangles")) ?? "0",
-    ),
-  };
+  // Read the renderer telemetry in one browser round-trip. Six sequential
+  // locator.getAttribute calls can each queue behind a saturated SwiftShader
+  // frame after a visual capture and turn measurement overhead into a timeout.
+  const webgl = await page.evaluate(() => {
+    const data = document.documentElement.dataset;
+    return {
+      software: data.universeWebglSoftware ?? null,
+      pixelRatio: Number(data.universeWebglPixelRatio ?? "0"),
+      geometries: Number(data.universeWebglGeometries ?? "0"),
+      textures: Number(data.universeWebglTextures ?? "0"),
+      programs: Number(data.universeWebglPrograms ?? "0"),
+      calls: Number(data.universeWebglCalls ?? "0"),
+      triangles: Number(data.universeWebglTriangles ?? "0"),
+    };
+  });
 
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
