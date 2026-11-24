@@ -3559,6 +3559,11 @@ test("Personal Signal deep link keeps its Surface focus through product landing 
     /^surface:/,
     { timeout: 30_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-cluster",
+    /^\d+$/,
+    { timeout: 30_000 },
+  );
 
   const focusedCard = page.locator(
     '.world-content-card[data-surface-focus="true"]',
