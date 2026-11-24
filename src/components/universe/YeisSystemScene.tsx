@@ -255,6 +255,54 @@ export function YeisSystemScene({
     return target ? nativePlanetId(target) : null;
   }, [handoffTargetPlanetId, system.planets]);
 
+  const targetResources = useMemo<ProductTargetResources>(
+    () => ({
+      hitGeometry: new THREE.SphereGeometry(HIT_RADIUS, 12, 12),
+      haloGeometry: new THREE.SphereGeometry(HIT_RADIUS * 0.78, 18, 18),
+      hitMaterial: new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.001,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+      haloMaterial: new THREE.MeshBasicMaterial({
+        color: "#73f4ff",
+        transparent: true,
+        opacity: 0.38,
+        wireframe: true,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    }),
+    [],
+  );
+  const bodyRenderOptions = useMemo(
+    () => ({
+      atmospheres: quality !== "low",
+      clouds: quality !== "low",
+      rings: true,
+      ringParticles: false,
+      shadows: quality !== "low",
+      imagery: false,
+      fill: focusFillRef.current,
+    }),
+    [quality],
+  );
+  const apparentRadiusForBody = useCallback(
+    (id: string) => resources?.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+    [resources],
+  );
+
+  useEffect(
+    () => () => {
+      targetResources.hitGeometry.dispose();
+      targetResources.haloGeometry.dispose();
+      targetResources.hitMaterial.dispose();
+      targetResources.haloMaterial.dispose();
+    },
+    [targetResources],
+  );
+
   useEffect(() => {
     let active = true;
     let created: NativeResources | null = null;
@@ -429,15 +477,7 @@ export function YeisSystemScene({
       star.radius,
       resources.sunColor,
       state.clock.elapsedTime,
-      {
-        atmospheres: quality !== "low",
-        clouds: quality !== "low",
-        rings: true,
-        ringParticles: false,
-        shadows: quality !== "low",
-        imagery: false,
-        fill: focusFillRef.current,
-      },
+      bodyRenderOptions,
     );
 
     const handoffView = handoffNativeId
@@ -510,6 +550,7 @@ export function YeisSystemScene({
             key={planet.id}
             planet={planet}
             resources={resources}
+            targetResources={targetResources}
             onSelect={onSelectPlanet}
           />
         ),
