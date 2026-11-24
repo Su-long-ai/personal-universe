@@ -511,6 +511,10 @@ export function PlanetScene({
   const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
   const paintReported = useRef(false);
+  const appliedLiveProfile = useRef<{
+    planet: Planet;
+    key: "gpu-auto" | "gpu-high" | "software-high";
+  } | null>(null);
   const onPaintReadyChangeRef = useRef(onPaintReadyChange);
   onPaintReadyChangeRef.current = onPaintReadyChange;
 
@@ -619,9 +623,19 @@ export function PlanetScene({
     }
 
     const liveMode = quality === "high" ? "high" : "auto";
-    livePlanet.set(liveQuality(liveMode, softwareRenderer));
-    document.documentElement.dataset.universeWorldLiveProfile =
-      softwareRenderer ? "software-high" : `gpu-${liveMode}`;
+    const profileKey = softwareRenderer
+      ? "software-high"
+      : (`gpu-${liveMode}` as "gpu-auto" | "gpu-high");
+    const applied = appliedLiveProfile.current;
+
+    if (applied?.planet !== livePlanet || applied.key !== profileKey) {
+      livePlanet.set(liveQuality(liveMode, softwareRenderer));
+      appliedLiveProfile.current = {
+        planet: livePlanet,
+        key: profileKey,
+      };
+    }
+    document.documentElement.dataset.universeWorldLiveProfile = profileKey;
 
     return () => {
       delete document.documentElement.dataset.universeWorldLiveProfile;
