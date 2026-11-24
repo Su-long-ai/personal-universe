@@ -98,6 +98,7 @@ export type YeisGalaxyViewState = {
 };
 
 export type YeisGalaxyScaleBridgeState = {
+  pathId: string;
   targetId: string;
   starId: string;
   sourceFrameId: string;
@@ -1080,6 +1081,13 @@ export function YeisGalaxyScene({
               number,
               number,
             ];
+          const pathId = [
+            scaleDestination.id,
+            targetStarId,
+            sourceFrameId,
+            startAbsolutePositionKm.map((value) => value.toExponential(9)).join(","),
+            startQuaternion.map((value) => value.toFixed(9)).join(","),
+          ].join("|");
           const frameSwitchJumpKm = switchScaleReferenceFrame(
             state,
             targetStarId,
@@ -1105,6 +1113,7 @@ export function YeisGalaxyScene({
           scaleBridgeDirection.normalize();
 
           bridge = {
+            pathId,
             targetId: scaleDestination.id,
             starId: targetStarId,
             sourceFrameId,
@@ -1137,6 +1146,8 @@ export function YeisGalaxyScene({
           scaleBridgeRef.current = bridge;
           document.documentElement.dataset.universeGalaxyScalePath =
             `${sourceFrameId}->${targetStarId}`;
+          document.documentElement.dataset.universeGalaxyScalePathId =
+            pathId;
           document.documentElement.dataset.universeGalaxyScaleStartDistanceKm =
             startDistanceKm.toExponential(6);
           document.documentElement.dataset.universeGalaxyScaleEndpointDistanceKm =
@@ -1179,6 +1190,10 @@ export function YeisGalaxyScene({
           scaleBridgeControllerKeyRef.current = bridgeControllerKey;
           scaleBridgeAutopilotRevisionRef.current =
             state.controller.autopilotRevision;
+          // Re-publish the retained identity on Galaxy remount. The ID was
+          // captured once with the path and is never regenerated per sample.
+          document.documentElement.dataset.universeGalaxyScalePathId =
+            bridge.pathId;
         }
 
         state.controller.setAutopilotProgress(
@@ -1230,6 +1245,7 @@ export function YeisGalaxyScene({
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.universeGalaxyScaleExecutor;
+      delete document.documentElement.dataset.universeGalaxyScalePathId;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
 

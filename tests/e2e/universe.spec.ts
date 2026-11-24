@@ -2122,10 +2122,23 @@ test("repeated Galaxy System round trips reuse one canvas and one scale target",
     { timeout: 20_000 },
   );
 
+  let retainedPathId: string | null = null;
   for (let cycle = 0; cycle < 3; cycle += 1) {
     for (let sample = 0; sample < 4; sample += 1) {
       await dispatchScaleWheel(page, -96);
       await page.waitForTimeout(60);
+      if (sample === 0) {
+        await expect(html).toHaveAttribute(
+          "data-universe-galaxy-scale-path-id",
+          /.+/,
+        );
+        const currentPathId = await html.getAttribute(
+          "data-universe-galaxy-scale-path-id",
+        );
+        expect(currentPathId).toBeTruthy();
+        if (retainedPathId === null) retainedPathId = currentPathId;
+        expect(currentPathId).toBe(retainedPathId);
+      }
     }
     await expect(html).toHaveAttribute(
       "data-universe-navigation-phase",
@@ -2154,6 +2167,10 @@ test("repeated Galaxy System round trips reuse one canvas and one scale target",
     await expect(html).toHaveAttribute(
       "data-universe-galaxy-scale-target",
       "hero:aurora-01",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-path-id",
+      retainedPathId!,
     );
     expect(await page.locator("canvas").count()).toBe(1);
   }
