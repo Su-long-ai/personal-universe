@@ -686,10 +686,16 @@ export function PlanetScene({
       livePlanet.rotation.y += delta * 0.014;
     }
 
+    const concreteRendererReady =
+      Boolean(fallbackReason) ||
+      (Boolean(livePlanet) &&
+        document.documentElement.dataset.universeWorldPipeline ===
+          "procedural-planets-pass");
+
     if (
       worldPresentationActive &&
       !paintReported.current &&
-      (Boolean(fallbackReason) || Boolean(livePlanet))
+      concreteRendererReady
     ) {
       paintedFrames.current += 1;
       if (paintedFrames.current >= 2) {
