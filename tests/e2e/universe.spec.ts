@@ -405,12 +405,12 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await runtime.assertClean(testInfo);
 });
 
-test("HIGH close-world prewarms after focus lock and keeps one pipeline allocation @webgl-heavy", async ({
+test("HIGH close-world retains one pipeline, Planet and PlanetPass across quality fallback @webgl-heavy", async ({
   page,
 }, testInfo) => {
   test.slow(
     true,
-    "HIGH ProceduralPlanets prewarm is intentionally isolated from ordinary software-WebGL release shards",
+    "HIGH ProceduralPlanets lifetime acceptance is isolated from ordinary software-WebGL release shards",
   );
   const runtime = await observeRuntime(page);
   await page.goto("/?phase=system&star=h-aurora&freeze=1");
@@ -454,24 +454,116 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "approach",
   );
   await expect(html).toHaveAttribute(
-    "data-universe-world-paint-ready",
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
     "true",
     { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
-    "data-universe-world-pipeline",
-    "procedural-planets-pass",
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-pipeline-lifecycle",
     "active",
   );
 
+  const planetAllocations = Number(
+    await html.getAttribute("data-universe-world-planet-allocations"),
+  );
+  const planetPassAllocations = Number(
+    await html.getAttribute("data-universe-world-planet-pass-allocations"),
+  );
+  const fallbackTextureAllocations = Number(
+    (await html.getAttribute(
+      "data-universe-world-fallback-texture-allocations",
+    )) ?? "0",
+  );
+  expect(planetAllocations).toBeGreaterThan(0);
+  expect(planetPassAllocations).toBeGreaterThan(0);
+
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
   expect(
     Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
   ).toBe(allocations);
+
+  await page.getByLabel("QUALITY").selectOption("low");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-renderer",
+    "procedural-planets-fallback-low-quality",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "fallback-low-quality",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 15_000 },
+  );
+
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(allocations);
+  expect(
+    Number(await html.getAttribute("data-universe-world-planet-allocations")),
+  ).toBe(planetAllocations);
+  expect(
+    Number(
+      await html.getAttribute("data-universe-world-planet-pass-allocations"),
+    ),
+  ).toBe(planetPassAllocations);
+
+  await page.getByLabel("QUALITY").selectOption("high");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-renderer",
+    "procedural-planets-live",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(allocations);
+  expect(
+    Number(await html.getAttribute("data-universe-world-planet-allocations")),
+  ).toBe(planetAllocations);
+  expect(
+    Number(
+      await html.getAttribute("data-universe-world-planet-pass-allocations"),
+    ),
+  ).toBe(planetPassAllocations);
+  if (fallbackTextureAllocations > 0) {
+    expect(
+      Number(
+        await html.getAttribute(
+          "data-universe-world-fallback-texture-allocations",
+        ),
+      ),
+    ).toBe(fallbackTextureAllocations);
+  }
 
   await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
