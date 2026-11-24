@@ -469,8 +469,12 @@ for (const viewport of [TABLET, MOBILE]) {
   );
 
   test(
-    `visual: ${viewport.name} Hero surface`,
+    `visual: ${viewport.name} Hero surface${viewport === TABLET ? " @webgl-heavy" : ""}`,
     async ({ page }, testInfo) => {
+      test.slow(
+        viewport === TABLET,
+        "Hosted software-WebGL tablet Surface capture is isolated in the heavy lane",
+      );
       await visualCase(
         page,
         testInfo,
