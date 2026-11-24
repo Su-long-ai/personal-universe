@@ -408,6 +408,20 @@ export default function UniverseApp({
         a.title.localeCompare(b.title),
     );
   }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  const surfaceClusterLeadEntries = useMemo(() => {
+    const leads = new Map<number, string>();
+    if (!surfaceProfile) return leads;
+
+    for (const anchor of rankSurfaceContentAnchors(
+      surfaceProfile.contentAnchors,
+      surfaceFocusEntryId,
+    )) {
+      if (!leads.has(anchor.cluster)) {
+        leads.set(anchor.cluster, anchor.entryId);
+      }
+    }
+    return leads;
+  }, [surfaceFocusEntryId, surfaceProfile]);
   const handleSurfaceFocusEntry = useCallback(
     (entryId: string) => {
       if (phaseRef.current !== "surface") return;
@@ -3330,14 +3344,28 @@ export default function UniverseApp({
                 surfaceFocusedAnchor?.cluster ?? null,
               )
                 .slice(0, 3)
-                .map((cluster) => (
-                  <span
-                    data-priority={cluster.priority}
-                    key={cluster.id}
-                  >
-                    {cluster.label} · {cluster.anchorIds.length}
-                  </span>
-                ))}
+                .map((cluster) => {
+                  const entryId = surfaceClusterLeadEntries.get(cluster.index);
+                  return (
+                    <button
+                      type="button"
+                      className="surface-cluster-chip"
+                      data-priority={cluster.priority}
+                      data-surface-cluster={cluster.index}
+                      data-surface-entry={entryId}
+                      aria-pressed={
+                        surfaceFocusedAnchor?.cluster === cluster.index
+                      }
+                      disabled={!entryId}
+                      key={cluster.id}
+                      onClick={() => {
+                        if (entryId) handleSurfaceFocusEntry(entryId);
+                      }}
+                    >
+                      {cluster.label} · {cluster.anchorIds.length}
+                    </button>
+                  );
+                })}
             </div>
           )}
           <em className="surface-explore-hint">
