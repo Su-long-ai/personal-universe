@@ -248,6 +248,7 @@ export function YeisSystemScene({
   handoffTargetPlanetId,
   onScaleFrame,
   quality,
+  presentationActive,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
@@ -256,6 +257,7 @@ export function YeisSystemScene({
   handoffTargetPlanetId?: string | null;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
+  presentationActive: boolean;
 }) {
   const { gl, camera, size } = useThree();
   const [resources, setResources] = useState<NativeResources | null>(null);
@@ -280,16 +282,10 @@ export function YeisSystemScene({
     let active = true;
     let created: NativeResources | null = null;
 
-    delete document.documentElement.dataset.universeSystemReady;
-    document.documentElement.dataset.universeSystemRenderer =
-      starId ? "yeis-native-loading" : "prototype";
-
     if (!starId) {
       setFailed(true);
-      return () => {
-        delete document.documentElement.dataset.universeSystemRenderer;
-        delete document.documentElement.dataset.universeSystemReady;
-      };
+      return;
+
     }
 
     void loadYeisCore()
@@ -319,6 +315,11 @@ export function YeisSystemScene({
           sunColor: new THREE.Vector3(r, g, b),
         };
 
+        const html = document.documentElement;
+        html.dataset.universeSystemNativeAllocations = String(
+          Number(html.dataset.universeSystemNativeAllocations ?? "0") + 1,
+        );
+
         if (!active) {
           disposeResources(created);
           return;
@@ -326,16 +327,11 @@ export function YeisSystemScene({
 
         setResources(created);
         setFailed(false);
-        document.documentElement.dataset.universeSystemRenderer = "yeis-native";
-        document.documentElement.dataset.universeSystemReady = "true";
       })
       .catch((error) => {
         if (!active) return;
         console.error("[YEIS-NATIVE-SYSTEM] FAILED; retaining product fallback", error);
         setFailed(true);
-        document.documentElement.dataset.universeSystemRenderer =
-          "prototype-fallback";
-        delete document.documentElement.dataset.universeSystemReady;
       });
 
     return () => {
@@ -343,6 +339,8 @@ export function YeisSystemScene({
       document.body.classList.remove("planet-hover");
       delete document.documentElement.dataset.universeSystemRenderer;
       delete document.documentElement.dataset.universeSystemReady;
+      delete document.documentElement.dataset.universeSystemLifecycle;
+      delete document.documentElement.dataset.universeSystemPrewarm;
       delete document.documentElement.dataset.universeSystemFocus;
       delete document.documentElement.dataset.universeSystemTargetSuppressed;
       delete document.documentElement.dataset.universeSystemTargetSpriteSuppressed;
@@ -354,6 +352,72 @@ export function YeisSystemScene({
       if (created) disposeResources(created);
     };
   }, [gl, starId]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (!presentationActive) {
+      delete html.dataset.universeSystemRenderer;
+      delete html.dataset.universeSystemReady;
+      html.dataset.universeSystemLifecycle = "prewarming";
+      return () => {
+        if (html.dataset.universeSystemLifecycle === "prewarming") {
+          delete html.dataset.universeSystemLifecycle;
+        }
+      };
+    }
+
+    html.dataset.universeSystemLifecycle = "active";
+    html.dataset.universeSystemRenderer = !starId
+      ? "prototype"
+      : failed
+        ? "prototype-fallback"
+        : resources
+          ? "yeis-native"
+          : "yeis-native-loading";
+    if (resources) {
+      html.dataset.universeSystemReady = "true";
+    } else {
+      delete html.dataset.universeSystemReady;
+    }
+
+    return () => {
+      if (html.dataset.universeSystemLifecycle === "active") {
+        delete html.dataset.universeSystemLifecycle;
+      }
+      delete html.dataset.universeSystemRenderer;
+      delete html.dataset.universeSystemReady;
+    };
+  }, [failed, presentationActive, resources, starId]);
+
+  useEffect(() => {
+    if (presentationActive || !resources) return;
+    let cancelled = false;
+    const html = document.documentElement;
+    html.dataset.universeSystemPrewarm = "compiling";
+
+    // Compile the already-created YEIS scene through the one shared renderer
+    // while close-world still presents. Nothing is attached to the R3F scene,
+    // so this warms shader/program state without becoming a second visual
+    // authority.
+    void gl.compileAsync(resources.scene, camera).then(() => {
+      if (cancelled) return;
+      html.dataset.universeSystemPrewarm = "ready";
+    }).catch(() => {
+      if (cancelled) return;
+      html.dataset.universeSystemPrewarm = "resources-ready";
+    });
+
+    return () => {
+      cancelled = true;
+      if (
+        html.dataset.universeSystemPrewarm === "compiling" ||
+        html.dataset.universeSystemPrewarm === "ready" ||
+        html.dataset.universeSystemPrewarm === "resources-ready"
+      ) {
+        delete html.dataset.universeSystemPrewarm;
+      }
+    };
+  }, [camera, gl, presentationActive, resources]);
 
   useFrame((state) => {
     if (!resources) return;
@@ -368,6 +432,12 @@ export function YeisSystemScene({
 
     const native = resources.system;
     native.update(J2000_JD, state.clock.elapsedTime * 3600);
+
+    if (!presentationActive) {
+      // Hidden reverse-Approach prewarm owns resources only. It deliberately
+      // publishes no focus/scale callbacks and performs no visible body pass.
+      return;
+    }
 
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
     const scaleTargetChanged =
@@ -514,6 +584,7 @@ export function YeisSystemScene({
   );
 
   if (!starId || failed || !resources) {
+    if (!presentationActive) return null;
     return (
       <SystemScene
         system={system}
@@ -525,6 +596,8 @@ export function YeisSystemScene({
       />
     );
   }
+
+  if (!presentationActive) return null;
 
   return (
     <>
