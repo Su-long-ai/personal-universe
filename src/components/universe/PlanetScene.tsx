@@ -550,14 +550,13 @@ export function PlanetScene({
   useEffect(() => {
     if (fallbackReason || warmedKey === liveKey) return;
 
-    // Hidden System prewarm is useful on a real GPU, where constructing the
-    // live ProceduralPlanets world can happen without stalling the scale
-    // gesture. On software WebGL, doing that same heavy construction while
-    // the visitor is still inside System blocks input. Keep the lightweight
-    // scene/pipeline mounted there, then start the live world only once the
-    // close-world presentation becomes active; UniverseCanvas retains the
-    // matched System frame until this world has painted.
-    if (softwareRenderer && phase === "system" && !presentationActive) {
+    // Hidden prewarm is useful on a real GPU, where constructing the live
+    // ProceduralPlanets world can happen without stalling the scale gesture.
+    // On software WebGL, never begin a new heavy Planet while presentation is
+    // hidden (System prewarm or a parked Galaxy target). An already-warmed
+    // instance exits above via warmedKey and remains retained; a missing one
+    // starts only when the close-world presentation actually asks for it.
+    if (softwareRenderer && !presentationActive) {
       return;
     }
 
