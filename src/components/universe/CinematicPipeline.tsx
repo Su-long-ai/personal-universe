@@ -73,6 +73,7 @@ export function CinematicPipeline({
           ? "software-renderer"
           : null;
   const useLiveWorld = liveWorld && !fallbackReason;
+  const softwareHigh = softwareRenderer && quality === "high";
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
   const reportedReady = useRef<boolean | null>(null);
@@ -108,47 +109,58 @@ export function CinematicPipeline({
 
     const next = new EffectComposer(gl);
     next.addPass(new RenderPass(scene, camera));
-    const planetPass = !fallbackReason
-      ? new PlanetPass(scene, camera, {
-          background: "transparent",
-          output: "linear",
-          impostors: true,
-          impostorPixels: softwareRenderer
-            ? 180
-            : quality === "high"
-              ? 90
-              : 120,
-        })
-      : null;
+
+    // On hardware WebGL, keep the selected ProceduralPlanets pass attached to
+    // one stable composer and toggle it instead of rebuilding GPU targets when
+    // AUTO/LOW changes. SwiftShader keeps AUTO/LOW lightweight; explicit HIGH
+    // may still construct the live pass because HIGH promises the full visual.
+    const planetPass =
+      !softwareRenderer || softwareHigh
+        ? new PlanetPass(scene, camera, {
+            background: "transparent",
+            output: "linear",
+            impostors: true,
+            impostorPixels: softwareRenderer ? 180 : 90,
+          })
+        : null;
     if (planetPass) next.addPass(planetPass);
 
     // SwiftShader already serializes shader compilation and is the slow path
     // on hosted Linux runners. Preserve the live Planet/PlanetPass contract
-    // there, but skip the expensive full-frame bloom chain. Real GPU HIGH
-    // quality keeps the existing post-processing path unchanged.
-    if (!softwareRenderer) {
-      next.addPass(
-        new UnrealBloomPass(
+    // for explicit HIGH there, but skip the expensive full-frame bloom chain.
+    const bloomPass = !softwareRenderer
+      ? new UnrealBloomPass(
           new THREE.Vector2(1, 1),
-          high ? 0.48 : 0.28,
-          high ? 0.48 : 0.36,
+          0.48,
+          0.48,
           1.08,
-        ),
-      );
-    }
+        )
+      : null;
+    if (bloomPass) next.addPass(bloomPass);
+
     next.addPass(new OutputPass());
     const html = document.documentElement;
     const allocations =
       Number(html.dataset.universeWorldPipelineAllocations ?? 0) + 1;
     html.dataset.universeWorldPipelineAllocations = String(allocations);
-    return { composer: next, planetPass, allocation: allocations };
-  }, [camera, fallbackReason, gl, high, quality, scene, softwareRenderer]);
+    return {
+      composer: next,
+      planetPass,
+      bloomPass,
+      allocation: allocations,
+    };
+  }, [camera, gl, scene, softwareHigh, softwareRenderer]);
 
   useEffect(() => {
     if (composer.planetPass) composer.planetPass.enabled = useLiveWorld;
+    if (composer.bloomPass) {
+      composer.bloomPass.strength = high ? 0.48 : 0.28;
+      composer.bloomPass.radius = high ? 0.48 : 0.36;
+      composer.bloomPass.threshold = 1.08;
+    }
     document.documentElement.dataset.universeWorldPipelineLifecycle =
       useLiveWorld ? "active" : "parked";
-  }, [composer, useLiveWorld]);
+  }, [composer, high, useLiveWorld]);
 
   useEffect(() => {
     if (!liveWorld) {
@@ -220,6 +232,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       composer.planetPass?.dispose();
+      composer.bloomPass?.dispose();
       composer.composer.dispose();
     };
   }, [composer]);
