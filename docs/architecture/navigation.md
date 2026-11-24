@@ -277,6 +277,13 @@ Manual input is intentionally available only after the visitor reaches a stable
 - right drag and truck/pan remain disabled, so manual exploration cannot drift
   the authoritative destination target away from the selected world/system.
 
+A pointer press alone is not a manual takeover. The product waits until the
+active pointer moves at least 5 CSS pixels before marking the cinematic camera
+as overridden. Mouse clicks and touch taps therefore remain available to canvas
+picking and Surface signals, while the existing camera-controls instance still
+executes the actual drag after intent is clear. The threshold only arbitrates
+selection versus camera intent; it is not a second gesture engine.
+
 The **mouse wheel is no longer a local camera dolly**. It is reserved for the
 continuous-scale coordinator described below, so YEIS, camera-controls and the
 product shell cannot interpret the same wheel event as three different camera
