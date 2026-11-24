@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -43,6 +44,63 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
+function SurfaceRocks({ terrain }: { terrain: FiniteTerrain }) {
+  // Keep decorative glTF work behind the real-GPU branch. In particular,
+  // SwiftShader/software fallback must not fetch, parse, cache or compile a
+  // model that its visual profile never renders.
+  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
+  const rockInstances = useMemo(
+    () =>
+      ROCKS.map((placement, index) => {
+        const object = seededClone(boulder.scene, index);
+        const localHeight =
+          terrain.sampleHeight(placement.x, placement.z) ?? 0;
+        object.position.set(
+          placement.x,
+          TERRAIN_Y + localHeight - placement.scale * 0.52,
+          placement.z,
+        );
+        object.rotation.set(
+          placement.tilt,
+          placement.ry,
+          placement.tilt * 0.4,
+        );
+        object.scale.setScalar(placement.scale);
+        return object;
+      }),
+    [boulder.scene, terrain],
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceDecorations =
+      "hardware-rocks";
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceDecorations ===
+        "hardware-rocks"
+      ) {
+        delete document.documentElement.dataset.universeSurfaceDecorations;
+      }
+      for (const object of rockInstances) {
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            // Geometry/materials remain owned by drei's shared glTF cache.
+            child.castShadow = false;
+          }
+        });
+      }
+    };
+  }, [rockInstances]);
+
+  return (
+    <>
+      {rockInstances.map((object) => (
+        <primitive key={object.name} object={object} />
+      ))}
+    </>
+  );
+}
+
 export function SurfaceTerrain({
   prepare,
   active,
@@ -57,7 +115,6 @@ export function SurfaceTerrain({
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
-  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
   const [activated, setActivated] = useState(prepare || active);
   const softwareRenderer = isSoftwareRenderer(gl);
@@ -365,48 +422,16 @@ export function SurfaceTerrain({
     }
   });
 
-  const rockInstances = useMemo(() => {
-    // Decorative PBR glTF rocks add first-use shader programs but do not
-    // contribute to terrain identity. Keep them on real GPUs only.
-    if (!terrain || softwareRenderer) return [];
-
-    return ROCKS.map((placement, index) => {
-      const object = seededClone(boulder.scene, index);
-      const localHeight = terrain.sampleHeight(placement.x, placement.z) ?? 0;
-      object.position.set(
-        placement.x,
-        TERRAIN_Y + localHeight - placement.scale * 0.52,
-        placement.z,
-      );
-      object.rotation.set(placement.tilt, placement.ry, placement.tilt * 0.4);
-      object.scale.setScalar(placement.scale);
-      return object;
-    });
-  }, [boulder.scene, softwareRenderer, terrain]);
-
-  useEffect(() => {
-    return () => {
-      for (const object of rockInstances) {
-        object.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            // Geometry/materials belong to the shared glTF cache and are not disposed here.
-            child.castShadow = false;
-          }
-        });
-      }
-    };
-  }, [rockInstances]);
-
   if (!terrain) return null;
 
   return (
     <>
       <primitive object={terrain.object} />
-      {rockInstances.map((object) => (
-        <primitive key={object.name} object={object} />
-      ))}
+      {!softwareRenderer ? (
+        <Suspense fallback={null}>
+          <SurfaceRocks terrain={terrain} />
+        </Suspense>
+      ) : null}
     </>
   );
 }
-
-useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");
