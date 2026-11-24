@@ -700,6 +700,19 @@ test("generated secondary terrestrial worlds receive deterministic Surface produ
   );
   await expect(page.locator(".surface-world-meta")).toBeVisible();
   await expect(page.locator(".surface-region-index span").first()).toBeVisible();
+  await expect(page.locator(".surface-cluster-index span").first()).toBeVisible();
+  await expect(page.locator(".surface-explore-hint")).toContainText(
+    /WHEEL TO DEPART|滚轮离开地表/,
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(
+          await html.getAttribute("data-universe-surface-content-clusters"),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0);
 
   await runtime.assertClean(testInfo);
 });
