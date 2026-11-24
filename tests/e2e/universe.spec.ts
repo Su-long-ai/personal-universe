@@ -1598,6 +1598,196 @@ test("high-frequency sustained wheel crosses renderer handoffs without losing sc
   await runtime.assertClean(testInfo);
 });
 
+test("120Hz-like burst stays reversible across Galaxy System and Approach handoffs", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  const inwardTrace: number[] = [];
+  for (let sample = 0; sample < 24; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(8);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    inwardTrace.push(position);
+    if (position >= 2.499) break;
+  }
+
+  for (let index = 1; index < inwardTrace.length; index += 1) {
+    expect(inwardTrace[index]).toBeGreaterThanOrEqual(
+      inwardTrace[index - 1] - 0.001,
+    );
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    /approach|orbit/,
+    { timeout: 10_000 },
+  );
+  expect(Number(await html.getAttribute("data-universe-scale-position")))
+    .toBeGreaterThanOrEqual(2.499);
+
+  const outwardTrace: number[] = [];
+  for (let sample = 0; sample < 32; sample += 1) {
+    await dispatchScaleWheel(page, 96);
+    await page.waitForTimeout(8);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    outwardTrace.push(position);
+    const phase = await html.getAttribute("data-universe-navigation-phase");
+    if (position <= 0.001 && phase === "galaxy") break;
+  }
+
+  for (let index = 1; index < outwardTrace.length; index += 1) {
+    expect(outwardTrace[index]).toBeLessThanOrEqual(
+      outwardTrace[index - 1] + 0.001,
+    );
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.000",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+  expect(await page.locator("canvas").count()).toBe(1);
+
+  await testInfo.attach("continuous-scale-120hz-trace.json", {
+    body: Buffer.from(
+      JSON.stringify({ inward: inwardTrace, outward: outwardTrace }, null, 2),
+    ),
+    contentType: "application/json",
+  });
+  await runtime.assertClean(testInfo);
+});
+
+test("144Hz-like close-world burst reverses without phase or camera backlog", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  const forward: number[] = [];
+  for (let sample = 0; sample < 14; sample += 1) {
+    await dispatchScaleWheel(page, -48);
+    await page.waitForTimeout(7);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    forward.push(position);
+    if (position >= 4.499) break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+
+  const reverse: number[] = [];
+  for (let sample = 0; sample < 12; sample += 1) {
+    await dispatchScaleWheel(page, 48);
+    await page.waitForTimeout(7);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    reverse.push(position);
+    if (position <= 2.001) break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  for (let index = 1; index < forward.length; index += 1) {
+    expect(forward[index]).toBeGreaterThanOrEqual(forward[index - 1] - 0.001);
+  }
+  for (let index = 1; index < reverse.length; index += 1) {
+    expect(reverse[index]).toBeLessThanOrEqual(reverse[index - 1] + 0.001);
+  }
+
+  await runtime.assertClean(testInfo);
+});
+
+test("trackpad inertia tail stops exactly where delivered samples end", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  // A decaying touchpad-like tail must affect the coordinate only through the
+  // samples the browser actually delivered. There is no project-owned inertia
+  // engine and no hidden replay queue after the final 3px sample.
+  for (const deltaY of [-72, -36, -18, -9, -5, -3]) {
+    await dispatchScaleWheel(page, deltaY);
+    await page.waitForTimeout(12);
+  }
+
+  const stoppedAt = await html.getAttribute("data-universe-scale-position");
+  expect(stoppedAt).not.toBeNull();
+  await page.waitForTimeout(900);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    stoppedAt!,
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  const beforeReverse = Number(stoppedAt);
+  await dispatchScaleWheel(page, 8);
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-scale-position")),
+    )
+    .toBeLessThan(beforeReverse);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-reversal",
+    /\d+/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Search freezes and resumes a partial Galaxy scale path", async ({
   page,
 }, testInfo) => {
