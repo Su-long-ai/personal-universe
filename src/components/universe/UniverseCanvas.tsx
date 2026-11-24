@@ -171,6 +171,10 @@ export function UniverseCanvas({
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
+  const [worldPaintStartedState, setWorldPaintStartedState] = useState<{
+    identity: string;
+    started: boolean;
+  }>({ identity: "", started: false });
   const [worldPaintState, setWorldPaintState] = useState<{
     identity: string;
     ready: boolean;
@@ -234,9 +238,22 @@ export function UniverseCanvas({
     `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
   const worldPaintIdentityRef = useRef(worldPaintIdentity);
   worldPaintIdentityRef.current = worldPaintIdentity;
+  const worldPaintStarted =
+    worldPaintStartedState.identity === worldPaintIdentity &&
+    worldPaintStartedState.started;
   const worldPaintReady =
     worldPaintState.identity === worldPaintIdentity &&
     worldPaintState.ready;
+  const handleWorldPaintStarted = useCallback(
+    (started: boolean) => {
+      if (worldPaintIdentityRef.current !== worldPaintIdentity) return;
+      setWorldPaintStartedState({
+        identity: worldPaintIdentity,
+        started,
+      });
+    },
+    [worldPaintIdentity],
+  );
   const handleWorldPaintReady = useCallback(
     (ready: boolean) => {
       // Carry the concrete planet + quality identity with readiness. If an
@@ -256,6 +273,7 @@ export function UniverseCanvas({
     // DOM diagnostics are capability-scoped too. The product handoff itself
     // is already synchronously protected by the keyed state above, so this
     // effect only clears the stale public diagnostic after an identity change.
+    delete document.documentElement.dataset.universeWorldPaintStarted;
     delete document.documentElement.dataset.universeWorldPaintReady;
   }, [worldPaintIdentity]);
 
@@ -267,6 +285,26 @@ export function UniverseCanvas({
   const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
   const keepSystemForHandoff =
     phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
+  const handoffTargetPlanetId =
+    keepSystemForHandoff && worldPaintStarted
+      ? worldPrewarmPlanet?.id ?? null
+      : null;
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      html.dataset.universeSystemHandoffTarget = handoffTargetPlanetId;
+    } else {
+      delete html.dataset.universeSystemHandoffTarget;
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemHandoffTarget === handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemHandoffTarget;
+      }
+    };
+  }, [handoffTargetPlanetId]);
 
   return (
     <Canvas
@@ -339,6 +377,7 @@ export function UniverseCanvas({
                 onSelectPlanet={onSelectPlanet}
                 onScaleFocus={onScaleFocusPlanet}
                 scaleTargetPlanet={systemScaleTargetPlanet}
+                handoffTargetPlanetId={handoffTargetPlanetId}
                 onScaleFrame={setSystemScaleFrame}
               />
             }
@@ -348,6 +387,7 @@ export function UniverseCanvas({
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}
               scaleTargetPlanet={systemScaleTargetPlanet}
+              handoffTargetPlanetId={handoffTargetPlanetId}
               onScaleFrame={setSystemScaleFrame}
               quality={quality}
             />
@@ -358,6 +398,7 @@ export function UniverseCanvas({
             onSelectPlanet={onSelectPlanet}
             onScaleFocus={onScaleFocusPlanet}
             scaleTargetPlanet={systemScaleTargetPlanet}
+            handoffTargetPlanetId={handoffTargetPlanetId}
             onScaleFrame={setSystemScaleFrame}
           />
         )
@@ -384,6 +425,7 @@ export function UniverseCanvas({
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
               surfaceFallbackReady={surfaceFallbackReady}
+              onPaintStartedChange={handleWorldPaintStarted}
               onPaintReadyChange={handleWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
