@@ -295,18 +295,37 @@ select {
   margin-top: 7px;
 }
 
-.surface-cluster-index span {
+.surface-cluster-chip {
   padding: 4px 7px;
   border: 1px solid rgba(115, 244, 255, 0.12);
   background: rgba(7, 24, 30, 0.2);
   color: rgba(190, 237, 242, 0.56);
+  font: inherit;
   font-size: 7px;
   letter-spacing: 0.06em;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
-.surface-cluster-index span[data-priority="primary"] {
+.surface-cluster-chip[data-priority="primary"] {
   border-color: rgba(255, 214, 158, 0.28);
   color: rgba(255, 232, 196, 0.78);
+}
+
+.surface-cluster-chip[aria-pressed="true"] {
+  border-color: rgba(255, 224, 176, 0.54);
+  background: rgba(49, 35, 22, 0.52);
+  color: rgba(255, 236, 207, 0.9);
+}
+
+.surface-cluster-chip:focus-visible {
+  outline: 2px solid rgba(156, 244, 255, 0.88);
+  outline-offset: 2px;
+}
+
+.surface-cluster-chip:disabled {
+  cursor: default;
+  opacity: 0.4;
 }
 
 .surface-explore-hint {
@@ -641,7 +660,7 @@ select {
     margin-top: 6px;
   }
 
-  .surface-cluster-index span:nth-child(n + 3) {
+  .surface-cluster-chip:nth-child(n + 3) {
     display: none;
   }
 
