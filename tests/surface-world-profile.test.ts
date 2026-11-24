@@ -132,6 +132,7 @@ test("content cluster geometry stays stable when unrelated content is inserted",
     assert.deepEqual(after.center, cluster.center);
     assert.equal(after.label, cluster.label);
     assert.equal(after.regionId, cluster.regionId);
+    assert.equal(after.landmarkId, cluster.landmarkId);
   }
 });
 
