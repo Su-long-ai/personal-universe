@@ -51,6 +51,7 @@ type CinematicCameraProps = {
   systemScaleFrame: SystemScaleFrame | null;
   galaxyViewState: YeisGalaxyViewState | null;
   worldFrameReady: boolean;
+  surfaceFallbackReady: boolean;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -95,9 +96,13 @@ type CameraShot = {
   transition?: boolean;
 };
 
-const FALLBACK_SURFACE_SHOT: CameraShot = {
+export const FALLBACK_SURFACE_CAMERA_FRAME = {
   position: [0.5, 22.0, 18.0] as [number, number, number],
   target: [0, 8.0, -16.0] as [number, number, number],
+} as const;
+
+const FALLBACK_SURFACE_SHOT: CameraShot = {
+  ...FALLBACK_SURFACE_CAMERA_FRAME,
   smoothTime: 0.38,
   maxSpeed: 24,
   positionTolerance: 0.14,
@@ -181,6 +186,7 @@ export function CinematicCamera({
   systemScaleFrame,
   galaxyViewState,
   worldFrameReady,
+  surfaceFallbackReady,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -192,8 +198,12 @@ export function CinematicCamera({
   const surfaceFallbackAvailable = Boolean(
     liveWorldFallbackReason(gl, quality),
   );
-  const surfaceFallback =
+  const surfaceFallbackRequested =
     phase === "surface" && surfaceFallbackAvailable;
+  const surfaceFallback =
+    surfaceFallbackRequested && surfaceFallbackReady;
+  const currentWorldFrameReady =
+    surfaceFallbackRequested ? surfaceFallbackReady : worldFrameReady;
   const continuousSystemCamera =
     phase === "system" &&
     worldScaleContinuous &&
@@ -240,8 +250,8 @@ export function CinematicCamera({
   const scratchNativeQuaternion = useRef(new Quaternion());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
-  const worldFrameReadyRef = useRef(worldFrameReady);
-  worldFrameReadyRef.current = worldFrameReady;
+  const worldFrameReadyRef = useRef(currentWorldFrameReady);
+  worldFrameReadyRef.current = currentWorldFrameReady;
 
   const handleControlsRef = useCallback(
     (controls: CameraControlsApi | null) => {
@@ -261,7 +271,7 @@ export function CinematicCamera({
           ? 1e-8
           : 5
         : phase === "surface"
-          ? surfaceFallback
+          ? surfaceFallbackAvailable
             ? 8
             : 0.015
           : 0.3;
@@ -271,7 +281,7 @@ export function CinematicCamera({
       : phase === "system"
         ? 55
         : phase === "surface"
-          ? surfaceFallback
+          ? surfaceFallbackAvailable
             ? 65
             : 1.4
           : 65;
@@ -369,7 +379,7 @@ export function CinematicCamera({
   );
 
   useEffect(() => {
-    if (!worldFrameReady) return;
+    if (!currentWorldFrameReady) return;
     if (
       document.documentElement.dataset.universeCameraAwaitingWorldFrame !==
       phase
@@ -377,7 +387,7 @@ export function CinematicCamera({
       return;
     }
     publishIfReached();
-  }, [phase, publishIfReached, worldFrameReady]);
+  }, [currentWorldFrameReady, phase, publishIfReached]);
 
   const publishScaleFrameDiagnostics = useCallback(
     (center: Vector3, radius: number) => {
