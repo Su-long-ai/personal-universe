@@ -98,6 +98,25 @@ A live HIGH world is accepted only when the renderer reports
 `procedural-planets-live`, the pipeline reports
 `procedural-planets-pass`, and `data-universe-world-ready="true"`.
 
+Task `WORLD-SOFTWARE-FALLBACK-TEXTURE-001` improves only the AUTO/software
+representation without weakening that capability boundary. SwiftShader still
+uses the same lightweight sphere, `MeshStandardMaterial`, product lights,
+camera and phase contract; it never constructs the live ProceduralPlanets
+world. The fallback now reuses Three.js' installed `ImprovedNoise` addon to
+generate one deterministic 128x64 equirectangular `DataTexture` from the
+planet seed and archetype. Noise is sampled on a unit sphere so longitude
+wraps continuously, while archetype palettes provide ocean/land, rocky,
+frozen, lava, giant-band and alien visual identity. The texture is generated
+once per software-fallback planet, sampled by the existing material, and
+disposed with the component. It adds no draw call, downloaded asset, custom
+shader or second planet renderer. Explicit LOW quality intentionally retains
+the older solid lightweight representation.
+
+Runtime evidence:
+
+- `data-universe-world-fallback-surface="generated-texture"` identifies the
+  AUTO/software generated-map path.
+
 ## Surface continuity
 
 Task `PROCEDURAL-PLANET-SURFACE-HANDOFF-001` removes the primary-path

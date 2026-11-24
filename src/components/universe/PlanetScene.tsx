@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
 import * as THREE from "three";
+import { ImprovedNoise } from "three/addons/math/ImprovedNoise.js";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
@@ -184,6 +185,217 @@ function fallbackColor(archetype: PlanetArchetype) {
   }
 }
 
+type FallbackRgb = readonly [number, number, number];
+type FallbackPalette = readonly [
+  FallbackRgb,
+  FallbackRgb,
+  FallbackRgb,
+  FallbackRgb,
+];
+
+function fallbackPalette(archetype: PlanetArchetype): FallbackPalette {
+  switch (archetype) {
+    case "ocean":
+      return [
+        [7, 34, 61],
+        [22, 103, 139],
+        [166, 158, 105],
+        [226, 226, 205],
+      ];
+    case "temperate":
+      return [
+        [28, 53, 47],
+        [72, 116, 68],
+        [151, 139, 87],
+        [210, 207, 174],
+      ];
+    case "desert":
+      return [
+        [79, 52, 37],
+        [166, 112, 70],
+        [205, 163, 105],
+        [238, 211, 159],
+      ];
+    case "ice":
+    case "frozen":
+      return [
+        [71, 104, 126],
+        [139, 183, 201],
+        [202, 226, 234],
+        [244, 249, 250],
+      ];
+    case "lava":
+      return [
+        [35, 17, 16],
+        [112, 35, 24],
+        [208, 70, 32],
+        [255, 157, 67],
+      ];
+    case "volcanic":
+      return [
+        [37, 31, 30],
+        [91, 59, 52],
+        [133, 88, 69],
+        [180, 139, 112],
+      ];
+    case "gas_giant":
+      return [
+        [92, 67, 49],
+        [165, 119, 78],
+        [216, 178, 127],
+        [245, 221, 183],
+      ];
+    case "ice_giant":
+      return [
+        [31, 78, 104],
+        [67, 137, 170],
+        [126, 190, 211],
+        [191, 226, 235],
+      ];
+    case "alien":
+      return [
+        [43, 29, 68],
+        [99, 73, 139],
+        [132, 112, 164],
+        [187, 177, 207],
+      ];
+    case "rocky":
+    default:
+      return [
+        [54, 49, 46],
+        [105, 94, 84],
+        [145, 132, 117],
+        [194, 183, 165],
+      ];
+  }
+}
+
+function mixFallbackRgb(
+  from: FallbackRgb,
+  to: FallbackRgb,
+  t: number,
+): FallbackRgb {
+  const k = THREE.MathUtils.clamp(t, 0, 1);
+  return [
+    Math.round(THREE.MathUtils.lerp(from[0], to[0], k)),
+    Math.round(THREE.MathUtils.lerp(from[1], to[1], k)),
+    Math.round(THREE.MathUtils.lerp(from[2], to[2], k)),
+  ];
+}
+
+function sampleFallbackPalette(
+  palette: FallbackPalette,
+  value: number,
+): FallbackRgb {
+  if (value < 0.48) {
+    return mixFallbackRgb(palette[0], palette[1], value / 0.48);
+  }
+  if (value < 0.68) {
+    return mixFallbackRgb(
+      palette[1],
+      palette[2],
+      (value - 0.48) / 0.2,
+    );
+  }
+  return mixFallbackRgb(
+    palette[2],
+    palette[3],
+    (value - 0.68) / 0.32,
+  );
+}
+
+function createFallbackSurfaceTexture(planet: PlanetDefinition) {
+  const width = 128;
+  const height = 64;
+  const data = new Uint8Array(width * height * 4);
+  const palette = fallbackPalette(planet.archetype);
+  const noise = new ImprovedNoise();
+  const seed = hashSeed(planet.seed);
+  const offsetX = ((seed & 0xff) / 255) * 19.0;
+  const offsetY = (((seed >>> 8) & 0xff) / 255) * 19.0;
+  const offsetZ = (((seed >>> 16) & 0xff) / 255) * 19.0;
+  const giant =
+    planet.archetype === "gas_giant" ||
+    planet.archetype === "ice_giant";
+
+  for (let row = 0; row < height; row += 1) {
+    const v = (row + 0.5) / height;
+    const phi = v * Math.PI;
+    const normalY = Math.cos(phi);
+    const radial = Math.sin(phi);
+
+    for (let column = 0; column < width; column += 1) {
+      const u = (column + 0.5) / width;
+      const theta = u * Math.PI * 2;
+      const normalX = radial * Math.cos(theta);
+      const normalZ = radial * Math.sin(theta);
+
+      const broad = noise.noise(
+        normalX * 1.55 + offsetX,
+        normalY * 1.55 + offsetY,
+        normalZ * 1.55 + offsetZ,
+      );
+      const medium = noise.noise(
+        normalX * 3.1 + offsetX * 0.73,
+        normalY * 3.1 + offsetY * 0.73,
+        normalZ * 3.1 + offsetZ * 0.73,
+      );
+      const fine = noise.noise(
+        normalX * 6.2 + offsetX * 1.17,
+        normalY * 6.2 + offsetY * 1.17,
+        normalZ * 6.2 + offsetZ * 1.17,
+      );
+
+      let value = THREE.MathUtils.clamp(
+        0.5 + broad * 0.29 + medium * 0.14 + fine * 0.07,
+        0,
+        1,
+      );
+
+      if (giant) {
+        const bandNoise = broad * 0.75 + medium * 0.25;
+        value = THREE.MathUtils.clamp(
+          0.5 +
+            Math.sin(normalY * 18 + bandNoise * 3.2 + offsetY) * 0.25 +
+            medium * 0.08,
+          0,
+          1,
+        );
+      }
+
+      let color = sampleFallbackPalette(palette, value);
+      const polar = THREE.MathUtils.smoothstep(
+        Math.abs(normalY),
+        0.78,
+        0.96,
+      );
+      if (!giant && polar > 0) {
+        color = mixFallbackRgb(color, palette[3], polar * 0.68);
+      }
+
+      const index = (row * width + column) * 4;
+      data[index] = color[0];
+      data[index + 1] = color[1];
+      data[index + 2] = color[2];
+      data[index + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(
+    data,
+    width,
+    height,
+    THREE.RGBAFormat,
+  );
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function DeepSky() {
   const texture = useTexture(
     `${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`,
@@ -275,6 +487,13 @@ export function PlanetScene({
   );
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const fallbackSurfaceTexture = useMemo(
+    () =>
+      fallbackReason === "software-renderer"
+        ? createFallbackSurfaceTexture(planet)
+        : null,
+    [fallbackReason, planet.archetype, planet.seed],
+  );
   const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
   const liveEnabled = warmedKey === liveKey && !fallbackReason;
@@ -340,6 +559,13 @@ export function PlanetScene({
     };
   }, [livePlanet]);
 
+  useEffect(
+    () => () => {
+      fallbackSurfaceTexture?.dispose();
+    },
+    [fallbackSurfaceTexture],
+  );
+
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
     return () => {
@@ -354,14 +580,21 @@ export function PlanetScene({
         ? `procedural-planets-fallback-${fallbackReason}`
         : "procedural-planets-warmup";
     document.documentElement.dataset.universeWorldRenderer = mode;
+    if (fallbackSurfaceTexture) {
+      document.documentElement.dataset.universeWorldFallbackSurface =
+        "generated-texture";
+    } else {
+      delete document.documentElement.dataset.universeWorldFallbackSurface;
+    }
     return () => {
       if (
         document.documentElement.dataset.universeWorldRenderer === mode
       ) {
         delete document.documentElement.dataset.universeWorldRenderer;
       }
+      delete document.documentElement.dataset.universeWorldFallbackSurface;
     };
-  }, [fallbackReason, livePlanet]);
+  }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
 
   useFrame((_, delta) => {
     // Once landed, keep the terrain under the visitor fixed. Orbit/approach
@@ -418,8 +651,13 @@ export function PlanetScene({
         <mesh scale={FALLBACK_WORLD_RADIUS}>
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
-            color={fallbackColor(planet.archetype)}
-            roughness={0.76}
+            color={
+              fallbackSurfaceTexture
+                ? "#ffffff"
+                : fallbackColor(planet.archetype)
+            }
+            map={fallbackSurfaceTexture}
+            roughness={0.82}
             metalness={0.02}
           />
         </mesh>
