@@ -617,6 +617,13 @@ test("Orbit capability switches reacquire paint without resurfacing System", asy
     "data-universe-system-renderer",
     /.+/,
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-allocations",
+    /\d+/,
+  );
+  const pipelineAllocations = await html.getAttribute(
+    "data-universe-world-pipeline-allocations",
+  );
 
   await page.evaluate(() => {
     const root = document.documentElement;
@@ -674,6 +681,9 @@ test("Orbit capability switches reacquire paint without resurfacing System", asy
     "data-universe-system-renderer",
     /.+/,
   );
+  expect(
+    await html.getAttribute("data-universe-world-pipeline-allocations"),
+  ).toBe(pipelineAllocations);
 
   const events = await page.evaluate(() =>
     (
