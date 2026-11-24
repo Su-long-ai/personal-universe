@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { PlanetPass } from "procedural-planets";
+import { PlanetPass, type Planet } from "procedural-planets";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -42,10 +48,14 @@ export function CinematicPipeline({
   quality,
   liveWorld,
   prewarmLiveWorld = false,
+  planetReleaseRef,
 }: {
   quality: QualityMode;
   liveWorld: boolean;
   prewarmLiveWorld?: boolean;
+  planetReleaseRef?: MutableRefObject<
+    ((planet: Planet) => void) | null
+  >;
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
@@ -135,6 +145,25 @@ export function CinematicPipeline({
   ]);
 
   useEffect(() => {
+    if (!planetReleaseRef) return;
+    const releasePlanet = (planet: Planet) => {
+      const renderer = planetPassRef.current?.planetRenderer;
+      if (!renderer) return;
+      renderer.release(planet);
+      const html = document.documentElement;
+      html.dataset.universeWorldPlanetReleases = String(
+        Number(html.dataset.universeWorldPlanetReleases ?? "0") + 1,
+      );
+    };
+    planetReleaseRef.current = releasePlanet;
+    return () => {
+      if (planetReleaseRef.current === releasePlanet) {
+        planetReleaseRef.current = null;
+      }
+    };
+  }, [planetReleaseRef]);
+
+  useEffect(() => {
     if (composer.bloomPass) {
       composer.bloomPass.enabled = high;
     }
@@ -210,6 +239,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       delete document.documentElement.dataset.universeWorldImpostorPixels;
+      delete document.documentElement.dataset.universeWorldPlanetReleases;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
       composer.composer.dispose();
