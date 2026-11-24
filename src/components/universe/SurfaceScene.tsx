@@ -184,7 +184,7 @@ export function SurfaceScene({
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
-  const [terrainEnabled, setTerrainEnabled] = useState(false);
+  const [terrainWorldId, setTerrainWorldId] = useState<string | null>(null);
 
   useEffect(() => {
     // These are local presentation states for one world, not product
@@ -192,6 +192,9 @@ export function SurfaceScene({
     // generated world while its new terrain is preparing.
     setBeaconActive(false);
     setAnchorHeight(4.8);
+    setTerrainWorldId((current) =>
+      current === profile?.id ? current : null,
+    );
   }, [profile?.id]);
   const landable = Boolean(profile && planet?.surfaceMode !== "none");
   const active =
@@ -231,21 +234,22 @@ export function SurfaceScene({
   }, -100);
 
   useEffect(() => {
-    if (!prepare) {
-      // Once the fallback terrain has been created, keep that same instance
-      // mounted under the shared Canvas and let SurfaceTerrain publish
-      // lifecycle="parked". Its active/phaseRef guards pause all update work;
-      // actual disposal remains owned by Canvas teardown.
+    if (!prepare || !profile) {
+      // Keep a prepared terrain only while it still belongs to the selected
+      // world. Same-world reverse travel parks/resumes that instance; changing
+      // world identity clears terrainWorldId in the profile effect above so
+      // System/Approach never eagerly compile the next world's fallback.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
-      if (!terrainEnabled) {
+      if (terrainWorldId !== profile?.id) {
         document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
       }
       return;
     }
 
-    // A previously prepared terrain is the retained fallback. Re-entering
-    // Surface must resume it rather than scheduling a second FiniteTerrain.
-    if (terrainEnabled) {
+    // A previously prepared terrain for this exact world is the retained
+    // fallback. Re-entering Surface resumes it rather than scheduling a second
+    // Infinite World instance.
+    if (terrainWorldId === profile.id) {
       document.documentElement.dataset.universeSurfacePrewarm = "ready";
       return;
     }
@@ -262,7 +266,7 @@ export function SurfaceScene({
         if (cancelled) return;
         document.documentElement.dataset.universeSurfaceTerrainState = "preparing";
         document.documentElement.dataset.universeSurfacePrewarm = "preparing";
-        setTerrainEnabled(true);
+        setTerrainWorldId(profile.id);
       };
       if (idleWindow.requestIdleCallback) {
         idleHandle = idleWindow.requestIdleCallback(enable, { timeout: 650 });
@@ -279,7 +283,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [phase, prepare, terrainEnabled]);
+  }, [phase, prepare, profile, terrainWorldId]);
 
   const content = (
     <>
@@ -312,17 +316,15 @@ export function SurfaceScene({
       ) : null}
 
       <Suspense fallback={null}>
-        {terrainEnabled ? (
-          profile ? (
-            <SurfaceTerrain
-              active={active}
-              phaseRef={phaseRef}
-              profile={profile}
-              focusedEntryId={surfaceFocusEntryId}
-              onFocusEntry={onSurfaceFocusEntry}
-              onAnchorHeight={handleAnchorHeight}
-            />
-          ) : null
+        {profile && landable && terrainWorldId === profile.id ? (
+          <SurfaceTerrain
+            active={active}
+            phaseRef={phaseRef}
+            profile={profile}
+            focusedEntryId={surfaceFocusEntryId}
+            onFocusEntry={onSurfaceFocusEntry}
+            onAnchorHeight={handleAnchorHeight}
+          />
         ) : null}
       </Suspense>
 
