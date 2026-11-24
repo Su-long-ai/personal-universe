@@ -12,6 +12,171 @@ async function openNavigator(page: import("@playwright/test").Page) {
   return dialog;
 }
 
+
+type ReleaseScaleSnapshot = {
+  position: number;
+  phase: string | null;
+  direction: string | null;
+  authority: string | null;
+  handoff: string | null;
+  queued: string | null;
+  canvasCount: number;
+};
+
+async function dispatchReleaseWheel(
+  page: import("@playwright/test").Page,
+  deltaY: number,
+) {
+  await page.locator("main.universe-root").evaluate(
+    (node, value) => {
+      node.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: value,
+        }),
+      );
+    },
+    deltaY,
+  );
+}
+
+async function releaseScaleSnapshot(
+  page: import("@playwright/test").Page,
+): Promise<ReleaseScaleSnapshot> {
+  return page.evaluate(() => {
+    const data = document.documentElement.dataset;
+    return {
+      position: Number(data.universeScalePosition ?? "NaN"),
+      phase: data.universeNavigationPhase ?? null,
+      direction: data.universeScaleDirection ?? null,
+      authority: data.universeRenderAuthority ?? null,
+      handoff: data.universeHandoffState ?? null,
+      queued: data.universeScaleQueued ?? null,
+      canvasCount: document.querySelectorAll("canvas").length,
+    };
+  });
+}
+
+async function openHeroScaleJourney(page: import("@playwright/test").Page) {
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  expect(await page.locator("canvas").count()).toBe(1);
+  return html;
+}
+
+async function stepReleaseScale(
+  page: import("@playwright/test").Page,
+  deltaY: number,
+  position: number,
+  phase: string,
+) {
+  await dispatchReleaseWheel(page, deltaY);
+  const html = page.locator("html");
+  await expect
+    .poll(
+      async () => Number(await html.getAttribute("data-universe-scale-position")),
+      { timeout: 20_000 },
+    )
+    .toBeCloseTo(position, 3);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    phase,
+    { timeout: 20_000 },
+  );
+  expect(await page.locator("canvas").count()).toBe(1);
+}
+
+async function driveReleaseScaleBurst(
+  page: import("@playwright/test").Page,
+  deltaY: number,
+  done: (snapshot: ReleaseScaleSnapshot) => boolean,
+  cadenceMs = 72,
+  maxSamples = 96,
+) {
+  const trace: ReleaseScaleSnapshot[] = [];
+  for (let sample = 0; sample < maxSamples; sample += 1) {
+    await dispatchReleaseWheel(page, deltaY);
+    await page.waitForTimeout(cadenceMs);
+    const snapshot = await releaseScaleSnapshot(page);
+    trace.push(snapshot);
+    if (done(snapshot)) return trace;
+  }
+  throw new Error(
+    `continuous-scale burst did not reach its terminal state after ${maxSamples} samples: ${JSON.stringify(trace.slice(-8))}`,
+  );
+}
+
+
+test("fresh BrowserContext preserves one-canvas Galaxy midpoint reversal", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  const runtime = await observeRuntime(page);
+
+  try {
+    await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+    await waitForYeis(page);
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-active-destination",
+      "hero:aurora-01",
+      { timeout: 20_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    const root = page.locator("main.universe-root");
+    await root.evaluate((node) => {
+      node.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -96,
+        }),
+      );
+    });
+    await expect(html).toHaveAttribute("data-universe-scale-position", "0.250");
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-bridge",
+      "active",
+      { timeout: 10_000 },
+    );
+
+    await root.evaluate((node) => {
+      node.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: 96,
+        }),
+      );
+    });
+    await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "galaxy",
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await runtime.assertClean(testInfo);
+  } finally {
+    await context.close();
+  }
+});
+
 test("Hero deep link returns through system to galaxy", async ({
   page,
 }, testInfo) => {
@@ -376,4 +541,153 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
   // restoration rather than requiring a page reload or a second Canvas.
   await waitForYeis(page);
   await runtime.assertDetected(testInfo, "webglcontextlost");
+});
+
+
+test("release: Hero completes the full reversible 0-to-5-to-0 scale journey", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const html = await openHeroScaleJourney(page);
+
+  const inward: Array<[number, string]> = [
+    [0.25, "galaxy"],
+    [0.5, "galaxy"],
+    [0.75, "galaxy"],
+    [1, "system"],
+    [4 / 3, "system"],
+    [5 / 3, "system"],
+    [2, "approach"],
+    [2.5, "approach"],
+    [3, "orbit"],
+    [3.5, "orbit"],
+    [4, "atmosphere"],
+    [4.4, "atmosphere"],
+    [4.8, "atmosphere"],
+    [5, "surface"],
+  ];
+
+  for (const [position, phase] of inward) {
+    await stepReleaseScale(page, -96, position, phase);
+    if (position >= 2 && Number.isInteger(position)) {
+      await expect(html).toHaveAttribute(
+        "data-universe-camera-settled",
+        phase,
+        { timeout: 30_000 },
+      );
+    }
+  }
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "5.000");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+
+  const outward: Array<[number, string]> = [
+    [4.6, "atmosphere"],
+    [4.2, "atmosphere"],
+    [3.75, "orbit"],
+    [3.25, "orbit"],
+    [2.75, "approach"],
+    [2.25, "approach"],
+    [2, "approach"],
+    [5 / 3, "system"],
+    [4 / 3, "system"],
+    [1, "system"],
+    [0.75, "galaxy"],
+    [0.5, "galaxy"],
+    [0.25, "galaxy"],
+    [0, "galaxy"],
+  ];
+
+  for (const [position, phase] of outward) {
+    await stepReleaseScale(page, 96, position, phase);
+  }
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued", /.+/);
+  expect(await page.locator("canvas").count()).toBe(1);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("release: rapid sustained wheel cadence crosses every scale authority and reverses immediately @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const html = await openHeroScaleJourney(page);
+
+  const inwardTrace = await driveReleaseScaleBurst(
+    page,
+    -96,
+    (snapshot) =>
+      snapshot.position >= 4.999 &&
+      snapshot.phase === "surface" &&
+      snapshot.canvasCount === 1,
+  );
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "5.000");
+  const inwardPhases = new Set(inwardTrace.map((snapshot) => snapshot.phase));
+  for (const phase of [
+    "galaxy",
+    "system",
+    "approach",
+    "orbit",
+    "atmosphere",
+    "surface",
+  ]) {
+    expect(
+      inwardPhases.has(phase),
+      `rapid inward trace should expose ${phase}`,
+    ).toBeTruthy();
+  }
+
+  // Reverse immediately from the terminal Surface state. Do not wait for a
+  // fresh dwell/readiness cycle: a direction change must supersede any queued
+  // inward intent and keep the same Canvas alive all the way back to Galaxy.
+  const outwardTrace = await driveReleaseScaleBurst(
+    page,
+    96,
+    (snapshot) =>
+      snapshot.position <= 0.001 &&
+      snapshot.phase === "galaxy" &&
+      snapshot.canvasCount === 1,
+  );
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued", /.+/);
+  expect(await page.locator("canvas").count()).toBe(1);
+
+  const outwardPhases = new Set(outwardTrace.map((snapshot) => snapshot.phase));
+  for (const phase of ["atmosphere", "orbit", "approach", "system", "galaxy"]) {
+    expect(
+      outwardPhases.has(phase),
+      `rapid outward trace should expose ${phase}`,
+    ).toBeTruthy();
+  }
+
+  await testInfo.attach("continuous-scale-rapid-trace.json", {
+    body: Buffer.from(
+      JSON.stringify(
+        {
+          inward: inwardTrace,
+          outward: outwardTrace,
+        },
+        null,
+        2,
+      ),
+    ),
+    contentType: "application/json",
+  });
+
+  await runtime.assertClean(testInfo);
 });
