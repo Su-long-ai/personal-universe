@@ -122,6 +122,33 @@ export function CinematicPipeline({
     };
   }, [rendererIdentity, softwareRenderer]);
 
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const html = document.documentElement;
+
+    const invalidateReady = (state: "lost" | "warming") => {
+      stableFrames.current = 0;
+      if (reportedReady.current !== false) {
+        reportedReady.current = false;
+        onReadyChangeRef.current?.(false);
+      }
+      delete html.dataset.universeWorldReady;
+      delete html.dataset.universeWorldScreenshotReady;
+      html.dataset.universeWorldRecovery = state;
+    };
+
+    const onContextLost = () => invalidateReady("lost");
+    const onContextRestored = () => invalidateReady("warming");
+
+    canvas.addEventListener("webglcontextlost", onContextLost);
+    canvas.addEventListener("webglcontextrestored", onContextRestored);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", onContextLost);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
+      delete html.dataset.universeWorldRecovery;
+    };
+  }, [gl]);
+
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = 1.0;
@@ -311,6 +338,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldRenderPath;
       delete document.documentElement.dataset.universeWorldComposerTargets;
       delete document.documentElement.dataset.universeWorldBloom;
+      delete document.documentElement.dataset.universeWorldRecovery;
       appliedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
@@ -405,6 +433,9 @@ export function CinematicPipeline({
       publishReady(false);
       delete html.dataset.universeWorldReady;
       delete html.dataset.universeWorldScreenshotReady;
+      if (html.dataset.universeWorldRecovery === "warming") {
+        html.dataset.universeWorldRecovery = "idle";
+      }
       return;
     }
 
@@ -420,6 +451,12 @@ export function CinematicPipeline({
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
+      }
+      if (
+        sceneReady &&
+        html.dataset.universeWorldRecovery === "warming"
+      ) {
+        html.dataset.universeWorldRecovery = "ready";
       }
       return;
     }
@@ -448,6 +485,9 @@ export function CinematicPipeline({
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
+      }
+      if (html.dataset.universeWorldRecovery === "warming") {
+        html.dataset.universeWorldRecovery = "ready";
       }
     } else {
       publishReady(false);
