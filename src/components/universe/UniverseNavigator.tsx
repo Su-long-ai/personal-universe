@@ -14,6 +14,7 @@ import {
   type ProductLocale,
 } from "../../lib/universe/locale";
 import {
+  guidedJourneysForSections,
   loadUniverseNavigation,
   loadUniversePlaces,
   navigationSectionsForResults,
@@ -98,6 +99,7 @@ export function UniverseNavigator({
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
   onStartJourney?: (
+    id: "featured" | "projects" | "research",
     title: string,
     destinations: UniverseNavigationDestination[],
   ) => void;
@@ -201,55 +203,10 @@ export function UniverseNavigator({
     [displaySections],
   );
 
-  const journeyOptions = useMemo(() => {
-    const personal =
-      sections.find((section) => section.id === "personal-signals")
-        ?.destinations ?? [];
-    const featuredIds = new Set(
-      (sections.find((section) => section.id === "featured")
-        ?.destinations ?? [])
-        .filter((destination) => destination.entryId)
-        .map((destination) => destination.id),
-    );
-    const featured = personal.filter((destination) =>
-      featuredIds.has(destination.id),
-    );
-    const projects =
-      sections.find((section) => section.id === "projects")
-        ?.destinations ?? [];
-    const research =
-      sections.find((section) => section.id === "research")
-        ?.destinations ?? [];
-
-    const candidates = [
-      {
-        id: "featured",
-        title: "Featured Journey",
-        destinations: featured,
-      },
-      {
-        id: "projects",
-        title: "Projects Journey",
-        destinations: projects,
-      },
-      {
-        id: "research",
-        title: "Research Journey",
-        destinations: research,
-      },
-    ];
-
-    const seenRoutes = new Set<string>();
-    return candidates.filter((journey) => {
-      if (journey.destinations.length === 0) return false;
-      const routeKey = journey.destinations
-        .map((destination) => destination.id)
-        .join("\u0000");
-      if (seenRoutes.has(routeKey)) return false;
-      seenRoutes.add(routeKey);
-      return true;
-    });
-  }, [sections]);
+  const journeyOptions = useMemo(
+    () => guidedJourneysForSections(sections),
+    [sections],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -550,7 +507,11 @@ export function UniverseNavigator({
                   type="button"
                   key={journey.id}
                   onClick={() => {
-                    onStartJourney(journey.title, journey.destinations);
+                    onStartJourney(
+                      journey.id,
+                      journey.title,
+                      journey.destinations,
+                    );
                     onClose();
                   }}
                 >
