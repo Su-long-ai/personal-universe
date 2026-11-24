@@ -1045,14 +1045,20 @@ export function PlanetScene({
         speed={phase === "surface" ? 0 : 0.08}
       />
 
-      <ambientLight intensity={0.34} />
+      <hemisphereLight
+        args={[
+          surfaceProfile.atmosphere.horizon,
+          surfaceProfile.atmosphere.fog,
+          1.15,
+        ]}
+      />
       <directionalLight
-        // Keep the lightweight fallback on the exact same stellar light axis
-        // as ProceduralPlanets. The old +Z work light only looked correct from
-        // the previous night-side Orbit shot.
+        // Keep the lightweight fallback on the exact same world lighting
+        // contract as stable Surface: stellar axis, intensity and color all
+        // come from the deterministic Surface profile.
         position={[sunDirection.x, sunDirection.y, sunDirection.z]}
-        intensity={3.8}
-        color="#ffe0aa"
+        intensity={surfaceProfile.lighting.sunIntensity * 3.05}
+        color={new THREE.Color(...surfaceProfile.lighting.sunColor)}
       />
 
       <group position={[...SURFACE_STELLAR_SOURCE_POSITION]}>
