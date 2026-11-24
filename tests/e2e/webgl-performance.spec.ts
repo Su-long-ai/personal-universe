@@ -14,6 +14,8 @@ type WebglMetrics = {
   planetAllocations: number;
   planetPassAllocations: number;
   fallbackTextureAllocations: number;
+  renderPath: string | null;
+  composerTargets: string | null;
   lifecycle: string | null;
   pipelineLifecycle: string | null;
   sceneLifecycle: string | null;
@@ -164,6 +166,8 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       fallbackTextureAllocations: Number(
         data.universeWorldFallbackTextureAllocations ?? 0,
       ),
+      renderPath: data.universeWorldRenderPath ?? null,
+      composerTargets: data.universeWorldComposerTargets ?? null,
       lifecycle: data.universeWebglLifecycle ?? null,
       pipelineLifecycle: data.universeWorldPipelineLifecycle ?? null,
       sceneLifecycle: data.universeWorldSceneLifecycle ?? null,
@@ -470,7 +474,90 @@ test("AUTO LOW AUTO quality switching reuses the existing pipeline @webgl-heavy"
   expect(restored.renderer).toBe(initial.renderer);
   expect(restored.software).toBe(initial.software);
   expect(restored.allocations).toBe(initial.allocations);
+  if (initial.software) {
+    expect(initial.renderPath).toBe("direct");
+    expect(initial.composerTargets).toBe("parked-1x1");
+    expect(restored.renderPath).toBe("direct");
+    expect(restored.composerTargets).toBe("parked-1x1");
+  }
   expect(restored.geometries).toBeLessThanOrEqual(initial.geometries + 1);
   expect(restored.textures).toBeLessThanOrEqual(initial.textures + 1);
   expect(restored.programs).toBeLessThanOrEqual(initial.programs + 1);
+});
+
+
+test("software fallback only activates the composer for HIGH live worlds @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const quality = page.locator(".hud-actions select");
+  const html = page.locator("html");
+  await quality.selectOption("auto");
+  const autoBefore = (await settleWebglMetrics(page)).second;
+  await attachMetrics(
+    testInfo,
+    "webgl-software-composer-auto-before.json",
+    autoBefore,
+  );
+
+  test.skip(
+    !autoBefore.software,
+    "parked composer target acceptance is specific to software WebGL",
+  );
+
+  expect(autoBefore.renderPath).toBe("direct");
+  expect(autoBefore.composerTargets).toBe("parked-1x1");
+  const pipelineAllocations = autoBefore.allocations;
+
+  await quality.selectOption("high");
+  await expect(quality).toHaveValue("high");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-lifecycle",
+    "active",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-render-path",
+    "composer",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-composer-targets",
+    "viewport",
+    { timeout: 30_000 },
+  );
+
+  const high = (await settleWebglMetrics(page)).second;
+  await attachMetrics(testInfo, "webgl-software-composer-high.json", high);
+  expect(high.allocations).toBe(pipelineAllocations);
+  expect(high.renderPath).toBe("composer");
+  expect(high.composerTargets).toBe("viewport");
+
+  await quality.selectOption("auto");
+  await expect(quality).toHaveValue("auto");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-render-path",
+    "direct",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-composer-targets",
+    "parked-1x1",
+    { timeout: 30_000 },
+  );
+
+  const autoRestored = (await settleWebglMetrics(page)).second;
+  await attachMetrics(
+    testInfo,
+    "webgl-software-composer-auto-restored.json",
+    autoRestored,
+  );
+  expect(autoRestored.allocations).toBe(pipelineAllocations);
+  expect(autoRestored.renderPath).toBe("direct");
+  expect(autoRestored.composerTargets).toBe("parked-1x1");
+  expect(autoRestored.planetPassAllocations).toBe(high.planetPassAllocations);
 });
