@@ -290,6 +290,23 @@ export default function UniverseApp({
       ? entryId
       : null;
   }, [activeDestinationId, selectedPlanet]);
+  useEffect(() => {
+    if (surfaceFocusEntryId) {
+      document.documentElement.dataset.universeSurfaceFocusEntry =
+        surfaceFocusEntryId;
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+    }
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceFocusEntry ===
+        surfaceFocusEntryId
+      ) {
+        delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      }
+    };
+  }, [surfaceFocusEntryId]);
+
   const surfaceProfile = useMemo(
     () =>
       selectedPlanet && selectedPlanet.surfaceMode !== "none"
