@@ -253,10 +253,31 @@ export function SurfaceScene({
     document.documentElement.dataset.universeSurfaceTerrainState = "deferred";
     document.documentElement.dataset.universeSurfacePrewarm = "scheduled";
 
+    const coordinatorStillWantsPrime = () =>
+      phaseRef.current === "atmosphere" ||
+      phaseRef.current === "surface";
+    const cancelBeforeConstruction = () => {
+      document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
+      delete document.documentElement.dataset.universeSurfaceTerrainState;
+    };
+
     const timer = window.setTimeout(() => {
       if (cancelled) return;
+      // phaseRef is mutated synchronously by the scale coordinator before
+      // React reconciliation. On a saturated software renderer an outward
+      // wheel can therefore supersede this Atmosphere effect before its
+      // cleanup runs. Never let the stale idle job cross into non-interruptible
+      // ProceduralTerrains preparation after that reversal.
+      if (!coordinatorStillWantsPrime()) {
+        cancelBeforeConstruction();
+        return;
+      }
       const enable = () => {
         if (cancelled) return;
+        if (!coordinatorStillWantsPrime()) {
+          cancelBeforeConstruction();
+          return;
+        }
         document.documentElement.dataset.universeSurfaceTerrainState = "preparing";
         document.documentElement.dataset.universeSurfacePrewarm = "preparing";
         setTerrainEnabled(true);
