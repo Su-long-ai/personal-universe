@@ -258,6 +258,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       delete document.documentElement.dataset.universeWorldImpostorPixels;
+      delete document.documentElement.dataset.universeWorldLiveDrawFrame;
       appliedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
@@ -268,21 +269,38 @@ export function CinematicPipeline({
 
   useFrame((_, delta) => {
     const html = document.documentElement;
-    const planetRenderer = planetPass?.planetRenderer;
+    const rendererBeforeDraw = planetPass?.planetRenderer;
     if (
-      planetRenderer &&
+      rendererBeforeDraw &&
       appliedImpostorPixels.current !== impostorPixels
     ) {
-      planetRenderer.setOptions({ impostorPixels });
+      rendererBeforeDraw.setOptions({ impostorPixels });
       appliedImpostorPixels.current = impostorPixels;
+    }
+
+    composer.composer.render(delta);
+
+    // PlanetPass creates PlanetRenderer lazily during its first live draw.
+    // If that happened this frame, align the final profile now but do not
+    // count the just-drawn frame as readiness evidence; the next frame will
+    // start with the correct quality profile.
+    const rendererAfterDraw = planetPass?.planetRenderer;
+    let rendererProfileReady = false;
+    if (rendererAfterDraw) {
+      if (appliedImpostorPixels.current !== impostorPixels) {
+        rendererAfterDraw.setOptions({ impostorPixels });
+        appliedImpostorPixels.current = impostorPixels;
+      } else {
+        rendererProfileReady = true;
+      }
       publishDatasetMetric(
         html,
         "universeWorldImpostorPixels",
         String(impostorPixels),
       );
+    } else {
+      delete html.dataset.universeWorldImpostorPixels;
     }
-
-    composer.composer.render(delta);
 
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
@@ -342,12 +360,18 @@ export function CinematicPipeline({
       return;
     }
 
-    const renderer = planetPass?.planetRenderer;
+    const renderer = rendererAfterDraw;
     const frameReady = Boolean(
+      rendererProfileReady &&
       renderer &&
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
     );
+    if (frameReady) {
+      html.dataset.universeWorldLiveDrawFrame = String(
+        Number(html.dataset.universeWorldLiveDrawFrame ?? "0") + 1,
+      );
+    }
     stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
 
     // A single pending=0 sample is not enough: moving the near-surface camera
