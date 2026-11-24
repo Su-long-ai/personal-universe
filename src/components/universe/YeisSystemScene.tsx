@@ -264,6 +264,8 @@ export function YeisSystemScene({
   const starId = nativeStarId(system);
   const focusFrameRef = useRef(0);
   const focusedIdRef = useRef<string | null>(null);
+  const focusedNativeIdRef = useRef<string | null>(null);
+  const focusFillRef = useRef(new Map<string, number>());
   const focusProjectionRef = useRef(new THREE.Vector3());
 
   useEffect(() => {
@@ -333,6 +335,10 @@ export function YeisSystemScene({
       document.body.classList.remove("planet-hover");
       delete document.documentElement.dataset.universeSystemRenderer;
       delete document.documentElement.dataset.universeSystemReady;
+      delete document.documentElement.dataset.universeSystemFocus;
+      focusedIdRef.current = null;
+      focusedNativeIdRef.current = null;
+      focusFillRef.current.clear();
       if (created) disposeResources(created);
     };
   }, [gl, starId]);
@@ -350,6 +356,41 @@ export function YeisSystemScene({
 
     const native = resources.system;
     native.update(J2000_JD, state.clock.elapsedTime * 3600);
+
+    focusFrameRef.current = (focusFrameRef.current + 1) % 6;
+    if (focusFrameRef.current === 0) {
+      let best: { planet: PlanetDefinition; distance: number } | null = null;
+      for (const planet of system.planets) {
+        const body = native.get(nativePlanetId(planet));
+        if (!body) continue;
+        const projected = focusProjectionRef.current
+          .copy(body.position)
+          .project(camera as THREE.PerspectiveCamera);
+        if (projected.z < -1 || projected.z > 1) continue;
+        const distance = Math.hypot(
+          projected.x * size.width * 0.5,
+          projected.y * size.height * 0.5,
+        );
+        if (distance <= 92 && (!best || distance < best.distance)) {
+          best = { planet, distance };
+        }
+      }
+
+      const nextId = best?.planet.id ?? null;
+      const nextNativeId = best ? nativePlanetId(best.planet) : null;
+      if (focusedIdRef.current !== nextId) {
+        focusedIdRef.current = nextId;
+        focusedNativeIdRef.current = nextNativeId;
+        focusFillRef.current.clear();
+        if (nextNativeId) focusFillRef.current.set(nextNativeId, 0.22);
+        if (nextId) {
+          document.documentElement.dataset.universeSystemFocus = nextId;
+        } else {
+          delete document.documentElement.dataset.universeSystemFocus;
+        }
+        onScaleFocus?.(best?.planet ?? null);
+      }
+    }
 
     const perspective = camera as THREE.PerspectiveCamera;
     const fovRad = THREE.MathUtils.degToRad(perspective.fov || 48);
@@ -373,6 +414,7 @@ export function YeisSystemScene({
         ringParticles: false,
         shadows: quality !== "low",
         imagery: false,
+        fill: focusFillRef.current,
       },
     );
     resources.points.setPixelRatio(gl.getPixelRatio());
@@ -387,36 +429,8 @@ export function YeisSystemScene({
       quality !== "low",
       pxPerRad,
       (id) => resources.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
-      null,
+      focusedNativeIdRef.current,
     );
-
-    if (onScaleFocus) {
-      focusFrameRef.current = (focusFrameRef.current + 1) % 6;
-      if (focusFrameRef.current === 0) {
-        let best: { planet: PlanetDefinition; distance: number } | null = null;
-        for (const planet of system.planets) {
-          const body = native.get(nativePlanetId(planet));
-          if (!body) continue;
-          const projected = focusProjectionRef.current
-            .copy(body.position)
-            .project(camera as THREE.PerspectiveCamera);
-          if (projected.z < -1 || projected.z > 1) continue;
-          const distance = Math.hypot(
-            projected.x * size.width * 0.5,
-            projected.y * size.height * 0.5,
-          );
-          if (distance <= 92 && (!best || distance < best.distance)) {
-            best = { planet, distance };
-          }
-        }
-
-        const nextId = best?.planet.id ?? null;
-        if (focusedIdRef.current !== nextId) {
-          focusedIdRef.current = nextId;
-          onScaleFocus(best?.planet ?? null);
-        }
-      }
-    }
   });
 
   useEffect(
