@@ -419,12 +419,14 @@ function DeepSky() {
   );
 }
 
-function liveQuality(softwareRenderer: boolean) {
-  // A live Planet is a retained world resource, not a per-quality disposable.
-  // Use one stable budget for its lifetime so AUTO <-> HIGH and temporary LOW
-  // fallback switches do not destroy terrain/material/LOD state. Software HIGH
-  // keeps the conservative hosted-runner profile; real GPUs retain the prior
-  // HIGH profile so an AUTO-first visit can later promote without rebuilding.
+function liveQuality(
+  quality: Exclude<QualityMode, "low">,
+  softwareRenderer: boolean,
+) {
+  // Planet.set() is the package's supported live parameter path. Keep one
+  // Planet identity while allowing the real-GPU AUTO profile to stay cheaper
+  // than HIGH. Software rendering only exposes a live world in HIGH and keeps
+  // the conservative hosted-runner budget.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
@@ -435,12 +437,22 @@ function liveQuality(softwareRenderer: boolean) {
     } as const;
   }
 
+  if (quality === "high") {
+    return {
+      cloudQuality: 72,
+      cloudResolution: 0.6,
+      chunkRes: 32,
+      maxDepth: 6,
+      splitFactor: 2.7,
+    } as const;
+  }
+
   return {
-    cloudQuality: 72,
-    cloudResolution: 0.6,
-    chunkRes: 32,
-    maxDepth: 6,
-    splitFactor: 2.7,
+    cloudQuality: 56,
+    cloudResolution: 0.5,
+    chunkRes: 24,
+    maxDepth: 5,
+    splitFactor: 2.4,
   } as const;
 }
 
@@ -582,7 +594,10 @@ export function PlanetScene({
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      ...liveQuality(softwareRenderer),
+      // Start from the ordinary AUTO budget on a real GPU. If the visitor
+      // entered directly in HIGH, the live set() effect below promotes this
+      // same instance before it earns first-paint authority.
+      ...liveQuality("auto", softwareRenderer),
     });
     const html = document.documentElement;
     html.dataset.universeWorldPlanetAllocations = String(
@@ -596,6 +611,22 @@ export function PlanetScene({
       livePlanet?.dispose();
     };
   }, [livePlanet]);
+
+  useEffect(() => {
+    if (!livePlanet || fallbackReason) {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+      return;
+    }
+
+    const liveMode = quality === "high" ? "high" : "auto";
+    livePlanet.set(liveQuality(liveMode, softwareRenderer));
+    document.documentElement.dataset.universeWorldLiveProfile =
+      softwareRenderer ? "software-high" : `gpu-${liveMode}`;
+
+    return () => {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+    };
+  }, [fallbackReason, livePlanet, quality, softwareRenderer]);
 
   useEffect(
     () => () => {
