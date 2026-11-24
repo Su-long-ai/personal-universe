@@ -1,0 +1,144 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-INFINITE-FALLBACK-001",
+  "title": "Replace the bounded fallback Surface board with the installed ProceduralTerrains Infinite World runtime",
+  "scope": {
+    "level": "implementation",
+    "subject": "Use the already-installed ProceduralTerrains infinite runtime for fallback Surface so low/software rendering has camera-centred terrain coverage instead of exposing the finite board edge, while retaining the same host Canvas, camera authority, terrain lifecycle and bounded performance budgets"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted tablet/mobile Surface evidence from NARROW-SURFACE-VISUAL-ACCEPTANCE-001 shows a straight finite-board edge and a flat grey lower field. The existing fallback uses createTerrain with a 72-unit finite board. ProceduralTerrains 2.0.5 is already installed and exposes createInfiniteTerrain from procedural-terrains/infinite; its documentation explicitly positions Infinite World for walk/open-world exploration, streams chunks around the supplied camera, supports bounded viewRadius/triangleBudget/maxCreatesPerFrame/streamBudgetMs/cacheResolution, and preserves the same prepare/update/dispose/sampleHeight host contract. This attacks the root cause without introducing a second terrain engine. A camera-only reframe can move the finite edge but cannot remove it, so it remains a fallback if the infinite candidate fails hosted performance or visual acceptance.",
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/6293268/packages/procedural-terrains/README.md",
+      "finding": "ProceduralTerrains 2.0.5 exposes createInfiniteTerrain as a caller-owned Three.js runtime with camera-centred streaming and the same prepare, update, serialize, diagnostics and dispose lifecycle used by the current finite runtime."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/6293268/docs/large-worlds.md",
+      "finding": "The upstream larger-world guide recommends Infinite terrain for open-world exploration and documents explicit work bounds through chunkSize, viewRadius, triangleBudget, maxCreatesPerFrame, streamBudgetMs, cacheResolution and LOD."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "The existing hosted Playwright screenshots can compare tablet/mobile Surface composition after the runtime swap without another visual framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [0, 1],
+      "conclusion": "No new full-page or game-engine solution is justified because the installed terrain subsystem already contains the open-world mode needed by the existing Surface host."
+    },
+    {
+      "level": "framework_engine",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [1],
+      "conclusion": "Camera controls can change framing but cannot eliminate a finite terrain boundary; the renderer/world-mode mismatch must be solved below the camera layer."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": ["procedural-terrains"],
+      "source_refs": [0, 1],
+      "conclusion": "Reuse ProceduralTerrains Infinite World inside the existing SurfaceTerrain component, with explicit low budgets and no second scene, renderer, camera or terrain package."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": ["playwright-test"],
+      "source_refs": [2],
+      "conclusion": "Reuse the newly landed tablet/mobile Surface visual cases plus the existing WebGL-heavy and release lanes as promotion evidence."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "procedural-terrains-infinite-fallback",
+      "name": "ProceduralTerrains Infinite World fallback",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "procedural-terrains/infinite createInfiniteTerrain in the already-installed 2.0.5 package",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Removes the actual bounded-board edge with the same terrain engine and host lifecycle, while exposing explicit streaming and triangle budgets that can stay stricter on software rendering.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "finite-board-camera-reframe",
+      "name": "Keep finite board and only retune the fallback camera",
+      "level": "framework_engine",
+      "source": "Existing camera-controls fallback shot with no terrain-world change",
+      "license": "existing project dependency",
+      "decision": "reject",
+      "reason": "Can hide or relocate the board edge for one aspect ratio but cannot remove the finite coverage boundary, so mobile, tablet and manual camera movement would remain coupled to a composition trick.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-fog-horizon-mask",
+      "name": "Product-owned fog or horizon mask over the finite edge",
+      "level": "component_asset",
+      "source": "New project-owned rendering overlay",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would cosmetically hide the finite board boundary rather than fix world coverage and would add another visual layer to maintain across renderer tiers."
+    },
+    {
+      "id": "existing-surface-hosted-acceptance",
+      "name": "Existing hosted Surface visual and WebGL acceptance",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current desktop/tablet/mobile Surface screenshots and hosted release/WebGL lanes",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Provides direct before/after visual evidence plus lifecycle/performance regression coverage without a new test system.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "procedural-terrains-infinite-fallback",
+      "existing-surface-hosted-acceptance"
+    ],
+    "rationale": "Promote the installed ProceduralTerrains Infinite World runtime as the fallback Surface world because the observed defect is the bounded finite board itself. Keep the same React/R3F host, product camera, Surface phase, terrain lifecycle and visual acceptance pipeline. Start with deliberately small streaming budgets, especially on software rendering, and accept the change only if hosted Surface screenshots improve without regressing WebGL-heavy or release timing.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "finite-board-camera-reframe",
+        "reason": "The camera layer is broader but cannot remove the finite terrain coverage boundary; it only relocates the visible edge for a specific viewport. Infinite World fixes the world-coverage root cause while preserving the existing camera authority and constrains work through explicit streaming budgets, so subsystem reuse wins globally."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the Infinite World candidate fails hosted performance or lifecycle acceptance, revert the candidate implementation and use a separately approved camera-only composition fix; do not add a second terrain engine or horizon mask."
+  }
+}

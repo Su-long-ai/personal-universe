@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-INFINITE-FALLBACK-001",
+  "approved_at": "2026-11-24T08:06:00.000Z",
+  "baseline_commit": "6d048a9eddc55ef0b4c1c1e7f9bc61cb2b31a673",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-INFINITE-FALLBACK-001.json",
+  "record_sha256": "28f93d06c76b0ed28b88d0562f6259bb1f01c2f4878cbedc65fe255daef1fee1",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Use the already-installed ProceduralTerrains infinite runtime for fallback Surface so low/software rendering has camera-centred terrain coverage instead of exposing the finite board edge, while retaining the same host Canvas, camera authority, terrain lifecycle and bounded performance budgets"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "procedural-terrains-infinite-fallback",
+    "existing-surface-hosted-acceptance"
+  ],
+  "candidate_scores": {
+    "procedural-terrains-infinite-fallback": 52.5,
+    "finite-board-camera-reframe": 49,
+    "custom-fog-horizon-mask": null,
+    "existing-surface-hosted-acceptance": 57
+  }
+}

@@ -123,23 +123,30 @@ Runtime evidence:
 - the existing `data-universe-world-pipeline="procedural-planets-pass"`
 
 If live rendering is intentionally disabled by LOW quality or an AUTO software
-renderer, the existing ProceduralTerrains scene is retained and moved into the
-same near-surface product frame. That fallback publishes
-`data-universe-surface-renderer="procedural-terrains-fallback"`.
+renderer, the existing ProceduralTerrains subsystem remains the fallback inside
+the same near-surface product frame. Task `SURFACE-INFINITE-FALLBACK-001`
+uses the package's own `createInfiniteTerrain` world mode instead of exposing a
+finite board edge. Infinite World follows the product camera with bounded
+chunk streaming; software rendering uses a deliberately small radius, triangle
+budget, creation rate and clipmap resolution. This is still the same installed
+terrain subsystem, not a second terrain engine. The fallback publishes
+`data-universe-surface-renderer="procedural-terrains-fallback"` and
+`data-universe-surface-terrain-profile="infinite-software"` or
+`"infinite-hardware"`.
 
-Task `SURFACE-FALLBACK-LIFETIME-001` makes that fallback resource follow the
-Canvas lifetime instead of the Surface phase lifetime. The first fallback
-Surface visit creates the existing `FiniteTerrain`; leaving Surface hides the
-same scene and pauses its `terrain.update` call, but does not synchronously
-dispose GPU/chunk resources on the wheel transition path. The retained instance
-is disposed only when its R3F Canvas host is actually destroyed. This is a
-bounded one-instance residency tradeoff, not a terrain cache and not a second
-renderer or navigation authority.
+Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
+first fallback Surface visit creates one retained Infinite World instance;
+leaving Surface hides the same scene and pauses its `terrain.update` call, but
+does not synchronously dispose streamed GPU/chunk resources on the wheel
+transition path. The retained instance is disposed only when its R3F Canvas host
+is actually destroyed. This remains a bounded one-instance residency tradeoff,
+not a terrain cache and not a second renderer or navigation authority.
 
 Runtime evidence:
 
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
-- `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive.
+- `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
+- `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget.
 
 The retained fallback's heavy `terrain.update()` loop also reads the navigation
 coordinator's existing phase ref as a synchronous stop signal. This is

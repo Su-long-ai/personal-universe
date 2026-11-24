@@ -469,6 +469,11 @@ for (const viewport of [TABLET, MOBILE]) {
             { timeout: 60_000 },
           );
           await expect(html).toHaveAttribute(
+            "data-universe-surface-terrain-profile",
+            "infinite-software",
+            { timeout: 60_000 },
+          );
+          await expect(html).toHaveAttribute(
             "data-universe-surface-terrain-state",
             "ready",
             { timeout: 60_000 },
