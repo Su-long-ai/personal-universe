@@ -27,5 +27,8 @@ Roles:
 4. [WebGL / Performance / Release Engineering](./04-webgl-performance-release-engineering.md)
 5. [Release / Visual Acceptance](./05-release-visual-acceptance.md)
 6. [Surface / World Productization](./06-surface-world-productization.md)
+7. [Content / Discovery Productization](./07-content-discovery-productization.md)
+8. [Procedural Universe Population](./08-procedural-universe-population.md)
+9. [Personal Content Authoring / Data Pipeline](./09-personal-content-authoring-pipeline.md)
 
 The lead/integration line owns cross-domain merge order, conflict resolution, combined release candidates, and final merge to main.
