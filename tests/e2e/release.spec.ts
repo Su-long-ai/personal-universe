@@ -267,6 +267,10 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
     if (!extension) {
       return { supported: false, lost: false, restored: false };
     }
+    const html = document.documentElement;
+    const generationBefore = Number(
+      html.dataset.universeWebglContextGeneration ?? "0",
+    );
 
     const waitFor = (name: "webglcontextlost" | "webglcontextrestored") =>
       new Promise<boolean>((resolve) => {
@@ -300,6 +304,7 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
     extension.loseContext();
     const lost = await lostPromise;
     if (!lost) return { supported: true, lost: false, restored: false };
+    const lifecycleDuringLoss = html.dataset.universeWebglLifecycle ?? null;
 
     // restoreContext() is invalid until the context-lost event has completed.
     // Cross a task boundary so the synthetic restore follows the WebGL spec
@@ -314,6 +319,12 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
       lost,
       restored,
       contextStillLost: gl.isContextLost(),
+      lifecycleDuringLoss,
+      lifecycleAfterRestore: html.dataset.universeWebglLifecycle ?? null,
+      generationBefore,
+      generationAfter: Number(
+        html.dataset.universeWebglContextGeneration ?? "0",
+      ),
     };
   });
 
@@ -328,6 +339,9 @@ test("runtime guard detects and recovers from forced WebGL context loss @webgl-h
   expect(recovery.contextStillLost, "WebGL context should be restored").toBe(
     false,
   );
+  expect(recovery.lifecycleDuringLoss).toBe("lost");
+  expect(recovery.lifecycleAfterRestore).toBe("active");
+  expect(recovery.generationAfter).toBe(recovery.generationBefore + 1);
 
   await expect
     .poll(() =>
