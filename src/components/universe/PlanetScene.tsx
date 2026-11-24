@@ -428,7 +428,7 @@ function liveStructuralQuality(
   if (softwareRenderer) {
     return {
       chunkRes: 16,
-      maxDepth: 5,
+      maxDepth: 4,
     } as const;
   }
 
@@ -449,7 +449,7 @@ function liveDynamicQuality(
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
-      splitFactor: 2.3,
+      splitFactor: 2.1,
     } as const;
   }
 
@@ -807,13 +807,15 @@ export function PlanetScene({
   }, [fallbackReason, fallbackSurfaceMap, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
+    // Surface camera sampling begins as continuous scale enters 4 -> 5.
+    // Freeze the landing patch at that same boundary so the terrain cannot
+    // rotate underneath a fixed camera frame and near-surface LOD can converge.
     if (
       worldPresentationActive &&
       livePlanet &&
       !fallbackReason &&
-      phase !== "surface"
+      phase !== "surface" &&
+      worldScalePosition <= 4
     ) {
       livePlanet.rotation.y += delta * 0.014;
     }
