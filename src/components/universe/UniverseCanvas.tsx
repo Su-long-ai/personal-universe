@@ -130,7 +130,7 @@ function RendererPageLifecycle({
         window.clearTimeout(releaseTimer);
         releaseTimer = null;
       }
-      if (html.dataset.universeWebglLifecycle === "active") {
+      if (!released) {
         delete html.dataset.universeWebglLifecycle;
         delete html.dataset.universeWebglContextGeneration;
       }
