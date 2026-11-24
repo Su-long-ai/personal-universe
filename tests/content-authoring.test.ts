@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   authoringRecordToUniverseContentEntry,
   buildUniverseContentIndex,
@@ -22,6 +31,27 @@ import type {
   UniverseContentEntry,
   UniverseContentPlacement,
 } from "../src/lib/universe/content/types.ts";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function runContentCli(...args: string[]) {
+  return spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "scripts/content-author.mjs",
+      ...args,
+    ],
+    {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NO_COLOR: "1",
+      },
+    },
+  );
+}
 
 function entry(
   overrides: Partial<UniverseContentEntry> = {},
@@ -400,6 +430,86 @@ test("normalized records become runtime entries with stable ids", () => {
   assert.equal(runtime.id, "runtime-entry");
   assert.equal(runtime.provenance?.kind, "authored");
   assert.equal(runtime.signalVisible, true);
+});
+
+test("authoring CLI dry-run, migrate, preview, and index workflows execute", () => {
+  const temp = mkdtempSync(resolve(tmpdir(), "personal-universe-content-"));
+  try {
+    const batchPath = resolve(temp, "batch.json");
+    writeFileSync(
+      batchPath,
+      JSON.stringify(
+        {
+          items: [
+            {
+              schemaVersion: 1,
+              contentId: "cli-import-smoke",
+              title: "CLI import smoke",
+              summary: "Dry-run import coverage",
+              kind: "note",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const legacyPath = resolve(temp, "legacy.json");
+    writeFileSync(
+      legacyPath,
+      JSON.stringify({
+        id: "cli-legacy",
+        title: "CLI legacy",
+        summary: "Migration smoke",
+        kind: "artifact",
+      }),
+    );
+
+    const created = runContentCli(
+      "new",
+      "--id",
+      "cli-new-smoke",
+      "--title",
+      "CLI new smoke",
+      "--summary",
+      "Dry-run scaffold coverage",
+      "--kind",
+      "project",
+      "--dry-run",
+    );
+    assert.equal(created.status, 0, created.stderr);
+    assert.match(created.stdout, /\[dry-run\] created/);
+    assert.match(created.stdout, /"contentId": "cli-new-smoke"/);
+
+    const imported = runContentCli("import", batchPath, "--dry-run");
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.match(imported.stdout, /normalized 1 content item/);
+    assert.match(imported.stdout, /cli-import-smoke\.json/);
+
+    const migrated = runContentCli("migrate", legacyPath);
+    assert.equal(migrated.status, 0, migrated.stderr);
+    assert.match(migrated.stdout, /"schemaVersion": 1/);
+    assert.match(migrated.stdout, /"contentId": "cli-legacy"/);
+
+    const previewed = runContentCli("preview", "--id", "personal-universe");
+    assert.equal(previewed.status, 0, previewed.stderr);
+    const preview = JSON.parse(previewed.stdout);
+    assert.equal(preview.canonicalId, "personal-universe");
+    assert.equal(preview.sharePath, "?destination=personal%3Apersonal-universe");
+    assert.equal(preview.placement.nativeDestinationStatus, "verified-native");
+
+    const indexed = runContentCli("index");
+    assert.equal(indexed.status, 0, indexed.stderr);
+    const index = JSON.parse(indexed.stdout);
+    assert.ok(index.ids.includes("personal-universe"));
+    assert.equal(
+      index.references["personal-universe"],
+      "personal-universe",
+    );
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
 });
 
 test("large catalogs validate in linear-time practice", () => {
