@@ -694,6 +694,16 @@ export class BodyRenderer {
     if (i >= 0) this.views.splice(i, 1);
   }
 
+  /** Terminal release for React/host lifecycles. This instance must not be reused. */
+  dispose(): void {
+    for (const v of this.views) v.dispose(this.scene);
+    this.views.length = 0;
+    this.byId.clear();
+    this.sphereGeo.dispose();
+    this.scene.remove(this.sunLight, this.sunLight.target, this.fillLight);
+    this.imageryCredit = null;
+  }
+
   update(
     camPos: Vector3, camQuat: Quaternion, camera: Camera, viewportH: number, fovRad: number,
     sunPos: Vector3, sunRadius: number, sunColor: Vector3, time: number, settings: RenderSettings,
