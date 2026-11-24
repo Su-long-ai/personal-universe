@@ -10,7 +10,10 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { PlanetDefinition, QualityMode, UniversePhase } from "../../lib/universe/types";
-import { buildSurfaceWorldProfile } from "../../lib/universe/surface";
+import {
+  SURFACE_STELLAR_LIGHT_DIRECTION,
+  buildSurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
@@ -280,7 +283,7 @@ export function SurfaceScene({
             ]}
           />
           <directionalLight
-            position={[-12, 9, 4]}
+            position={[...SURFACE_STELLAR_LIGHT_DIRECTION]}
             intensity={(profile?.lighting.sunIntensity ?? 1.45) * 3.05}
             color={
               profile
