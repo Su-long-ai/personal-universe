@@ -517,6 +517,22 @@ Search, Places, canvas clicks, deep links and Guided Journeys remain direct
 entry paths into the same destinations. Continuous wheel navigation changes
 interaction continuity, not destination identity.
 
+### Surface-local content focus
+
+Stable Surface adds one deliberately local interaction layer over the existing
+destination model. A world-content card, cluster chip or 3D Surface signal may
+focus an existing content entry so its anchor and spatial context are easier to
+read. This does **not** create another destination, URL, camera or navigation
+authority.
+
+The navigation-derived Personal Signal remains the fallback focus. A manual
+Surface focus may survive Surface → Atmosphere → Surface on the same planet so
+local exploration does not reset at the boundary, but any change to the product
+navigation destination clears that local override immediately. The new
+destination therefore regains authority even when both signals live on the same
+world. Surface focus is presentation state only and never mutates the global
+destination identity.
+
 ## Canvas picking
 
 Both galaxy-scale and system-scale canvas interactions route back into the
