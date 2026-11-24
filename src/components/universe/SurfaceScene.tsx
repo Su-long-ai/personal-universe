@@ -128,15 +128,21 @@ export function SurfaceScene({
 
   useEffect(() => {
     if (!active) {
-      setTerrainEnabled(false);
+      // Once the fallback terrain has been created, keep that same instance
+      // mounted under the shared Canvas and let SurfaceTerrain publish
+      // lifecycle="parked". Its active/phaseRef guards pause all update work;
+      // actual disposal remains owned by Canvas teardown.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
       return;
     }
 
+    // A previously prepared terrain is the retained fallback. Re-entering
+    // Surface must resume it rather than scheduling a second FiniteTerrain.
+    if (terrainEnabled) return;
+
     const idleWindow = window as IdleWindow;
     let cancelled = false;
     let idleHandle: number | null = null;
-    setTerrainEnabled(false);
     document.documentElement.dataset.universeSurfaceTerrainState = "deferred";
 
     const timer = window.setTimeout(() => {
@@ -161,7 +167,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [active]);
+  }, [active, terrainEnabled]);
 
   const content = (
     <>
