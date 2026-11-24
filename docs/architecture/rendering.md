@@ -143,11 +143,15 @@ direction and radius-relative target offset converge to the existing Approach
 composition, so coordinate 2 has matched apparent framing even though renderer
 coordinates change after the boundary.
 
-The renderer handoff is deliberately delayed until the matched System endpoint
-has had a paint opportunity. The reverse path mounts System at coordinate 2
-while retaining the selected planet as scale focus; if its body frame is not
-ready yet, the camera holds the last Approach frame rather than snapping to the
-System overview. No transition planet, fade, second camera or custom tween loop
+The renderer handoff prefers one real paint at the matched endpoint, but that
+preference has a 64 ms deadline. On healthy GPU rendering the paint path wins;
+on throttled/software WebGL the composition-matched endpoint hands authority
+over directly so sustained wheel input cannot be stranded at coordinate 1 or 2.
+Repeated same-direction samples at an endpoint do not invalidate the scheduled
+handoff. The reverse path mounts System at coordinate 2 while retaining the
+selected planet as scale focus; if its body frame is not ready yet, the camera
+holds the last Approach frame rather than snapping to the System overview. No
+transition planet, fade, second camera, input replay queue or custom tween loop
 is introduced.
 
 Runtime evidence:
