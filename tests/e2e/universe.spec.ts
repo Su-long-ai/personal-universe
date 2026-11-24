@@ -1892,6 +1892,7 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
     .locator(".navigator-result-row")
     .filter({ has: page.locator(".kind-body") })
     .filter({ hasText: "Moon" })
+    .filter({ hasText: "EARTH'S NATURAL SATELLITE" })
     .first();
   await expect(moon).toBeVisible();
   await moon.locator(".navigator-result-open").click();
