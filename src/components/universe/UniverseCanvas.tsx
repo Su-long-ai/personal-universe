@@ -18,6 +18,7 @@ import {
   type SurfaceCameraFrame,
 } from "./CinematicCamera";
 import type {
+  YeisGalaxyScaleBridgeState,
   YeisGalaxyViewState,
   YeisSignalHover,
 } from "./YeisGalaxyScene";
@@ -103,6 +104,7 @@ export function UniverseCanvas({
   phaseRef,
   worldScalePosition,
   worldScaleContinuous,
+  galaxyScaleTarget,
   engineMode,
   markers,
   contentPlacements,
@@ -129,6 +131,7 @@ export function UniverseCanvas({
   phaseRef: MutableRefObject<UniversePhase>;
   worldScalePosition: number;
   worldScaleContinuous: boolean;
+  galaxyScaleTarget: UniverseNavigationDestination | null;
   engineMode: UniverseEngine;
   markers: GalaxyMarker[];
   contentPlacements: UniverseContentPlacement[];
@@ -159,6 +162,8 @@ export function UniverseCanvas({
   onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
+  const yeisGalaxyScaleBridgeRef =
+    useRef<YeisGalaxyScaleBridgeState | null>(null);
   const [surfaceCameraFrame, setSurfaceCameraFrame] =
     useState<SurfaceCameraFrame | null>(null);
   const [systemScaleFrame, setSystemScaleFrame] =
@@ -223,6 +228,9 @@ export function UniverseCanvas({
             onScaleManualTakeover={onScaleManualTakeover}
             quality={quality}
             reducedMotion={reducedMotion}
+            scalePosition={worldScalePosition}
+            scaleTarget={galaxyScaleTarget}
+            scaleBridgeRef={yeisGalaxyScaleBridgeRef}
             viewStateRef={yeisViewStateRef}
           />
         </Suspense>
