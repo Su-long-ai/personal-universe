@@ -370,14 +370,15 @@ export function CinematicCamera({
 
   useEffect(() => {
     if (!worldFrameReady) return;
-    if (
-      document.documentElement.dataset.universeCameraAwaitingWorldFrame !==
-      phase
-    ) {
-      return;
-    }
+
+    // Renderer readiness can become true before a throttled camera transition
+    // first reaches publishSettled() and writes the diagnostic awaiting marker.
+    // Treat readiness itself as the retry signal. publishIfReached() already
+    // guards transition generation, phase ownership, manual takeover,
+    // continuous-scale boundaries and position/target tolerances, so this
+    // cannot publish a stale or premature settlement.
     publishIfReached();
-  }, [phase, publishIfReached, worldFrameReady]);
+  }, [publishIfReached, worldFrameReady]);
 
   const publishScaleFrameDiagnostics = useCallback(
     (center: Vector3, radius: number) => {
