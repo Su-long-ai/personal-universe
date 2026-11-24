@@ -310,8 +310,11 @@ export default function UniverseApp({
   ]);
 
   useEffect(() => {
+    // Local Surface exploration can survive Atmosphere/Surface round trips,
+    // but a new product navigation destination must regain authority even when
+    // it resolves to another signal on the same world.
     setSurfaceLocalFocusEntryId(null);
-  }, [selectedPlanet?.id]);
+  }, [activeDestinationId, selectedPlanet?.id]);
 
   useEffect(() => {
     if (surfaceFocusEntryId) {
