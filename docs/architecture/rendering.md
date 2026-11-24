@@ -177,7 +177,11 @@ Wheel delta changes this coordinate directly. The camera resolves the existing
 viewport-aware shot anchors on either side and reuses
 `camera-controls.lerpLookAt()` with a reversible smoothstep interpolation;
 React `UniversePhase` is now a semantic/rendering boundary rather than a
-camera tween trigger.
+camera tween trigger. Framed Approach/Orbit endpoints keep
+`camera-controls.getDistanceToFitSphere()` as the no-clipping safety floor,
+then apply an aspect-aware vertical-composition distance so the same world keeps
+comparable apparent radius from portrait mobile/tablet through 16:9 and
+ultrawide viewports.
 
 This does not add a RAF loop, tween library or second camera. On software/LOW
 fallback, Approach through Atmosphere still use the same continuous product
@@ -462,11 +466,16 @@ without adding another renderer: once a planet focus is locked, the existing
 close-world scene may prewarm while System still presents. The System scene
 remains visible until the close world reports real painted frames. The
 EffectComposer is now allocated once for the shared Canvas lifetime instead of
-being keyed to LOW/AUTO/HIGH capability. PlanetPass is provisioned lazily only
-when a live world is first requested, then retained and parked across later
+being keyed to LOW/AUTO/HIGH capability. On real GPUs the retained PlanetPass
+and its single PlanetRenderer host may be provisioned while System still owns
+presentation; software WebGL keeps that host lazy until a live world is
+actually requested. The pass is then retained and parked across later
 fallback/quality switches; bloom is likewise retained and toggled rather than
-rebuilt. This keeps AUTO/software cheap before a live request while preventing
-quality changes from reallocating the complete post-processing chain. The live
+rebuilt. On SwiftShader, parked/fallback frames draw directly through the same
+R3F renderer and camera while the inactive composer targets are reduced to
+1x1; HIGH live presentation restores that same composer to viewport size.
+This avoids an offscreen RenderPass/OutputPass round trip without introducing a
+second renderer or reallocating the post-processing chain. The live
 ProceduralPlanets world follows the same lifetime rule: its resource identity is
 planet + renderer class, not the current LOW/AUTO/HIGH selector. The package
 marks `chunkRes` and `maxDepth` as structural rebuild keys, so real-GPU
@@ -539,12 +548,16 @@ publishes `data-universe-world-paint-ready="true"`, and only then may the whole
 System renderer leave. This removes the duplicate target planet without a fade,
 mask, second renderer or blank ownership gap.
 
-UniverseCanvas keys both paint-started and paint-ready authority by
-`planet id + quality` rather than storing unqualified booleans. The current
-identity is mirrored in a ref, so a callback whose captured identity is already
-stale is discarded before it can mutate parent readiness at all. Old cleanup
-work therefore cannot either authorize a new world or revoke a new world's
-already-earned authority. Runtime diagnostics
+UniverseCanvas keys both paint-started and paint-ready authority by the
+concrete retained `planet id + quality`, an activation generation and the
+current WebGL context generation rather than storing unqualified booleans.
+Presenting -> parked -> presenting, HIGH -> LOW -> HIGH and
+`webglcontextlost` all invalidate the previous authority. PlanetScene resets
+its concrete-draw counters for the new context generation, so restore must earn
+first paint again instead of reviving an older `ready=true` token. A callback
+whose captured authority is already stale is discarded before it can mutate
+parent readiness at all. Old cleanup work therefore cannot either authorize a
+new world or revoke a new world's already-earned authority. Runtime diagnostics
 `data-universe-system-handoff-target` and
 `data-universe-system-target-suppressed` make the intermediate ownership stage
 machine-verifiable.
