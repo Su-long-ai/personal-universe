@@ -1,4 +1,4 @@
-import snapshot from "../../../data/exoplanet-hosts.json";
+import snapshot from "../../../data/exoplanet-hosts.json" with { type: "json" };
 import type {
   GalaxyMarker,
   PlanetArchetype,
