@@ -480,7 +480,14 @@ export default function UniverseApp({
       const validGalaxyPosition =
         position >= GALAXY_SCALE_MIN - WORLD_SCALE_EPSILON &&
         position <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON;
-      if (!validGalaxyPosition || (!galaxyScaleTarget && position > 0)) {
+      // A manual pointer takeover intentionally detaches the camera from the
+      // captured native path while preserving the user's current scale. Only
+      // an actively continuous bridge with no target is invalid; a frozen
+      // partial coordinate is a valid takeover state and must not jump to 0.
+      if (
+        !validGalaxyPosition ||
+        (!galaxyScaleTarget && position > 0 && worldScaleContinuous)
+      ) {
         worldScalePositionRef.current = GALAXY_SCALE_MIN;
         setWorldScalePosition(GALAXY_SCALE_MIN);
         setWorldScaleContinuous(false);
@@ -519,6 +526,7 @@ export default function UniverseApp({
     phase,
     selectedPlanet?.id,
     systemScaleTargetPlanet,
+    worldScaleContinuous,
   ]);
 
   useEffect(() => {
@@ -1259,16 +1267,25 @@ export default function UniverseApp({
     document.documentElement.dataset.universeScaleSoftFocus = "disabled";
     if (phaseRef.current !== "galaxy") return;
 
+    continuousScaleIntentEpochRef.current += 1;
+    pendingScaleEnterSystemRef.current = null;
+    pendingWorldScaleStepsRef.current = 0;
+    const frozenPosition = Math.min(
+      SYSTEM_SCALE_MIN,
+      Math.max(GALAXY_SCALE_MIN, worldScalePositionRef.current),
+    );
     galaxyScaleTargetRef.current = null;
     setGalaxyScaleTarget(null);
-    worldScalePositionRef.current = GALAXY_SCALE_MIN;
-    setWorldScalePosition(GALAXY_SCALE_MIN);
     setWorldScaleContinuous(false);
     lockedGalaxyScaleFocusRef.current = null;
     document.documentElement.dataset.universeScalePosition =
-      GALAXY_SCALE_MIN.toFixed(3);
-    document.documentElement.dataset.universeScaleProgress = "0";
+      frozenPosition.toFixed(3);
+    document.documentElement.dataset.universeScaleProgress =
+      galaxyScaleSegmentProgress(frozenPosition).toFixed(3);
+    document.documentElement.dataset.universeGalaxyScaleBridge =
+      "manual-frozen";
     delete document.documentElement.dataset.universeGalaxyScaleTarget;
+    delete document.documentElement.dataset.universeScaleQueued;
   }, []);
 
   const handleSystemScaleFocus = useCallback(
