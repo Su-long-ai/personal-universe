@@ -11,6 +11,10 @@ import type {
   PlanetDefinition,
 } from "../src/lib/universe/types.ts";
 import type { UniverseContentEntry } from "../src/lib/universe/content/types.ts";
+import {
+  catalogMarkers,
+  catalogSystem,
+} from "../src/lib/universe/generation/catalog.ts";
 
 function content(
   id: string,
@@ -62,6 +66,22 @@ test("surface profiles are exactly reproducible from stable planet identity", ()
     buildSurfaceWorldProfile(source),
     buildSurfaceWorldProfile(source),
   );
+});
+
+test("observed catalog worlds infer a landable Surface capability without runtime globals", () => {
+  const marker = catalogMarkers(Number.MAX_SAFE_INTEGER).find(
+    (candidate) => candidate.catalogId === "Gliese 12",
+  );
+  assert.ok(marker, "Gliese 12 should remain in the observed catalog snapshot");
+
+  const system = catalogSystem(marker);
+  assert.ok(system, "Gliese 12 should resolve into a catalog system");
+  const observed = system.planets.find((candidate) => candidate.name === "Gliese 12 b");
+  assert.ok(observed, "Gliese 12 b should resolve into a PlanetDefinition");
+
+  assert.equal(observed.observed, true);
+  assert.equal(observed.surfaceMode, surfaceModeForArchetype(observed.archetype));
+  assert.doesNotThrow(() => buildSurfaceWorldProfile(observed));
 });
 
 test("secondary worlds vary by seed without hand authored state", () => {
