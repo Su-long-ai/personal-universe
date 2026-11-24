@@ -122,6 +122,13 @@ Runtime evidence:
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive.
 
+The retained fallback's heavy `terrain.update()` loop also reads the navigation
+coordinator's existing phase ref as a synchronous stop signal. This is
+read-only rendering glue, not another phase authority: the coordinator mutates
+that ref before scheduling React state, so a hosted software-WebGL frame cannot
+run one more stale Surface terrain update and starve the R3F phase/camera
+handoff while the prop update is still queued.
+
 ## Fallback rules
 
 Fallbacks are product behavior, not hidden test exceptions:
