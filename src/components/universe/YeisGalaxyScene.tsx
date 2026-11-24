@@ -290,6 +290,7 @@ export function YeisGalaxyScene({
   const scaleManualTakeoverReportedRef = useRef(false);
   const scaleFocusIdRef = useRef<string | null>(null);
   const scaleFocusFrameRef = useRef(0);
+  const scaleBridgeControllerKeyRef = useRef<string | null>(null);
   const scalePositionRef = useRef(scalePosition);
   const scaleTargetRef =
     useRef<UniverseNavigationDestination | null>(scaleTarget);
@@ -1073,10 +1074,18 @@ export function YeisGalaxyScene({
         }
 
         // Recreate the pinned YEIS gotoPoint trajectory whenever Galaxy
-        // remounts from product System or a full endpoint previously settled.
-        // Then scrub its native interpolation by normalized scale position
-        // instead of elapsed wall-clock time.
-        if (!state.controller.autopilot) {
+        // remounts from product System, a full endpoint previously settled, or
+        // scale input supersedes an older Locate/Travel autopilot. The
+        // controller key prevents an unrelated native autopilot from being
+        // mistaken for scale progress.
+        const bridgeControllerKey =
+          bridge.targetId + ":" + bridge.starId;
+        if (
+          scaleBridgeControllerKeyRef.current !== bridgeControllerKey ||
+          !state.controller.autopilot
+        ) {
+          pendingNavigationRef.current = null;
+          state.controller.autopilot = null;
           state.controller.position.fromArray(bridge.startPositionKm);
           state.controller.quaternion.fromArray(bridge.startQuaternion);
           state.controller.goToPoint(
@@ -1088,6 +1097,7 @@ export function YeisGalaxyScene({
               name: runtime.universe.star.name,
             },
           );
+          scaleBridgeControllerKeyRef.current = bridgeControllerKey;
         }
 
         const autopilot = state.controller.autopilot;
@@ -1117,12 +1127,19 @@ export function YeisGalaxyScene({
               ? "galaxy-endpoint"
               : "active";
       }
-    } else if (scaleBridgeRef.current) {
+    } else if (
+      scaleBridgeRef.current ||
+      scaleBridgeControllerKeyRef.current
+    ) {
       // A real authority takeover (manual camera, Search result, Journey,
-      // explicit navigation) clears the retained path. Merely reaching Galaxy
-      // coordinate zero does not: the target is still present in that case and
-      // reverse/forward scrubbing must keep the same path identity.
+      // explicit navigation) clears the retained path and freezes the native
+      // scale executor immediately. Merely reaching Galaxy coordinate zero
+      // does not: the target is still present in that case and reverse/forward
+      // scrubbing must keep the same path identity.
       scaleBridgeRef.current = null;
+      scaleBridgeControllerKeyRef.current = null;
+      state.controller.autopilot = null;
+      state.controller.speed = 0;
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
