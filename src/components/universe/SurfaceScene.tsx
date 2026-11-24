@@ -139,6 +139,7 @@ export function SurfaceScene({
   quality,
   planet,
   surfaceFocusEntryId,
+  onSurfaceFocusEntry,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
@@ -146,6 +147,7 @@ export function SurfaceScene({
   quality: QualityMode;
   planet: PlanetDefinition | null;
   surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
@@ -304,6 +306,7 @@ export function SurfaceScene({
               phaseRef={phaseRef}
               profile={profile}
               focusedEntryId={surfaceFocusEntryId}
+              onFocusEntry={onSurfaceFocusEntry}
               onAnchorHeight={handleAnchorHeight}
             />
           ) : null
