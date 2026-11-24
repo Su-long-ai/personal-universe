@@ -23,10 +23,20 @@ function rendererLabel(gl: THREE.WebGLRenderer) {
   return String(context.getParameter(context.RENDERER) ?? "");
 }
 
+function rendererIsSoftware(renderer: string) {
+  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(renderer);
+}
+
+function publishDatasetMetric(
+  html: HTMLElement,
+  key: string,
+  value: string,
+) {
+  if (html.dataset[key] !== value) html.dataset[key] = value;
+}
+
 export function isSoftwareRenderer(gl: THREE.WebGLRenderer) {
-  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
-    rendererLabel(gl),
-  );
+  return rendererIsSoftware(rendererLabel(gl));
 }
 
 export function liveWorldFallbackReason(
@@ -49,8 +59,19 @@ export function CinematicPipeline({
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
-  const softwareRenderer = isSoftwareRenderer(gl);
-  const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const rendererIdentity = useMemo(
+    () => rendererLabel(gl).slice(0, 240) || "unknown",
+    [gl],
+  );
+  const softwareRenderer = rendererIsSoftware(rendererIdentity);
+  const fallbackReason =
+    quality === "low"
+      ? "low-quality"
+      : quality === "high"
+        ? null
+        : softwareRenderer
+          ? "software-renderer"
+          : null;
   const useLiveWorld = liveWorld && !fallbackReason;
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
@@ -63,6 +84,22 @@ export function CinematicPipeline({
     onReadyChangeRef.current?.(ready);
   };
   const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
+
+  useEffect(() => {
+    const html = document.documentElement;
+    publishDatasetMetric(html, "universeWebglRenderer", rendererIdentity);
+    publishDatasetMetric(
+      html,
+      "universeWebglSoftware",
+      softwareRenderer ? "true" : "false",
+    );
+    return () => {
+      if (html.dataset.universeWebglRenderer === rendererIdentity) {
+        delete html.dataset.universeWebglRenderer;
+      }
+      delete html.dataset.universeWebglSoftware;
+    };
+  }, [rendererIdentity, softwareRenderer]);
 
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -195,12 +232,31 @@ export function CinematicPipeline({
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
       metricFrame.current = 0;
-      html.dataset.universeWebglGeometries = String(gl.info.memory.geometries);
-      html.dataset.universeWebglTextures = String(gl.info.memory.textures);
-      html.dataset.universeWebglPrograms = String(gl.info.programs?.length ?? 0);
-      html.dataset.universeWebglCalls = String(gl.info.render.calls);
-      html.dataset.universeWebglTriangles = String(gl.info.render.triangles);
-      html.dataset.universeWebglSoftware = softwareRenderer ? "true" : "false";
+      publishDatasetMetric(
+        html,
+        "universeWebglGeometries",
+        String(gl.info.memory.geometries),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglTextures",
+        String(gl.info.memory.textures),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglPrograms",
+        String(gl.info.programs?.length ?? 0),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglCalls",
+        String(gl.info.render.calls),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglTriangles",
+        String(gl.info.render.triangles),
+      );
     }
 
     const cameraReady =
