@@ -2032,7 +2032,7 @@ export default function UniverseApp({
         continuousScaleResponseDistance(responseSourcePosition).toFixed(2);
 
       // Manual scale intent owns navigation immediately, even before a small
-      // trackpad delta crosses the currentPhase threshold. This stops Journey
+      // trackpad delta crosses a semantic phase boundary. This stops Journey
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
 
