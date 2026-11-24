@@ -1812,6 +1812,10 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
     "data-universe-galaxy-scale-target",
     "hero:aurora-01",
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.500",
+  );
 
   const beforeSearch = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
@@ -1873,24 +1877,28 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
     "data-universe-galaxy-scale-executor",
     "native-progress",
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.500",
+  );
 
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
-  await search.fill("Moon");
-  const moon = page
+  await search.fill("Earth");
+  const earth = page
     .locator(".navigator-result-row")
     .filter({ has: page.locator(".kind-body") })
-    .filter({ hasText: "Moon" })
+    .filter({ hasText: "Earth" })
     .first();
-  await expect(moon).toBeVisible();
-  await moon.locator(".navigator-result-open").click();
+  await expect(earth).toBeVisible();
+  await earth.locator(".navigator-result-open").click();
   await expect(dialog).toBeHidden();
 
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
-    "body:c0/moon",
+    "body:c0/earth",
   );
-  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/moon");
+  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/earth");
   await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
   await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
 
@@ -1898,12 +1906,12 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
     .poll(async () => {
       const traveling = await html.getAttribute("data-universe-traveling");
       const complete = await html.getAttribute("data-universe-travel-complete");
-      return traveling === "c0/moon" || complete === "c0/moon";
+      return traveling === "c0/earth" || complete === "c0/earth";
     })
     .toBe(true);
   await expect(html).toHaveAttribute(
     "data-universe-travel-complete",
-    "c0/moon",
+    "c0/earth",
     { timeout: 15_000 },
   );
   const travelDeltaPc = Number(
@@ -2362,6 +2370,15 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
       "data-universe-galaxy-scale-target",
       target,
     );
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
+      .toBeCloseTo(expected, 2);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
     );
@@ -2462,6 +2479,15 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     await dispatchScaleWheel(page, deltaY);
     await expect
       .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
+      .toBeCloseTo(accumulated, 2);
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
       .toBeCloseTo(accumulated, 2);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
@@ -2604,6 +2630,15 @@ test("Galaxy direct scale reverses cleanly at 0.4 0.8 near-one and immediately a
       "data-universe-galaxy-scale-target",
       "hero:aurora-01",
     );
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
+      .toBeCloseTo(value, 2);
     await expect(html).not.toHaveAttribute("data-universe-scale-queued");
   };
 
@@ -2701,6 +2736,10 @@ test("Galaxy exact endpoint reversal beats pending System handoff", async ({
 
   await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.750",
+  );
   await page.waitForTimeout(350);
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
   await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
@@ -3210,8 +3249,8 @@ test("Chinese Moon alias preserves exact native-body travel identity", async ({
   await expect(dialog).toBeHidden();
 
   const html = page.locator("html");
-  const destinationId = "body:c0/moon";
-  const nativeTarget = "c0/moon";
+  const destinationId = "body:c0/earth";
+  const nativeTarget = "c0/earth";
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
     destinationId,

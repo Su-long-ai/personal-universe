@@ -1246,6 +1246,7 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.universeGalaxyScaleExecutor;
       delete document.documentElement.dataset.universeGalaxyScalePathId;
+      delete document.documentElement.dataset.universeGalaxyScaleAppliedPosition;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
 
@@ -1260,6 +1261,8 @@ export function YeisGalaxyScene({
 
     if (scaleBridgeActive && scaleBridgeRef.current) {
       const bridge = scaleBridgeRef.current;
+      document.documentElement.dataset.universeGalaxyScaleAppliedPosition =
+        scalePosition.toFixed(3);
       document.documentElement.dataset.universeTravelArrivalRatio =
         (
           state.controller.position.distanceTo(

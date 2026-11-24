@@ -358,27 +358,13 @@ export default function UniverseApp({
   });
 
   const publishWorldScalePosition = useCallback(
-    (
-      position: number,
-      immediate = false,
-      imperativeOnly = false,
-    ) => {
+    (position: number, immediate = false) => {
+      // Camera authority is always this imperative coordinate. React receives
+      // at most one mirror commit per RAF so diagnostics/semantic consumers
+      // stay current without making wheel sample frequency drive renders.
       worldScalePositionRef.current = position;
       document.documentElement.dataset.universeScalePosition =
         position.toFixed(3);
-
-      if (imperativeOnly) {
-        // Native Galaxy scale is consumed directly from the shared ref by the
-        // YEIS frame loop. Cancel any older scheduled React mirror so a stale
-        // render cannot overwrite a newer reversal coordinate.
-        if (worldScaleRenderFrameRef.current !== null) {
-          window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
-          worldScaleRenderFrameRef.current = null;
-        }
-        pendingWorldScaleRenderPositionRef.current = null;
-        return;
-      }
-
       pendingWorldScaleRenderPositionRef.current = position;
       if (immediate) {
         if (worldScaleRenderFrameRef.current !== null) {
@@ -598,7 +584,7 @@ export default function UniverseApp({
     // otherwise overwrite a newer high-frequency Galaxy reversal.
     worldScaleRenderCommitCountRef.current += 1;
     document.documentElement.dataset.universeScalePosition =
-      worldScalePosition.toFixed(3);
+      worldScalePositionRef.current.toFixed(3);
     document.documentElement.dataset.universeScaleReactCommits = String(
       worldScaleRenderCommitCountRef.current,
     );
@@ -2254,16 +2240,15 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleBlocked;
 
             // Native YEIS consumes Galaxy 0→1 directly from the shared
-            // imperative coordinate. React only mirrors semantic endpoints;
-            // System/world camera positions retain main's one-commit-per-RAF
-            // batching because camera-controls owns those interpolations.
+            // imperative coordinate. React mirrors that coordinate at most
+            // once per RAF for semantic/diagnostic freshness; exact endpoints
+            // publish immediately for renderer handoff.
             const semanticGalaxyEndpoint =
               nextPosition === GALAXY_SCALE_MIN ||
               nextPosition === SYSTEM_SCALE_MIN;
             publishWorldScalePosition(
               nextPosition,
               semanticGalaxyEndpoint,
-              !semanticGalaxyEndpoint,
             );
             setWorldScaleContinuous(true);
             document.documentElement.dataset.universeScaleDirection =
