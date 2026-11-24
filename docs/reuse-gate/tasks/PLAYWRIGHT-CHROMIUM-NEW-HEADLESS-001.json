@@ -1,0 +1,117 @@
+{
+  "schema": 2,
+  "task_id": "PLAYWRIGHT-CHROMIUM-NEW-HEADLESS-001",
+  "title": "Use Playwright's Chromium new-headless channel for hosted WebGL release validation",
+  "scope": {
+    "level": "implementation",
+    "subject": "Replace Playwright's default headless-shell execution with its official Chromium new-headless channel while preserving the existing browser, context, retry, sharding, and failure semantics"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted evidence repeatedly shows BrowserContext setup flaking before product assertions, with Browser.setDownloadBehavior reporting a missing context under the current default headless-shell path. Playwright documents that its default headless mode uses a separate Chromium headless shell, while channel: chromium opts into the regular Chromium browser's new headless mode and is intended to behave more like the real browser. Reuse that native Playwright execution path without changing failOnFlakyTests, retries, worker isolation, WebGL assertions, GitHub Actions sharding, or product lifecycle code.",
+  "planned_files": [
+    "playwright.config.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/browsers",
+      "finding": "Playwright documents that the default headless path uses a separate Chromium headless shell, while setting channel to chromium opts into Chromium's new headless mode using the regular browser build."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-testoptions#test-options-channel",
+      "finding": "Playwright Test exposes channel as a native project/use option; the chromium channel can opt into new headless without replacing Playwright's BrowserContext isolation, reporters, retries, or worker model."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep the existing Playwright Test plus GitHub Actions release system; the failure is in the chosen Chromium headless execution path, not a reason to replace the end-to-end stack."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse Playwright's own chromium channel option so browser-process behavior changes inside the already-selected framework rather than through a custom launcher."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "No separate browser-lifecycle subsystem is needed because the installed Playwright framework already owns Chromium launch, BrowserContexts, retries, workers, and reports."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "This gap is a framework execution-mode choice; adding a component or helper would duplicate Playwright launch behavior instead of addressing the native browser path."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "playwright-chromium-new-headless",
+      "name": "Playwright channel=chromium new-headless execution",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Official Playwright browser/channel configuration already installed in the release test stack",
+      "license": "Apache-2.0 Playwright tooling plus bundled Chromium",
+      "decision": "reuse",
+      "reason": "It changes only the native Chromium execution path while retaining all current Playwright isolation, assertions, retries, artifacts, and CI topology.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "retain-headless-shell-and-relax-flaky-gate",
+      "name": "Keep default headless shell and stop failing CI on flaky retries",
+      "level": "framework_engine",
+      "source": "Current Playwright configuration with failOnFlakyTests disabled",
+      "license": "Project configuration",
+      "decision": "reject",
+      "reason": "It would make the current infrastructure symptom disappear from status while also allowing genuine product flakes to pass, reducing release truthfulness."
+    },
+    {
+      "id": "custom-context-setup-retry-wrapper",
+      "name": "Project-owned BrowserContext setup retry and Chromium relaunch wrapper",
+      "level": "framework_engine",
+      "source": "New custom test infrastructure around Playwright browser/context creation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It duplicates Playwright browser lifecycle and retry ownership before trying the framework's documented regular-Chromium headless mode."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-chromium-new-headless"
+    ],
+    "rationale": "Switch only Playwright's Chromium execution channel to the framework's documented new-headless path. Preserve failOnFlakyTests, the one retry, one CI worker, dedicated WebGL-heavy project, four release shards, artifact/reporting behavior, and every product/WebGL assertion so a real failure still blocks release.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If BrowserContext setup still flakes on the regular Chromium new-headless path, preserve strict flaky failure semantics and investigate native worker/browser-process recycling with evidence; do not globally increase test timeouts or disable failOnFlakyTests."
+  }
+}
