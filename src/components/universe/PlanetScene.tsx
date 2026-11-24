@@ -394,7 +394,10 @@ export function PlanetScene({
 
       <ambientLight intensity={0.34} />
       <directionalLight
-        position={[-8, 5, 8]}
+        // Keep the lightweight fallback on the exact same stellar light axis
+        // as ProceduralPlanets. The old +Z work light only looked correct from
+        // the previous night-side Orbit shot.
+        position={[sunDirection.x, sunDirection.y, sunDirection.z]}
         intensity={3.8}
         color="#ffe0aa"
       />

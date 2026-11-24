@@ -56,6 +56,52 @@ async function waitForCameraSettled(
   );
 }
 
+async function expectReadableWorldFrame(page: Page, label: string) {
+  const png = await page.locator(".universe-canvas canvas").screenshot();
+  const stats = await page.evaluate(async ({ base64 }) => {
+    const response = await fetch(`data:image/png;base64,${base64}`);
+    const bitmap = await createImageBitmap(await response.blob());
+    const sample = document.createElement("canvas");
+    sample.width = 160;
+    sample.height = 100;
+    const context = sample.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas unavailable for visual probe");
+    context.drawImage(bitmap, 0, 0, sample.width, sample.height);
+    bitmap.close();
+
+    const pixels = context.getImageData(
+      0,
+      0,
+      sample.width,
+      sample.height,
+    ).data;
+    let readable = 0;
+    let luminanceSum = 0;
+    const total = sample.width * sample.height;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const luminance =
+        pixels[offset] * 0.2126 +
+        pixels[offset + 1] * 0.7152 +
+        pixels[offset + 2] * 0.0722;
+      luminanceSum += luminance;
+      if (luminance > 20) readable += 1;
+    }
+    return {
+      meanLuminance: luminanceSum / total,
+      readableFraction: readable / total,
+    };
+  }, { base64: png.toString("base64") });
+
+  expect(
+    stats.readableFraction,
+    `${label} should render a readable world instead of a near-black canvas`,
+  ).toBeGreaterThan(0.08);
+  expect(
+    stats.meanLuminance,
+    `${label} should produce visible world luminance`,
+  ).toBeGreaterThan(8);
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -222,6 +268,7 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
     await waitForCameraSettled(page, "orbit");
+    await expectReadableWorldFrame(page, "AUTO Hero orbit");
   });
 });
 
@@ -253,6 +300,7 @@ test("visual: desktop Hero world high-quality live renderer", async ({
         "true",
         { timeout: 60_000 },
       );
+      await expectReadableWorldFrame(page, "HIGH Hero orbit");
     },
   );
 });
