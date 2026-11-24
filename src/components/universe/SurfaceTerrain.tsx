@@ -10,7 +10,8 @@ import { useGLTF } from "@react-three/drei";
 import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
-import type { SurfaceWorldProfile } from "../../lib/universe/surface";\nimport { isSoftwareRenderer } from "./CinematicPipeline";
+import type { SurfaceWorldProfile } from "../../lib/universe/surface";
+import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
