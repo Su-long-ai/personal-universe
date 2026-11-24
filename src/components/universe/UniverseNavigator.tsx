@@ -19,14 +19,58 @@ import {
   navigationSectionsForResults,
   universeDestinationSystemId,
   type UniverseNavigationDestination,
+  type UniverseNavigationGroup,
   type UniverseNavigationSection,
 } from "../../lib/universe/yeis/navigation";
+
+const DISCOVERY_DENSITY_LIMITS: Record<
+  UniverseNavigationGroup,
+  readonly [galaxy: number, system: number, world: number]
+> = {
+  "personal-signals": [8, 10, 8],
+  featured: [8, 8, 6],
+  projects: [4, 6, 5],
+  research: [4, 6, 5],
+  experience: [3, 4, 4],
+  artifacts: [3, 4, 4],
+  notes: [3, 4, 4],
+  hero: [2, 2, 2],
+  "observed-hosts": [7, 8, 4],
+  exoplanets: [4, 8, 4],
+  bodies: [5, 14, 16],
+  stars: [6, 6, 3],
+  "black-holes": [4, 4, 3],
+  "deep-sky": [5, 5, 4],
+  galaxies: [4, 4, 3],
+};
+
+function discoveryDensityLimit(
+  group: UniverseNavigationGroup,
+  scalePosition: number,
+): number {
+  const [galaxy, system, world] = DISCOVERY_DENSITY_LIMITS[group];
+  const scale = Math.min(2, Math.max(0, scalePosition));
+  const interpolated =
+    scale <= 1
+      ? galaxy + (system - galaxy) * scale
+      : system + (world - system) * (scale - 1);
+  return Math.max(1, Math.round(interpolated));
+}
+
+function discoveryDensityMode(
+  scalePosition: number,
+): "galaxy" | "system" | "world" {
+  if (scalePosition < 0.75) return "galaxy";
+  if (scalePosition < 1.75) return "system";
+  return "world";
+}
 
 export function UniverseNavigator({
   open,
   markers,
   placements,
   currentSystem,
+  scalePosition = 0,
   activeDestinationId,
   recentDestinationIds = [],
   pendingDestinationId,
@@ -41,6 +85,7 @@ export function UniverseNavigator({
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
   currentSystem?: SystemDefinition | null;
+  scalePosition?: number;
   activeDestinationId?: string | null;
   recentDestinationIds?: string[];
   pendingDestinationId?: string | null;
@@ -81,13 +126,15 @@ export function UniverseNavigator({
     currentSystem?.id.startsWith("yeis-system:")
       ? currentSystem.id.slice("yeis-system:".length)
       : null;
+  const densityMode = discoveryDensityMode(scalePosition);
 
   const displaySections = useMemo(() => {
     const seenDestinations = new Set<string>();
     const searchMode = Boolean(query.trim());
+    const defaultPlaces = !searchMode && placesFilter === "all";
 
     return sections.flatMap((section) => {
-      const destinations = section.destinations.filter((destination) => {
+      let candidates = section.destinations.filter((destination) => {
         if (!searchMode) {
           const matchesFilter =
             placesFilter === "all" ||
@@ -106,17 +153,46 @@ export function UniverseNavigator({
           if (!matchesFilter) return false;
         }
 
-        if (seenDestinations.has(destination.id)) return false;
-        seenDestinations.add(destination.id);
+        if (
+          defaultPlaces &&
+          section.id === "personal-signals" &&
+          !destination.featured &&
+          (destination.importance ?? 0) < 4
+        ) {
+          // The catch-all Personal group is a spotlight in default Places.
+          // Lower-priority authored entries remain available in their semantic
+          // Projects/Research/etc groups, explicit Personal filter and Search.
+          return false;
+        }
+
         return true;
       });
-      return destinations.length ? [{ ...section, destinations }] : [];
+
+      candidates = candidates.filter(
+        (destination) => !seenDestinations.has(destination.id),
+      );
+
+      if (defaultPlaces) {
+        candidates = candidates.slice(
+          0,
+          discoveryDensityLimit(section.id, scalePosition),
+        );
+      }
+
+      for (const destination of candidates) {
+        seenDestinations.add(destination.id);
+      }
+
+      return candidates.length
+        ? [{ ...section, destinations: candidates }]
+        : [];
     });
   }, [
     currentSystemId,
     placesFilter,
     query,
     recentDestinationSet,
+    scalePosition,
     sections,
   ]);
 
@@ -196,6 +272,7 @@ export function UniverseNavigator({
       delete document.documentElement.dataset.universeNavigatorResults;
       delete document.documentElement.dataset.universeNavigatorMode;
       delete document.documentElement.dataset.universeNavigatorFilter;
+      delete document.documentElement.dataset.universeDiscoveryDensity;
     };
   }, [open]);
 
@@ -272,8 +349,9 @@ export function UniverseNavigator({
   useEffect(() => {
     if (!open) return;
     document.documentElement.dataset.universeNavigatorFilter = placesFilter;
+    document.documentElement.dataset.universeDiscoveryDensity = densityMode;
     setActiveIndex(0);
-  }, [open, placesFilter]);
+  }, [densityMode, open, placesFilter]);
 
   useEffect(() => {
     if (!results[activeIndex]) return;
