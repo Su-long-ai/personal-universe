@@ -43,6 +43,17 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: git fetch origin main --no-tags
 
+      - name: Ensure push range base commit is available
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "${BEFORE_SHA}"
+          fi
+          git cat-file -e "${BEFORE_SHA}^{commit}"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
