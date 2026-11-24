@@ -140,6 +140,23 @@ export function SystemScene({
   const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
 
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+    } else {
+      delete html.dataset.universeSystemTargetSuppressed;
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemTargetSuppressed ===
+        handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemTargetSuppressed;
+      }
+    };
+  }, [handoffTargetPlanetId]);
+
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
     const scaleTargetChanged =
