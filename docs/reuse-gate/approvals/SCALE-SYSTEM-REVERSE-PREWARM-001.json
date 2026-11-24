@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-SYSTEM-REVERSE-PREWARM-001",
+  "approved_at": "2026-11-24T18:35:00.000Z",
+  "baseline_commit": "9694b3f1e3d04a31a66f172ed1a57de4f82aa59f",
+  "record_path": "docs/reuse-gate/tasks/SCALE-SYSTEM-REVERSE-PREWARM-001.json",
+  "record_sha256": "6ab16e6bda6fbe2bd175ddf731fb1474baf728f8a08adf4b4840a31c59488e11",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Prewarm the existing pinned YEIS System resources only during reverse Approach and carry the same mounted System component across the Approach to System boundary without adding a renderer, camera authority, or persistent Surface-time System allocation"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "yeis-hidden-reverse-approach-reuse",
+    "r3f-latched-reverse-lifecycle"
+  ],
+  "candidate_scores": {
+    "yeis-hidden-reverse-approach-reuse": 54,
+    "r3f-latched-reverse-lifecycle": 57,
+    "persistent-system-cache": 33
+  }
+}
