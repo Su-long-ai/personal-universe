@@ -376,9 +376,13 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await runtime.assertClean(testInfo);
 });
 
-test("HIGH close-world prewarms after focus lock and keeps one pipeline allocation", async ({
+test("HIGH close-world prewarms after focus lock and keeps one pipeline allocation @webgl-heavy", async ({
   page,
 }, testInfo) => {
+  test.slow(
+    true,
+    "HIGH ProceduralPlanets prewarm is intentionally isolated from ordinary software-WebGL release shards",
+  );
   const runtime = await observeRuntime(page);
   await page.goto("/?phase=system&star=h-aurora&freeze=1");
   await waitForYeisEngine(page);
