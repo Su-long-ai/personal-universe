@@ -404,9 +404,18 @@ function commandImport(args) {
     typeof option(args, "source") === "string"
       ? String(option(args, "source"))
       : "import:" + basename(source);
-  const normalized = normalizeImportedContentBatch(readJson(source), {
-    source: provenanceSource,
-  });
+  let normalized;
+  try {
+    normalized = normalizeImportedContentBatch(readJson(source), {
+      source: provenanceSource,
+    });
+  } catch (error) {
+    fail(
+      source +
+        ": " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
 
   for (const record of normalized) {
     if (existsSync(contentPath(record.contentId))) {

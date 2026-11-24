@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "contentId": "continuous-scale-navigation",
+  "title": "Continuous Scale Navigation",
+  "summary": "A scroll-driven interaction path that carries the view from galaxy scale through stellar systems and worlds toward a planetary surface.",
+  "body": "This product artifact keeps scale changes reversible and continuous while reusing the existing YEIS navigation and world-rendering authority.",
+  "i18n": {
+    "zh": {
+      "title": "连续尺度导航",
+      "summary": "一条由滚轮驱动的连续交互路径，从银河尺度进入恒星系与星球，并继续逼近星球表面。",
+      "body": "该产品能力保持尺度切换连续、可逆，同时继续复用现有 YEIS 导航与世界渲染权威。"
+    }
+  },
+  "aliases": {
+    "en": [
+      "Scale Navigation",
+      "Galaxy to Surface"
+    ],
+    "zh": [
+      "连续缩放导航",
+      "银河到地表"
+    ]
+  },
+  "kind": "artifact",
+  "status": "active",
+  "importance": 4,
+  "tags": [
+    "navigation",
+    "continuous-scale",
+    "YEIS",
+    "WebGL"
+  ],
+  "featured": false,
+  "signalVisible": true,
+  "placement": "auto",
+  "placementKey": "continuous-scale-navigation",
+  "links": [],
+  "media": [],
+  "surface": {
+    "preferredRegion": "navigation",
+    "anchorCategory": "artifact",
+    "cluster": "interaction",
+    "order": 10,
+    "featured": false
+  },
+  "provenance": {
+    "kind": "authored",
+    "source": "repository:personal-universe"
+  },
+  "relations": [
+    {
+      "type": "belongs-to",
+      "targetId": "personal-universe"
+    }
+  ],
+  "journeys": [
+    "projects"
+  ],
+  "legacyIds": [],
+  "draft": false
+}

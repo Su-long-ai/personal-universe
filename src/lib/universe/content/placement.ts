@@ -22,7 +22,6 @@ export function placeUniverseContent(
       Boolean(marker.nativeId),
   );
 
-  const used = new Set<string>();
   const placements: UniverseContentPlacement[] = [];
 
   for (const entry of [...entries].sort(compareEntries)) {
@@ -53,13 +52,12 @@ export function placeUniverseContent(
         continue;
       }
     } else {
-      marker = chooseRendezvousMarker(placementKey, autoMarkers, used);
+      marker = chooseRendezvousMarker(placementKey, autoMarkers);
     }
 
     // Pinned non-YEIS marker IDs must never silently drift to another star.
     if (!marker) continue;
 
-    used.add(markerIdentity(marker));
     placements.push({
       entry,
       markerId: marker.id,

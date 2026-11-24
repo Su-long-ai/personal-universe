@@ -15,7 +15,7 @@
     "content:validate": "node --experimental-strip-types scripts/content-author.mjs validate",
     "content:preview": "node --experimental-strip-types scripts/content-author.mjs preview",
     "content:index": "node --experimental-strip-types scripts/content-author.mjs index",
-    "test:content": "node --experimental-strip-types --test tests/content-authoring.test.ts",
+    "test:content": "node --experimental-strip-types --test tests/content-authoring.test.ts tests/content-placement.test.ts",
     "predev": "npm run gate:reuse && npm run content:validate",
     "dev": "astro dev",
     "prebuild": "npm run gate:reuse && npm run content:validate && npm run test:content",

@@ -122,13 +122,13 @@ test("pinned placement stays on the requested YEIS star", () => {
   assert.equal(placements[0]?.nativeId, "c12");
 });
 
-test("a missing pinned destination does not silently drift", () => {
+test("a missing non-YEIS pinned destination does not silently drift", () => {
   const markers = Array.from({ length: 8 }, (_, index) => marker(index + 1));
   const placements = placeUniverseContent(
     [
       entry("missing", {
         placement: "pinned",
-        starId: "c99999",
+        starId: "external-marker-that-does-not-exist",
       }),
     ],
     markers,

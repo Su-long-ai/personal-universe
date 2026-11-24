@@ -3430,7 +3430,7 @@ test("black-hole Search preserves exact native travel identity", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Search keyboard navigation reaches personal content", async ({
+test("Search keyboard navigation reaches representative authored content", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -3440,18 +3440,18 @@ test("Search keyboard navigation reaches personal content", async ({
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
 
-  // Authored locale metadata must feed the existing Search contract instead
-  // of creating a duplicate Chinese content record.
-  await search.fill("个人宇宙");
+  // The newly-authored bilingual artifact must feed the existing Search
+  // contract without creating a second locale-specific content identity.
+  await search.fill("连续尺度导航");
   const bilingualResult = page
     .locator(".navigator-result-row")
-    .filter({ hasText: "Personal Universe" })
+    .filter({ hasText: "Continuous Scale Navigation" })
     .first();
   await expect(bilingualResult).toBeVisible();
-  await expect(bilingualResult.locator(".kind-project")).toBeVisible();
+  await expect(bilingualResult.locator(".kind-artifact")).toBeVisible();
 
-  // The canonical English title resolves the same product destination.
-  await search.fill("Personal Universe");
+  // Its canonical English title resolves the same product destination.
+  await search.fill("Continuous Scale Navigation");
   await expect(bilingualResult).toBeVisible();
   await expect
     .poll(async () =>
@@ -3471,15 +3471,15 @@ test("Search keyboard navigation reaches personal content", async ({
   );
   const personalWorld = page.locator(".world-content-card");
   await expect(personalWorld).toBeVisible();
-  await expect(personalWorld).toContainText("Personal Universe");
+  await expect(personalWorld).toContainText("Continuous Scale Navigation");
   const html = page.locator("html");
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
-    "personal:personal-universe",
+    "personal:continuous-scale-navigation",
   );
   await expect
     .poll(() => new URL(page.url()).searchParams.get("destination"))
-    .toBe("personal:personal-universe");
+    .toBe("personal:continuous-scale-navigation");
   const personalTarget = await html.getAttribute(
     "data-universe-navigation-target",
   );
@@ -3498,7 +3498,7 @@ test("Places exposes authored content and its canonical deep link survives reloa
   const dialog = await openNavigator(page);
   const personalPlace = page
     .locator(".navigator-result-row")
-    .filter({ hasText: "Personal Universe" })
+    .filter({ hasText: "Continuous Scale Navigation" })
     .first();
   await expect(personalPlace).toBeVisible();
   await expect(personalPlace.locator(".kind-personal")).toBeVisible();
@@ -3508,18 +3508,18 @@ test("Places exposes authored content and its canonical deep link survives reloa
   await expect(dialog).toBeHidden();
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
-    "personal:personal-universe",
+    "personal:continuous-scale-navigation",
   );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "approach",
   );
   await expect(page.locator(".world-content-card")).toContainText(
-    "Personal Universe",
+    "Continuous Scale Navigation",
   );
   await expect
     .poll(() => new URL(page.url()).searchParams.get("destination"))
-    .toBe("personal:personal-universe");
+    .toBe("personal:continuous-scale-navigation");
 
   // Reload the exact product-generated share URL. It must resolve back to the
   // same canonical authored identity without relying on the source filename.
@@ -3527,12 +3527,12 @@ test("Places exposes authored content and its canonical deep link survives reloa
   await waitForYeis(page);
   await expect(html).toHaveAttribute(
     "data-universe-deep-link",
-    "personal:personal-universe",
+    "personal:continuous-scale-navigation",
     { timeout: 20_000 },
   );
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
-    "personal:personal-universe",
+    "personal:continuous-scale-navigation",
     { timeout: 20_000 },
   );
   await expect(html).toHaveAttribute(
@@ -3540,11 +3540,11 @@ test("Places exposes authored content and its canonical deep link survives reloa
     "approach",
   );
   await expect(page.locator(".world-content-card")).toContainText(
-    "Personal Universe",
+    "Continuous Scale Navigation",
   );
   await expect
     .poll(() => new URL(page.url()).searchParams.get("destination"))
-    .toBe("personal:personal-universe");
+    .toBe("personal:continuous-scale-navigation");
 
   await runtime.assertClean(testInfo);
 });
