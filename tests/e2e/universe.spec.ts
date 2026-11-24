@@ -1,6 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import {
+  continuousScaleResponseDistance,
+} from "../../src/lib/universe/continuousScale";
+import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
@@ -61,11 +64,33 @@ async function wheelScale(
   // This helper means "complete one semantic scale interval" for legacy
   // settled-phase tests. Individual browser samples remain real proportional
   // wheel input; tests that assert sub-phase continuity use dispatchScaleWheel
-  // directly. In reverse, crossing a phase boundary at e.g. 3.5 is not enough:
-  // continue to the destination phase's authored anchor at 3.0 before a test
-  // may expect camera-settled=orbit.
+  // directly. When a tuned interval is not an integer multiple of the 96px
+  // delivered-sample cap (notably Atmosphere<->Surface at 240px), make the
+  // final physical sample exactly consume the remaining response distance.
+  // That prevents the test driver itself from overshooting the authored anchor.
   for (let sample = 0; sample < 10; sample += 1) {
-    await page.mouse.wheel(0, deltaY);
+    let deliveredDeltaY = deltaY;
+    const positionBeforeSample = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    if (
+      expectedWorldPhase &&
+      Number.isFinite(targetWorldAnchor) &&
+      Number.isFinite(positionBeforeSample)
+    ) {
+      const currentDistance =
+        continuousScaleResponseDistance(positionBeforeSample);
+      const targetDistance =
+        continuousScaleResponseDistance(targetWorldAnchor);
+      const remainingDistance = Math.abs(targetDistance - currentDistance);
+      if (remainingDistance > 0) {
+        const deliveredMagnitude = Math.min(96, remainingDistance);
+        deliveredDeltaY =
+          direction === "in" ? -deliveredMagnitude : deliveredMagnitude;
+      }
+    }
+
+    await page.mouse.wheel(0, deliveredDeltaY);
     await page.waitForTimeout(80);
 
     const phaseAfterSample = await html.getAttribute(
@@ -804,13 +829,15 @@ test("continuous wheel coordinate crosses close-world boundaries without waiting
     box!.y + box!.height * 0.5,
   );
 
-  // Keep scrolling without waiting for authored shot settlement. Six
-  // half-interval wheel samples traverse the continuous coordinate from
-  // Approach (2) to Surface (5); there is no world-step queue anymore.
+  // Keep scrolling without waiting for authored shot settlement. Six capped
+  // 96px samples reach 4.8 and one final 48px physical sample consumes the
+  // remaining response distance to Surface=5; there is no world-step queue.
   for (let index = 0; index < 6; index += 1) {
     await page.mouse.wheel(0, -120);
     await page.waitForTimeout(60);
   }
+  await page.mouse.wheel(0, -48);
+  await page.waitForTimeout(60);
 
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
