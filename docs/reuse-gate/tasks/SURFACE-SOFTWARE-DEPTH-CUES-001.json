@@ -1,0 +1,164 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-SOFTWARE-DEPTH-CUES-001",
+  "title": "Restore low-cost depth cues on software Surface using the existing R3F scene",
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve the AUTO/software Surface fallback's spatial readability by reusing the existing SurfaceScene distant-body and arrival-marker concepts in a software-lite form, while keeping ProceduralTerrains as terrain authority and adding no renderer, post-process pass, external asset pack, cloud/water layer or camera authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The approved SURFACE-SOFTWARE-VISUAL-PROFILE-001 probe showed that changing only ProceduralTerrains style, height and fog uniforms either produced harsh clipping artifacts or remained visually flat, so its implementation was reverted. The current SurfaceScene already contains two effective spatial cues on real GPUs—DistantMoon and ArrivalBeacon—but disables both on software rendering along with the expensive point light/PBR path. The next lowest-cost reuse is to preserve those product concepts while supplying software-lite Three.js geometry/material variants: low-segment unlit/basic geometry for the distant body and a minimal emissive/basic arrival marker, with no animation-heavy effect stack, imported model, cloud/water layer or second scene. React Three Fiber remains the existing host and Playwright's existing mobile/tablet Surface screenshots remain the promotion evidence.",
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://threejs.org/docs/#api/en/materials/MeshBasicMaterial",
+      "finding": "Three.js provides unlit basic materials that do not require scene lighting, making them suitable for cheap software-rendered depth landmarks inside the existing renderer."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/geometries/SphereGeometry",
+      "finding": "Three.js built-in sphere geometry exposes explicit segment counts, so the existing distant-body concept can use a much smaller geometry budget on software rendering instead of the current high-segment real-GPU version."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/advanced/scaling-performance",
+      "finding": "React Three Fiber's performance guidance emphasizes reducing unnecessary continuous work on weaker devices; reusing static low-cost objects inside the existing Canvas is preferable to adding another effect/runtime."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "The current Playwright screenshot pipeline already captures viewport-specific product composition and can validate the same mobile/tablet Surface states without introducing a second visual framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Replacing the Surface with another full scene or sky product is disproportionate: terrain/navigation are already correct and only inexpensive visual depth landmarks are missing on the software tier."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Keep React Three Fiber as the one scene host and Playwright as the one visual acceptance framework; neither a new renderer nor a new screenshot service is warranted."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-terrains",
+        "pmndrs-sky"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "ProceduralTerrains remains terrain authority, while a new sky/atmosphere subsystem is intentionally not promoted for this software-only composition gap because it would broaden runtime cost and ownership."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse the already-authored DistantMoon and ArrivalBeacon product concepts with low-segment Three.js geometry and basic materials inside the existing SurfaceScene rather than importing new models or effects."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-surface-depth-cues-software-lite",
+      "name": "Software-lite variants of existing DistantMoon and ArrivalBeacon",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Current SurfaceScene DistantMoon/ArrivalBeacon concepts using built-in Three.js geometry/materials in the existing R3F Canvas",
+      "license": "MIT dependencies / project code",
+      "decision": "reuse",
+      "reason": "Restores strong scale, horizon and destination cues with a tiny bounded object/draw-call budget and no new runtime ownership, while preserving the same product visual language already used on real GPUs.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.8,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-surface-playwright-acceptance",
+      "name": "Existing mobile/tablet Surface Playwright acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current hosted narrow-screen Surface screenshot cases and runtime metrics",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Directly validates whether the cheap cues materially improve the exact software-rendered viewports that exposed the defect while retaining existing release evidence.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-terrains-water-cloud-effects",
+      "name": "ProceduralTerrains water/cloud effects",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Installed procedural-terrains@2.0.5 optional /water and /clouds layers",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Adds effect preparation/render work on the exact SwiftShader tier being protected and does not cheaply restore the missing product landmarks."
+    },
+    {
+      "id": "pmndrs-sky-software-surface",
+      "name": "@pmndrs/sky atmosphere subsystem",
+      "level": "subsystem",
+      "registry_id": "pmndrs-sky",
+      "source": "Existing registry candidate for ground-to-orbit sky/aerial perspective",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Broader atmosphere ownership is unnecessary for a software-only fallback cue gap and would introduce a new rendering subsystem where existing static primitives are sufficient."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-surface-depth-cues-software-lite",
+      "existing-surface-playwright-acceptance"
+    ],
+    "rationale": "Restore only the missing spatial landmarks inside the existing SurfaceScene: a low-segment unlit distant body and minimal arrival marker on software rendering, reusing the real-GPU concepts but not their expensive PBR/light geometry. Keep ProceduralTerrains terrain, the current camera, the current Canvas and all software terrain budgets unchanged; promote only if mobile/tablet screenshots visibly improve and hosted WebGL timing remains healthy.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "procedural-terrains-water-cloud-effects",
+        "reason": "The selected solution deliberately stays below the terrain-effect subsystem because clouds/water add continuous effect rendering cost but do not outperform two static landmarks for the specific software Surface depth/readability gap."
+      },
+      {
+        "candidate_id": "pmndrs-sky-software-surface",
+        "reason": "A full atmosphere subsystem has much broader ownership and integration cost than the missing software fallback landmarks; the existing product scene already has equivalent visual concepts that can be reused cheaply."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If even software-lite landmarks cause hosted timing or draw-call regressions, retain only the cheaper of the distant body or arrival marker based on screenshot value; do not escalate to clouds, water or another renderer in this task."
+  }
+}

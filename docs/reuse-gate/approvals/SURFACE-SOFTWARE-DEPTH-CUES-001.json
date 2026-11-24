@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-SOFTWARE-DEPTH-CUES-001",
+  "approved_at": "2026-11-24T09:24:30.065Z",
+  "baseline_commit": "6e514bb493ec69d9104d9efc3d0e914454ff0c60",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-SOFTWARE-DEPTH-CUES-001.json",
+  "record_sha256": "32a90c76befdf79cc0acfe3a938814afc6a295fa7c1be9300289da08fca962c7",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "pmndrs-sky": "603734724183712960497540fe947931d3dc5b40212a95140915d8561016a2c3",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve the AUTO/software Surface fallback's spatial readability by reusing the existing SurfaceScene distant-body and arrival-marker concepts in a software-lite form, while keeping ProceduralTerrains as terrain authority and adding no renderer, post-process pass, external asset pack, cloud/water layer or camera authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "existing-surface-depth-cues-software-lite",
+    "existing-surface-playwright-acceptance"
+  ],
+  "candidate_scores": {
+    "existing-surface-depth-cues-software-lite": 55.3,
+    "existing-surface-playwright-acceptance": 56.5,
+    "procedural-terrains-water-cloud-effects": null,
+    "pmndrs-sky-software-surface": null
+  }
+}

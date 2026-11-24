@@ -1,0 +1,161 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-SOFTWARE-VISUAL-PROFILE-001",
+  "title": "Improve software-rendered Surface depth with the installed ProceduralTerrains visual profile",
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve the AUTO/software Surface fallback's visible relief, tonal separation and distance depth using only the installed ProceduralTerrains terrain configuration and existing hosted visual acceptance, without adding clouds, water, a second renderer, extra scene passes or another camera authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted mobile Surface evidence is now world-correct but visually flat: the Infinite World boundary is gone, yet the low-octave SwiftShader profile reads as a pale ground sheet with weak near/mid/far separation. ProceduralTerrains 2.0.5 already exposes terrain-owned palette saturation/contrast/tint, sun intensity/color, sky ambient, ground bounce, sun elevation, fog density and height scale as configuration/uniform controls. Its runtime README also states that terrain shaders own their sun/ambient lighting rather than adopting arbitrary host-scene lights. The lowest-cost product fix is therefore a software-only terrain visual profile that keeps the existing seed, two-octave shader, streaming/LOD budgets and renderer lifecycle unchanged, while the existing Playwright narrow Surface cases provide promotion evidence. Optional water/cloud effects are deliberately rejected on the software path because they add effect work to the exact renderer tier being protected.",
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/releases/tag/v2.0.5",
+      "finding": "ProceduralTerrains 2.0.5 is the installed MIT runtime release; its world runtime and performance controls are already the supported surface subsystem rather than a product-owned terrain replacement."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/6293268/packages/procedural-terrains/README.md",
+      "finding": "The caller-owned runtime exposes terrain configuration for style/lighting and documents that its built-in terrain shaders use their own sun/ambient lighting; water and clouds are explicit optional layers rather than required terrain features."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "The existing Playwright release suite can capture the same mobile/tablet Surface viewports after tuning, preserving comparable hosted visual evidence without another screenshot framework."
+    },
+    {
+      "url": "https://threejs.org/manual/en/fog.html",
+      "finding": "Three.js scene fog is a generic host-scene mechanism, but the current terrain uses its own shader fog uniform; adding a separate product fog mechanism would duplicate a capability already exposed by ProceduralTerrains."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "No full terrain/sky product should replace the existing Surface subsystem for a tonal-depth defect; the installed runtime already owns the terrain and exposes the required visual controls."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test",
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Keep the existing R3F host and Playwright acceptance. Generic scene fog/lights are not promoted as a second visual authority because the terrain shader already owns equivalent controls."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse ProceduralTerrains' existing style, lighting, palette and height configuration to tune only the software fallback while retaining its current Infinite World, lifecycle and performance budgets."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        3
+      ],
+      "conclusion": "No new model, sprite, sky dome, fog mesh or decorative asset is needed for the first pass; visual depth should be proven with terrain-owned uniforms before adding any object-level decoration."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "procedural-terrains-software-visual-profile",
+      "name": "ProceduralTerrains software-only style and lighting profile",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Installed procedural-terrains@2.0.5 configuration: heightScale, style, lighting and palette controls",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Directly changes the shader-owned relief, tonal contrast and distance fog without adding geometry, a render pass, a dependency or a second Surface authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-narrow-surface-playwright-acceptance",
+      "name": "Existing hosted narrow Surface Playwright acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current mobile/tablet Surface visual cases and GitHub-hosted screenshot artifacts",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Provides direct before/after evidence on the software-rendered viewports that exposed the defect, with no new visual-testing system.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-terrains-water-cloud-stack",
+      "name": "ProceduralTerrains water and cloud effect layers",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Installed procedural-terrains@2.0.5 /water and /clouds entry points",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "They can enrich a real-GPU scene but add effect preparation/render work and do not address the basic terrain tonal-depth defect on the SwiftShader tier.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 1.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "host-scene-fog-light-overlay",
+      "name": "Additional Three.js fog/light or custom atmosphere overlay",
+      "level": "component_asset",
+      "source": "Three.js scene fog/lights or new product-owned atmospheric mesh",
+      "license": "MIT / project code",
+      "decision": "reject",
+      "reason": "The terrain shader does not use arbitrary host-scene lighting and already has its own fog control, so this would duplicate visual machinery while leaving the terrain-owned parameters underused."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "procedural-terrains-software-visual-profile",
+      "existing-narrow-surface-playwright-acceptance"
+    ],
+    "rationale": "Tune the existing ProceduralTerrains software fallback at its own shader/configuration layer and judge the result with the already-landed hosted mobile/tablet Surface screenshots. Keep seed, octave count, Infinite World streaming, LOD budgets, lifecycle, camera authority and renderer count unchanged; promote only if visual depth improves without hosted timing or WebGL regressions.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If uniform-only tuning cannot create a materially better hosted Surface composition without harming legibility or timing, keep the current profile and open a separate reuse-first candidate for one cheap package-owned atmospheric/background layer rather than broadening this task."
+  }
+}

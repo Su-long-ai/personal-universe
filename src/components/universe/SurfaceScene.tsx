@@ -23,15 +23,54 @@ type IdleWindow = Window & {
   cancelIdleCallback?: (handle: number) => void;
 };
 
-function ArrivalBeacon({ active, onToggle, height }: { active: boolean; onToggle: () => void; height: number }) {
+function ArrivalBeacon({
+  active,
+  onToggle,
+  height,
+  softwareLite = false,
+}: {
+  active: boolean;
+  onToggle: () => void;
+  height: number;
+  softwareLite?: boolean;
+}) {
   const beacon = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
-    if (!beacon.current) return;
+    if (softwareLite || !beacon.current) return;
     beacon.current.rotation.y += delta * 0.12;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.55) * 0.035;
     beacon.current.scale.setScalar(active ? pulse * 1.06 : pulse);
   });
+
+  if (softwareLite) {
+    return (
+      <group position={[1.2, height + 0.2, -11]} onClick={onToggle}>
+        <mesh position={[0, 0.82, 0]}>
+          <cylinderGeometry args={[0.045, 0.09, 1.7, 6]} />
+          <meshBasicMaterial
+            color={active ? "#ffd39a" : "#8bdcff"}
+            transparent
+            opacity={0.82}
+          />
+        </mesh>
+        <mesh position={[0, 1.78, 0]}>
+          <octahedronGeometry args={[0.17, 0]} />
+          <meshBasicMaterial color={active ? "#fff0cf" : "#e1f8ff"} />
+        </mesh>
+        <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.22, 0.31, 12]} />
+          <meshBasicMaterial
+            color={active ? "#ffb66f" : "#65d5ff"}
+            transparent
+            opacity={0.42}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
     <group ref={beacon} position={[0.4, height, -5.4]} onClick={onToggle}>
@@ -175,20 +214,22 @@ export function SurfaceScene({
 
   const content = (
     <>
-      <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
-      <directionalLight
-        position={[-12, 9, 4]}
-        intensity={4.6}
-        color="#ffc27d"
-        castShadow
-      />
       {!softwareRenderer ? (
-        <pointLight
-          position={[0.4, anchorHeight + 1.0, -5.4]}
-          intensity={beaconActive ? 7 : 2.8}
-          distance={11}
-          color={beaconActive ? "#ffb46d" : "#74d8ff"}
-        />
+        <>
+          <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
+          <directionalLight
+            position={[-12, 9, 4]}
+            intensity={4.6}
+            color="#ffc27d"
+            castShadow
+          />
+          <pointLight
+            position={[0.4, anchorHeight + 1.0, -5.4]}
+            intensity={beaconActive ? 7 : 2.8}
+            distance={11}
+            color={beaconActive ? "#ffb46d" : "#74d8ff"}
+          />
+        </>
       ) : null}
 
       <Suspense fallback={null}>
@@ -201,16 +242,13 @@ export function SurfaceScene({
         ) : null}
       </Suspense>
 
-      {!softwareRenderer ? (
-        <>
-          <DistantMoon />
-          <ArrivalBeacon
-            active={beaconActive}
-            height={anchorHeight}
-            onToggle={() => setBeaconActive((value) => !value)}
-          />
-        </>
-      ) : null}
+      {!softwareRenderer ? <DistantMoon /> : null}
+      <ArrivalBeacon
+        active={beaconActive}
+        height={anchorHeight}
+        onToggle={() => setBeaconActive((value) => !value)}
+        softwareLite={softwareRenderer}
+      />
     </>
   );
 
@@ -218,6 +256,9 @@ export function SurfaceScene({
     if (!active) return;
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-terrains-fallback";
+    document.documentElement.dataset.universeSurfaceDepthCues = softwareRenderer
+      ? "software-beacon"
+      : "full";
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -225,8 +266,9 @@ export function SurfaceScene({
       ) {
         delete document.documentElement.dataset.universeSurfaceRenderer;
       }
+      delete document.documentElement.dataset.universeSurfaceDepthCues;
     };
-  }, [active]);
+  }, [active, softwareRenderer]);
 
   return (
     <>
