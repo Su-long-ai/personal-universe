@@ -1,0 +1,172 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001",
+  "title": "Drive the native Galaxy to System LOD bridge from the continuous wheel coordinate",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the merged pinned-YEIS native system LOD bridge and the existing System-to-Surface continuous-scale coordinator so every wheel/trackpad delta directly advances or reverses Galaxy=0 to System=1 instead of launching a time-driven native autopilot."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "PR #81 restored the correct pinned-YEIS point-to-native-system LOD chain, reference-frame switch, shared physical-system span and matched System handoff, but its first Galaxy inward wheel still launches CameraController autopilot and completes 0→1 as a time-driven travel. The existing product scale coordinator already proves the required input contract on System=1 through Surface=5: each wheel/trackpad delta mutates one normalized coordinate immediately, semantic phases are only boundary labels, and reverse input evaluates the same path backward. The reuse-first change is therefore not another renderer or camera: retain #81's native BodyRenderer/BodyPoints/OrbitLines and frame switch, retain the product coordinator's delta normalization, and expose a narrow YEIS native scale-progress executor that places the existing CameraController along the same focus-relative logarithmic distance curve as the restored system LOD. At coordinate 1, reuse #81's matched native System overview and entry quaternion; on reverse, retain its view state and evaluate the same coordinate back toward the captured Galaxy anchor.",
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
+      "finding": "Pinned MIT YEIS CameraController already owns the physical Galaxy camera, logarithmic native travel and floating-origin frame semantics; direct scale must reuse this controller state rather than create another camera or tween loop."
+    },
+    {
+      "url": "https://docs.openspaceproject.com/latest/reference/scripting-api/openspace.navigation.html",
+      "finding": "OpenSpace exposes focus-relative navigation and distance operations, supporting a normalized input coordinate that changes distance to one retained focus instead of starting unrelated discrete view transitions."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "The installed camera-controls instance already executes the continuous System→Surface product coordinate and defines the viewport-aware System endpoint inherited from the native YEIS entry orientation."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the merged #81 pinned-YEIS current-system LOD and CameraController authority as the full Galaxy-side spatial solution."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Keep the existing single R3F Canvas and renderer lifecycle; only scale-progress data crosses the Galaxy/System ownership boundary."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Compose the restored native LOD executor with the existing normalized product scale coordinator; both authorities already exist and no new transition subsystem is required."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Retain the existing System endpoint framing and native-entry quaternion inheritance so coordinate 1 is the same visible composition on both sides."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "merged-yeis-native-lod-plus-product-coordinate",
+      "name": "Merged #81 pinned-YEIS native LOD driven by the existing normalized scale coordinator",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current main native Galaxy LOD + current continuousScale coordinator",
+      "license": "MIT pinned YEIS plus project orchestration",
+      "decision": "reuse",
+      "reason": "It preserves the proven point→mesh native LOD, exact reference-frame switch and matched System endpoint while changing only who supplies progress: signed wheel/trackpad delta instead of elapsed autopilot time.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-product-scale-contract",
+      "name": "Existing camera-controls continuous System→Surface coordinate contract",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Current UniverseApp/CinematicCamera continuous scale implementation",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already validates immediate small-delta motion, exact reversal, semantic boundary crossing and higher-priority takeover; extend the same normalized input semantics upward without giving camera-controls Galaxy authority.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "native-autopilot-only",
+      "name": "Keep #81 native autopilot as the Galaxy→System scale interaction",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current merged PR #81 behavior",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Visual LOD continuity is good, but a single wheel notch still starts a time-driven full 0→1 trip; user input does not continuously own scale distance and cannot proportionally scrub/reverse the same path.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 0,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-galaxy-camera-tween",
+      "name": "Project-owned second Galaxy camera/tween executor",
+      "level": "component_asset",
+      "source": "New project code",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates CameraController and risks breaking the exact floating-origin/frame-switch semantics that #81 just restored.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 3,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "merged-yeis-native-lod-plus-product-coordinate",
+      "camera-controls-product-scale-contract"
+    ],
+    "rationale": "Retain #81's native system LOD, physical-system span, frame switching and System entry orientation unchanged. Extend the normalized product scale coordinate to Galaxy=0 and feed its 0→1 progress into a narrow executor inside YeisGalaxyScene. The existing YEIS CameraController remains the only Galaxy camera state; it is positioned along a captured focus-relative logarithmic path, while BodyRenderer/BodyPoints/OrbitLines keep providing native visual LOD. Coordinate 1 hands off through the already matched System overview. Reverse System→Galaxy remounts the retained native view and evaluates the same path backward. No new renderer, camera, router, target database, fade or RAF-owned animation is introduced.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "For a target that cannot resolve to a native stellar frame, retain the existing discrete product fallback rather than fabricate a second physical scale model."
+  }
+}
