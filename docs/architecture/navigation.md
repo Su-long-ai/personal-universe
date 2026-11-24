@@ -390,9 +390,14 @@ object is expected to be represented by the local mesh, so a focused star
 resolves from point into its native system as coordinate 0→1 advances. The
 native endpoint and product System overview share the same physical system
 span, viewport FOV and sphere-fit factor. At coordinate 1 the native
-`starId + position + quaternion` is retained; only after that matched endpoint
-has painted does the product System take authority at the same view direction
-and apparent system size.
+`starId + position + quaternion` is retained. Product System normally takes
+authority after the matched endpoint receives a real paint opportunity. That
+paint preference is bounded: if a throttled/software renderer does not deliver
+the required rAF pair within 64 ms, the already composition-matched System
+endpoint takes authority directly instead of turning renderer readiness into an
+input lock. Same-direction wheel samples pressed against coordinate 1 do not
+invalidate that in-flight handoff; only a real coordinate change or authority
+takeover advances the scale intent epoch.
 
 The bridge snapshot is retained across renderer ownership. System→Galaxy first
 re-enters the native scene at the matched coordinate-1 endpoint and evaluates
