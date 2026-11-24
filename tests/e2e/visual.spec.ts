@@ -270,6 +270,11 @@ test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
       );
       await waitForYeisEngine(page);
       await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-fallback-surface",
+        "generated-texture",
+        { timeout: 60_000 },
+      );
       await waitForCameraSettled(page, "orbit");
       await expect(page.locator(".world-content-card")).toBeVisible();
     },
@@ -281,6 +286,11 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-universe-world-fallback-surface",
+      "generated-texture",
+      { timeout: 60_000 },
+    );
     await waitForCameraSettled(page, "orbit");
     await expectReadableWorldFrame(page, "AUTO Hero orbit");
   });
@@ -313,6 +323,10 @@ test("visual: desktop Hero world high-quality live renderer", async ({
         "data-universe-world-ready",
         "true",
         { timeout: 60_000 },
+      );
+      await expect(page.locator("html")).not.toHaveAttribute(
+        "data-universe-world-fallback-surface",
+        "generated-texture",
       );
       await expectReadableWorldFrame(page, "HIGH Hero orbit");
     },
@@ -441,6 +455,11 @@ for (const viewport of [TABLET, MOBILE]) {
           );
           await waitForYeisEngine(page);
           await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-universe-world-fallback-surface",
+            "generated-texture",
+            { timeout: 60_000 },
+          );
           await waitForCameraSettled(page, "orbit");
           await expect(page.locator(".world-content-card")).toBeVisible();
           await expectCompactNarrowHud(page);

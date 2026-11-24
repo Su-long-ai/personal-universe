@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "WORLD-SOFTWARE-FALLBACK-TEXTURE-001",
+  "approved_at": "2026-11-24T09:57:50.020Z",
+  "baseline_commit": "d2e05a3e8184e118933b060fc5d1b21ebff9317f",
+  "record_path": "docs/reuse-gate/tasks/WORLD-SOFTWARE-FALLBACK-TEXTURE-001.json",
+  "record_sha256": "86a871aa62ca704f42921505fe2c39374d38325b2fb52b900145210ccb304a1e",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve Approach/Orbit/Atmosphere visual quality on AUTO/software rendering by keeping the existing lightweight R3F sphere and generating one small deterministic archetype-aware color texture with the installed Three.js ImprovedNoise + DataTexture primitives; do not enable live ProceduralPlanets on software renderers, add a custom shader, external texture pack, second planet renderer or new camera authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "three-noise-datatexture-existing-sphere",
+    "existing-world-playwright-acceptance"
+  ],
+  "candidate_scores": {
+    "three-noise-datatexture-existing-sphere": 54.4,
+    "existing-world-playwright-acceptance": 56.5,
+    "procedural-planets-live-on-software": null,
+    "external-planet-texture-pack": null,
+    "custom-glsl-fallback-planet": null
+  }
+}
