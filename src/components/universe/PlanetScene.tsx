@@ -476,6 +476,7 @@ export function PlanetScene({
   onPaintStartedChange,
   onPaintReadyChange,
   onSurfaceCameraFrame,
+  onBeforeLivePlanetDispose,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
@@ -486,6 +487,7 @@ export function PlanetScene({
   onPaintStartedChange?: (started: boolean) => void;
   onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
+  onBeforeLivePlanetDispose?: (planet: Planet) => void;
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
@@ -656,9 +658,10 @@ export function PlanetScene({
 
   useEffect(() => {
     return () => {
+      if (livePlanet) onBeforeLivePlanetDispose?.(livePlanet);
       livePlanet?.dispose();
     };
-  }, [livePlanet]);
+  }, [livePlanet, onBeforeLivePlanetDispose]);
 
   useEffect(() => {
     if (!livePlanet || fallbackReason) {
