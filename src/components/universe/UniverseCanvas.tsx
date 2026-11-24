@@ -1,6 +1,7 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -64,14 +65,35 @@ const UNIVERSE_DPR_LOW: [number, number] = [1, 1];
 const UNIVERSE_DPR_DEFAULT: [number, number] = [1, 1.75];
 
 
-function RendererPageLifecycle() {
+function RendererPageLifecycle({
+  onContextLost,
+}: {
+  onContextLost: () => void;
+}) {
   const { gl } = useThree();
 
   useEffect(() => {
     let released = false;
     let releaseTimer: number | null = null;
     const html = document.documentElement;
+    const canvas = gl.domElement;
     html.dataset.universeWebglLifecycle = "active";
+    html.dataset.universeWebglContextGeneration ??= "0";
+
+    const onWebglContextLost = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "lost";
+      delete html.dataset.universeWorldPaintReady;
+      onContextLost();
+    };
+
+    const onWebglContextRestored = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "active";
+      html.dataset.universeWebglContextGeneration = String(
+        Number(html.dataset.universeWebglContextGeneration ?? "0") + 1,
+      );
+    };
 
     const onPageHide = (event: PageTransitionEvent) => {
       if (event.persisted || released) return;
@@ -94,8 +116,15 @@ function RendererPageLifecycle() {
       }, 0);
     };
 
+    canvas.addEventListener("webglcontextlost", onWebglContextLost);
+    canvas.addEventListener("webglcontextrestored", onWebglContextRestored);
     window.addEventListener("pagehide", onPageHide);
     return () => {
+      canvas.removeEventListener("webglcontextlost", onWebglContextLost);
+      canvas.removeEventListener(
+        "webglcontextrestored",
+        onWebglContextRestored,
+      );
       window.removeEventListener("pagehide", onPageHide);
       if (releaseTimer !== null) {
         window.clearTimeout(releaseTimer);
@@ -103,9 +132,10 @@ function RendererPageLifecycle() {
       }
       if (html.dataset.universeWebglLifecycle === "active") {
         delete html.dataset.universeWebglLifecycle;
+        delete html.dataset.universeWebglContextGeneration;
       }
     };
-  }, [gl]);
+  }, [gl, onContextLost]);
 
   return null;
 }
@@ -184,6 +214,15 @@ export function UniverseCanvas({
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [worldPaintReady, setWorldPaintReady] = useState(false);
   const [worldPipelineReady, setWorldPipelineReady] = useState(false);
+  const handleWebglContextLost = useCallback(() => {
+    // Context restoration keeps the same Canvas/renderer authority, but any
+    // previously published handoff readiness described resources that no
+    // longer exist. The pipeline will earn readiness again from restored
+    // frames instead of letting the camera trust stale pre-loss state.
+    setWorldPaintReady(false);
+    setWorldPipelineReady(false);
+    delete document.documentElement.dataset.universeWorldPaintReady;
+  }, []);
   const canvasDpr =
     quality === "low" ? UNIVERSE_DPR_LOW : UNIVERSE_DPR_DEFAULT;
   const canvasGl = useMemo(
@@ -252,7 +291,7 @@ export function UniverseCanvas({
       camera={UNIVERSE_CAMERA_CONFIG}
       gl={canvasGl}
     >
-      <RendererPageLifecycle />
+      <RendererPageLifecycle onContextLost={handleWebglContextLost} />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
