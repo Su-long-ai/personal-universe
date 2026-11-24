@@ -236,27 +236,6 @@ export function CinematicPipeline({
     composer.composer.render(delta);
 
     const html = document.documentElement;
-    const rendererAfterDraw = planetPass?.planetRenderer;
-    let rendererProfileReady = false;
-    if (rendererAfterDraw) {
-      if (appliedImpostorPixels.current !== desiredImpostorPixels) {
-        // First PlanetPass draw may be the moment the lazy renderer appears.
-        // Correct its options now, but do not count that just-drawn frame as
-        // first-paint evidence; the following frame will use the matched
-        // profile from the start.
-        rendererAfterDraw.setOptions({
-          impostorPixels: desiredImpostorPixels,
-        });
-        appliedImpostorPixels.current = desiredImpostorPixels;
-      } else {
-        rendererProfileReady = true;
-      }
-      html.dataset.universeWorldImpostorPixels =
-        String(desiredImpostorPixels);
-    } else {
-      delete html.dataset.universeWorldImpostorPixels;
-    }
-
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
       metricFrame.current = 0;
@@ -268,18 +247,20 @@ export function CinematicPipeline({
       html.dataset.universeWebglSoftware = softwareRenderer ? "true" : "false";
     }
 
-    const cameraReady =
-      html.dataset.universeNavigationPhase !== "surface" ||
-      html.dataset.universeCameraSettled === "surface";
-
     if (!liveWorld) {
       stableFrames.current = 0;
       delete html.dataset.universeWorldReady;
       delete html.dataset.universeWorldScreenshotReady;
+      delete html.dataset.universeWorldImpostorPixels;
       return;
     }
 
+    const cameraReady =
+      html.dataset.universeNavigationPhase !== "surface" ||
+      html.dataset.universeCameraSettled === "surface";
+
     if (fallbackReason) {
+      delete html.dataset.universeWorldImpostorPixels;
       // A retained live PlanetPass may have been fully converged before a
       // quality/capability fallback. Do not carry that convergence token back
       // across the capability boundary: returning to live rendering must earn
@@ -303,7 +284,26 @@ export function CinematicPipeline({
       return;
     }
 
-    const renderer = rendererAfterDraw;
+    const renderer = planetPass?.planetRenderer;
+    let rendererProfileReady = false;
+    if (renderer) {
+      if (appliedImpostorPixels.current !== desiredImpostorPixels) {
+        // First active PlanetPass draw may create the lazy renderer. Match its
+        // retained profile now and require the following frame as paint
+        // evidence so the just-drawn mismatched frame cannot own handoff.
+        renderer.setOptions({
+          impostorPixels: desiredImpostorPixels,
+        });
+        appliedImpostorPixels.current = desiredImpostorPixels;
+      } else {
+        rendererProfileReady = true;
+      }
+      html.dataset.universeWorldImpostorPixels =
+        String(desiredImpostorPixels);
+    } else {
+      delete html.dataset.universeWorldImpostorPixels;
+    }
+
     const frameReady = Boolean(
       rendererProfileReady &&
       renderer &&
