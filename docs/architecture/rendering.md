@@ -134,6 +134,21 @@ fallback therefore disables that optional detail layer and invokes
 `terrain.update()` only for the first visible view or a real camera/projection
 change. Manual camera movement and resize still refresh terrain normally; a
 stationary Surface no longer repeats identical SwiftShader work every frame.
+
+The pinned runtime also documents that driver compilation inside
+`FiniteTerrain.prepare()` cannot be interrupted. Hosted traces showed that
+the original seven-octave/triplanar fallback could remain inside that compile
+after the visitor had already requested Surface exit. The software profile
+therefore keeps the same ProceduralTerrains runtime, seed and 72-unit footprint
+but uses its supported lower-complexity configuration: 3 noise octaves,
+4×4 larger chunks, 32/16/8/4 LOD segments, morphing off, detail off and
+triplanar shading off. Real GPU fallback retains the original 6×6,
+7-octave, 64/32/16/8, triplanar configuration.
+
+Runtime evidence:
+- `data-universe-surface-terrain-profile="software-performance"` on the software path;
+- `data-universe-surface-terrain-profile="gpu-default"` on the real-GPU path.
+
 Real-GPU fallback keeps the package's normal per-frame update cadence.
 
 The retained Surface scene also consumes the same coordinator phase ref as a
