@@ -1884,21 +1884,24 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
 
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
-  await search.fill("Earth");
-  const earth = page
+  // English "Moon" is intentionally ambiguous across native systems. Reuse
+  // the existing localized identity contract: "月球" resolves uniquely to
+  // Sol's native Moon, which remains a real Galaxy time-driven travel target.
+  await search.fill("月球");
+  const moon = page
     .locator(".navigator-result-row")
     .filter({ has: page.locator(".kind-body") })
-    .filter({ hasText: "Earth" })
+    .filter({ hasText: "Moon" })
     .first();
-  await expect(earth).toBeVisible();
-  await earth.locator(".navigator-result-open").click();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
   await expect(dialog).toBeHidden();
 
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
-    "body:c0/earth",
+    "body:c0/moon",
   );
-  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/earth");
+  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/moon");
   await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
   await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
 
@@ -1906,12 +1909,12 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
     .poll(async () => {
       const traveling = await html.getAttribute("data-universe-traveling");
       const complete = await html.getAttribute("data-universe-travel-complete");
-      return traveling === "c0/earth" || complete === "c0/earth";
+      return traveling === "c0/moon" || complete === "c0/moon";
     })
     .toBe(true);
   await expect(html).toHaveAttribute(
     "data-universe-travel-complete",
-    "c0/earth",
+    "c0/moon",
     { timeout: 15_000 },
   );
   const travelDeltaPc = Number(
@@ -2434,6 +2437,15 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
   await dispatchScaleWheel(page, 96);
   await expect
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
+    .toBeCloseTo(0.55, 2);
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
     .toBeCloseTo(0.55, 2);
   const reverseRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
