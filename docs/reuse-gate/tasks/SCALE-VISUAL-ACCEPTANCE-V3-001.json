@@ -1,0 +1,132 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-VISUAL-ACCEPTANCE-V3-001",
+  "title": "Scale response visual acceptance alignment",
+  "scope": {
+    "level": "implementation",
+    "subject": "Align the existing Playwright visual midpoint matrix with the approved continuous-scale response map across desktop, tablet, mobile and WebGL-heavy lanes without weakening renderer, handoff, readability, or single-Canvas assertions"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The current visual suite already reuses Playwright, shared visualCase helpers, responsive viewport matrices, renderer diagnostics, screenshots, traces and hosted sharding. The scale-input product change intentionally moved the one-sample System midpoint from 1.500 to 1.333 and the one-sample Atmosphere midpoint from 4.500 to 4.400. Reuse the existing visual acceptance framework and update only those expected product coordinates; do not add a second screenshot framework, relax readiness assertions, or hide real renderer failures.",
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Playwright locator assertions auto-retry against live browser state and remain the existing mechanism for scale position, renderer, handoff and layout acceptance."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "Playwright already provides browser screenshots and integrates with the repository visualCase evidence path, so no separate capture framework is needed for tuned scale midpoints."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "No external product-level visual suite should replace the repository acceptance matrix for product-specific scale coordinates and renderer diagnostics."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep Playwright Test as the browser lifecycle, retrying assertion, screenshot and trace framework."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "playwright-ci-sharding"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the existing hosted shard matrix and WebGL-heavy lane so response changes are validated under the same release topology."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse current visualCase, dispatchVisualWheel and responsive viewport helpers; change only the expected tuned coordinate."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-playwright-visual-matrix",
+      "name": "Existing Playwright visualCase midpoint matrix",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current tests/e2e/visual.spec.ts helpers and hosted CI",
+      "license": "Apache-2.0 Playwright plus project tests",
+      "decision": "reuse",
+      "reason": "Already covers desktop/tablet/mobile, WebGL-heavy rendering, screenshots, readability, handoff state and one-Canvas acceptance; only product-coordinate expectations became stale.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "new-scale-screenshot-harness",
+      "name": "New custom scale screenshot harness",
+      "level": "component_asset",
+      "source": "New project-owned test machinery",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate the existing Playwright visual evidence path and add maintenance without improving renderer or interaction truthfulness."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Desktop, tablet and mobile midpoint coordinates match the approved response map",
+      "importance": "high",
+      "coverage": {
+        "existing-playwright-visual-matrix": "full",
+        "new-scale-screenshot-harness": "partial"
+      },
+      "decision": "Update stale one-sample coordinate assertions inside the existing responsive visual matrix."
+    },
+    {
+      "capability": "Renderer, handoff, readability, screenshots and WebGL-heavy evidence remain unchanged",
+      "importance": "high",
+      "coverage": {
+        "existing-playwright-visual-matrix": "full",
+        "new-scale-screenshot-harness": "partial"
+      },
+      "decision": "Preserve every non-coordinate visual assertion and existing hosted lane."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-playwright-visual-matrix"
+    ],
+    "rationale": "Reuse the existing Playwright visual acceptance system and change only stale coordinate expectations introduced by the approved response mapping. The suite must continue to assert real renderer/handoff/readability behavior.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a visual case still fails after coordinate alignment, diagnose the renderer/readiness/composition defect from its screenshot and trace; do not loosen timeouts or drop visual assertions."
+  }
+}

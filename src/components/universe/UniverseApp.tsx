@@ -45,6 +45,8 @@ import {
   applyWorldScaleWheel,
   continuousScaleDelta,
   continuousScaleDirection,
+  continuousScaleInputResponseDelta,
+  continuousScaleResponseDistance,
   normalizeWheelDelta,
   galaxyScaleSegmentProgress,
   isWorldScalePhase,
@@ -2196,6 +2198,15 @@ export default function UniverseApp({
             : "pixel";
       document.documentElement.dataset.universeScaleDelta =
         normalizedDelta.toFixed(3);
+      const responseSourcePosition = worldScalePositionRef.current;
+      const responseDelta = continuousScaleInputResponseDelta(
+        responseSourcePosition,
+        normalizedDelta,
+      );
+      document.documentElement.dataset.universeScaleResponse =
+        responseDelta.toFixed(4);
+      document.documentElement.dataset.universeScaleResponseDistance =
+        continuousScaleResponseDistance(responseSourcePosition).toFixed(2);
 
       // Manual scale intent owns navigation immediately, even before a small
       // trackpad delta crosses the currentPhase threshold. This stops Journey
