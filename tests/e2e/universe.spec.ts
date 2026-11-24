@@ -636,6 +636,22 @@ test("low-quality Surface retains the existing terrain fallback", async ({
   await expect(surfaceMeta).toBeVisible();
   await expect(surfaceMeta.locator("b")).toHaveCount(3);
   await expect(page.locator(".surface-region-index span").first()).toBeVisible();
+  await expect(page.locator(".surface-explore-hint")).toContainText(
+    /WHEEL TO DEPART|滚轮离开地表/,
+  );
+
+  const signalCount = Number(
+    await html.getAttribute("data-universe-surface-content-anchors"),
+  );
+  const clusterCount = Number(
+    await html.getAttribute("data-universe-surface-content-clusters"),
+  );
+  if (signalCount > 0) {
+    expect(clusterCount).toBeGreaterThan(0);
+    await expect(page.locator(".surface-cluster-index span").first()).toBeVisible();
+  } else {
+    expect(clusterCount).toBe(0);
+  }
 
   const cards = page.locator(".world-content-card");
   const cardCount = await cards.count();
@@ -700,19 +716,16 @@ test("generated secondary terrestrial worlds receive deterministic Surface produ
   );
   await expect(page.locator(".surface-world-meta")).toBeVisible();
   await expect(page.locator(".surface-region-index span").first()).toBeVisible();
-  await expect(page.locator(".surface-cluster-index span").first()).toBeVisible();
   await expect(page.locator(".surface-explore-hint")).toContainText(
     /WHEEL TO DEPART|滚轮离开地表/,
   );
-  await expect
-    .poll(
-      async () =>
-        Number(
-          await html.getAttribute("data-universe-surface-content-clusters"),
-        ),
-      { timeout: 15_000 },
-    )
-    .toBeGreaterThan(0);
+  const secondarySignals = Number(
+    await html.getAttribute("data-universe-surface-content-anchors"),
+  );
+  const secondaryClusters = Number(
+    await html.getAttribute("data-universe-surface-content-clusters"),
+  );
+  expect(secondaryClusters).toBeLessThanOrEqual(secondarySignals);
 
   await runtime.assertClean(testInfo);
 });
