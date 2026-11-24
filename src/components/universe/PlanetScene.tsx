@@ -41,11 +41,13 @@ function LiveSurfaceAnchor({
   planet,
   profile,
   expanded,
+  surfaceFocusEntryId,
   onCameraFrame,
 }: {
   planet: Planet;
   profile: SurfaceWorldProfile;
   expanded: boolean;
+  surfaceFocusEntryId: string | null;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -83,6 +85,18 @@ function LiveSurfaceAnchor({
           (anchor) => anchor.priority === "primary",
         ).length,
       );
+    const focusedAnchor = profile.contentAnchors.find(
+      (anchor) => anchor.entryId === surfaceFocusEntryId,
+    );
+    if (focusedAnchor) {
+      document.documentElement.dataset.universeSurfaceFocusEntry =
+        focusedAnchor.entryId;
+      document.documentElement.dataset.universeSurfaceFocusAnchor =
+        focusedAnchor.id;
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+    }
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -98,9 +112,11 @@ function LiveSurfaceAnchor({
       delete document.documentElement.dataset.universeSurfaceContentAnchors;
       delete document.documentElement.dataset.universeSurfaceContentClusters;
       delete document.documentElement.dataset.universeSurfacePrimarySignals;
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
       onCameraFrame(null);
     };
-  }, [onCameraFrame, profile]);
+  }, [onCameraFrame, profile, surfaceFocusEntryId]);
 
   useFrame(() => {
     if (!group.current) return;
@@ -185,15 +201,26 @@ function LiveSurfaceAnchor({
         .sort((a, b) => b.prominence - a.prominence)
         .slice(0, 2);
   const rankedContent = useMemo(
-    () => rankSurfaceContentAnchors(profile.contentAnchors),
-    [profile.contentAnchors],
+    () =>
+      rankSurfaceContentAnchors(
+        profile.contentAnchors,
+        surfaceFocusEntryId,
+      ),
+    [profile.contentAnchors, surfaceFocusEntryId],
   );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === surfaceFocusEntryId) ??
+    null;
   const visibleContent = expanded
     ? rankedContent.slice(0, 6)
     : rankedContent.slice(0, 1);
   const rankedClusters = useMemo(
-    () => rankSurfaceContentClusters(profile.contentClusters),
-    [profile.contentClusters],
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
   );
   const visibleClusters = expanded
     ? rankedClusters.slice(0, 3)
@@ -254,12 +281,13 @@ function LiveSurfaceAnchor({
 
         {visibleClusters.map((cluster) => {
           const point = tangentPoint(cluster.center);
+          const focused = focusedAnchor?.cluster === cluster.index;
           const radius =
-            cluster.priority === "primary"
+            (cluster.priority === "primary"
               ? 0.014
               : cluster.priority === "secondary"
                 ? 0.011
-                : 0.009;
+                : 0.009) * (focused ? 1.2 : 1);
           return (
             <mesh
               key={cluster.id}
@@ -271,11 +299,13 @@ function LiveSurfaceAnchor({
                 color={profile.accent}
                 transparent
                 opacity={
-                  cluster.priority === "primary"
-                    ? 0.34
-                    : cluster.priority === "secondary"
-                      ? 0.22
-                      : 0.14
+                  focused
+                    ? 0.46
+                    : cluster.priority === "primary"
+                      ? 0.34
+                      : cluster.priority === "secondary"
+                        ? 0.22
+                        : 0.14
                 }
                 depthWrite={false}
                 side={THREE.DoubleSide}
@@ -335,8 +365,10 @@ function LiveSurfaceAnchor({
 
         {visibleContent.map((anchor) => {
           const point = tangentPoint(anchor.position);
-          const priorityScale =
-            anchor.priority === "primary"
+          const focused = anchor.entryId === surfaceFocusEntryId;
+          const priorityScale = focused
+            ? 1.38
+            : anchor.priority === "primary"
               ? 1.25
               : anchor.priority === "secondary"
                 ? 1
@@ -352,13 +384,19 @@ function LiveSurfaceAnchor({
                 <meshBasicMaterial
                   color={profile.accent}
                   transparent
-                  opacity={anchor.priority === "primary" ? 1 : 0.78}
+                  opacity={
+                    focused || anchor.priority === "primary" ? 1 : 0.78
+                  }
                 />
               </mesh>
               <mesh position={[0, 0.014, 0]}>
                 <octahedronGeometry args={[0.0038, 0]} />
                 <meshBasicMaterial
-                  color={anchor.priority === "primary" ? "#fff0cf" : "#ffffff"}
+                  color={
+                    focused || anchor.priority === "primary"
+                      ? "#fff0cf"
+                      : "#ffffff"
+                  }
                 />
               </mesh>
             </group>
@@ -695,6 +733,7 @@ export function PlanetScene({
   phase,
   worldScalePosition,
   presentationActive = true,
+  surfaceFocusEntryId,
   onPaintReady,
   onSurfaceCameraFrame,
 }: {
@@ -703,6 +742,7 @@ export function PlanetScene({
   phase: UniversePhase;
   worldScalePosition: number;
   presentationActive?: boolean;
+  surfaceFocusEntryId: string | null;
   onPaintReady?: () => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
@@ -959,6 +999,7 @@ export function PlanetScene({
           planet={livePlanet}
           profile={surfaceProfile}
           expanded={phase === "surface"}
+          surfaceFocusEntryId={surfaceFocusEntryId}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}
