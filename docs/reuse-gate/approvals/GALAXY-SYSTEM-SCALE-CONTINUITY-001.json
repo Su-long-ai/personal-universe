@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "GALAXY-SYSTEM-SCALE-CONTINUITY-001",
+  "approved_at": "2026-11-24T11:41:19.569Z",
+  "baseline_commit": "05fb7d76f4670ccd77c9882ea66812edc399a81b",
+  "record_path": "docs/reuse-gate/tasks/GALAXY-SYSTEM-SCALE-CONTINUITY-001.json",
+  "record_sha256": "afe9b13182d90cbd72667cbee9ab49fc4e94de47e6dbaf64387568a01d6ac7d9",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the pinned MIT YEIS full-scale StarPoints + current-system BodyRenderer/BodyPoints/OrbitLines + CameraController frame-switch chain so a focused star is physically approached and resolves into its native system before the product System overview handoff"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/lib/universe/yeis/systemScale.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "restore-pinned-yeis-system-lod"
+  ],
+  "candidate_scores": {
+    "restore-pinned-yeis-system-lod": 54,
+    "product-system-overlap-in-galaxy": null,
+    "third-transition-renderer": null,
+    "fade-boundary": null
+  }
+}
