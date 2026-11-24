@@ -704,6 +704,13 @@ test("Orbit capability switches reacquire paint without resurfacing System", asy
   const pipelineAllocations = await html.getAttribute(
     "data-universe-world-pipeline-allocations",
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-fallback-texture-allocations",
+    /\d+/,
+  );
+  const fallbackTextureAllocations = await html.getAttribute(
+    "data-universe-world-fallback-texture-allocations",
+  );
 
   await page.evaluate(() => {
     const root = document.documentElement;
@@ -764,6 +771,11 @@ test("Orbit capability switches reacquire paint without resurfacing System", asy
   expect(
     await html.getAttribute("data-universe-world-pipeline-allocations"),
   ).toBe(pipelineAllocations);
+  expect(
+    await html.getAttribute(
+      "data-universe-world-fallback-texture-allocations",
+    ),
+  ).toBe(fallbackTextureAllocations);
 
   const events = await page.evaluate(() =>
     (
