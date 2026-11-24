@@ -19,6 +19,15 @@ const DESKTOP: Viewport = {
   width: 1440,
   height: 900,
 };
+// HIGH ProceduralPlanets transition evidence uses a smaller desktop viewport
+// that stays above the product's 900px responsive breakpoint. This keeps the
+// same desktop composition contract while bounding SwiftShader's framebuffer
+// workload; normal DESKTOP/WQHD/ULTRAWIDE cases still own the layout matrix.
+const HIGH_TRANSITION_DESKTOP: Viewport = {
+  name: "desktop-high-960x600",
+  width: 960,
+  height: 600,
+};
 const WQHD: Viewport = {
   name: "wqhd-2560x1440",
   width: 2560,
@@ -776,7 +785,7 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
   await visualCase(
     page,
     testInfo,
-    DESKTOP,
+    HIGH_TRANSITION_DESKTOP,
     "atmosphere-surface-midpoint-live",
     async () => {
       await page.goto(
@@ -828,7 +837,7 @@ test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuit
   await visualCase(
     page,
     testInfo,
-    DESKTOP,
+    HIGH_TRANSITION_DESKTOP,
     "surface-atmosphere-reverse-live",
     async () => {
       await page.goto(
@@ -844,6 +853,21 @@ test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuit
       );
       await expect(html).toHaveAttribute(
         "data-universe-surface-anchor-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-frame",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-applied",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
         "true",
         { timeout: 60_000 },
       );
