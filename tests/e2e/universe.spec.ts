@@ -927,6 +927,7 @@ test("YEIS native System suppresses only the matched handoff target after first 
       renderer: string | null;
       target: string | null;
       suppressed: string | null;
+      spriteSuppressed: string | null;
     }> = [];
     const sample = () => {
       events.push({
@@ -937,6 +938,8 @@ test("YEIS native System suppresses only the matched handoff target after first 
         target: root.dataset.universeSystemHandoffTarget ?? null,
         suppressed:
           root.dataset.universeSystemTargetSuppressed ?? null,
+        spriteSuppressed:
+          root.dataset.universeSystemTargetSpriteSuppressed ?? null,
       });
     };
     sample();
@@ -950,6 +953,7 @@ test("YEIS native System suppresses only the matched handoff target after first 
         "data-universe-system-renderer",
         "data-universe-system-handoff-target",
         "data-universe-system-target-suppressed",
+        "data-universe-system-target-sprite-suppressed",
       ],
     });
     Object.assign(window, {
@@ -980,6 +984,7 @@ test("YEIS native System suppresses only the matched handoff target after first 
           renderer: string | null;
           target: string | null;
           suppressed: string | null;
+          spriteSuppressed: string | null;
         }>;
       }
     ).__nativeWorldHandoffEvents ?? [],
@@ -997,7 +1002,8 @@ test("YEIS native System suppresses only the matched handoff target after first 
       event.ready !== "true" &&
       event.renderer === "yeis-native" &&
       event.target === focus &&
-      event.suppressed === focus,
+      event.suppressed === focus &&
+      event.spriteSuppressed === focus,
   );
   const fullHandoff = events.findIndex(
     (event) =>
@@ -1015,6 +1021,10 @@ test("YEIS native System suppresses only the matched handoff target after first 
   );
   await expect(html).not.toHaveAttribute(
     "data-universe-system-target-suppressed",
+    /.+/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-target-sprite-suppressed",
     /.+/,
   );
 
