@@ -128,7 +128,7 @@ function writeGalaxyViewState(
   state: NativeGalaxyState,
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>,
   systemOverview = state.systemOverview,
-) {
+): YeisGalaxyViewState {
   let view = viewStateRef.current;
   if (!view) {
     view = {
@@ -149,6 +149,18 @@ function writeGalaxyViewState(
   view.quaternion[2] = state.controller.quaternion.z;
   view.quaternion[3] = state.controller.quaternion.w;
   view.systemOverview = systemOverview;
+  return view;
+}
+
+function cloneGalaxyViewState(
+  view: YeisGalaxyViewState,
+): YeisGalaxyViewState {
+  return {
+    starId: view.starId,
+    positionKm: [...view.positionKm] as [number, number, number],
+    quaternion: [...view.quaternion] as [number, number, number, number],
+    systemOverview: view.systemOverview,
+  };
 }
 
 const NATIVE_GALAXY_SYSTEM_SETTINGS: RenderSettings = {
@@ -294,6 +306,7 @@ export function YeisGalaxyScene({
   scaleTarget,
   scaleBridgeRef,
   viewStateRef,
+  onViewStateCommit,
 }: {
   markers: GalaxyMarker[];
   contentPlacements: UniverseContentPlacement[];
@@ -315,6 +328,7 @@ export function YeisGalaxyScene({
   scaleTarget: UniverseNavigationDestination | null;
   scaleBridgeRef: MutableRefObject<YeisGalaxyScaleBridgeState | null>;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
+  onViewStateCommit?: (viewState: YeisGalaxyViewState) => void;
 }) {
   const { gl, scene, camera, size } = useThree();
   const perspective = camera as PerspectiveCamera;
@@ -352,8 +366,11 @@ export function YeisGalaxyScene({
   const scaleBridgeAutopilotRevisionRef = useRef<number | null>(null);
   const scaleTargetRef =
     useRef<UniverseNavigationDestination | null>(scaleTarget);
+  const viewStateCommitRef = useRef(onViewStateCommit);
+  const committedSystemOverviewRef = useRef<boolean | null>(null);
 
   scaleTargetRef.current = scaleTarget;
+  viewStateCommitRef.current = onViewStateCommit;
 
   useEffect(() => {
     if (scaleTarget) {
@@ -1311,7 +1328,20 @@ export function YeisGalaxyScene({
       state.cameraPc,
     );
 
-    writeGalaxyViewState(state, viewStateRef);
+    const currentViewState = writeGalaxyViewState(
+      state,
+      viewStateRef,
+    );
+    if (
+      committedSystemOverviewRef.current !==
+      currentViewState.systemOverview
+    ) {
+      committedSystemOverviewRef.current =
+        currentViewState.systemOverview;
+      viewStateCommitRef.current?.(
+        cloneGalaxyViewState(currentViewState),
+      );
+    }
 
     if (scaleFocusRef.current) {
       scaleFocusFrameRef.current = (scaleFocusFrameRef.current + 1) % 6;
