@@ -635,9 +635,11 @@ export function PlanetScene({
   }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
-    if (livePlanet && phase !== "surface") {
+    // The Surface camera frame starts being sampled as soon as the continuous
+    // scale enters 4 -> 5. Lock the live world at that same boundary so the
+    // chosen landing patch cannot rotate underneath a fixed camera frame and
+    // near-surface ProceduralPlanets LOD work can actually converge.
+    if (livePlanet && phase !== "surface" && worldScalePosition <= 4) {
       livePlanet.rotation.y += delta * 0.014;
     }
 

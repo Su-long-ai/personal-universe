@@ -119,33 +119,6 @@ async function expectReadableWorldFrame(page: Page, label: string) {
   await captureReadableWorldFrame(page, label);
 }
 
-async function expectReadableContinuousWorldFrame(page: Page, label: string) {
-  const html = page.locator("html");
-  // A scale midpoint is intentionally moving, so ProceduralPlanets may keep
-  // background LOD work pending indefinitely. Waiting for three consecutive
-  // pending=0 frames here turns valid motion into a false release failure.
-  // Require the concrete scene + live pass to have painted, then cross two
-  // animation frames so the capture is definitely after the wheel sample.
-  await expect(html).toHaveAttribute(
-    "data-universe-world-paint-ready",
-    "true",
-    { timeout: 20_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-world-pipeline",
-    "procedural-planets-pass",
-    { timeout: 20_000 },
-  );
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      }),
-  );
-
-  await captureReadableWorldFrame(page, label);
-}
-
 async function captureReadableWorldFrame(page: Page, label: string) {
   // Capture the final viewport once and let visualCase reuse the exact same
   // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
@@ -704,10 +677,7 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
-      await expectReadableContinuousWorldFrame(
-        page,
-        "HIGH Atmosphere/Surface midpoint",
-      );
+      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
     },
   );
 });
