@@ -166,6 +166,20 @@ Runtime evidence publishes
 `data-universe-surface-depth-cues="software-beacon"` on the software path and
 `"full"` on the real-GPU fallback.
 
+Task `SURFACE-SOFTWARE-HORIZON-BLEND-001` then tested an exact solid
+background match to ProceduralTerrains' installed default fog color. The
+software screenshots remained materially unchanged, so that implementation was
+reverted rather than promoted.
+
+Task `SURFACE-SOFTWARE-HORIZON-GRADIENT-001` keeps the same Three.js Scene
+background authority but replaces the software-only solid background with a
+tiny generated 1x8 `DataTexture`. The static gradient remains near-black at
+the zenith and lifts only the horizon band toward the terrain palette; it adds
+no downloaded asset, mesh, animation, scene light, post-process pass or second
+renderer. GPU fallback keeps its existing solid background plus Three.js fog.
+Runtime evidence publishes
+`data-universe-surface-horizon="generated-gradient"` on the software path.
+
 The retained fallback's heavy `terrain.update()` loop also reads the navigation
 coordinator's existing phase ref as a synchronous stop signal. This is
 read-only rendering glue, not another phase authority: the coordinator mutates
