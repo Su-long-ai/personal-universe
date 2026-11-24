@@ -49,6 +49,7 @@ type CinematicCameraProps = {
   surfaceCameraFrame: SurfaceCameraFrame | null;
   systemScaleFrame: SystemScaleFrame | null;
   galaxyViewState: YeisGalaxyViewState | null;
+  worldFrameReady: boolean;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -178,6 +179,7 @@ export function CinematicCamera({
   surfaceCameraFrame,
   systemScaleFrame,
   galaxyViewState,
+  worldFrameReady,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -237,6 +239,8 @@ export function CinematicCamera({
   const scratchNativeQuaternion = useRef(new Quaternion());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
+  const worldFrameReadyRef = useRef(worldFrameReady);
+  worldFrameReadyRef.current = worldFrameReady;
 
   const handleControlsRef = useCallback(
     (controls: CameraControlsApi | null) => {
@@ -286,7 +290,7 @@ export function CinematicCamera({
       const html = document.documentElement;
       if (
         isWorldScalePhase(phase) &&
-        html.dataset.universeWorldReady !== "true"
+        !worldFrameReadyRef.current
       ) {
         html.dataset.universeCameraAwaitingWorldFrame = phase;
         return;
@@ -359,6 +363,17 @@ export function CinematicCamera({
       worldScalePosition,
     ],
   );
+
+  useEffect(() => {
+    if (!worldFrameReady) return;
+    if (
+      document.documentElement.dataset.universeCameraAwaitingWorldFrame !==
+      phase
+    ) {
+      return;
+    }
+    publishIfReached();
+  }, [phase, publishIfReached, worldFrameReady]);
 
   const publishScaleFrameDiagnostics = useCallback(
     (center: Vector3, radius: number) => {
