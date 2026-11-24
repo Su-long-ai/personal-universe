@@ -1,0 +1,127 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-INPUT-DYNAMICS-V2-001",
+  "title": "Device-stable continuous scale input dynamics and takeover lifecycle",
+  "scope": {
+    "level": "implementation",
+    "subject": "Productize the existing System=1 to Surface=5 continuous coordinate with normalized WheelEvent units, reversible gesture sessions, immediate direction takeover, boundary idempotence, and navigation-authority cancellation"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The repository already has one continuous scale coordinate and one UniverseApp input authority. Browser WheelEvent supplies deltaMode but deliberately does not standardize physical device magnitude, so the missing layer is a small deterministic adapter: normalize line/page units into CSS-pixel distance, cap individual samples to bound coalesced or stalled delivery, preserve every signed sample directly in the real scale coordinate, and reset gesture-local evidence on reversal or higher-priority navigation takeover. Existing camera-controls and YEIS wheel ownership remain disabled; no inertia loop, queue, second controller, or phase-step threshold is introduced.",
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://www.w3.org/TR/uievents/#dom-wheelevent-deltamode",
+      "finding": "WheelEvent deltaMode defines pixel, line, and page units; product input must convert these units before mapping distance while retaining the signed delta." 
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/WheelEvent/deltaMode",
+      "finding": "Wheel delta units vary by deltaMode and browser/device, so raw deltaY is not a stable scale-distance input." 
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "The installed camera-controls remains the sole product-world camera executor; its wheel action stays disabled while programmatic continuous coordinates update it." 
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the large-scale renderer/navigation authority; product scale input must not add another camera or physics authority." 
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": ["your-eyes-in-space-mit-e520568"],
+      "source_refs": [3],
+      "conclusion": "Keep the selected Personal Universe/YEIS navigation product and extend its existing coordinator instead of replacing the universe stack."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": ["react-three-fiber"],
+      "source_refs": [3],
+      "conclusion": "Keep the single R3F host and React event boundary; normalization happens before the existing coordinate update."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": ["your-eyes-in-space-mit-e520568"],
+      "source_refs": [3],
+      "conclusion": "Reuse UniverseApp as the sole navigation/input coordinator and retain existing takeover/cancellation entry points."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": ["yomotsu-camera-controls"],
+      "source_refs": [0, 1, 2],
+      "conclusion": "Reuse camera-controls only as the camera executor and implement a small pure WheelEvent unit adapter because camera-controls wheel physics is intentionally not an authority here."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-coordinate-input-adapter",
+      "name": "Pure WheelEvent normalization and gesture session on the existing scale coordinator",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseApp and continuousScale module",
+      "license": "project orchestration over existing MIT stack",
+      "decision": "reuse",
+      "reason": "Preserves the real 1..5 coordinate and sole input/camera authority while adding only missing browser-unit and gesture-lifecycle semantics.",
+      "evaluation": {"coverage": 5, "integration_cost": 1, "license_fit": 5, "maintenance_health": 5, "performance_fit": 5, "customization_fit": 5, "maturity": 5}
+    },
+    {
+      "id": "camera-controls-wheel-physics",
+      "name": "Re-enable camera-controls wheel dolly and damping",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Installed dependency",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "It would create a second wheel/camera authority, add post-release motion, and cannot own cross-renderer semantic scale boundaries.",
+      "evaluation": {"coverage": 2, "integration_cost": 2, "license_fit": 5, "maintenance_health": 5, "performance_fit": 5, "customization_fit": 2, "maturity": 5}
+    },
+    {
+      "id": "phase-threshold-wheel-queue",
+      "name": "Discrete accumulated phase threshold and queued animation",
+      "level": "component_asset",
+      "source": "Legacy product pattern",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Quantizes the coordinate, delays reversal behind stale work, and makes boundary input observable as hidden queued mutations."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Mouse notch and high-resolution trackpad produce comparable direct scale distance",
+      "importance": "high",
+      "coverage": {"existing-coordinate-input-adapter": "full", "camera-controls-wheel-physics": "partial", "phase-threshold-wheel-queue": "none"},
+      "decision": "Normalize deltaMode to CSS-pixel-equivalent distance, then apply a documented bounded transfer function to every sample."
+    },
+    {
+      "capability": "Rapid reversal and takeover supersede old gesture state immediately",
+      "importance": "high",
+      "coverage": {"existing-coordinate-input-adapter": "full", "camera-controls-wheel-physics": "none", "phase-threshold-wheel-queue": "none"},
+      "decision": "Track signed gesture direction/epoch only for evidence and reset it on reversal, Search/Journey/deep-link/manual takeover."
+    },
+    {
+      "capability": "System and Surface boundaries are idempotent with immediate outward recovery",
+      "importance": "high",
+      "coverage": {"existing-coordinate-input-adapter": "full", "camera-controls-wheel-physics": "partial", "phase-threshold-wheel-queue": "none"},
+      "decision": "Clamp the one coordinate, emit boundary evidence without mutating it, and let the next opposite sample move immediately."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": ["existing-coordinate-input-adapter"],
+    "rationale": "Extend the existing pure scale helpers and UniverseApp handler. Normalize WheelEvent units and map bounded signed distance directly to the 1..5 coordinate. Gesture state never drives autonomous frames; it only records segmentation and is invalidated on reversal or authority takeover.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a browser reports pathological deltas, cap only the individual delivered sample while preserving its sign and subsequent samples; never introduce inertia, a hidden queue, or phase-step accumulation."
+  }
+}
