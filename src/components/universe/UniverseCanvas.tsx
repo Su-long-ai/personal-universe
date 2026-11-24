@@ -285,6 +285,9 @@ export function UniverseCanvas({
   }, [phase, systemScaleTargetPlanet]);
 
   const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
+  const prewarmLiveWorld =
+    Boolean(worldPrewarmPlanet) &&
+    (phase === "system" || closeWorldPhase);
   const keepSystemForHandoff =
     phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
   const handoffTargetPlanetId =
@@ -451,6 +454,7 @@ export function UniverseCanvas({
       <CinematicPipeline
         quality={quality}
         liveWorld={liveWorld}
+        prewarmLiveWorld={prewarmLiveWorld}
       />
     </Canvas>
   );
