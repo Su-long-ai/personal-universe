@@ -244,6 +244,52 @@ select {
   color: rgba(202, 239, 241, 0.56);
 }
 
+@media (max-width: 900px) {
+  .universe-hud {
+    top: 16px;
+    left: 16px;
+    padding: 10px 12px;
+  }
+
+  .hud-content {
+    margin-top: 12px;
+  }
+
+  .hud-status strong {
+    margin-top: 4px;
+    font-size: 15px;
+  }
+
+  .hud-destination {
+    margin: 12px 0;
+    padding-left: 10px;
+  }
+
+  .hud-destination small {
+    margin-top: 3px;
+  }
+
+  .hud-collapse,
+  .hud-actions button,
+  .hud-return,
+  .hud-actions select {
+    padding: 6px 8px;
+  }
+
+  .hud-actions label {
+    gap: 3px;
+  }
+
+  .hud-navigate {
+    margin-top: 8px;
+    padding: 7px 8px;
+  }
+
+  .hud-return {
+    margin-top: 8px;
+  }
+}
+
 @media (max-width: 800px) {
   .navigation-failure-notice {
     align-items: stretch;

@@ -1,0 +1,154 @@
+{
+  "schema": 2,
+  "task_id": "MOBILE-HUD-DENSITY-001",
+  "title": "Reduce narrow-screen HUD occlusion without creating a second mobile interface",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing UniverseHud structure and CSS media-query path to reduce vertical HUD density on narrow screens while preserving all controls and one product UI authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted mobile/tablet visual artifacts show the current 320px HUD remains roughly 360px tall because desktop spacing is retained at narrow widths. On 390x844 it covers the upper portion of the world sphere, while the existing DOM structure already contains all required controls and the stylesheet already owns responsive layout through media queries. Reuse that structure: compact padding, vertical margins and button spacing at a narrow-screen breakpoint, keep every control visible, and validate with the existing Playwright mobile/tablet visual cases. Do not introduce a mobile-only HUD component, duplicate state, or a second navigation surface.",
+  "planned_files": [
+    "src/components/universe/universe.css",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries",
+      "finding": "CSS media queries are the native web-platform mechanism for adapting an existing interface to viewport constraints without duplicating application state or component trees."
+    },
+    {
+      "url": "https://react.dev/learn/sharing-state-between-components",
+      "finding": "The existing React HUD already centralizes its product state and controls; keeping one component tree avoids creating parallel mobile state ownership."
+    },
+    {
+      "url": "https://playwright.dev/docs/emulation",
+      "finding": "The existing Playwright suite already emulates tablet and mobile viewports, so responsive HUD changes can be validated in the current release path without a new visual-test framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing UniverseHud React component as the single product-control surface; the gap is responsive density, not missing mobile functionality."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Retain the current React DOM structure and use native CSS media queries rather than branching rendering logic by device."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse the existing mobile/tablet Playwright visual cases as the acceptance subsystem."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "No third-party responsive component is needed; the existing HUD markup plus native CSS spacing rules cover the gap with less state and integration cost."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-hud-responsive-density",
+      "name": "Existing UniverseHud with narrow-screen CSS density overrides",
+      "level": "full_solution",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseHud markup plus native CSS media queries",
+      "license": "MIT React / web platform CSS",
+      "decision": "reuse",
+      "reason": "Preserves one HUD, one state model and all controls while directly removing the excessive desktop vertical spacing seen in hosted mobile screenshots.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "auto-collapsed-mobile-hud",
+      "name": "Viewport-driven automatic collapsed HUD state",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Additional React effect/state policy",
+      "license": "MIT React",
+      "decision": "partial",
+      "reason": "Would reduce occlusion further but changes product behavior and introduces viewport-driven state transitions when spacing alone can retain direct access to all controls.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "separate-mobile-hud",
+      "name": "Dedicated mobile HUD component",
+      "level": "full_solution",
+      "source": "New project-owned mobile component tree",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates controls, responsive logic and product state for a layout-only problem."
+    },
+    {
+      "id": "playwright-existing-mobile-visuals",
+      "name": "Existing Playwright tablet/mobile visual cases",
+      "level": "subsystem",
+      "registry_id": "playwright-test",
+      "source": "Current visual.spec.ts",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Already captures the exact tablet/mobile states where HUD occlusion is visible and runs inside the protected release suite.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-hud-responsive-density",
+      "playwright-existing-mobile-visuals"
+    ],
+    "rationale": "Keep one UniverseHud and one navigation/control state model. Use only narrow-screen CSS spacing overrides to reduce HUD height, then validate the same product states through the existing mobile/tablet Playwright visual cases. Do not auto-collapse by viewport unless spacing proves insufficient, and do not create a parallel mobile component.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If compact spacing still materially obscures world content, adjust only the existing HUD collapsed presentation or the already-approved camera framing path; do not introduce a second mobile HUD."
+  }
+}
