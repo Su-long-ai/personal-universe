@@ -410,17 +410,22 @@ export default function UniverseApp({
     [contentEntries, galaxy.markers],
   );
   const defaultGalaxyScaleFocus = useMemo(() => {
+    // Opening soft focus is a product-tour fallback, not the centre-pick
+    // ranking. Prefer the one world that currently owns the complete
+    // Galaxy=0 -> Surface=5 path so a first-time visitor who simply scrolls
+    // can experience the whole scale journey. Real centre focus still keeps
+    // Personal Signals ahead of Hero, and Search/Places ranking is unchanged.
+    const hero = galaxy.markers.find((marker) => marker.source === "hero");
+    if (hero) {
+      return navigationDestinationForMarker(hero, contentPlacements);
+    }
+
     for (const placement of contentPlacements) {
       const destination = navigationDestinationForPlacement(
         placement,
         galaxy.markers,
       );
       if (destination) return destination;
-    }
-
-    const hero = galaxy.markers.find((marker) => marker.source === "hero");
-    if (hero) {
-      return navigationDestinationForMarker(hero, contentPlacements);
     }
 
     const nativeStar = galaxy.markers.find(
