@@ -265,6 +265,10 @@ export function CinematicCamera({
 
   const manualCameraEnabled =
     phase === "system" || phase === "orbit" || phase === "surface";
+  const liveSurfaceScaleCamera =
+    !surfaceFallbackAvailable &&
+    worldScaleContinuous &&
+    worldScalePosition > 4 + WORLD_SCALE_EPSILON;
   const manualMinDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 1.28
@@ -276,7 +280,9 @@ export function CinematicCamera({
           ? surfaceFallback
             ? 8
             : 0.015
-          : 0.3;
+          : liveSurfaceScaleCamera
+            ? 0.015
+            : 0.3;
   const manualMaxDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 7
