@@ -75,14 +75,26 @@ export function SurfaceTerrain({
         renderer: gl,
         signal: controller.signal,
         configuration: {
-          layout: {
-            chunkCount: 6,
-            chunkSize: 12,
-          },
+          layout: softwareRenderer
+            ? {
+                // Preserve the same 72-unit footprint with fewer chunks so
+                // SwiftShader does less geometry/material preparation.
+                chunkCount: 4,
+                chunkSize: 18,
+              }
+            : {
+                chunkCount: 6,
+                chunkSize: 12,
+              },
           source: {
             kind: "noise",
             seed: 73021,
-            octaves: 7,
+            // The pinned ProceduralTerrains shader specializes its octave
+            // count at compile time. Driver compilation itself cannot be
+            // interrupted, so use the package's formal lower-complexity
+            // configuration on software WebGL instead of starting the
+            // seven-octave shader and trying to cancel it later.
+            octaves: softwareRenderer ? 3 : 7,
             scale: 0.025,
             ridge: 0.7,
             warp: 0.3,
@@ -92,14 +104,27 @@ export function SurfaceTerrain({
           },
           heightScale: 34,
           seaLevel: -20,
+          quality: softwareRenderer
+            ? {
+                lodSegments: [32, 16, 8, 4],
+                lodDistanceScale: 1,
+                morphEnabled: false,
+                mergeEnabled: true,
+                cullingEnabled: true,
+              }
+            : {
+                lodSegments: [64, 32, 16, 8],
+                lodDistanceScale: 1,
+                morphEnabled: true,
+                mergeEnabled: true,
+                cullingEnabled: true,
+              },
           material: {
-            // Detail pages are useful on a real GPU, but their per-frame
-            // streaming/upload path is disproportionately expensive under
-            // SwiftShader. The software fallback keeps the same terrain
-            // geometry/height identity and omits only that optional detail
-            // layer so navigation remains interruptible.
+            // Detail pages and triplanar shading are optional visual layers.
+            // Keep them on real GPUs; omit both from the software fallback so
+            // its non-interruptible prepare/driver compile remains bounded.
             terrainDetailQuality: softwareRenderer ? 0 : 2,
-            terrainTriplanar: true,
+            terrainTriplanar: !softwareRenderer,
           },
           style: {
             paletteSaturation: 0.7,
@@ -140,6 +165,8 @@ export function SurfaceTerrain({
         return;
       }
       terrainViewInitialized.current = false;
+      document.documentElement.dataset.universeSurfaceTerrainProfile =
+        softwareRenderer ? "software-performance" : "gpu-default";
       setTerrain(instance);
       onAnchorHeight?.((instance.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
     })().catch((error) => {
@@ -160,6 +187,7 @@ export function SurfaceTerrain({
       cancelled = true;
       controller.abort();
       instance?.dispose();
+      delete document.documentElement.dataset.universeSurfaceTerrainProfile;
     };
   }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
 
