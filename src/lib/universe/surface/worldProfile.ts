@@ -47,6 +47,7 @@ export interface SurfaceWorldPath {
   from: [number, number];
   to: [number, number];
   width: number;
+  landmarkId?: string;
 }
 
 export interface SurfaceContentAnchor {
@@ -223,6 +224,22 @@ export function rankSurfaceWorldLandmarks(
   return [
     focused,
     ...landmarks.filter((landmark) => landmark.id !== focusedLandmarkId),
+  ];
+}
+
+export function rankSurfaceWorldPaths(
+  paths: readonly SurfaceWorldPath[],
+  focusedLandmarkId: string | null = null,
+): SurfaceWorldPath[] {
+  if (!focusedLandmarkId) return [...paths];
+  const focusedIndex = paths.findIndex(
+    (path) => path.landmarkId === focusedLandmarkId,
+  );
+  if (focusedIndex <= 0) return [...paths];
+  return [
+    paths[focusedIndex]!,
+    ...paths.slice(0, focusedIndex),
+    ...paths.slice(focusedIndex + 1),
   ];
 }
 
@@ -507,6 +524,7 @@ export function buildSurfaceWorldProfile(
     from: index === 0 ? LANDING : pathTargets[index - 1]!.position,
     to: landmark.position,
     width: authored ? 0.18 : 0.13,
+    landmarkId: landmark.id,
   }));
 
   const contentAnchors: SurfaceContentAnchor[] = contentEntries.map(
