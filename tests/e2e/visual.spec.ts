@@ -807,6 +807,10 @@ test("visual: ultrawide close-world composition", async ({ page }, testInfo) => 
       "approach:orbit",
     );
     await expectReadableWorldFrame(page, "ultrawide Approach/Orbit midpoint");
+    await expectViewportContainedLayout(
+      page,
+      "ultrawide Approach/Orbit midpoint",
+    );
   });
 });
 
@@ -1028,6 +1032,10 @@ for (const viewport of [TABLET, MOBILE]) {
             { timeout: 10_000 },
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} System-Approach midpoint`,
+          );
         },
       );
     },
@@ -1063,6 +1071,10 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} Atmosphere-Surface midpoint`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Atmosphere-Surface midpoint`,
+          );
         },
       );
     },
@@ -1107,6 +1119,7 @@ for (const viewport of [TABLET, MOBILE]) {
       await page.goto("/?freeze=1");
       await waitForYeis(page);
       await expect(page.locator(".universe-hud")).toBeVisible();
+      await expectViewportContainedLayout(page, `${viewport.name} Galaxy`);
     });
   });
 
@@ -1176,6 +1189,10 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} Approach/Orbit midpoint`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Approach/Orbit midpoint`,
+          );
         },
       );
     },
@@ -1258,6 +1275,10 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} AUTO Hero surface`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} AUTO Hero surface`,
+          );
         },
       );
     },
