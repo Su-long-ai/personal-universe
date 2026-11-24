@@ -1,4 +1,5 @@
 import type { GalaxyMarker, GalaxyPointCloud } from "../types";
+import { generatedMarkerPopulation } from "./population";
 import { SeededRng } from "./seededRng";
 
 const TAU = Math.PI * 2;
@@ -78,13 +79,16 @@ export function generateProceduralMarkers(seed: string, count = 28): GalaxyMarke
       position = spiralPosition(markerRng.fork("reroll"));
     }
     const markerSeed = `${seed}:system:${index}`;
+    const name = proceduralName(markerRng, index);
+    const spectralType = markerSpectral(markerRng);
     return {
       id: `proc:${index}`,
-      name: proceduralName(markerRng, index),
+      name,
       seed: markerSeed,
       source: "procedural",
       position,
-      spectralType: markerSpectral(markerRng),
+      spectralType,
+      population: generatedMarkerPopulation({ seed: markerSeed, spectralType }),
     };
   });
 }
