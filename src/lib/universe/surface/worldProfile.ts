@@ -517,6 +517,12 @@ export function buildSurfaceWorldProfile(
       );
       const lead = anchors[0]!;
       const region = regions[clusterIndex];
+      const clusterLandmark = landmarks
+        .filter((_, index) => index % regions.length === clusterIndex)
+        .sort(
+          (a, b) =>
+            b.prominence - a.prominence || a.id.localeCompare(b.id),
+        )[0];
 
       return {
         id: `${planet.id}:surface:cluster:${clusterIndex}`,
@@ -525,7 +531,7 @@ export function buildSurfaceWorldProfile(
         center: region?.center ?? LANDING,
         anchorIds: anchors.map((anchor) => anchor.id),
         ...(region ? { regionId: region.id } : {}),
-        ...(lead.landmarkId ? { landmarkId: lead.landmarkId } : {}),
+        ...(clusterLandmark ? { landmarkId: clusterLandmark.id } : {}),
         priority: lead.priority,
       };
     });
