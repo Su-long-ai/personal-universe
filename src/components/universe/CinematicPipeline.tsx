@@ -272,6 +272,11 @@ export function CinematicPipeline({
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
     );
+    if (frameReady) {
+      html.dataset.universeWorldLiveDrawFrame = String(
+        Number(html.dataset.universeWorldLiveDrawFrame ?? "0") + 1,
+      );
+    }
     stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
 
     // A single pending=0 sample is not enough: moving the near-surface camera
