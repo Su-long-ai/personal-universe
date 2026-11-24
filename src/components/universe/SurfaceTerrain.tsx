@@ -566,6 +566,17 @@ export function SurfaceTerrain({
                 : undefined
             }
           >
+            <mesh
+              name={`surface-signal-hit-${anchor.id}`}
+              position={[0, 0.22, 0]}
+            >
+              <sphereGeometry args={[0.3, 8, 6]} />
+              <meshBasicMaterial
+                transparent
+                opacity={0}
+                depthWrite={false}
+              />
+            </mesh>
             <mesh>
               <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
               <meshBasicMaterial
