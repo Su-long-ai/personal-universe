@@ -3,7 +3,10 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   continuousScaleResponseDistance,
 } from "../../src/lib/universe/continuousScale";
-import { nextSurfaceClusterEntryId } from "../../src/lib/universe/surface";
+import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
+  nextSurfaceClusterEntryId,
+} from "../../src/lib/universe/surface";
 import {
   observeRuntime,
   positiveDataset,
@@ -11,21 +14,13 @@ import {
   waitForYeisEngine,
 } from "./support/runtime";
 
-test("Surface cluster cycling keeps every signal reachable within render budgets", () => {
+test("Surface cluster cycling keeps every signal reachable beyond render budgets", () => {
   const anchors = [
-    {
-      id: "ambient",
-      entryId: "ambient",
-      title: "Ambient",
-      position: [0, 0] as [number, number],
-      cluster: 2,
-      priority: "ambient" as const,
-    },
     {
       id: "primary",
       entryId: "primary",
       title: "Primary",
-      position: [1, 0] as [number, number],
+      position: [0, 0] as [number, number],
       cluster: 2,
       priority: "primary" as const,
     },
@@ -33,24 +28,36 @@ test("Surface cluster cycling keeps every signal reachable within render budgets
       id: "secondary",
       entryId: "secondary",
       title: "Secondary",
-      position: [2, 0] as [number, number],
+      position: [1, 0] as [number, number],
       cluster: 2,
       priority: "secondary" as const,
     },
+    ...Array.from({ length: 6 }, (_, index) => ({
+      id: `ambient-${index}`,
+      entryId: `ambient-${index}`,
+      title: `Ambient ${index}`,
+      position: [index + 2, 0] as [number, number],
+      cluster: 2,
+      priority: "ambient" as const,
+    })),
   ];
+  expect(anchors.length).toBeGreaterThan(
+    SURFACE_CONTENT_SIGNAL_BUDGET.stable,
+  );
 
-  const sequence = [
-    nextSurfaceClusterEntryId(anchors, 2),
-    nextSurfaceClusterEntryId(anchors, 2, "primary"),
-    nextSurfaceClusterEntryId(anchors, 2, "secondary"),
-    nextSurfaceClusterEntryId(anchors, 2, "ambient"),
-  ];
-  expect(sequence).toEqual([
+  const sequence: string[] = [];
+  let current: string | null = null;
+  for (let index = 0; index < anchors.length; index += 1) {
+    current = nextSurfaceClusterEntryId(anchors, 2, current);
+    expect(current).not.toBeNull();
+    sequence.push(current!);
+  }
+
+  expect(sequence.slice(0, 2)).toEqual(["primary", "secondary"]);
+  expect(new Set(sequence).size).toBe(anchors.length);
+  expect(nextSurfaceClusterEntryId(anchors, 2, sequence.at(-1)!)).toBe(
     "primary",
-    "secondary",
-    "ambient",
-    "primary",
-  ]);
+  );
 });
 
 async function openNavigator(page: Page) {
