@@ -479,6 +479,18 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     await html.getAttribute("data-universe-world-planet-pass-allocations"),
   );
   expect(planetPassAllocations).toBeGreaterThan(0);
+  await expect(html).toHaveAttribute(
+    "data-universe-world-live-profile",
+    "software-high",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-live-profile-updates",
+    /\d+/,
+  );
+  const liveProfileUpdates = Number(
+    await html.getAttribute("data-universe-world-live-profile-updates"),
+  );
+  expect(liveProfileUpdates).toBeGreaterThan(0);
 
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
@@ -505,6 +517,13 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "true",
     { timeout: 15_000 },
   );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-world-live-profile",
+    /.+/,
+  );
+  expect(
+    Number(await html.getAttribute("data-universe-world-live-profile-updates")),
+  ).toBe(liveProfileUpdates);
   expect(
     Number(await html.getAttribute("data-universe-world-planet-allocations")),
   ).toBe(planetAllocations);
@@ -538,6 +557,13 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "true",
     { timeout: 30_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-live-profile",
+    "software-high",
+  );
+  expect(
+    Number(await html.getAttribute("data-universe-world-live-profile-updates")),
+  ).toBe(liveProfileUpdates);
   expect(
     Number(await html.getAttribute("data-universe-world-planet-allocations")),
   ).toBe(planetAllocations);
