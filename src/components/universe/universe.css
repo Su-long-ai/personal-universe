@@ -554,6 +554,15 @@ select {
     max-height: min(34vh, 310px);
   }
 
+  html[data-universe-navigation-phase="surface"] .world-content-stack {
+    bottom: 198px;
+    max-height: min(30vh, 250px);
+  }
+
+  html[data-universe-navigation-phase="surface"] .world-content-card:nth-child(n + 3) {
+    display: none;
+  }
+
   .world-content-card {
     padding: 10px 12px;
   }
