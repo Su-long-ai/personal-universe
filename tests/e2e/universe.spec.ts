@@ -1852,6 +1852,83 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Search native travel keeps autopilot authority after partial Galaxy scale", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+
+  // Opening Search freezes the retained scale path. Choosing a real native
+  // body is a stronger authority takeover and starts a fresh time-driven YEIS
+  // autopilot. Stale scale cleanup must not cancel that newer trajectory or
+  // write its 0.5 progress override into it.
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Moon");
+  const moon = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ hasText: "Moon" })
+    .first();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/moon",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-target",
+    "c0/moon",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+  );
+
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute("data-universe-travel-complete");
+      return traveling === "c0/moon" || complete === "c0/moon";
+    })
+    .toBe(true);
+  await expect(html).toHaveAttribute(
+    "data-universe-travel-complete",
+    "c0/moon",
+    { timeout: 15_000 },
+  );
+  const travelDeltaPc = Number(
+    await html.getAttribute("data-universe-travel-delta-pc"),
+  );
+  expect(Number.isFinite(travelDeltaPc)).toBeTruthy();
+  expect(travelDeltaPc).toBeGreaterThan(1e-9);
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Guided Journey supersedes a partial Galaxy scale path without stale System handoff", async ({
   page,
 }, testInfo) => {
