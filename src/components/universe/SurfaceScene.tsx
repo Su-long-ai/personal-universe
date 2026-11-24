@@ -353,12 +353,9 @@ export function SurfaceScene({
         (anchor) => anchor.entryId === surfaceFocusEntryId,
       );
       if (focusedAnchor) {
-        document.documentElement.dataset.universeSurfaceFocusEntry =
-          focusedAnchor.entryId;
         document.documentElement.dataset.universeSurfaceFocusAnchor =
           focusedAnchor.id;
       } else {
-        delete document.documentElement.dataset.universeSurfaceFocusEntry;
         delete document.documentElement.dataset.universeSurfaceFocusAnchor;
       }
     }
@@ -377,7 +374,6 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceContentAnchors;
       delete document.documentElement.dataset.universeSurfaceContentClusters;
       delete document.documentElement.dataset.universeSurfacePrimarySignals;
-      delete document.documentElement.dataset.universeSurfaceFocusEntry;
       delete document.documentElement.dataset.universeSurfaceFocusAnchor;
     };
   }, [active, profile, softwareRenderer, surfaceFocusEntryId]);
