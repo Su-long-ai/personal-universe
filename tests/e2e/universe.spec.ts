@@ -506,6 +506,10 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     await html.getAttribute("data-universe-world-live-profile-updates"),
   );
   expect(liveProfileUpdates).toBeGreaterThan(0);
+  const firstHighPaintGeneration = Number(
+    await html.getAttribute("data-universe-world-paint-generation"),
+  );
+  expect(firstHighPaintGeneration).toBeGreaterThanOrEqual(0);
 
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
@@ -532,6 +536,10 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "true",
     { timeout: 15_000 },
   );
+  const lowPaintGeneration = Number(
+    await html.getAttribute("data-universe-world-paint-generation"),
+  );
+  expect(lowPaintGeneration).toBeGreaterThan(firstHighPaintGeneration);
   await expect(html).not.toHaveAttribute(
     "data-universe-world-live-profile",
     /.+/,
@@ -562,6 +570,10 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "procedural-planets-live",
     { timeout: 15_000 },
   );
+  const secondHighPaintGeneration = Number(
+    await html.getAttribute("data-universe-world-paint-generation"),
+  );
+  expect(secondHighPaintGeneration).toBeGreaterThan(lowPaintGeneration);
   await expect(html).toHaveAttribute(
     "data-universe-world-pipeline",
     "procedural-planets-pass",
@@ -955,9 +967,12 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
     expect(targetSuppressed).toBeGreaterThanOrEqual(paintStarted);
     expect(painted).toBeGreaterThan(targetSuppressed);
     expect(settled).toBeGreaterThanOrEqual(painted);
+    return Number(
+      await html.getAttribute("data-universe-world-paint-generation"),
+    );
   };
 
-  await assertFreshPaintHandoff();
+  const firstPaintGeneration = await assertFreshPaintHandoff();
 
   await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
@@ -984,6 +999,10 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
     "data-universe-world-scene-lifecycle",
     "prewarming",
   );
+  const parkedPaintGeneration = Number(
+    await html.getAttribute("data-universe-world-paint-generation"),
+  );
+  expect(parkedPaintGeneration).toBeGreaterThan(firstPaintGeneration);
 
   await page.evaluate(() => {
     const runtimeWindow = window as typeof window & {
@@ -995,7 +1014,8 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
   // Re-entering the same retained world is the important regression case:
   // renderer identity/resources may stay warm, but first-paint authority must
   // be reacquired before System disappears or camera settlement is published.
-  await assertFreshPaintHandoff();
+  const secondPaintGeneration = await assertFreshPaintHandoff();
+  expect(secondPaintGeneration).toBeGreaterThan(parkedPaintGeneration);
 
   await page.evaluate(() => {
     const runtimeWindow = window as typeof window & {
