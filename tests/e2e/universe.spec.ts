@@ -5,7 +5,9 @@ import {
 } from "../../src/lib/universe/continuousScale";
 import {
   SURFACE_CONTENT_SIGNAL_BUDGET,
+  SURFACE_STELLAR_LIGHT_DIRECTION,
   nextSurfaceClusterEntryId,
+  surfaceStellarLightAngles,
 } from "../../src/lib/universe/surface";
 import {
   observeRuntime,
@@ -13,6 +15,21 @@ import {
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+
+test("Surface lighting metadata stays aligned with the close-world stellar axis", () => {
+  const [x, y, z] = SURFACE_STELLAR_LIGHT_DIRECTION;
+  expect(Math.hypot(x, y, z)).toBeCloseTo(1, 8);
+
+  const angles = surfaceStellarLightAngles();
+  expect(angles.elevation).toBeCloseTo(
+    (Math.asin(y) * 180) / Math.PI,
+    8,
+  );
+  expect(angles.azimuth).toBeCloseTo(
+    ((Math.atan2(x, z) * 180) / Math.PI + 360) % 360,
+    8,
+  );
+});
 
 test("Surface cluster cycling keeps every signal reachable beyond render budgets", () => {
   const anchors = [
