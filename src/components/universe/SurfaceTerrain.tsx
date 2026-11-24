@@ -62,12 +62,6 @@ export function SurfaceTerrain({
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
-    if (active) setActivated(true);
-  }, [active]);
-
-  useEffect(() => {
-    if (!activated) return;
-
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
     const controller = new AbortController();
@@ -197,16 +191,14 @@ export function SurfaceTerrain({
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
       delete document.documentElement.dataset.universeSurfaceTerrainWorld;
     };
-  }, [activated, camera, gl, onAnchorHeight, profile.id, softwareRenderer]);
+  }, [camera, gl, onAnchorHeight, profile.id, softwareRenderer]);
 
   useEffect(() => {
-    const lifecycle = !activated
-      ? "idle"
-      : !terrain
-        ? "preparing"
-        : active
-          ? "active"
-          : "parked";
+    const lifecycle = !terrain
+      ? "preparing"
+      : active
+        ? "active"
+        : "parked";
     document.documentElement.dataset.universeSurfaceTerrainLifecycle =
       lifecycle;
     return () => {
@@ -218,7 +210,7 @@ export function SurfaceTerrain({
           .universeSurfaceTerrainLifecycle;
       }
     };
-  }, [active, activated, terrain]);
+  }, [active, terrain]);
 
   useFrame((_, delta) => {
     // `active` is delivered through the R3F reconciler. Read the coordinator
