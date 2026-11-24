@@ -545,6 +545,10 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
       "data-universe-navigation-phase",
       phase,
     );
+    await expect(html).not.toHaveAttribute(
+      "data-universe-camera-settled",
+      phase === "atmosphere" ? "surface" : phase === "orbit" ? "atmosphere" : "orbit",
+    );
     await expect(html).toHaveAttribute(
       "data-universe-camera-settled",
       phase,
@@ -638,15 +642,26 @@ test("Search takeover cancels queued world scale intent", async ({
     box!.y + box!.height * 0.5,
   );
 
-  // Queue the second inward step in the same input burst. On a fast/software
-  // camera Orbit can settle before Playwright observes a transient SETTLING
-  // state, so the release contract must not depend on seeing that instant.
-  await dispatchScaleWheel(page, -120);
+  // Queue both inward steps in one browser task. The first event moves the
+  // coordinator to Orbit synchronously; the second must therefore be recorded
+  // as pending before React/camera settlement can legitimately consume it.
+  // This tests takeover semantics rather than runner-dependent camera speed.
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (const deltaY of [-120, -120]) {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY,
+        }),
+      );
+    }
+  });
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
   );
-  await dispatchScaleWheel(page, -120);
   await expect(html).toHaveAttribute(
     "data-universe-scale-queued",
     "world:+1",
