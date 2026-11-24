@@ -711,6 +711,18 @@ test("the first opening wheel always acquires a scale target", async ({
       { timeout: 10_000 },
     )
     .not.toBeNull();
+
+  // When the opening composition has no explicit centre pick, the soft
+  // fallback must demonstrate the only current full Galaxy→Surface path.
+  if (
+    (await html.getAttribute("data-universe-scale-soft-focus")) ===
+    "consumed-fallback"
+  ) {
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-target",
+      "hero:aurora-01",
+    );
+  }
   await expect(html).toHaveAttribute(
     "data-universe-galaxy-scale-bridge",
     "active",
