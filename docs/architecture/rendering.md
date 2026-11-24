@@ -557,6 +557,31 @@ for the short two-stage first-paint handoff above, but neither case introduces a
 second Canvas, renderer, camera or destination authority. Clearing/changing the
 captured destination releases the retained close-world resource set.
 
+Reverse close-world travel uses the opposite bounded lifetime. The native YEIS
+System is not kept resident through Orbit, Atmosphere or Surface. When
+UniverseCanvas observes a decreasing continuous-scale sample inside Approach it
+latches a reverse-System prewarm only for that Approach interval and mounts the
+existing YeisSystemScene owner with presentation disabled. The owner creates its
+ordinary BodyRenderer/BodyPoints/OrbitLines graph and asks the one shared
+WebGLRenderer to `compileAsync()` that detached native scene. No System scene,
+background, focus callback or scale callback is published while hidden. Crossing
+Approach -> System flips the same mounted owner to active presentation; no second
+native resource construction occurs at the boundary. If shader compilation has
+not completed, navigation still proceeds and the existing prototype Suspense
+fallback remains the presentation fallback rather than introducing another
+renderer authority.
+
+Runtime evidence:
+
+- `data-universe-system-lifecycle="prewarming"` marks the hidden reverse
+  Approach owner;
+- `data-universe-system-prewarm` reports `compiling`, `ready`, or
+  `resources-ready` when asynchronous compile falls back to resource-only
+  prewarm;
+- `data-universe-system-native-allocations` counts native YEIS resource-graph
+  construction and must not increase at the reverse Approach -> System
+  boundary.
+
 The product release gate validates both semantic arrival and renderer readiness;
 screenshots remain evidence, not the authority for navigation state.
 
