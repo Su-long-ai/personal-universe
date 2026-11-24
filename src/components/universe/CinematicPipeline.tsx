@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { PlanetPass } from "procedural-planets";
@@ -61,47 +61,73 @@ export function CinematicPipeline({
 
     const next = new EffectComposer(gl);
     next.addPass(new RenderPass(scene, camera));
-    const planetPass = !fallbackReason
-      ? new PlanetPass(scene, camera, {
-          background: "transparent",
-          output: "linear",
-          impostors: true,
-          impostorPixels: softwareRenderer
-            ? 180
-            : quality === "high"
-              ? 90
-              : 120,
-        })
-      : null;
-    if (planetPass) next.addPass(planetPass);
 
-    // SwiftShader already serializes shader compilation and is the slow path
-    // on hosted Linux runners. Preserve the live Planet/PlanetPass contract
-    // there, but skip the expensive full-frame bloom chain. Real GPU HIGH
-    // quality keeps the existing post-processing path unchanged.
-    if (!softwareRenderer) {
-      next.addPass(
-        new UnrealBloomPass(
+    // Keep the composer topology stable across product quality changes.
+    // PlanetPass is provisioned lazily below only when a live world is
+    // actually requested, then retained and parked for later fallback modes.
+    // This avoids paying its construction cost on AUTO/software while also
+    // preventing LOW/AUTO/HIGH switches from reallocating the whole pipeline.
+    const bloomPass = !softwareRenderer
+      ? new UnrealBloomPass(
           new THREE.Vector2(1, 1),
-          high ? 0.48 : 0.28,
-          high ? 0.48 : 0.36,
+          0.48,
+          0.48,
           1.08,
-        ),
-      );
-    }
+        )
+      : null;
+    if (bloomPass) next.addPass(bloomPass);
     next.addPass(new OutputPass());
+
     const html = document.documentElement;
     const allocations =
       Number(html.dataset.universeWorldPipelineAllocations ?? 0) + 1;
     html.dataset.universeWorldPipelineAllocations = String(allocations);
-    return { composer: next, planetPass, allocation: allocations };
-  }, [camera, fallbackReason, gl, high, quality, scene, softwareRenderer]);
+    return { composer: next, bloomPass, allocation: allocations };
+  }, [camera, gl, scene, softwareRenderer]);
+
+  const planetPassRef = useRef<PlanetPass | null>(null);
+  const [planetPass, setPlanetPass] = useState<PlanetPass | null>(null);
 
   useEffect(() => {
-    if (composer.planetPass) composer.planetPass.enabled = useLiveWorld;
+    if (!fallbackReason && !planetPassRef.current) {
+      const nextPass = new PlanetPass(scene, camera, {
+        background: "transparent",
+        output: "linear",
+        impostors: true,
+        // Use one stable live-renderer budget for the lifetime of this WebGL
+        // host. HIGH keeps its detailed GPU profile; software HIGH retains the
+        // conservative hosted-runner impostor threshold.
+        impostorPixels: softwareRenderer ? 180 : 90,
+      });
+      composer.composer.insertPass(nextPass, 1);
+      planetPassRef.current = nextPass;
+      setPlanetPass(nextPass);
+
+      const html = document.documentElement;
+      html.dataset.universeWorldPlanetPassAllocations = String(
+        Number(html.dataset.universeWorldPlanetPassAllocations ?? 0) + 1,
+      );
+    }
+
+    const retainedPass = planetPassRef.current;
+    if (retainedPass) retainedPass.enabled = useLiveWorld;
     document.documentElement.dataset.universeWorldPipelineLifecycle =
       useLiveWorld ? "active" : "parked";
-  }, [composer, useLiveWorld]);
+  }, [
+    camera,
+    composer,
+    fallbackReason,
+    scene,
+    softwareRenderer,
+    useLiveWorld,
+  ]);
+
+  useEffect(() => {
+    if (composer.bloomPass) {
+      composer.bloomPass.enabled = high;
+    }
+  }, [composer, high]);
+
 
   useEffect(() => {
     if (!liveWorld) {
@@ -124,7 +150,7 @@ export function CinematicPipeline({
       };
     }
 
-    if (!composer.planetPass) {
+    if (!planetPass) {
       delete document.documentElement.dataset.universeWorldPipeline;
       delete document.documentElement.dataset.universeWorldReady;
       return;
@@ -142,7 +168,7 @@ export function CinematicPipeline({
       }
       delete document.documentElement.dataset.universeWorldReady;
     };
-  }, [composer.planetPass, fallbackReason, liveWorld]);
+  }, [planetPass, fallbackReason, liveWorld]);
 
   useEffect(() => {
     // R3F owns the renderer DPR. On software WebGL, cap the actual canvas
@@ -171,7 +197,8 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
-      composer.planetPass?.dispose();
+      planetPassRef.current?.dispose();
+      planetPassRef.current = null;
       composer.composer.dispose();
     };
   }, [composer]);
@@ -222,7 +249,7 @@ export function CinematicPipeline({
       return;
     }
 
-    const renderer = composer.planetPass?.planetRenderer;
+    const renderer = planetPass?.planetRenderer;
     const frameReady = Boolean(
       renderer &&
       renderer.info.planets > 0 &&
