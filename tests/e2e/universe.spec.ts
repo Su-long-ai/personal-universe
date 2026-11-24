@@ -456,6 +456,13 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
+    "data-universe-world-live-draw-frame",
+    /\d+/,
+  );
+  expect(
+    Number(await html.getAttribute("data-universe-world-live-draw-frame")),
+  ).toBeGreaterThanOrEqual(2);
+  await expect(html).toHaveAttribute(
     "data-universe-world-pipeline",
     "procedural-planets-pass",
   );
