@@ -509,3 +509,17 @@ origin and reuses the legacy fallback camera shot. It is not parented, rotated
 or scaled onto the live globe. The primary high-quality path remains the
 continuous ProceduralPlanets globe; the fallback prioritizes correctness and
 availability over pretending to share the live globe frame.
+
+### Surface spatial-focus budget
+
+Both the live ProceduralPlanets tangent layout and the retained
+ProceduralTerrains fallback consume the same deterministic
+`SurfaceWorldProfile`. When a content signal is focused, render-budget ranking
+promotes only the associated signal, cluster, region and landmark; unrelated
+generated ordering is left intact. This matters most on software/LOW tiers,
+where only a bounded subset of landmarks and regions is drawn.
+
+The focused objects are presentation cues, not a new renderer authority. 3D
+signal clicks and the equivalent DOM card/cluster controls feed the same local
+Surface focus callback, while the existing CinematicCamera and destination
+coordinator retain camera and navigation ownership.
