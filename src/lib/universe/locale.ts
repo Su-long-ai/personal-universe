@@ -89,9 +89,9 @@ const TEXT = {
       "Select a planet to approach it. Ordinary worlds remain orbital; Hero worlds may continue below the clouds.",
     contentSignal: "PERSONAL SIGNAL",
     worldSignal: "WORLD SIGNAL",
-    heroSurface: "HERO WORLD // SURFACE MODULE",
+    heroSurface: "PERSONAL UNIVERSE // HOME WORLD",
     surfaceDescription:
-      "Custom surfaces are overrides. The procedural universe does not require every generated planet to carry a handcrafted world.",
+      "A place to land between signals. Search the universe, return to the system, or stay and explore the surface.",
     lockAcquired: "LOCK ACQUIRED",
     orbit: "ORBIT",
     scanMode: "SCAN MODE",
@@ -185,9 +185,9 @@ const TEXT = {
       "选择一颗行星接近。普通世界停留在轨道层；Hero 世界可以继续深入云层之下。",
     contentSignal: "个人信号",
     worldSignal: "世界信号",
-    heroSurface: "HERO 世界 // 地表模块",
+    heroSurface: "个人宇宙 // 主世界",
     surfaceDescription:
-      "自定义地表只作为覆盖层存在；程序化宇宙不要求每颗生成行星都拥有手工制作的世界。",
+      "信号之间的停泊地。搜索宇宙、返回恒星系，或留在这里继续探索地表。",
     lockAcquired: "已锁定",
     orbit: "轨道",
     scanMode: "扫描模式",
