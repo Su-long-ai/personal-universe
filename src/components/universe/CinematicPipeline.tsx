@@ -231,6 +231,11 @@ export function CinematicPipeline({
     }
 
     if (fallbackReason) {
+      // A retained live PlanetPass may have been fully converged before a
+      // quality/capability fallback. Do not carry that convergence token back
+      // across the capability boundary: returning to live rendering must earn
+      // fresh consecutive pending=0 frames.
+      stableFrames.current = 0;
       const surfaceFallback =
         html.dataset.universeNavigationPhase === "surface";
       const presentationReady = surfaceFallback
