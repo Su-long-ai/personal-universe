@@ -81,7 +81,7 @@ const TEXT = {
     heroEyebrow: "PERSONAL UNIVERSE // GALACTIC INDEX",
     heroTitle: "A living map of observed and imagined worlds.",
     heroDescription:
-      "Personal signals are scattered among observed and imagined worlds. Follow one, search for a destination, or keep drifting through the galaxy.",
+      "Personal signals are scattered among observed and imagined worlds. Scroll or use the trackpad to move closer, or open Search / Places to choose a destination.",
     systemWord: "SYSTEM",
     worlds: "worlds",
     personalSignalsDetected: "personal signals detected",
@@ -179,7 +179,7 @@ const TEXT = {
     heroEyebrow: "个人宇宙 // 银河索引",
     heroTitle: "一张连接真实观测与想象世界的动态地图。",
     heroDescription:
-      "个人信号散落在真实观测与想象世界之间。跟随一个信号、搜索目的地，或继续在银河中漫游。",
+      "个人信号散落在真实观测与想象世界之间。滚动鼠标滚轮或触控板向前靠近，也可以打开“搜索 / 地点”选择目的地。",
     systemWord: "恒星系",
     worlds: "个世界",
     personalSignalsDetected: "个个人信号已发现",
