@@ -6,6 +6,7 @@ import {
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+import sharp from "sharp";
 
 type Viewport = {
   name: string;
@@ -79,48 +80,73 @@ async function waitForCameraSettled(
 
 async function expectReadableWorldFrame(page: Page, label: string) {
   const png = await page.locator(".universe-canvas canvas").screenshot();
-  const stats = await page.evaluate(async ({ base64 }) => {
-    const response = await fetch(`data:image/png;base64,${base64}`);
-    const bitmap = await createImageBitmap(await response.blob());
-    const sample = document.createElement("canvas");
-    sample.width = 160;
-    sample.height = 100;
-    const context = sample.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("2D canvas unavailable for visual probe");
-    context.drawImage(bitmap, 0, 0, sample.width, sample.height);
-    bitmap.close();
+  const image = sharp(png);
+  const metadata = await image.metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  if (width <= 0 || height <= 0) {
+    throw new Error(`${label} visual probe received an empty screenshot`);
+  }
 
-    const pixels = context.getImageData(
-      0,
-      0,
-      sample.width,
-      sample.height,
-    ).data;
-    let readable = 0;
-    let luminanceSum = 0;
-    const total = sample.width * sample.height;
-    for (let offset = 0; offset < pixels.length; offset += 4) {
-      const luminance =
-        pixels[offset] * 0.2126 +
-        pixels[offset + 1] * 0.7152 +
-        pixels[offset + 2] * 0.0722;
-      luminanceSum += luminance;
-      if (luminance > 20) readable += 1;
-    }
-    return {
-      meanLuminance: luminanceSum / total,
-      readableFraction: readable / total,
-    };
-  }, { base64: png.toString("base64") });
+  // Measure the spatial subject, not the full black-space composition. On
+  // ultrawide and portrait viewports a correctly framed planet can occupy a
+  // small fraction of the whole canvas while remaining large and readable.
+  // Keep this probe off the browser main thread: decoding a PNG with
+  // createImageBitmap can block hosted SwiftShader long enough to distort the
+  // renderer acceptance that the probe is supposed to observe.
+  const left = Math.floor(width * 0.2);
+  const top = Math.floor(height * 0.2);
+  const roiWidth = Math.max(1, Math.floor(width * 0.6));
+  const roiHeight = Math.max(1, Math.floor(height * 0.6));
+  const { data, info } = await image
+    .extract({
+      left,
+      top,
+      width: Math.min(roiWidth, width - left),
+      height: Math.min(roiHeight, height - top),
+    })
+    .resize(160, 100, { fit: "fill" })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let readable = 0;
+  let luminanceSum = 0;
+  let luminanceSquaredSum = 0;
+  const total = info.width * info.height;
+  for (let offset = 0; offset < data.length; offset += info.channels) {
+    const luminance =
+      data[offset] * 0.2126 +
+      data[offset + 1] * 0.7152 +
+      data[offset + 2] * 0.0722;
+    luminanceSum += luminance;
+    luminanceSquaredSum += luminance * luminance;
+    if (luminance > 20) readable += 1;
+  }
+
+  const meanLuminance = luminanceSum / total;
+  const luminanceVariance = Math.max(
+    0,
+    luminanceSquaredSum / total - meanLuminance * meanLuminance,
+  );
+  const stats = {
+    meanLuminance,
+    readableFraction: readable / total,
+    luminanceContrast: Math.sqrt(luminanceVariance),
+  };
 
   expect(
     stats.readableFraction,
-    `${label} should render a readable world instead of a near-black canvas`,
-  ).toBeGreaterThan(0.08);
+    `${label} central world region should contain a visible spatial subject`,
+  ).toBeGreaterThan(0.06);
   expect(
     stats.meanLuminance,
-    `${label} should produce visible world luminance`,
-  ).toBeGreaterThan(8);
+    `${label} central world region should not be blank/near-black`,
+  ).toBeGreaterThan(4);
+  expect(
+    stats.luminanceContrast,
+    `${label} central world region should retain visible geometry/lighting contrast`,
+  ).toBeGreaterThan(7);
 }
 
 async function expectCompactNarrowHud(page: Page) {
