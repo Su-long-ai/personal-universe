@@ -11,6 +11,7 @@ import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
 import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
   rankSurfaceWorldLandmarks,
@@ -381,9 +382,12 @@ export function SurfaceTerrain({
   const visibleRegions = softwareRenderer
     ? rankedRegions.slice(0, 2)
     : rankedRegions;
-  const visibleContent = softwareRenderer
-    ? rankedContent.slice(0, 3)
-    : rankedContent;
+  const visibleContent = rankedContent.slice(
+    0,
+    softwareRenderer
+      ? SURFACE_CONTENT_SIGNAL_BUDGET.software
+      : SURFACE_CONTENT_SIGNAL_BUDGET.stable,
+  );
 
   useEffect(() => {
     document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
