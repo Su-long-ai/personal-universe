@@ -11,6 +11,9 @@ async function openNavigator(page: Page) {
   await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".navigator-header span")).toHaveText(
+    "PERSONAL UNIVERSE // SEARCH + PLACES",
+  );
   return dialog;
 }
 
@@ -865,6 +868,11 @@ test("Chinese and English switch in place and persist", async ({
   const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
+  await expect(
+    page.getByText(
+      "Personal signals are scattered among observed and imagined worlds. Scroll or use the trackpad to move closer, or open Search / Places to choose a destination.",
+    ),
+  ).toBeVisible();
 
   let mainFrameNavigations = 0;
   page.on("framenavigated", (frame) => {
@@ -889,6 +897,11 @@ test("Chinese and English switch in place and persist", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /搜索 \/ 地点/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "个人信号散落在真实观测与想象世界之间。滚动鼠标滚轮或触控板向前靠近，也可以打开“搜索 / 地点”选择目的地。",
+    ),
   ).toBeVisible();
   expect(mainFrameNavigations).toBe(0);
 
