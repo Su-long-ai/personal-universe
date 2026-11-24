@@ -89,7 +89,7 @@ export function CinematicPipeline({
   const [planetPass, setPlanetPass] = useState<PlanetPass | null>(null);
 
   useEffect(() => {
-    if (!fallbackReason && !planetPassRef.current) {
+    if (useLiveWorld && !planetPassRef.current) {
       const nextPass = new PlanetPass(scene, camera, {
         background: "transparent",
         output: "linear",
