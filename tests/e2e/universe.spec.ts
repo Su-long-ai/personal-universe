@@ -704,6 +704,40 @@ test("generated secondary terrestrial worlds receive deterministic Surface produ
   await runtime.assertClean(testInfo);
 });
 
+test("default YEIS secondary terrestrial world reaches the shared Surface product @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=c0&body=yeis-planet%3Aearth&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 30_000 },
+  );
+  await page.getByLabel("QUALITY").selectOption("low");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 60_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-profile",
+    /^surface:/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-biome",
+    /.+/,
+  );
+  await expect(page.locator(".surface-world-meta")).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("LOW fallback prewarm cancels on immediate reverse and resumes before Surface", async ({
   page,
 }, testInfo) => {
