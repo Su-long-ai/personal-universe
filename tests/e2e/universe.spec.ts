@@ -1484,11 +1484,14 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     destinationBefore,
   );
 
-  // The identity assertions above are allowed to exceed the 260ms gesture
+  // The identity assertions above may exceed the single-sample gesture
   // reset. Start a fresh trackpad-like gesture and cross the threshold inside
   // one reset window; Journey must stay stopped while manual scale resumes.
+  // Chromium can coalesce tiny automation-level mouse.wheel samples; use the
+  // same DOM WheelEvent accumulator probe as the dedicated trackpad contract.
+  // The first page.mouse.wheel above still validates real pointer takeover.
   for (let index = 0; index < 5; index += 1) {
-    await page.mouse.wheel(0, -16);
+    await dispatchScaleWheel(page, -16);
     await page.waitForTimeout(20);
   }
 
