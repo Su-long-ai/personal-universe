@@ -7,6 +7,8 @@ import { hashSeed, SeededRng } from "../generation/seededRng";
 
 export type SurfaceRgb = [number, number, number];
 
+export type SurfaceContentPriority = "primary" | "secondary" | "ambient";
+
 export interface SurfaceTerrainPalette {
   sand: SurfaceRgb;
   dune: SurfaceRgb;
@@ -55,6 +57,18 @@ export interface SurfaceContentAnchor {
   landmarkId?: string;
   regionId?: string;
   cluster: number;
+  priority: SurfaceContentPriority;
+}
+
+export interface SurfaceContentCluster {
+  id: string;
+  index: number;
+  label: string;
+  center: [number, number];
+  anchorIds: string[];
+  regionId?: string;
+  landmarkId?: string;
+  priority: SurfaceContentPriority;
 }
 
 export interface SurfaceWorldProfile {
@@ -102,6 +116,7 @@ export interface SurfaceWorldProfile {
   landmarks: SurfaceWorldLandmark[];
   paths: SurfaceWorldPath[];
   contentAnchors: SurfaceContentAnchor[];
+  contentClusters: SurfaceContentCluster[];
 }
 
 const LANDING: [number, number] = [0.4, -5.4];
@@ -137,6 +152,33 @@ const LANDMARK_KINDS: readonly SurfaceWorldLandmark["kind"][] = [
   "grove",
   "archive",
 ];
+
+const SURFACE_CONTENT_PRIORITY_WEIGHT: Record<SurfaceContentPriority, number> = {
+  primary: 3,
+  secondary: 2,
+  ambient: 1,
+};
+
+function surfaceContentPriority(entry: {
+  featured?: boolean;
+  importance?: number;
+}): SurfaceContentPriority {
+  if (entry.featured || (entry.importance ?? 0) >= 4) return "primary";
+  if ((entry.importance ?? 0) >= 3) return "secondary";
+  return "ambient";
+}
+
+export function rankSurfaceContentAnchors(
+  anchors: readonly SurfaceContentAnchor[],
+): SurfaceContentAnchor[] {
+  return [...anchors].sort(
+    (a, b) =>
+      SURFACE_CONTENT_PRIORITY_WEIGHT[b.priority] -
+        SURFACE_CONTENT_PRIORITY_WEIGHT[a.priority] ||
+      a.title.localeCompare(b.title) ||
+      a.id.localeCompare(b.id),
+  );
+}
 
 function rgb(hex: string): SurfaceRgb {
   const value = Number.parseInt(hex.replace("#", ""), 16);
@@ -451,9 +493,42 @@ export function buildSurfaceWorldProfile(
         cluster:
           hashSeed(`${planet.seed}:${key}:cluster`) %
           Math.max(1, Math.min(3, regions.length)),
+        priority: surfaceContentPriority(entry),
       };
     },
   );
+
+  const contentClusters: SurfaceContentCluster[] = Array.from(
+    new Set(contentAnchors.map((anchor) => anchor.cluster)),
+  )
+    .sort((a, b) => a - b)
+    .map((clusterIndex) => {
+      const anchors = rankSurfaceContentAnchors(
+        contentAnchors.filter((anchor) => anchor.cluster === clusterIndex),
+      );
+      const lead = anchors[0]!;
+      const region = regions.find((candidate) => candidate.id === lead.regionId);
+      const center = anchors.reduce<[number, number]>(
+        (sum, anchor) => [
+          sum[0] + anchor.position[0],
+          sum[1] + anchor.position[1],
+        ],
+        [0, 0],
+      );
+      center[0] /= anchors.length;
+      center[1] /= anchors.length;
+
+      return {
+        id: `${planet.id}:surface:cluster:${clusterIndex}`,
+        index: clusterIndex,
+        label: region?.name ?? biome,
+        center,
+        anchorIds: anchors.map((anchor) => anchor.id),
+        ...(lead.regionId ? { regionId: lead.regionId } : {}),
+        ...(lead.landmarkId ? { landmarkId: lead.landmarkId } : {}),
+        priority: lead.priority,
+      };
+    });
 
   const terrainRng = rng.fork("terrain");
   const lightRng = rng.fork("light");
@@ -526,5 +601,6 @@ export function buildSurfaceWorldProfile(
     landmarks,
     paths,
     contentAnchors,
+    contentClusters,
   };
 }
