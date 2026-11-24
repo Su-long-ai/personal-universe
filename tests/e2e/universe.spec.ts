@@ -3622,6 +3622,81 @@ test("Earth body navigation preserves async search and shareable return flow", a
   await runtime.assertClean(testInfo);
 });
 
+test("Guided Journey share URL reloads the same canonical route and Stop clears route params", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const featuredJourney = dialog.getByRole("button", {
+    name: /Featured Journey/,
+  });
+  await expect(featuredJourney).toBeEnabled();
+  await featuredJourney.click();
+
+  const controls = page.locator(".universe-journey-controls");
+  const html = page.locator("html");
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-route",
+    "featured",
+  );
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return [
+        url.searchParams.get("journey"),
+        url.searchParams.get("journeyStep"),
+      ].join(":");
+    })
+    .toBe("featured:0");
+
+  const sharedUrl = page.url();
+  const sharedDestination = new URL(sharedUrl).searchParams.get(
+    "destination",
+  );
+  expect(sharedDestination).toMatch(/^personal:/);
+
+  await page.goto(sharedUrl);
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-journey",
+    "Featured Journey",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-route",
+    "featured",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-deep-link",
+    "featured:0",
+  );
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    sharedDestination!,
+    { timeout: 20_000 },
+  );
+
+  await controls
+    .getByRole("button", { name: /Stop guided journey/i })
+    .click();
+  await expect(controls).toBeHidden();
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  const stoppedUrl = new URL(page.url());
+  expect(stoppedUrl.searchParams.get("journey")).toBeNull();
+  expect(stoppedUrl.searchParams.get("journeyStep")).toBeNull();
+  expect(stoppedUrl.searchParams.get("destination")).toBe(
+    sharedDestination,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Guided Journey auto advance starts only after the destination settles", async ({
   page,
 }, testInfo) => {
