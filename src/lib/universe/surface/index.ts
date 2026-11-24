@@ -10,6 +10,11 @@ export {
   surfaceModeForArchetype,
   supportsSurfaceArchetype,
 } from "./worldProfile";
+export {
+  SURFACE_STELLAR_LIGHT_DIRECTION,
+  SURFACE_STELLAR_SOURCE_POSITION,
+  surfaceStellarLightAngles,
+} from "./stellarLighting";
 export type {
   SurfaceContentAnchor,
   SurfaceContentCluster,
