@@ -448,4 +448,39 @@ for (const viewport of [TABLET, MOBILE]) {
       );
     },
   );
+
+  test(
+    `visual: ${viewport.name} Hero surface`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "hero-surface-auto",
+        async () => {
+          await page.goto(
+            "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          const html = page.locator("html");
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-renderer",
+            "procedural-terrains-fallback",
+            { timeout: 60_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-terrain-state",
+            "ready",
+            { timeout: 60_000 },
+          );
+          await waitForCameraSettled(page, "surface");
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} AUTO Hero surface`,
+          );
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
 }
