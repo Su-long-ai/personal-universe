@@ -715,9 +715,9 @@ export function PlanetScene({
     document.documentElement.dataset.universeWorldSceneLifecycle =
       worldPresentationActive
         ? "active"
-        : presentationActive
-          ? "parked"
-          : "prewarming";
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
     return () => {
       publishPaintReady(false);
       delete document.documentElement.dataset.universeWorldSceneReady;
@@ -730,10 +730,10 @@ export function PlanetScene({
     document.documentElement.dataset.universeWorldSceneLifecycle =
       worldPresentationActive
         ? "active"
-        : presentationActive
-          ? "parked"
-          : "prewarming";
-  }, [presentationActive, worldPresentationActive]);
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
+  }, [phase, presentationActive, worldPresentationActive]);
 
   useEffect(() => {
     const capability = fallbackReason
@@ -791,7 +791,12 @@ export function PlanetScene({
   useFrame((_, delta) => {
     // Once landed, keep the terrain under the visitor fixed. Orbit/approach
     // retain the subtle planetary rotation.
-    if (livePlanet && !fallbackReason && phase !== "surface") {
+    if (
+      worldPresentationActive &&
+      livePlanet &&
+      !fallbackReason &&
+      phase !== "surface"
+    ) {
       livePlanet.rotation.y += delta * 0.014;
     }
 
