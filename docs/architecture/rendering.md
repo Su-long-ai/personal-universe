@@ -126,8 +126,15 @@ The retained fallback's heavy `terrain.update()` loop also reads the navigation
 coordinator's existing phase ref as a synchronous stop signal. This is
 read-only rendering glue, not another phase authority: the coordinator mutates
 that ref before scheduling React state, so a hosted software-WebGL frame cannot
-run one more stale Surface terrain update and starve the R3F phase/camera
-handoff while the prop update is still queued.
+start new stale Surface terrain work after an outward intent.
+
+ProceduralTerrains' finite runtime performs LOD/culling on every `update()`
+and optionally drives its detail-page cache. On a software renderer the
+fallback therefore disables that optional detail layer and invokes
+`terrain.update()` only for the first visible view or a real camera/projection
+change. Manual camera movement and resize still refresh terrain normally; a
+stationary Surface no longer repeats identical SwiftShader work every frame.
+Real-GPU fallback keeps the package's normal per-frame update cadence.
 
 ## Fallback rules
 
