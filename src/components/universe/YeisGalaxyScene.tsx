@@ -277,7 +277,7 @@ export function YeisGalaxyScene({
   onScaleManualTakeover,
   quality,
   reducedMotion,
-  scalePosition,
+  scalePositionRef,
   scaleTarget,
   scaleBridgeRef,
   viewStateRef,
@@ -298,7 +298,7 @@ export function YeisGalaxyScene({
   onScaleManualTakeover?: () => void;
   quality: QualityMode;
   reducedMotion: boolean;
-  scalePosition: number;
+  scalePositionRef: MutableRefObject<number>;
   scaleTarget: UniverseNavigationDestination | null;
   scaleBridgeRef: MutableRefObject<YeisGalaxyScaleBridgeState | null>;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -335,11 +335,9 @@ export function YeisGalaxyScene({
   const scaleFocusFrameRef = useRef(0);
   const scaleBridgeControllerKeyRef = useRef<string | null>(null);
   const scaleBridgeAutopilotRevisionRef = useRef<number | null>(null);
-  const scalePositionRef = useRef(scalePosition);
   const scaleTargetRef =
     useRef<UniverseNavigationDestination | null>(scaleTarget);
 
-  scalePositionRef.current = scalePosition;
   scaleTargetRef.current = scaleTarget;
 
   useEffect(() => {

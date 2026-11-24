@@ -309,7 +309,12 @@ export default function UniverseApp({
   const [worldScalePosition, setWorldScalePosition] =
     useState(GALAXY_SCALE_MIN);
   const worldScalePositionRef = useRef(GALAXY_SCALE_MIN);
-  worldScalePositionRef.current = worldScalePosition;
+  useEffect(() => {
+    // React state mirrors semantic/renderer boundaries. The Galaxy 0->1 hot
+    // path writes the physical coordinate straight through this ref so high-
+    // frequency wheel/trackpad samples do not rerender the product tree.
+    worldScalePositionRef.current = worldScalePosition;
+  }, [worldScalePosition]);
   const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
   const [galaxyScaleTarget, setGalaxyScaleTarget] =
     useState<UniverseNavigationDestination | null>(null);
@@ -2156,7 +2161,15 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleBlocked;
 
             worldScalePositionRef.current = nextPosition;
-            setWorldScalePosition(nextPosition);
+            // Galaxy scale is a native imperative camera coordinate. Keep
+            // React state for the two semantic endpoints only; intermediate
+            // samples are consumed directly by YEIS through the shared ref.
+            if (
+              nextPosition === GALAXY_SCALE_MIN ||
+              nextPosition === SYSTEM_SCALE_MIN
+            ) {
+              setWorldScalePosition(nextPosition);
+            }
             setWorldScaleContinuous(true);
             document.documentElement.dataset.universeScalePosition =
               nextPosition.toFixed(3);
@@ -2679,6 +2692,7 @@ export default function UniverseApp({
           phase={phase}
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
+          worldScalePositionRef={worldScalePositionRef}
           worldScaleContinuous={worldScaleContinuous}
           galaxyScaleTarget={galaxyScaleTarget}
           engineMode={activeEngine}
