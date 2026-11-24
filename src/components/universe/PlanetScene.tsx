@@ -16,6 +16,8 @@ import {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
@@ -191,13 +193,6 @@ function LiveSurfaceAnchor({
   const visiblePaths = expanded
     ? profile.paths.slice(0, 4)
     : profile.paths.slice(0, 1);
-  const visibleRegions = expanded ? profile.regions.slice(0, 4) : [];
-  const visibleLandmarks = expanded
-    ? profile.landmarks.slice(0, 6)
-    : profile.landmarks
-        .slice()
-        .sort((a, b) => b.prominence - a.prominence)
-        .slice(0, 2);
   const rankedContent = useMemo(
     () =>
       rankSurfaceContentAnchors(
@@ -209,6 +204,26 @@ function LiveSurfaceAnchor({
   const focusedAnchor =
     rankedContent.find((anchor) => anchor.entryId === surfaceFocusEntryId) ??
     null;
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const rankedLandmarks = useMemo(
+    () =>
+      rankSurfaceWorldLandmarks(
+        profile.landmarks,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.landmarks],
+  );
+  const visibleRegions = expanded ? rankedRegions.slice(0, 4) : [];
+  const visibleLandmarks = expanded
+    ? rankedLandmarks.slice(0, 6)
+    : rankedLandmarks.slice(0, 2);
   const visibleContent = expanded
     ? rankedContent.slice(0, 6)
     : rankedContent.slice(0, 1);
@@ -318,10 +333,12 @@ function LiveSurfaceAnchor({
 
         {visibleRegions.map((region) => {
           const point = tangentPoint(region.center);
-          const radius = Math.max(
-            0.009,
-            region.radius * LIVE_SURFACE_LAYOUT_SCALE * 0.16,
-          );
+          const focused = region.id === focusedAnchor?.regionId;
+          const radius =
+            Math.max(
+              0.009,
+              region.radius * LIVE_SURFACE_LAYOUT_SCALE * 0.16,
+            ) * (focused ? 1.12 : 1);
           return (
             <mesh
               key={region.id}
@@ -330,9 +347,9 @@ function LiveSurfaceAnchor({
             >
               <ringGeometry args={[radius * 0.68, radius, 20]} />
               <meshBasicMaterial
-                color={profile.accent}
+                color={focused ? "#fff0cf" : profile.accent}
                 transparent
-                opacity={0.14}
+                opacity={focused ? 0.32 : 0.14}
                 depthWrite={false}
                 side={THREE.DoubleSide}
               />
@@ -342,7 +359,9 @@ function LiveSurfaceAnchor({
 
         {visibleLandmarks.map((landmark) => {
           const point = tangentPoint(landmark.position);
-          const scale = 0.006 + landmark.scale * 0.0045;
+          const focused = landmark.id === focusedAnchor?.landmarkId;
+          const scale =
+            (0.006 + landmark.scale * 0.0045) * (focused ? 1.16 : 1);
           return (
             <mesh
               key={landmark.id}
@@ -357,9 +376,13 @@ function LiveSurfaceAnchor({
                 <coneGeometry args={[0.55, 1.4, 6]} />
               )}
               <meshBasicMaterial
-                color={profile.accent}
+                color={focused ? "#fff0cf" : profile.accent}
                 transparent
-                opacity={0.36 + landmark.prominence * 0.28}
+                opacity={
+                  focused
+                    ? 0.84
+                    : 0.36 + landmark.prominence * 0.28
+                }
               />
             </mesh>
           );
