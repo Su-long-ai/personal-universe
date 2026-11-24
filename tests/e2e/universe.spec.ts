@@ -672,6 +672,10 @@ test("entered HIGH world parks through Galaxy and reuses live allocations @webgl
     "data-universe-world-pipeline-lifecycle",
     "parked",
   );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    /.+/,
+  );
   expect(await page.locator("canvas").count()).toBe(1);
   expect(
     Number(await html.getAttribute("data-universe-world-planet-allocations")),
@@ -693,6 +697,10 @@ test("entered HIGH world parks through Galaxy and reuses live allocations @webgl
     "data-universe-world-paint-ready",
     "true",
     { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    /\d+/,
   );
 
   expect(
