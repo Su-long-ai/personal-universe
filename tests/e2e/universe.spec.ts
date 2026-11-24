@@ -34,59 +34,96 @@ async function wheelScale(
   const startingPhase = await html.getAttribute(
     "data-universe-navigation-phase",
   );
-  const continuousScaleDomain = [
-    "galaxy",
-    "system",
-    "approach",
-    "orbit",
-    "atmosphere",
-    "surface",
-  ].includes(startingPhase ?? "");
-  const deltaY = direction === "in" ? -120 : 120;
-
-  if (!continuousScaleDomain) {
-    await page.mouse.wheel(0, deltaY);
-    await page.waitForTimeout(320);
-    return;
-  }
-
   const startingPosition = Number(
     await html.getAttribute("data-universe-scale-position"),
   );
-  if (!Number.isFinite(startingPosition)) {
-    await page.mouse.wheel(0, deltaY);
-    await page.waitForTimeout(320);
-    return;
-  }
+  const deltaY = direction === "in" ? -120 : 120;
 
-  // A semantic phase boundary can occur halfway between authored camera
-  // anchors on the continuous coordinate (for example 4.0 -> 3.5 changes
-  // Atmosphere to Orbit). The helper therefore advances to the next integer
-  // scale anchor, not merely until the phase label changes. Settlement is only
-  // expected at those anchors.
-  const targetPosition =
-    direction === "in"
-      ? Math.min(5, Math.ceil(startingPosition + 0.001))
-      : Math.max(0, Math.floor(startingPosition - 0.001));
+  const worldAnchor: Record<string, number> = {
+    approach: 2,
+    orbit: 3,
+    atmosphere: 4,
+    surface: 5,
+  };
+  const nextWorldPhase: Record<string, { in?: string; out?: string }> = {
+    approach: { in: "orbit", out: "system" },
+    orbit: { in: "atmosphere", out: "approach" },
+    atmosphere: { in: "surface", out: "orbit" },
+    surface: { out: "atmosphere" },
+  };
+  const expectedWorldPhase =
+    startingPhase && nextWorldPhase[startingPhase]
+      ? nextWorldPhase[startingPhase][direction]
+      : undefined;
+  const targetWorldAnchor =
+    expectedWorldPhase && worldAnchor[expectedWorldPhase];
 
-  for (let sample = 0; sample < 12; sample += 1) {
+  // This helper means "complete one semantic scale interval" for legacy
+  // settled-phase tests. Individual browser samples remain real proportional
+  // wheel input; tests that assert sub-phase continuity use dispatchScaleWheel
+  // directly. In reverse, crossing a phase boundary at e.g. 3.5 is not enough:
+  // continue to the destination phase's authored anchor at 3.0 before a test
+  // may expect camera-settled=orbit.
+  for (let sample = 0; sample < 10; sample += 1) {
     await page.mouse.wheel(0, deltaY);
     await page.waitForTimeout(80);
 
+    const phaseAfterSample = await html.getAttribute(
+      "data-universe-navigation-phase",
+    );
     const blocked = await html.getAttribute("data-universe-scale-blocked");
     const position = Number(
       await html.getAttribute("data-universe-scale-position"),
     );
-    if (!Number.isFinite(position)) break;
 
-    const reached =
-      direction === "in"
-        ? position >= targetPosition - 0.001
-        : position <= targetPosition + 0.001;
-    if (reached || blocked) {
-      // Renderer authority can change exactly at 1/2, so allow the matched
-      // endpoint frame to paint before callers assert phase/camera evidence.
-      await page.waitForTimeout(160);
+    if (blocked) break;
+
+    if (startingPhase === "galaxy") {
+      if (direction === "out") break;
+      if (phaseAfterSample === "system") break;
+      if (Number.isFinite(position) && position >= 0.999) {
+        // Renderer handoff is paint-gated; more wheel input would overshoot.
+        await page.waitForTimeout(160);
+        break;
+      }
+      continue;
+    }
+
+    if (startingPhase === "system") {
+      if (direction === "out") {
+        if (phaseAfterSample === "galaxy") break;
+        continue;
+      }
+      if (phaseAfterSample === "approach") break;
+      if (Number.isFinite(position) && position >= 1.999) {
+        await page.waitForTimeout(160);
+        break;
+      }
+      continue;
+    }
+
+    if (expectedWorldPhase === "system") {
+      if (phaseAfterSample === "system") break;
+      continue;
+    }
+
+    if (
+      expectedWorldPhase &&
+      Number.isFinite(targetWorldAnchor) &&
+      Number.isFinite(position) &&
+      Math.abs(position - targetWorldAnchor) <= 0.01 &&
+      phaseAfterSample === expectedWorldPhase
+    ) {
+      break;
+    }
+
+    // Surface inward is a true hard limit. A missing/legacy scale-position
+    // attribute should also remain a single physical input instead of causing
+    // a test helper to synthesize an arbitrary gesture.
+    if (
+      (startingPhase === "surface" && direction === "in") ||
+      (!Number.isFinite(startingPosition) && !Number.isFinite(position))
+    ) {
       break;
     }
   }
