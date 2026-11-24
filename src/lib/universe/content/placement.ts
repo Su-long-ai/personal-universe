@@ -14,6 +14,7 @@ export function placeUniverseContent(
   if (entries.length === 0 || markers.length === 0) return [];
 
   const hero = markers.find((marker) => marker.source === "hero");
+  const hasYeisAuthority = markers.some((marker) => marker.engine === "yeis");
   const autoMarkers = markers.filter(
     (marker) =>
       marker.engine === "yeis" &&
@@ -32,11 +33,30 @@ export function placeUniverseContent(
       marker = hero;
     } else if (entry.placement === "pinned") {
       marker = resolvePinnedMarker(entry, markers);
+
+      // YEIS navigation can materialize native stars lazily even when they are
+      // outside the intentionally small Galaxy marker sample. Keep the
+      // authored Personal Signal alive as a virtual placement, then let the
+      // existing markerForYeisStarId path resolve the real spatial target.
+      if (
+        !marker &&
+        hasYeisAuthority &&
+        entry.starId &&
+        isLazyYeisNativeId(entry.starId)
+      ) {
+        placements.push({
+          entry,
+          markerId: `yeis:${entry.starId}`,
+          nativeId: entry.starId,
+          planetSlotSeed: stableHash(`${placementKey}:planet`),
+        });
+        continue;
+      }
     } else {
       marker = chooseRendezvousMarker(placementKey, autoMarkers, used);
     }
 
-    // Pinned content must never silently drift to another star.
+    // Pinned non-YEIS marker IDs must never silently drift to another star.
     if (!marker) continue;
 
     used.add(markerIdentity(marker));
@@ -120,6 +140,10 @@ function resolvePinnedMarker(
       marker.nativeId === entry.starId ||
       marker.id === entry.starId,
   );
+}
+
+function isLazyYeisNativeId(value: string): boolean {
+  return value === "h-aurora" || /^c(?:0|[1-9]\d*)$/.test(value);
 }
 
 function chooseRendezvousMarker(

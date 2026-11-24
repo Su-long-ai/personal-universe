@@ -742,10 +742,7 @@ export function validateUniverseContentCatalog(
       }
     }
 
-    for (const alias of [
-      ...(entry.aliases?.en ?? []),
-      ...(entry.aliases?.zh ?? []),
-    ]) {
+    for (const alias of universeContentAliases(entry)) {
       const key = normalizedAlias(alias);
       if (!key) continue;
       const previous = aliasOwner.get(key);
@@ -755,7 +752,7 @@ export function validateUniverseContentCatalog(
           entryId: entry.id,
           path: "aliases",
           message:
-            'Discovery alias "' +
+            'Discovery name "' +
             alias +
             '" is ambiguous between "' +
             previous +

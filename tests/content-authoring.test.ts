@@ -27,7 +27,10 @@ import {
   validateUniverseContentMediaPresence,
   universeContentSearchTerms,
 } from "../src/lib/universe/content/authoring.ts";
-import { placementForContentReference } from "../src/lib/universe/content/placement.ts";
+import {
+  placeUniverseContent,
+  placementForContentReference,
+} from "../src/lib/universe/content/placement.ts";
 import type {
   UniverseContentEntry,
   UniverseContentPlacement,
@@ -150,12 +153,20 @@ test("bilingual authored copy becomes deterministic discovery metadata", () => {
   ].sort((a, b) => a.localeCompare(b)));
 });
 
-test("explicit aliases cannot become ambiguous across content", () => {
+test("authored discovery names cannot become ambiguous across content", () => {
   const issues = validateUniverseContentCatalog([
-    entry({ id: "alpha", aliases: { en: ["shared"] } }),
-    entry({ id: "beta", aliases: { zh: ["Shared"] } }),
+    entry({ id: "alpha", title: "Alpha title", aliases: { en: ["shared"] } }),
+    entry({ id: "beta", title: "Shared" }),
+    entry({
+      id: "gamma",
+      title: "Gamma",
+      i18n: { zh: { title: "冲突标题" } },
+    }),
+    entry({ id: "delta", title: "Delta", aliases: { zh: ["冲突标题"] } }),
   ]);
-  assert.ok(issues.some((issue) => issue.code === "ambiguous_alias"));
+  assert.ok(
+    issues.filter((issue) => issue.code === "ambiguous_alias").length >= 2,
+  );
 });
 
 test("broken relations fail before product data is emitted", () => {
