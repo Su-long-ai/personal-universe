@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { createTerrain, type FiniteTerrain } from "procedural-terrains";
 import * as THREE from "three";
+import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
 
@@ -12,6 +19,11 @@ const ROCKS = [
   { x: -9.8, z: -13.5, scale: 2.8, ry: 2.6, tilt: 0.03 },
   { x: 9.6, z: -18.0, scale: 3.3, ry: 0.9, tilt: -0.04 },
 ] as const;
+
+function terrainErrorCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return null;
+  return String((error as { code?: unknown }).code ?? "");
+}
 
 function seededClone(source: THREE.Object3D, index: number) {
   const clone = source.clone(true);
@@ -26,27 +38,64 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
-export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: number) => void }) {
+export function SurfaceTerrain({
+  active,
+  phaseRef,
+  onAnchorHeight,
+}: {
+  active: boolean;
+  phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
+  onAnchorHeight?: (height: number) => void;
+}) {
   const { gl, camera } = useThree();
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
+  const [activated, setActivated] = useState(active);
+  const softwareRenderer = isSoftwareRenderer(gl);
+  const terrainViewInitialized = useRef(false);
+  const lastCameraPosition = useRef(new THREE.Vector3());
+  const lastCameraQuaternion = useRef(new THREE.Quaternion());
+  const lastProjection = useRef(new THREE.Matrix4());
+  const currentCameraPosition = useRef(new THREE.Vector3());
+  const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
+    if (active) setActivated(true);
+  }, [active]);
+
+  useEffect(() => {
+    if (!activated) return;
+
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
+    const controller = new AbortController();
 
     void (async () => {
       instance = await createTerrain({
         renderer: gl,
+        signal: controller.signal,
         configuration: {
-          layout: {
-            chunkCount: 6,
-            chunkSize: 12,
-          },
+          layout: softwareRenderer
+            ? {
+                // Preserve the same 72-unit footprint with only four chunks.
+                // Hosted SwiftShader traces show the first visible draw is now
+                // the dominant Surface cost, so minimize its mesh/shader fanout.
+                chunkCount: 2,
+                chunkSize: 36,
+              }
+            : {
+                chunkCount: 6,
+                chunkSize: 12,
+              },
           source: {
             kind: "noise",
             seed: 73021,
-            octaves: 7,
+            // The pinned ProceduralTerrains shader specializes its octave
+            // count at compile time. Driver compilation itself cannot be
+            // interrupted, so use the package's formal lower-complexity
+            // configuration on software WebGL instead of starting the
+            // seven-octave shader and trying to cancel it later.
+            octaves: softwareRenderer ? 2 : 7,
             scale: 0.025,
             ridge: 0.7,
             warp: 0.3,
@@ -56,9 +105,27 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
           },
           heightScale: 34,
           seaLevel: -20,
+          quality: softwareRenderer
+            ? {
+                lodSegments: [16, 8, 4, 2],
+                lodDistanceScale: 1,
+                morphEnabled: false,
+                mergeEnabled: true,
+                cullingEnabled: true,
+              }
+            : {
+                lodSegments: [64, 32, 16, 8],
+                lodDistanceScale: 1,
+                morphEnabled: true,
+                mergeEnabled: true,
+                cullingEnabled: true,
+              },
           material: {
-            terrainDetailQuality: 2,
-            terrainTriplanar: true,
+            // Detail pages and triplanar shading are optional visual layers.
+            // Keep them on real GPUs; omit both from the software fallback so
+            // its non-interruptible prepare/driver compile remains bounded.
+            terrainDetailQuality: softwareRenderer ? 0 : 2,
+            terrainTriplanar: !softwareRenderer,
           },
           style: {
             paletteSaturation: 0.7,
@@ -92,32 +159,105 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
         },
       });
 
-      await instance.prepare(camera);
+      await instance.prepare(camera, { signal: controller.signal });
 
       if (cancelled) {
         instance.dispose();
         return;
       }
+      terrainViewInitialized.current = false;
+      document.documentElement.dataset.universeSurfaceTerrainProfile =
+        softwareRenderer ? "software-performance" : "gpu-default";
       setTerrain(instance);
       onAnchorHeight?.((instance.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
     })().catch((error) => {
-      console.error("[surface-terrain]", error);
-      instance?.dispose();
+      const code = terrainErrorCode(error);
+      const expectedTeardown =
+        cancelled &&
+        (code === "TERRAIN_CANCELLED" || code === "TERRAIN_DISPOSED");
+
+      if (!expectedTeardown) {
+        console.error("[surface-terrain]", error);
+      }
+      if (!cancelled) {
+        instance?.dispose();
+      }
     });
 
     return () => {
       cancelled = true;
-      setTerrain(null);
+      controller.abort();
       instance?.dispose();
+      delete document.documentElement.dataset.universeSurfaceTerrainProfile;
     };
-  }, [camera, gl, onAnchorHeight]);
+  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
+
+  useEffect(() => {
+    const lifecycle = !activated
+      ? "idle"
+      : !terrain
+        ? "preparing"
+        : active
+          ? "active"
+          : "parked";
+    document.documentElement.dataset.universeSurfaceTerrainLifecycle =
+      lifecycle;
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceTerrainLifecycle ===
+        lifecycle
+      ) {
+        delete document.documentElement.dataset
+          .universeSurfaceTerrainLifecycle;
+      }
+    };
+  }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
-    terrain?.update(delta, { camera });
+    // `active` is delivered through the R3F reconciler. Read the coordinator
+    // ref first so no *new* Surface work starts after an outward wheel intent.
+    if (!active || phaseRef.current !== "surface" || !terrain) return;
+
+    if (softwareRenderer) {
+      // FiniteTerrain.update() performs LOD/culling and optional detail-cache
+      // work. Repeating it every frame for an unchanged camera is redundant,
+      // and under SwiftShader one already-running update can monopolize the
+      // main thread long enough to starve the React/R3F phase handoff. Keep
+      // software fallback updates camera-driven: first visible frame plus any
+      // real camera/projection change (manual exploration and resize still
+      // update normally).
+      camera.updateWorldMatrix(true, false);
+      camera.getWorldPosition(currentCameraPosition.current);
+      camera.getWorldQuaternion(currentCameraQuaternion.current);
+      const positionChanged =
+        !terrainViewInitialized.current ||
+        currentCameraPosition.current.distanceToSquared(
+          lastCameraPosition.current,
+        ) > 1e-8;
+      const rotationChanged =
+        !terrainViewInitialized.current ||
+        1 - Math.abs(
+          currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
+        ) > 1e-8;
+      const projectionChanged =
+        !terrainViewInitialized.current ||
+        !camera.projectionMatrix.equals(lastProjection.current);
+
+      if (!positionChanged && !rotationChanged && !projectionChanged) return;
+
+      lastCameraPosition.current.copy(currentCameraPosition.current);
+      lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
+      lastProjection.current.copy(camera.projectionMatrix);
+      terrainViewInitialized.current = true;
+    }
+
+    terrain.update(delta, { camera });
   });
 
   const rockInstances = useMemo(() => {
-    if (!terrain) return [];
+    // Decorative PBR glTF rocks add first-use shader programs but do not
+    // contribute to terrain identity. Keep them on real GPUs only.
+    if (!terrain || softwareRenderer) return [];
 
     return ROCKS.map((placement, index) => {
       const object = seededClone(boulder.scene, index);
@@ -131,7 +271,7 @@ export function SurfaceTerrain({ onAnchorHeight }: { onAnchorHeight?: (height: n
       object.scale.setScalar(placement.scale);
       return object;
     });
-  }, [boulder.scene, terrain]);
+  }, [boulder.scene, softwareRenderer, terrain]);
 
   useEffect(() => {
     return () => {

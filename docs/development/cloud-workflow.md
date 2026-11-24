@@ -29,17 +29,19 @@ The bundle guard reports `dist` size, JS/CSS/image totals, the largest JS file, 
 
 ## Reports and artifacts
 
-The production `dist` artifact is uploaded before browser E2E, so a browser failure still leaves a deployable/reproducible build. Dist is retained for seven days. Playwright HTML reports, success screenshots, failure screenshots/traces, and CI metrics are retained for fourteen days. Each shard emits Playwright's native blob report as well; a lightweight final CI job merges those blobs into one `personal-universe-playwright-report-<run_id>` HTML-report artifact even when a shard failed.
+The production `dist` artifact is uploaded before browser E2E, so a browser failure still leaves a deployable/reproducible build. Dist is retained for seven days. Playwright HTML reports, success screenshots, failure screenshots/traces, and CI metrics are retained for fourteen days. Each shard emits Playwright's native blob report as well; a lightweight final CI job merges those blobs into one `personal-universe-playwright-report-<run_id>` HTML-report artifact even when a shard failed. The report is uploaded first, then the combined-report job deliberately returns non-success whenever the shard aggregate is non-success, so diagnostics remain available without showing a misleading green release signal.
 
 Start CI diagnosis from the combined HTML report and the failing shard trace rather than reproducing on the user's computer.
 
 ## Preview deployment
 
-`.github/workflows/pages-preview.yml` is currently a manual deployment path for a selected ref. The first real `main` deployment attempt proved that this private repository does not yet have an enabled GitHub Pages site, so automatic `main` publication is intentionally disabled until hosting is available. The deployment build still injects `PUBLIC_SITE_URL=https://su-long-ai.github.io` and `PUBLIC_BASE_PATH=/personal-universe`; ordinary local development and normal browser CI remain rooted at `/`.
+The repository is now public, so `.github/workflows/pages-preview.yml` publishes the protected `main` branch automatically after a merge reaches `main`. Branch protection remains the release authority: a change cannot reach `main` until Machine Reuse Gate, build/bundle checks, every Playwright shard, and the combined report satisfy the required-check policy. Pages therefore consumes an already-validated production commit instead of becoming a second merge gate.
+
+The workflow also keeps a manual `workflow_dispatch` path for a selected branch, tag, or SHA. Manual previews validate the selected ref against `origin/main`; automatic `main` deployments validate the exact `github.event.before → github.sha` merge delta before building. Both paths inject `PUBLIC_SITE_URL=https://su-long-ai.github.io` and `PUBLIC_BASE_PATH=/personal-universe`.
 
 Public runtime assets use Astro/Vite `import.meta.env.BASE_URL`, so the same code works at local root, the GitHub Pages repository subpath, and a future custom-domain root without maintaining a second URL layer. After `deploy-pages`, the workflow probes both the live homepage and the YEIS `stars.bin` catalogue before reporting the production URL.
 
-GitHub Pages must be enabled and configured to use GitHub Actions before the manual deployment can succeed. Until that external repository/account prerequisite is satisfied, a failed Pages deployment is not treated as a product regression and does not run automatically on `main`. PR CI remains independent from hosting. Cloudflare Pages and Vercel remain the researched root-hosted fallbacks if Pages availability cannot be enabled for this private repository.
+GitHub Pages still needs the repository Pages source configured for GitHub Actions. Once that repository setting is enabled, the first successful protected-main merge becomes the production deployment trigger automatically. PR CI remains independent from hosting, and Cloudflare Pages / Vercel remain the researched fallbacks if Pages itself becomes unsuitable.
 
 ## When a local machine is justified
 

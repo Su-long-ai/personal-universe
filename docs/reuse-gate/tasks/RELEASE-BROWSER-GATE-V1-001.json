@@ -1,0 +1,193 @@
+{
+  "schema": 2,
+  "task_id": "RELEASE-BROWSER-GATE-V1-001",
+  "title": "Close release-browser semantic and WebGL failure coverage",
+  "scope": {
+    "level": "architecture",
+    "subject": "Release-level browser acceptance for navigation, journeys, responsive behavior and WebGL/runtime failure conditions"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "Reuse the existing Playwright runner, runtime guard, sharding and reports. Add missing product-semantic cases for Hero/return, native landmark and black-hole travel completion, guided Journey controls, mobile navigation and reduced motion. Extend the current runtime hook with browser-native WebGL context-loss events and test it using the standard WEBGL_lose_context extension. Use Playwright route abort for deterministic critical-resource negative coverage. No new runner, reporter or browser framework is needed.",
+  "planned_files": [
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/support/runtime.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/emulation",
+      "finding": "Playwright natively supports viewport/device and reduced-motion emulation, including per-test media emulation."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-route",
+      "finding": "Playwright route.abort provides deterministic resource-failure injection without a proxy or custom network harness."
+    },
+    {
+      "url": "https://playwright.dev/docs/evaluating",
+      "finding": "page.evaluate executes browser-side code and can invoke WebGL APIs directly in the page context."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/webglcontextlost_event",
+      "finding": "The standard webglcontextlost event reports loss of a WebGL drawing buffer."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/WEBGL_lose_context/loseContext",
+      "finding": "The standard WEBGL_lose_context extension can deterministically simulate context loss for tests."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "conclusion": "No external browser-quality platform adds needed value because the repository already has sharded Playwright, traces, screenshots, runtime hooks and cloud reports.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "conclusion": "Playwright already covers functional scenarios, viewport/reduced-motion emulation, request failure injection, page-side evaluation and per-test diagnostics.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "playwright-test"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Existing Playwright sharding and GitHub runners remain the execution subsystem; missing value is semantic coverage, not another CI topology.",
+      "source_refs": [
+        0
+      ],
+      "registry_refs": [
+        "playwright-ci-sharding",
+        "github-actions-matrix"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Browser-native WebGL context loss events plus WEBGL_lose_context provide the correct failure signal and deterministic injection mechanism.",
+      "source_refs": [
+        3,
+        4
+      ],
+      "registry_refs": [
+        "webgl-context-loss-api"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "playwright-release-scenarios",
+      "name": "Existing Playwright release scenarios",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Playwright Test",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Adds semantic release cases to the existing runner and preserves current traces/screenshots/reporting.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-native-failure-emulation",
+      "name": "Playwright route/emulation/evaluate primitives",
+      "level": "subsystem",
+      "registry_id": "playwright-test",
+      "source": "Playwright Test",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Covers resource abort, responsive/reduced-motion behavior and browser-side failure injection without new infrastructure.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "webgl-native-context-loss",
+      "name": "WebGL native context-loss APIs",
+      "level": "component_asset",
+      "registry_id": "webgl-context-loss-api",
+      "source": "Web platform WebGL API",
+      "license": "Web standard",
+      "decision": "reuse",
+      "reason": "Provides the actual runtime failure event plus a standards-based deterministic simulation extension.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Journey, return, landmark and native travel semantics",
+      "importance": "high",
+      "coverage": {
+        "playwright-release-scenarios": "full",
+        "playwright-native-failure-emulation": "partial",
+        "webgl-native-context-loss": "none"
+      },
+      "decision": "Add independent Playwright release tests against real product state and DOM/dataset contracts."
+    },
+    {
+      "capability": "Mobile and reduced-motion behavior",
+      "importance": "high",
+      "coverage": {
+        "playwright-release-scenarios": "full",
+        "playwright-native-failure-emulation": "full",
+        "webgl-native-context-loss": "none"
+      },
+      "decision": "Use Playwright's native viewport and reduced-motion emulation inside dedicated release cases."
+    },
+    {
+      "capability": "Critical resource and WebGL failure detection",
+      "importance": "high",
+      "coverage": {
+        "playwright-release-scenarios": "partial",
+        "playwright-native-failure-emulation": "full",
+        "webgl-native-context-loss": "full"
+      },
+      "decision": "Use route.abort plus runtime WebGL event capture; negative tests pass only when the expected fatal signal is observed."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "playwright-release-scenarios",
+      "playwright-native-failure-emulation",
+      "webgl-native-context-loss"
+    ],
+    "rationale": "Close product release coverage with the existing Playwright stack and standards-based browser hooks. This adds no CI framework and keeps each failure independently diagnosable.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a product-semantic case exposes a real application bug, keep the test and create a separate approved product fix rather than weakening the assertion."
+  }
+}

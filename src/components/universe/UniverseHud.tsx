@@ -4,16 +4,13 @@ import type {
   SystemDefinition,
   UniversePhase,
 } from "../../lib/universe/types";
-
-const LABELS: Record<UniversePhase, string> = {
-  galaxy: "GALACTIC OVERVIEW",
-  system: "STELLAR SYSTEM",
-  approach: "INTERPLANETARY APPROACH",
-  orbit: "LOW ORBIT",
-  atmosphere: "ATMOSPHERIC ENTRY",
-  surface: "SURFACE",
-  returning: "RETURN VECTOR",
-};
+import {
+  archetypeLabel,
+  astronomicalName,
+  phaseLabel,
+  text,
+  type ProductLocale,
+} from "../../lib/universe/locale";
 
 export function UniverseHud({
   phase,
@@ -29,6 +26,8 @@ export function UniverseHud({
   onOpenNavigator,
   navigatorAvailable,
   onReturn,
+  locale,
+  onLocaleChange,
 }: {
   phase: UniversePhase;
   selectedSystem: SystemDefinition | null;
@@ -43,48 +42,83 @@ export function UniverseHud({
   onOpenNavigator: () => void;
   navigatorAvailable: boolean;
   onReturn: () => void;
+  locale: ProductLocale;
+  onLocaleChange: (locale: ProductLocale) => void;
 }) {
   const destination =
     phase === "galaxy"
       ? {
-          name: "MILKY WAY",
-          detail: `${markerCount} survey markers / observed + procedural`,
+          name: astronomicalName(locale, "MILKY WAY"),
+          detail:
+            String(markerCount) + " " + text(locale, "surveyMarkers"),
         }
       : phase === "system" || phase === "returning"
         ? {
-            name: selectedSystem?.name ?? "UNRESOLVED SYSTEM",
+            name: astronomicalName(
+              locale,
+              selectedSystem?.name ?? text(locale, "unresolvedSystem"),
+            ),
             detail: selectedSystem
-              ? `${selectedSystem.planets.length} worlds / ${selectedSystem.source}`
-              : "system data unavailable",
+              ? locale === "zh"
+                ? `${selectedSystem.planets.length} ${text(locale, "worlds")} / ${selectedSystem.source}`
+                : `${selectedSystem.planets.length} worlds / ${selectedSystem.source}`
+              : text(locale, "systemUnavailable"),
           }
         : {
-            name: selectedPlanet?.name ?? "UNRESOLVED WORLD",
+            name: astronomicalName(
+              locale,
+              selectedPlanet?.name ?? text(locale, "unresolvedWorld"),
+            ),
             detail: selectedPlanet
-              ? `${selectedPlanet.archetype.replace("_", " ")} / ${selectedPlanet.observed ? "observed" : selectedPlanet.heroKey ? "hero" : "procedural"}`
-              : "planet data unavailable",
+              ? `${archetypeLabel(locale, selectedPlanet.archetype)} / ${
+                  selectedPlanet.observed
+                    ? text(locale, "observed")
+                    : selectedPlanet.heroKey
+                      ? text(locale, "hero")
+                      : text(locale, "procedural")
+                }`
+              : text(locale, "planetUnavailable"),
           };
 
   const returnLabel =
     phase === "system"
-      ? "← RETURN TO GALAXY"
+      ? text(locale, "returnGalaxy")
       : phase === "returning"
-        ? "RETURNING…"
-        : "← RETURN TO SYSTEM";
+        ? text(locale, "returning")
+        : text(locale, "returnSystem");
 
   return (
     <aside className={`universe-hud ${collapsed ? "is-collapsed" : ""}`}>
       <div className="hud-topline">
         <span className="hud-mark">PU // 01</span>
-        <button className="hud-collapse" onClick={onToggleCollapsed}>
-          {collapsed ? "OPEN" : "HIDE"}
-        </button>
+        <span style={{ display: "flex", gap: 6 }}>
+          <button
+            className="hud-collapse"
+            type="button"
+            onClick={() => onLocaleChange(locale === "en" ? "zh" : "en")}
+            aria-label={
+              locale === "en"
+                ? "Switch language to Chinese"
+                : "切换语言为英文"
+            }
+          >
+            {locale === "en" ? "中文" : "EN"}
+          </button>
+          <button
+            className="hud-collapse"
+            type="button"
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? text(locale, "open") : text(locale, "hide")}
+          </button>
+        </span>
       </div>
 
       {!collapsed && (
         <div className="hud-content">
           <div className="hud-status">
-            <span className="hud-kicker">CURRENT LAYER</span>
-            <strong>{LABELS[phase]}</strong>
+            <span className="hud-kicker">{text(locale, "currentLayer")}</span>
+            <strong>{phaseLabel(locale, phase)}</strong>
           </div>
 
           <div className="hud-destination">
@@ -93,31 +127,38 @@ export function UniverseHud({
           </div>
 
           <div className="hud-actions">
-            <button onClick={onToggleMuted}>{muted ? "SOUND OFF" : "SOUND ON"}</button>
+            <button type="button" onClick={onToggleMuted}>
+              {muted ? text(locale, "soundOff") : text(locale, "soundOn")}
+            </button>
             <label>
-              QUALITY
+              {text(locale, "quality")}
               <select
                 value={quality}
                 onChange={(event) =>
                   onQualityChange(event.target.value as QualityMode)
                 }
               >
-                <option value="auto">AUTO</option>
-                <option value="high">HIGH</option>
-                <option value="low">LOW</option>
+                <option value="auto">{text(locale, "auto")}</option>
+                <option value="high">{text(locale, "high")}</option>
+                <option value="low">{text(locale, "low")}</option>
               </select>
             </label>
           </div>
 
           {navigatorAvailable && (
-            <button className="hud-navigate" onClick={onOpenNavigator}>
-              SEARCH / PLACES <span>CTRL K</span>
+            <button
+              className="hud-navigate"
+              type="button"
+              onClick={onOpenNavigator}
+            >
+              {text(locale, "searchPlaces")} <span>CTRL K</span>
             </button>
           )}
 
           {phase !== "galaxy" && (
             <button
               className="hud-return"
+              type="button"
               onClick={onReturn}
               disabled={phase === "returning"}
             >

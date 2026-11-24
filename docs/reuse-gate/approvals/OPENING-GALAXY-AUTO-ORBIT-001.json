@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "OPENING-GALAXY-AUTO-ORBIT-001",
+  "approved_at": "2026-11-23T10:15:29.595Z",
+  "baseline_commit": "66f2a24afedbaa43bcecb9e87725a2821a4d4c4c",
+  "record_path": "docs/reuse-gate/tasks/OPENING-GALAXY-AUTO-ORBIT-001.json",
+  "record_sha256": "47f96909fde793d82eab47056a1dcf1fe2ed64481cec6ab481a0dbf4e7fadca8",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Use the pinned MIT YEIS CameraController autoOrbit capability for a subtle opening-galaxy drift without creating a second camera animation authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "yeis-native-auto-orbit"
+  ],
+  "candidate_scores": {
+    "yeis-native-auto-orbit": 55,
+    "r3f-custom-camera-drift": 47,
+    "css-canvas-drift": 37
+  }
+}

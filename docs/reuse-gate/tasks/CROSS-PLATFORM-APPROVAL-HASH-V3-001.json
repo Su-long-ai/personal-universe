@@ -1,0 +1,184 @@
+{
+  "schema": 2,
+  "task_id": "CROSS-PLATFORM-APPROVAL-HASH-V3-001",
+  "title": "Hash committed reuse records from Git blobs instead of checkout bytes",
+  "scope": {
+    "level": "architecture",
+    "subject": "Cross-platform Machine Reuse Gate approval hashing against committed Git blob bytes"
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-23",
+  "research_summary": "The repository contains historically approved JSON blobs with mixed LF and CRLF byte representations. Windows core.autocrlf can materialize a different working-tree representation from the committed blob, so hashing checkout bytes produces false stale-token failures. Canonicalizing all text to LF is also incorrect because some valid historical approval hashes intentionally freeze CRLF blobs. Keep exact SHA-256 byte freezing, but read the committed research record and legacy registry bytes from Git objects for approval generation and validation. Semantic JSON validation can continue from the working tree; cryptographic identity must follow the committed Git blob.",
+  "planned_files": [
+    "scripts/reuse-gate.mjs"
+  ],
+  "sources": [
+    {
+      "url": "https://git-scm.com/docs/gitattributes",
+      "finding": "Git may normalize text in the index while materializing different working-tree line endings, so checkout bytes are not a stable representation of committed text."
+    },
+    {
+      "url": "https://git-scm.com/docs/git-show",
+      "finding": "git show <commit>:<path> reads the exact blob stored at a commit, which is the stable object that approval history actually freezes."
+    },
+    {
+      "url": "https://nodejs.org/api/crypto.html",
+      "finding": "Node's built-in SHA-256 can hash the Git blob bytes directly without a new dependency or policy runtime."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "conclusion": "No broader governance product is needed for a committed-object hashing defect.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": []
+    },
+    {
+      "level": "framework_engine",
+      "status": "none",
+      "conclusion": "A second policy engine would still need to choose between worktree and committed object representations and would duplicate the existing gate.",
+      "source_refs": [
+        0,
+        1
+      ],
+      "registry_refs": [
+        "opa-conftest"
+      ]
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "conclusion": "Retain the repository-local Node Machine Reuse Gate and make approval identity follow Git's committed blob.",
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "registry_refs": [
+        "github-actions-pr-diff-gate"
+      ]
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "conclusion": "Reuse Git object reads plus Node crypto SHA-256; no external hashing or normalization package is needed.",
+      "source_refs": [
+        1,
+        2
+      ],
+      "registry_refs": [
+        "git-hooks"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "git-blob-sha256",
+      "name": "Exact committed Git blob bytes plus existing SHA-256",
+      "level": "subsystem",
+      "registry_id": "github-actions-pr-diff-gate",
+      "source": "Repository-local Node gate + git show + node:crypto",
+      "license": "Project code / Git / Node.js runtime",
+      "decision": "reuse",
+      "reason": "Preserves historical exact-byte approval hashes and makes validation independent of Windows/Linux checkout transformations.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "canonical-lf-hash",
+      "name": "Canonicalize every approval record to LF before SHA-256",
+      "level": "component_asset",
+      "registry_id": "git-hooks",
+      "source": "Project-owned text normalization",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Would invalidate legitimate historical approvals whose committed blobs intentionally contain CRLF bytes; exact Git-object identity is safer.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 3
+      }
+    },
+    {
+      "id": "opa-blob-policy",
+      "name": "OPA / Conftest approval identity policy",
+      "level": "framework_engine",
+      "registry_id": "opa-conftest",
+      "source": "OPA / Conftest",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Adds a second policy runtime while Git object identity and SHA-256 are already sufficient.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Existing LF and CRLF approval hashes remain exact and valid",
+      "importance": "high",
+      "coverage": {
+        "git-blob-sha256": "full",
+        "canonical-lf-hash": "partial",
+        "opa-blob-policy": "partial"
+      },
+      "decision": "Hash the exact committed blob bytes referenced by Git history."
+    },
+    {
+      "capability": "Windows autocrlf cannot create false stale-token failures",
+      "importance": "high",
+      "coverage": {
+        "git-blob-sha256": "full",
+        "canonical-lf-hash": "full",
+        "opa-blob-policy": "partial"
+      },
+      "decision": "Never use working-tree bytes as the cryptographic approval identity for committed records."
+    },
+    {
+      "capability": "Approval authoring proves the research record was committed before token creation",
+      "importance": "high",
+      "coverage": {
+        "git-blob-sha256": "full",
+        "canonical-lf-hash": "partial",
+        "opa-blob-policy": "partial"
+      },
+      "decision": "Generate record_sha256 from HEAD:<record_path>; an uncommitted research record therefore cannot be approved."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "git-blob-sha256"
+    ],
+    "rationale": "Keep exact SHA-256 freezing and the existing Node gate, but compute the digest from committed Git blob bytes for both approval generation and validation. This preserves every historical byte representation and removes checkout-platform dependence.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "opa-blob-policy",
+        "reason": "OPA would duplicate the current gate and still depend on Git object identity."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If future approval records are intentionally generated from staged but uncommitted metadata, add an explicit index-blob mode rather than falling back to worktree hashing."
+  }
+}

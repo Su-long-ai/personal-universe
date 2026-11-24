@@ -1,0 +1,186 @@
+{
+  "schema": 2,
+  "task_id": "PRODUCT-ZH-EN-LOCALE-001",
+  "title": "Add in-place Chinese and English switching to Personal Universe",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing YEIS localization boundary and add a thin product-locale adapter for Chinese/English UI switching without resetting universe state"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Pinned MIT YEIS already supplies the selected gettext-style localization runtime and the product already restores its English dictionary before Universe construction. i18next is mature but would duplicate that runtime. For the Personal Universe React chrome, use one thin product-locale dictionary (zh/en) keyed by stable UI semantics, persist the preference in localStorage, update document.lang in-place, and keep YEIS astronomical source data on its existing English projection so proper names remain stable. Navigation/search/camera/content identities are not duplicated or rebuilt.",
+  "planned_files": [
+    "src/lib/universe/locale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/index.ts",
+      "finding": "Pinned MIT YEIS already defines the version-matched localization boundary, locale detection/persistence concepts and runtime translation contract used by the selected universe engine."
+    },
+    {
+      "url": "https://www.i18next.com/",
+      "finding": "i18next is a mature generic localization subsystem, but adding it would duplicate the already-selected YEIS translation runtime for a two-locale product chrome."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage",
+      "finding": "localStorage is sufficient for a small user locale preference and does not require page reload or a second state authority."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep YEIS as localization authority for its astronomical source strings and English projection."
+    },
+    {
+      "level": "framework_engine",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "React state already owns the live product UI; no new application framework is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "i18next"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Do not add i18next for only zh/en product chrome because it would create a second runtime and duplicate persistence/detection semantics."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Reuse the existing locale concepts and add only a product dictionary plus in-place persisted selection."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-plus-product-dictionary",
+      "name": "Pinned YEIS i18n boundary + thin Personal Universe zh/en dictionary",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing YEIS i18n runtime plus product-local React dictionary",
+      "license": "MIT upstream boundary + project glue",
+      "decision": "reuse",
+      "reason": "Preserves one astronomical translation authority while adding only the product-specific UI strings YEIS cannot know about.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "i18next-product-runtime",
+      "name": "i18next for all product and YEIS text",
+      "level": "subsystem",
+      "registry_id": "i18next",
+      "source": "i18next",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Would require translating/importing YEIS resources into another runtime and create duplicate locale ownership for a two-language site.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "reload-language-pages",
+      "name": "Separate /zh and /en page trees",
+      "level": "full_solution",
+      "source": "Project-owned duplicated routes",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Duplicates page state and would reset camera/navigation/Journey during language switching."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "In-place Chinese/English UI switch",
+      "importance": "high",
+      "coverage": {
+        "yeis-plus-product-dictionary": "full",
+        "i18next-product-runtime": "full",
+        "reload-language-pages": "partial"
+      },
+      "decision": "Use React locale state with stable product keys."
+    },
+    {
+      "capability": "Preserve current galaxy/system/world and Journey state",
+      "importance": "high",
+      "coverage": {
+        "yeis-plus-product-dictionary": "full",
+        "i18next-product-runtime": "full",
+        "reload-language-pages": "none"
+      },
+      "decision": "Do not reload or route-switch when locale changes."
+    },
+    {
+      "capability": "Astronomical names remain stable and non-Turkish",
+      "importance": "high",
+      "coverage": {
+        "yeis-plus-product-dictionary": "full",
+        "i18next-product-runtime": "partial",
+        "reload-language-pages": "partial"
+      },
+      "decision": "Keep YEIS runtime initialized with the existing English dictionary; translate product taxonomy around proper nouns."
+    },
+    {
+      "capability": "Persist preference and update accessibility language",
+      "importance": "high",
+      "coverage": {
+        "yeis-plus-product-dictionary": "full",
+        "i18next-product-runtime": "full",
+        "reload-language-pages": "partial"
+      },
+      "decision": "Persist locale and set document.documentElement.lang without navigation."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-plus-product-dictionary"
+    ],
+    "rationale": "Reuse the pinned YEIS localization boundary for astronomical data and add only the missing Personal Universe zh/en product dictionary. The switch is in-place and persisted, so camera, navigation, selection and Journey state stay intact.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "i18next-product-runtime",
+        "reason": "i18next is mature, but its global runtime is unnecessary here because YEIS already owns astronomical translations and only the product chrome lacks Chinese."
+      },
+      {
+        "candidate_id": "reload-language-pages",
+        "reason": "A separate /zh and /en route tree is broader, but it loses globally because switching routes reloads the app and discards camera, destination, world and Journey state while duplicating page chrome. The product requires an in-place language toggle inside one persistent universe session."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the product dictionary grows beyond the current Personal Universe chrome, keep the same locale API and split dictionaries by domain rather than replacing YEIS or adding a parallel route tree."
+  }
+}

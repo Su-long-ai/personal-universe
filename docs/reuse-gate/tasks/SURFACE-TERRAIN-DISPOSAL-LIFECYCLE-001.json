@@ -1,0 +1,132 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-TERRAIN-DISPOSAL-LIFECYCLE-001",
+  "title": "Treat ProceduralTerrains teardown rejection as native cancellation",
+  "scope": {
+    "level": "implementation",
+    "subject": "Stop Surface fallback unmount from reporting expected ProceduralTerrains prepare cancellation as a fatal runtime error while preserving immediate GPU/resource disposal"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted shard evidence shows the existing Surface fallback can unmount while procedural-terrains is still inside prepare(), causing FiniteTerrain.dispose() to cancel the pending operation with the library-defined TERRAIN_DISPOSED error. Reuse the installed procedural-terrains 2.0.5 cancellation contract and the existing R3F effect lifecycle: pass an AbortSignal into terrain preparation, abort and dispose during cleanup, and suppress only TERRAIN_CANCELLED/TERRAIN_DISPOSED rejections that occur after this component initiated teardown. Unexpected failures remain fatal. Do not add a terrain job manager, custom worker scheduler, or delayed resource-retention layer.",
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber keeps lifecycle work inside the existing Canvas/React component tree; use the current effect/useFrame ownership rather than introducing a parallel renderer or loop."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/8349b2c8c8637f355bfe17e01c76807d41994407/packages/procedural-terrains/README.md",
+      "finding": "ProceduralTerrains 2.0.5 uses the caller-owned renderer and loop, exposes idempotent dispose(), accepts cancellation for async operations, and documents TERRAIN_CANCELLED/TERRAIN_SUPERSEDED/TERRAIN_DISPOSED rejection codes."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/8349b2c8c8637f355bfe17e01c76807d41994407/src/runtime/FiniteTerrain.js",
+      "finding": "FiniteTerrain.dispose() marks the instance disposed, increments its revision, and calls _cancelJobs('TERRAIN_DISPOSED', ...); prepare(camera,{signal}) races work against cancellation and therefore rejects by design when teardown occurs during preparation."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "This is a bounded lifecycle correction inside the already-selected Surface renderer, not a product or terrain-engine replacement."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep React Three Fiber as the component/frame lifecycle owner and perform cancellation/disposal in the existing SurfaceTerrain effect cleanup."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Reuse ProceduralTerrains native AbortSignal and coded cancellation/disposal semantics instead of wrapping its asynchronous preparation in a second scheduler."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "No extra cancellation helper is needed because the selected subsystem already provides operation cancellation, disposal, and typed error codes."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-effect-owned-terrain-lifecycle",
+      "name": "Existing R3F effect ownership for terrain creation and cleanup",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current SurfaceTerrain React effect/useFrame lifecycle",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "R3F already supplies the correct mount/unmount and frame-loop boundary; keep that ownership and add only subsystem-native cancellation handling inside the effect.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-terrains-native-cancellation",
+      "name": "ProceduralTerrains 2.0.5 AbortSignal plus coded teardown rejections",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Installed ProceduralTerrains FiniteTerrain prepare/dispose contract",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "The subsystem already defines immediate operation cancellation and idempotent resource disposal; distinguish its expected teardown codes rather than treating them as product failures.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "custom-terrain-job-manager",
+      "name": "Project-owned terrain job and teardown manager",
+      "level": "component_asset",
+      "source": "New project-owned async job registry around ProceduralTerrains",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It duplicates the subsystem's cancellation/disposal state, adds a second lifecycle owner, and can retain GPU work longer than the native immediate teardown path."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "r3f-effect-owned-terrain-lifecycle",
+      "procedural-terrains-native-cancellation"
+    ],
+    "rationale": "Keep R3F as the only component/frame lifecycle owner and ProceduralTerrains as the only terrain-job/resource owner. On effect cleanup, mark local teardown, abort the native operation, and dispose the terrain immediately. The async task suppresses only TERRAIN_CANCELLED or TERRAIN_DISPOSED when local teardown has already begun; all other preparation errors still reach the runtime guard. This directly closes the hosted race without hiding unexpected failures or delaying GPU release.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If hosted evidence still shows post-unmount terrain work, inspect ProceduralTerrains diagnostics and worker ownership first; do not add a second scheduler unless the native cancellation contract is proven insufficient."
+  }
+}

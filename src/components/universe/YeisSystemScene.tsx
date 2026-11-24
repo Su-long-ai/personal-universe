@@ -1,0 +1,454 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { Stars } from "@react-three/drei";
+import * as THREE from "three";
+import type {
+  PlanetDefinition,
+  QualityMode,
+  SystemDefinition,
+} from "../../lib/universe/types";
+import { loadYeisCore } from "../../lib/universe/yeis";
+import { J2000_JD } from "../../vendor/yeis/core/constants";
+import { StarSystem } from "../../vendor/yeis/core/StarSystem";
+import type { CelestialBody } from "../../vendor/yeis/core/CelestialBody";
+import type {
+  BodyData,
+  OrbitElements,
+  SimpleElements,
+} from "../../vendor/yeis/data/types";
+import { starLightColor } from "../../vendor/yeis/astro/stellar";
+import { BodyRenderer } from "../../vendor/yeis/render/BodyRenderer";
+import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
+import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
+import { SystemScene } from "./SystemScene";
+
+const TARGET_SYSTEM_RADIUS = 8.2;
+const HIT_RADIUS = 0.34;
+
+type NativeResources = {
+  system: StarSystem;
+  scene: THREE.Scene;
+  bodies: BodyRenderer;
+  points: BodyPoints;
+  orbits: OrbitLines;
+  luminosity: number;
+  sunColor: THREE.Vector3;
+};
+
+function nativeStarId(system: SystemDefinition) {
+  return system.id.startsWith("yeis-system:")
+    ? system.id.slice("yeis-system:".length)
+    : null;
+}
+
+function nativePlanetId(planet: PlanetDefinition) {
+  return planet.id.startsWith("yeis-planet:")
+    ? planet.id.slice("yeis-planet:".length)
+    : planet.id;
+}
+
+function systemScale(system: StarSystem) {
+  system.update(J2000_JD, 0);
+  const star = system.star;
+  let span = star.radius * 120;
+  for (const body of system.bodies) {
+    if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
+    span = Math.max(span, body.position.distanceTo(star.position));
+  }
+  return TARGET_SYSTEM_RADIUS / Math.max(span, 1);
+}
+
+function scaledOrbit(body: CelestialBody, scale: number): OrbitElements | undefined {
+  const orbit = body.data.orbit;
+  if (!orbit) return undefined;
+
+  if (body.resolved && (orbit.kind === "jpl" || orbit.kind === "simple")) {
+    const resolved = body.resolved;
+    const simple: SimpleElements = {
+      kind: "simple",
+      a: resolved.a * scale,
+      e: resolved.e,
+      i: THREE.MathUtils.radToDeg(resolved.i),
+      node: THREE.MathUtils.radToDeg(resolved.node),
+      argPeri: THREE.MathUtils.radToDeg(resolved.argPeri),
+      M0: THREE.MathUtils.radToDeg(resolved.M),
+      epoch: J2000_JD,
+      period: Math.max(body.periodDays, 1e-4),
+      frame: orbit.kind === "simple" ? orbit.frame : "ecliptic",
+      ...(orbit.kind === "simple" && orbit.nodeRate !== undefined
+        ? { nodeRate: orbit.nodeRate }
+        : {}),
+      ...(orbit.kind === "simple" && orbit.periRate !== undefined
+        ? { periRate: orbit.periRate }
+        : {}),
+    };
+    return simple;
+  }
+
+  if (orbit.kind === "linear") {
+    return {
+      ...orbit,
+      pos: orbit.pos.map((value) => value * scale) as [number, number, number],
+      vel: orbit.vel.map((value) => value * scale) as [number, number, number],
+    };
+  }
+
+  if (orbit.kind === "surface") {
+    return {
+      ...orbit,
+      ...(orbit.alt !== undefined ? { alt: orbit.alt * scale } : {}),
+    };
+  }
+
+  if (orbit.kind === "lagrange") {
+    return { ...orbit, distance: orbit.distance * scale };
+  }
+
+  return undefined;
+}
+
+function scaledBody(body: CelestialBody, scale: number): BodyData {
+  const data = body.data;
+  return {
+    ...data,
+    radius: data.radius * scale,
+    mass: data.mass * scale * scale * scale,
+    orbit: scaledOrbit(body, scale),
+    rings: data.rings
+      ? {
+          ...data.rings,
+          inner: data.rings.inner * scale,
+          outer: data.rings.outer * scale,
+          gaps: data.rings.gaps?.map(
+            ([radius, width]) => [radius * scale, width * scale] as [number, number],
+          ),
+        }
+      : undefined,
+  };
+}
+
+function createRenderSystem(source: StarSystem) {
+  source.update(J2000_JD, 0);
+  const scale = systemScale(source);
+  const retained = source.bodies.filter(
+    (body) =>
+      body.data.type !== "spacecraft" &&
+      body.data.orbit?.kind !== "trajectory",
+  );
+  const ids = new Set(retained.map((body) => body.id));
+  const catalogue = retained
+    .filter((body) => !body.parent || ids.has(body.parent.id))
+    .map((body) => scaledBody(body, scale));
+  const renderSystem = new StarSystem(
+    `${source.id}:product-render`,
+    source.starId,
+    source.catalogIndex,
+    new THREE.Vector3(),
+    catalogue,
+    [],
+    source.planetIds.filter((id) => ids.has(id)),
+  );
+  renderSystem.update(J2000_JD, 0);
+  return { renderSystem, scale };
+}
+
+function disposeResources(resources: NativeResources) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+
+  resources.scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    const material = (object as THREE.Mesh).material;
+    if (Array.isArray(material)) {
+      for (const entry of material) materials.add(entry);
+    } else if (material) {
+      materials.add(material);
+    }
+  });
+
+  for (const view of resources.bodies.views) {
+    view.dispose(resources.scene);
+  }
+  for (const line of resources.orbits.lines) {
+    resources.scene.remove(line.line);
+  }
+  resources.scene.remove(resources.points.points);
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) material.dispose();
+  resources.scene.clear();
+}
+
+function ProductPlanetTarget({
+  planet,
+  resources,
+  onSelect,
+}: {
+  planet: PlanetDefinition;
+  resources: NativeResources;
+  onSelect: (planet: PlanetDefinition) => void;
+}) {
+  const hit = useRef<THREE.Mesh>(null);
+  const halo = useRef<THREE.Mesh>(null);
+  const nativeId = nativePlanetId(planet);
+  const body = resources.system.get(nativeId);
+  const hasContent = Boolean(planet.content?.length);
+
+  useFrame((state) => {
+    if (!body) return;
+    hit.current?.position.copy(body.position);
+    if (halo.current) {
+      halo.current.position.copy(body.position);
+      const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.8) * 0.08;
+      halo.current.scale.setScalar(pulse);
+    }
+  });
+
+  if (!body) return null;
+
+  return (
+    <>
+      <mesh
+        ref={hit}
+        position={body.position}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(planet);
+        }}
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          document.body.classList.add("planet-hover");
+        }}
+        onPointerOut={() => document.body.classList.remove("planet-hover")}
+      >
+        <sphereGeometry args={[HIT_RADIUS, 12, 12]} />
+        <meshBasicMaterial
+          transparent
+          opacity={0.001}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {hasContent ? (
+        <mesh ref={halo} position={body.position}>
+          <sphereGeometry args={[HIT_RADIUS * 0.78, 18, 18]} />
+          <meshBasicMaterial
+            color="#73f4ff"
+            transparent
+            opacity={0.38}
+            wireframe
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ) : null}
+    </>
+  );
+}
+
+export function YeisSystemScene({
+  system,
+  onSelectPlanet,
+  onScaleFocus,
+  quality,
+}: {
+  system: SystemDefinition;
+  onSelectPlanet: (planet: PlanetDefinition) => void;
+  onScaleFocus?: (planet: PlanetDefinition | null) => void;
+  quality: QualityMode;
+}) {
+  const { gl, camera, size } = useThree();
+  const [resources, setResources] = useState<NativeResources | null>(null);
+  const [failed, setFailed] = useState(false);
+  const starId = nativeStarId(system);
+  const focusFrameRef = useRef(0);
+  const focusedIdRef = useRef<string | null>(null);
+  const focusProjectionRef = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    let active = true;
+    let created: NativeResources | null = null;
+
+    delete document.documentElement.dataset.universeSystemReady;
+    document.documentElement.dataset.universeSystemRenderer =
+      starId ? "yeis-native-loading" : "prototype";
+
+    if (!starId) {
+      setFailed(true);
+      return () => {
+        delete document.documentElement.dataset.universeSystemRenderer;
+        delete document.documentElement.dataset.universeSystemReady;
+      };
+    }
+
+    void loadYeisCore()
+      .then((runtime) => {
+        const source = runtime.universe.system(starId);
+        const { renderSystem, scale } = createRenderSystem(source);
+        const renderScene = new THREE.Scene();
+        const bodies = new BodyRenderer(
+          renderScene,
+          gl.capabilities.getMaxAnisotropy(),
+        );
+        bodies.setSystem(renderSystem);
+        const points = new BodyPoints(renderScene);
+        points.setViews(bodies.views);
+        const orbits = new OrbitLines(renderScene);
+        orbits.setSystem(renderSystem);
+        const [r, g, b] = starLightColor(renderSystem.starTemperature);
+
+        created = {
+          system: renderSystem,
+          scene: renderScene,
+          bodies,
+          points,
+          orbits,
+          luminosity:
+            runtime.universe.starInfo(starId).luminosity * scale * scale,
+          sunColor: new THREE.Vector3(r, g, b),
+        };
+
+        if (!active) {
+          disposeResources(created);
+          return;
+        }
+
+        setResources(created);
+        setFailed(false);
+        document.documentElement.dataset.universeSystemRenderer = "yeis-native";
+        document.documentElement.dataset.universeSystemReady = "true";
+      })
+      .catch((error) => {
+        if (!active) return;
+        console.error("[YEIS-NATIVE-SYSTEM] FAILED; retaining product fallback", error);
+        setFailed(true);
+        document.documentElement.dataset.universeSystemRenderer =
+          "prototype-fallback";
+        delete document.documentElement.dataset.universeSystemReady;
+      });
+
+    return () => {
+      active = false;
+      document.body.classList.remove("planet-hover");
+      delete document.documentElement.dataset.universeSystemRenderer;
+      delete document.documentElement.dataset.universeSystemReady;
+      if (created) disposeResources(created);
+    };
+  }, [gl, starId]);
+
+  useFrame((state) => {
+    if (!resources) return;
+
+    const native = resources.system;
+    native.update(J2000_JD, state.clock.elapsedTime * 3600);
+
+    const perspective = camera as THREE.PerspectiveCamera;
+    const fovRad = THREE.MathUtils.degToRad(perspective.fov || 48);
+    const pxPerRad = size.height / 2 / Math.tan(fovRad / 2);
+    const star = native.star;
+
+    resources.bodies.update(
+      camera.position,
+      camera.quaternion,
+      camera,
+      size.height,
+      fovRad,
+      star.position,
+      star.radius,
+      resources.sunColor,
+      state.clock.elapsedTime,
+      {
+        atmospheres: quality !== "low",
+        clouds: quality !== "low",
+        rings: true,
+        ringParticles: false,
+        shadows: quality !== "low",
+        imagery: false,
+      },
+    );
+    resources.points.setPixelRatio(gl.getPixelRatio());
+    resources.points.update(
+      star.position,
+      camera.position,
+      resources.luminosity,
+    );
+    resources.orbits.update(
+      camera.position,
+      true,
+      quality !== "low",
+      pxPerRad,
+      (id) => resources.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+      null,
+    );
+
+    if (onScaleFocus) {
+      focusFrameRef.current = (focusFrameRef.current + 1) % 6;
+      if (focusFrameRef.current === 0) {
+        let best: { planet: PlanetDefinition; distance: number } | null = null;
+        for (const planet of system.planets) {
+          const body = native.get(nativePlanetId(planet));
+          if (!body) continue;
+          const projected = focusProjectionRef.current
+            .copy(body.position)
+            .project(camera as THREE.PerspectiveCamera);
+          if (projected.z < -1 || projected.z > 1) continue;
+          const distance = Math.hypot(
+            projected.x * size.width * 0.5,
+            projected.y * size.height * 0.5,
+          );
+          if (distance <= 92 && (!best || distance < best.distance)) {
+            best = { planet, distance };
+          }
+        }
+
+        const nextId = best?.planet.id ?? null;
+        if (focusedIdRef.current !== nextId) {
+          focusedIdRef.current = nextId;
+          onScaleFocus(best?.planet ?? null);
+        }
+      }
+    }
+  });
+
+  useEffect(
+    () => () => {
+      if (focusedIdRef.current !== null) onScaleFocus?.(null);
+    },
+    [onScaleFocus],
+  );
+
+  if (!starId || failed || !resources) {
+    return (
+      <SystemScene
+        system={system}
+        onSelectPlanet={onSelectPlanet}
+        onScaleFocus={onScaleFocus}
+      />
+    );
+  }
+
+  return (
+    <>
+      <color attach="background" args={["#010208"]} />
+      <Stars
+        radius={90}
+        depth={45}
+        count={quality === "low" ? 900 : 1800}
+        factor={1.7}
+        saturation={0.22}
+        fade
+        speed={0.06}
+      />
+      <primitive object={resources.scene} />
+      {system.planets.map((planet) => (
+        <ProductPlanetTarget
+          key={planet.id}
+          planet={planet}
+          resources={resources}
+          onSelect={onSelectPlanet}
+        />
+      ))}
+    </>
+  );
+}

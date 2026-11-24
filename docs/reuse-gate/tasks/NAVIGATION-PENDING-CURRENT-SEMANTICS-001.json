@@ -1,0 +1,143 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATION-PENDING-CURRENT-SEMANTICS-001",
+  "title": "Separate native navigation target from current destination",
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep native YEIS travel and Locate destinations pending until autopilot completion so ACTIVE and aria-current=location never claim an unarrived or failed target"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "UniverseNavigator currently renders activeDestinationId as ACTIVE and aria-current=location. UniverseApp assigns that id before native YEIS travel/Locate actually completes, so a failed route can still appear as the current location after the failure notice is dismissed. WAI-ARIA defines aria-current as the current item and the location token as the current location within an environment/context; selected/pending and current can intentionally differ. React likewise treats pending state as distinct feedback while the final state is not yet shown. Keep product System/Planet opens immediate because the rendered product scene changes immediately, but native camera requests must carry destinationId, publish a separate pending destination/mode while autopilot runs, promote it to active only in the existing completion callback, and clear pending on failure. This retains one YEIS navigation authority and one destination model.",
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://www.w3.org/TR/wai-aria/#aria-current",
+      "finding": "WAI-ARIA defines aria-current as the element representing the current item; aria-current=location represents the current location. It explicitly distinguishes current from selected-next semantics."
+    },
+    {
+      "url": "https://react.dev/reference/react/useTransition",
+      "finding": "React's transition guidance treats pending visual state as distinct from the final state that is shown after asynchronous work completes, supporting an explicit pending destination rather than optimistic ACTIVE."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the native camera/navigation authority; its autopilot completion remains the correct point at which a native target becomes the current spatial destination."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "finding": "Pinned MIT TourPlayer keeps flying distinct from arrived/dwell, reinforcing that commanded camera target and arrived location are separate states."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Keep YEIS autopilot and its arrival semantics as the native spatial authority; do not add another router or flight controller."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Existing React state is sufficient to represent current versus pending destination explicitly; useTransition itself is not required because native completion is already callback-driven."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yeis-native-travel-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Extend the existing native camera request metadata with destinationId and promote pending to active only through the existing completion callback."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse aria-current exactly for arrived/current location and expose pending state visually without claiming aria-current."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-arrival-authority",
+      "name": "Existing pinned YEIS native arrival callback",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YeisGalaxyScene autopilot completion path",
+      "license": "MIT at pinned e520568",
+      "decision": "reuse",
+      "reason": "Already determines when native camera travel/Locate has actually completed; it is the authoritative promotion point from pending target to current destination.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-explicit-pending-destination",
+      "name": "Existing React current/pending destination state",
+      "level": "framework_engine",
+      "registry_id": "react-core-hooks",
+      "source": "UniverseApp and UniverseNavigator local state",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "A pendingDestinationId/mode pair around the existing request callback closes the semantic gap without new state-machine infrastructure.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "optimistic-active-destination",
+      "name": "Keep optimistic ACTIVE before native arrival",
+      "level": "component_asset",
+      "source": "Current implementation",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Conflicts with aria-current=location semantics and leaves failed targets visually/currently misrepresented after a route interruption."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-native-arrival-authority",
+      "react-explicit-pending-destination"
+    ],
+    "rationale": "Preserve one destination model and one YEIS camera authority. Product scenes remain immediate ACTIVE because the product render changes immediately; native travel/Locate requests carry destinationId and remain pending until the existing autopilot completion callback promotes them. Navigator renders pending mode separately and reserves aria-current=location for genuinely current destinations. Failure clears pending and never promotes the failed target.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If future native travel needs rollback to a previous camera location, add previous-current restoration to the same request transaction; do not reintroduce optimistic ACTIVE."
+  }
+}

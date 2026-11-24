@@ -1,0 +1,236 @@
+{
+  "schema": 2,
+  "task_id": "YEIS-NATIVE-SYSTEM-ADAPTER-001",
+  "title": "Adapt the pinned MIT YEIS native system renderer into the current product system phase",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Render native YEIS StarSystem bodies, point sprites and orbit lines inside the shared R3F system phase while preserving product destination, content and camera authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Reuse the current-branch pinned MIT YEIS BodyRenderer, BodyPoints and OrbitLines closure together with the existing cached YEIS runtime. The adapter keeps StarSystem in physical kilometres and maps it into the product R3F camera through one camera-relative scale transform; it does not reconstruct orbital data or create a second navigation model. Product click targets and Personal Signal halos remain thin adapter glue. Non-YEIS systems keep the existing SystemScene fallback.",
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/vendor/yeis/render/BodyRenderer.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "docs/architecture/rendering.md",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/render/BodyRenderer.ts",
+      "finding": "Pinned MIT YEIS already implements near-body rendering with body-specific meshes, rings, tile globes and scale-sensitive visibility."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/render/BodyPoints.ts",
+      "finding": "Pinned MIT YEIS already implements distant body point rendering so the system remains legible before individual bodies are large enough for full meshes."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/render/OrbitLines.ts",
+      "finding": "Pinned MIT YEIS already renders native orbital paths from StarSystem data and is the correct source of system-scale orbital geometry."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/main.ts",
+      "finding": "The pinned application composes OrbitLines, BodyRenderer and BodyPoints against one StarSystem and updates them from a floating-origin camera; this establishes the intended native subsystem orchestration."
+    },
+    {
+      "url": "https://github.com/beevr-labs/Cosmos",
+      "finding": "Cosmos provides a broader universe-scale rendering stack, but adopting it for system view would create a second spatial engine next to the already-selected YEIS authority."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber exposes the existing Three scene, camera and renderer to narrow adapters, so a YEIS render subsystem can be hosted without another canvas."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "cosmos-web-universe"
+      ],
+      "source_refs": [
+        3,
+        4
+      ],
+      "conclusion": "Keep the selected pinned MIT YEIS full solution. Cosmos is capable but would duplicate universe ownership and navigation semantics."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        5
+      ],
+      "conclusion": "Keep the existing R3F canvas and adapt native YEIS render objects to it instead of creating another render loop or canvas."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Reuse the pinned MIT YEIS BodyRenderer, BodyPoints and OrbitLines orchestration, plus only the required pinned-MIT closure."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "The project already vendors much of the pinned YEIS shader closure. Reuse those assets and add only missing renderer support files rather than rebuilding orbital and body materials."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-system-stack",
+      "name": "Pinned MIT YEIS native system renderer stack",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "YEIS MIT e520568 BodyRenderer + BodyPoints + OrbitLines",
+      "license": "MIT at pinned commit",
+      "decision": "reuse",
+      "reason": "It is already the selected universe authority, consumes the native StarSystem model directly, and covers mesh, point, orbit and scale transitions without a parallel system model.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "cosmos-system-replacement",
+      "name": "Cosmos system renderer replacement",
+      "level": "full_solution",
+      "registry_id": "cosmos-web-universe",
+      "source": "Cosmos",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Strong scale handling, but using it only for system view would split camera/spatial authority from YEIS and require model translation at every navigation boundary.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 3.5,
+        "performance_fit": 4.5,
+        "customization_fit": 4,
+        "maturity": 3.5
+      }
+    },
+    {
+      "id": "r3f-native-host",
+      "name": "Existing React Three Fiber host",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing project R3F canvas",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Provides the current renderer, scene lifecycle and product integration surface; the YEIS subsystem should be adapted into it rather than replacing it.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Native system bodies and orbital geometry",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "full",
+        "cosmos-system-replacement": "partial",
+        "r3f-native-host": "partial"
+      },
+      "decision": "Use pinned YEIS BodyRenderer and OrbitLines directly over the native StarSystem."
+    },
+    {
+      "capability": "Cross-scale body visibility and distant point representation",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "full",
+        "cosmos-system-replacement": "full",
+        "r3f-native-host": "partial"
+      },
+      "decision": "Use pinned YEIS BodyPoints together with BodyRenderer instead of maintaining the schematic project-owned body markers."
+    },
+    {
+      "capability": "Preserve Personal Signal and destination authority",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "full",
+        "cosmos-system-replacement": "partial",
+        "r3f-native-host": "full"
+      },
+      "decision": "System renderer accepts the already-resolved native system and reports picked body identity back through the existing destination adapter."
+    },
+    {
+      "capability": "Single WebGL host and mobile quality control",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "partial",
+        "cosmos-system-replacement": "partial",
+        "r3f-native-host": "full"
+      },
+      "decision": "Host the native render subsystem inside the current R3F canvas and retain existing quality-mode ownership."
+    },
+    {
+      "capability": "Camera-relative physical-kilometre rendering inside the existing product-scale R3F camera",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "full",
+        "cosmos-system-replacement": "partial",
+        "r3f-native-host": "full"
+      },
+      "decision": "Keep YEIS body positions/orbits in physical kilometres and apply one adapter-level scene scale/translation derived from the current product camera; do not rewrite orbital data into product coordinates."
+    },
+    {
+      "capability": "Product selection and Personal Signal semantics over native rendering",
+      "importance": "high",
+      "coverage": {
+        "yeis-native-system-stack": "partial",
+        "cosmos-system-replacement": "partial",
+        "r3f-native-host": "full"
+      },
+      "decision": "Use small R3F hit targets keyed by the same native body ids and keep content halos as product-only overlays; native renderer remains visual authority for bodies/orbits."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-native-system-stack",
+      "r3f-native-host"
+    ],
+    "rationale": "Use the pinned MIT YEIS renderer stack as system visual authority for YEIS-backed systems inside the existing R3F host. Preserve the current product camera, destination model and content binding by adapting only scene scale/translation and click overlays. Keep SystemScene as fallback for non-native systems.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "cosmos-system-replacement",
+        "reason": "Cosmos is a viable broad renderer, but the project already selected YEIS as universe authority and has native StarSystem/body identities throughout navigation. Replacing only this layer with Cosmos would add translation and duplicate scale/camera ownership."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the native adapter cannot preserve current system navigation or stable product framing, retain SystemScene for that system and keep the pinned native renderer closure dormant; do not introduce a separate universe engine or rewrite YEIS orbital data."
+  }
+}

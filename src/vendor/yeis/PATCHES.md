@@ -11,8 +11,8 @@ source boundary.
 
 ## Host patches
 
-The vendored code is kept structurally close to upstream. There are three
-intentional Personal Universe adaptations:
+The vendored code is kept structurally close to upstream. There are six
+intentional Personal Universe host adaptations:
 
 1. `core/Universe.ts`
    - Adds `registerExtraSystem(system)`.
@@ -25,15 +25,17 @@ intentional Personal Universe adaptations:
    - Data format and parsing are unchanged.
 
 3. `i18n/index.ts`
-   - Restores the exact pinned-MIT YEIS runtime translator after visual smoke
-     exposed Turkish source labels leaking through the earlier identity shim.
+   - Restores the exact pinned-MIT YEIS runtime translator after smoke testing
+     exposed localized source labels leaking through the earlier identity shim.
    - Vendors only `locales/en/data.json` and `locales/en/ui.json`; the host
-     calls `initI18n("en")` before constructing `Universe`.
-   - Translation lookup and source keys remain upstream behavior; Personal
-     Universe does not maintain a parallel body-name alias table.
+     initializes `en` before constructing the YEIS universe.
+   - Translation lookup and source keys remain pinned upstream behavior;
+     Personal Universe does not maintain a parallel body-name translation table.
 
-No model, orbital, catalogue, procedural-generation, galaxy, black-hole, or
-stellar algorithms were rewritten in this migration.
+No model, orbital, catalogue, procedural-generation, galaxy, black-hole,
+landmark-navigation, picking, or stellar algorithms were rewritten in this
+migration. Product Search/Places/Journey orchestration lives outside the
+vendored tree in `src/lib/universe/yeis/navigation.ts` and React host code.
 
 ## Data
 
@@ -62,8 +64,10 @@ Fiber.
 6. `render/LandmarkSprites.ts`
    - Adds `dispose(scene)` so the R3F host can remove the instanced landmark
      mesh and release its geometry, shader material, and photo atlas texture.
-   - Rendering, coordinate, LOD, atlas, and picking logic remain the exact
-     pinned MIT implementation.
+   - Exposes read-only atlas request/load/failure counters for host runtime
+     smoke evidence and guards the delayed atlas load after React disposal.
+   - Rendering, coordinate, LOD, atlas composition, and picking semantics remain
+     the pinned MIT implementation.
 
 ## Deep-sky landmark imagery
 
@@ -72,3 +76,30 @@ from the same pinned snapshot. Upstream metadata records the photographs as
 NASA/ESA/STScI public-domain material or ESO / ESA-Hubble CC BY 4.0 assets.
 The exact per-image credit lines are retained in `landmarkImages.ts` and in
 `public/THIRD_PARTY_ASSETS.md`.
+
+## Native system renderer closure
+
+Vendored from the fixed MIT boundary
+`e52056897364e060fbd6d00951628f163b57d7a1`:
+
+- `src/render/BodyRenderer.ts` → `render/BodyRenderer.ts`
+- `src/render/BodyPoints.ts` → `render/BodyPoints.ts`
+- `src/render/OrbitLines.ts` → `render/OrbitLines.ts`
+- `src/render/RingParticles.ts` → `render/RingParticles.ts`
+- `src/render/TileGlobe.ts` → `render/TileGlobe.ts`
+- `src/render/ProceduralShips.ts` → `render/ProceduralShips.ts`
+- `src/data/imagery.ts` → `data/imagery.ts`
+
+These files are the pinned-MIT renderer closure selected by
+`YEIS-NATIVE-SYSTEM-RENDERER-V3-001`. No code from the current AGPL
+upstream main is included. Project-specific host adaptation must remain
+outside this closure where possible; any necessary vendor patch must be
+listed below before release.
+
+
+
+7. `render/BodyRenderer.ts`
+   - Replaces the upstream Vite-injected `__BUILD_ID__` model cache key with
+     the same pinned source identifier `e520568` already used by `StarCatalog`.
+   - Rendering, body materials, loading semantics and model selection remain
+     the pinned MIT implementation.

@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "task_id": "CROSS-PLATFORM-APPROVAL-HASH-V3-001",
+  "approved_at": "2026-11-23T05:42:44.795Z",
+  "baseline_commit": "483c836cd560cfd30a1b3c09dcd0d605335beeca",
+  "record_path": "docs/reuse-gate/tasks/CROSS-PLATFORM-APPROVAL-HASH-V3-001.json",
+  "record_sha256": "58dc9d596a755d94a7deb7ffe77160bc4b04702a673822ffaf1f00ef80f202b0",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "git-hooks": "38e92e0cf551070b1ba2f565d193e71d2be7951d8281898010bdcc0b21c6a2d0",
+    "github-actions-pr-diff-gate": "3765dfd501ff4aaa27d657f4dda850f6f6f0ea8bb212ba95fe78bcab487fcf5d",
+    "opa-conftest": "f2b6f73af6d2f54b7283bb006c433641e187e07bcf25d92e37ad456a366d443c"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Cross-platform Machine Reuse Gate approval hashing against committed Git blob bytes"
+  },
+  "policy_change": true,
+  "planned_files": [
+    "scripts/reuse-gate.mjs"
+  ],
+  "selected_ids": [
+    "git-blob-sha256"
+  ],
+  "candidate_scores": {
+    "git-blob-sha256": 57,
+    "canonical-lf-hash": 43,
+    "opa-blob-policy": 41.5
+  }
+}

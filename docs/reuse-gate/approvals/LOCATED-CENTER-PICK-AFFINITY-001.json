@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "LOCATED-CENTER-PICK-AFFINITY-001",
+  "approved_at": "2026-11-23T07:24:04.109Z",
+  "baseline_commit": "4e1298bdcf72b8a5a951f2f528ce7cb27af9df70",
+  "record_path": "docs/reuse-gate/tasks/LOCATED-CENTER-PICK-AFFINITY-001.json",
+  "record_sha256": "7650530c65475e0dc3a36ce460a34bf9853eeff8c6f29be88fb980c76521c94c",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "three-vector3-project": "1de9440e822aa4ccf89b2ea7e131157d4e2dd499bff52207c046564ad8c9686f",
+    "yeis-native-travel-e520568": "c3ded8d14bd098a8bf2ef129c09c5dd48ada0e7a8b525494fc861ca7d95b6073",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Make a completed YEIS Locate own a bounded center-click affinity without replacing the existing picker priority or camera authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-located-center-affinity"
+  ],
+  "candidate_scores": {
+    "yeis-located-center-affinity": 57,
+    "r3f-picker-rebuild": 41,
+    "camera-controls-replacement": 30
+  }
+}

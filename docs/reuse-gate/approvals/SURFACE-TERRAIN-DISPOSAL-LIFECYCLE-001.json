@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-TERRAIN-DISPOSAL-LIFECYCLE-001",
+  "approved_at": "2026-11-23T18:36:00.000Z",
+  "baseline_commit": "6685385a944495b26bbe0155bd6df5836b08eab6",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-TERRAIN-DISPOSAL-LIFECYCLE-001.json",
+  "record_sha256": "4be7a4c7b333dd6369154582dd57d849e6f2291f6951fb89f080bb53b92c3db8",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Stop Surface fallback unmount from reporting expected ProceduralTerrains prepare cancellation as a fatal runtime error while preserving immediate GPU/resource disposal"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "r3f-effect-owned-terrain-lifecycle",
+    "procedural-terrains-native-cancellation"
+  ],
+  "candidate_scores": {
+    "r3f-effect-owned-terrain-lifecycle": 53,
+    "procedural-terrains-native-cancellation": 54.5,
+    "custom-terrain-job-manager": null
+  }
+}

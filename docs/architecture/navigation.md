@@ -1,288 +1,649 @@
 # Universe Navigation
 
-**Status:** pinned-MIT YEIS Search/Places semantics restored on 2026-11-22.
-
-## Decision
-
-The Personal Universe navigator does not maintain a second astronomical search
-index.
-
-The pinned MIT YEIS commit already contains:
-
-- search UX across stars, bodies, black holes, landmarks and galaxies;
-- a grouped Places model with stable destination refs;
-- `StarCatalog.search()` and `Universe` domain search helpers;
-- native camera autopilot primitives for later spatial fly-to.
-
-The current React shell therefore stays thin. It presents results and keyboard
-interaction while the YEIS runtime resolves astronomical destinations.
-
-## Current destination classes
-
-The first restored slice supports:
-
-- Personal Signals from Astro Content Collections / content placement;
-- catalogue stars through `StarCatalog.search()`;
-- black-hole systems through `Universe.searchBlackHoles()`;
-- star-like landmarks through `Universe.searchLandmarks()`;
-- a small featured-places subset using the stable star refs from the pinned MIT
-  `src/ui/places.ts`.
-
-Non-system deep-sky landmarks and galaxy-centre navigation remain candidates
-for the native-camera fly-to layer because the current product phase model
-enters star systems rather than arbitrary points in space.
-
-## Interaction
-
-- HUD button: `SEARCH / PLACES`;
-- keyboard: `Ctrl+K` / `Cmd+K`, or `/` when not typing;
-- arrow keys select results;
-- Enter opens the selected destination;
-- Shift+Enter locates the selected destination in the native galaxy view;
-- Escape closes the navigator.
-
-When no query is present, Personal Signals are listed first followed by featured
-YEIS places. Search keeps personal results and astronomical results in the same
+**Status:** YEIS is the default universe engine. Search, Places, canvas picking,
+deep links, Personal Signals, native spatial travel and guided journeys share one
 destination model.
 
-## Runtime validation
+**License boundary:** YEIS code/semantics in this subsystem are pinned to MIT
+commit `e52056897364e060fbd6d00951628f163b57d7a1`. Current upstream AGPL
+code is not copied into Personal Universe. Old localized labels from the pinned
+Places catalogue are source lookup refs only; product copy is owned here and is
+English/neutral.
 
-Production-preview/CDP validation on 2026-11-22:
+## One navigation model
 
-- `Ctrl+K` opened the navigator and exposed seven browse destinations with the
-  current one-entry portfolio;
-- searching `Personal Universe` returned exactly the Personal Signal result and
-  Enter navigated to native YEIS star `c59669` / Spica;
-- the resulting Spica system preserved its attached project signal;
-- searching `Sirius` returned the YEIS catalogue result `A0 · 8.6 LY`;
-- Enter navigated to native YEIS star `c29786` / Sirius System.
+`src/lib/universe/yeis/navigation.ts` is the narrow adapter between product
+intent and YEIS.
 
-This demonstrates that project discovery and astronomical discovery share the
-same navigator while astronomy still comes from YEIS rather than a duplicated
-search index.
+The product does **not** maintain separate Search, Places, canvas and deep-link
+routers. They all resolve a `UniverseNavigationDestination`, then call the same
+execution path in `UniverseApp`.
 
-## Next layer
+Destination targets are intentionally small:
 
-The existing `CameraController.centerOnDirection()` and `goToPoint()` methods
-can provide a spatial **Locate** action before entering a system. That should be
-added as a separate navigation enhancement rather than replacing direct Open.
+- `star(nativeId)`: open a YEIS star/system through the existing product
+  resolver;
+- `marker(markerId)`: observed NASA host without a native YEIS star identity;
+- `body(starId, bodyId)`: exact native YEIS system body;
+- `observed-body(markerId, bodyId)`: exact NASA observed planet in the
+  existing v2 host-system resolver;
+- `content(nativeId, markerId, entryId)`: exact Personal Signal;
+- `blackhole(id)`: exact pinned-YEIS black-hole body;
+- `landmark(index)`: non-stellar deep-sky target;
+- `galaxy(index)`: galaxy-centre target.
 
+Camera requests are derived from those destinations rather than being authored
+by UI components.
 
-Browser regression after the correction:
+## Search
 
-- typing the literal letter `l` in the focused search input produced `Pol` and did
-  not create a locate request;
-- `Shift+Enter` on Sirius still completed native Locate at `c29786` with the
-  measured `0.269212 rad` quaternion change;
-- reopening the navigator and pressing plain Enter still opened Sirius System.
+The single navigator input searches, in product-priority order:
 
-Generic search packages remain fallback tools:
+1. Content Collection entries / Personal Signals;
+2. Hero world;
+3. observed exoplanet hosts;
+4. real observed exoplanets from the existing NASA Exoplanet Archive snapshot;
+5. bodies in the currently open product system;
+6. current/native YEIS bodies and bodies in other hand-authored systems;
+7. catalogue stars;
+8. black holes;
+9. landmarks, nebulae and clusters;
+10. galaxies.
 
-- cmdk/Fuse.js: useful if result UX or fuzzy matching later needs more;
-- Pagefind: useful for future long-form document/article search, not for spatial
-  universe destinations.
+Personal content searches title, summary, tags, kind and status. Common Chinese
+astronomical aliases are translated into the same normalized YEIS query path
+without adding a second astronomy index. The pinned MIT normalization remains
+the canonical accent/case folding behavior.
 
-## Native Locate
+Results are grouped. Personal content is intentionally ranked before generic
+astronomy. The keyboard contract is:
 
-`LOCATE` is now a second action beside `OPEN`.
+- `Ctrl/Cmd+K` or `/` outside text editing: open navigator;
+- `ArrowUp / ArrowDown`: move selection;
+- `Enter`: Open / Travel;
+- `Shift+Enter`: Locate in galactic view;
+- `Escape`: close.
 
-- `OPEN` keeps the existing behavior and enters the resolved star system.
-- `LOCATE` stays in `GALACTIC OVERVIEW` and sends a focus request to the
-  hosted YEIS `CameraController`.
-- the native controller uses `centerOnDirection()` and its built-in autopilot;
-  the R3F PerspectiveCamera is not animated independently.
-- locate requests are retained until the native scene is ready and are consumed
-  from the render loop, so returning from a system and locating immediately is
-  safe.
+The vendored YEIS `Input.isTyping()` check prevents the 3D hotkey layer from
+claiming keystrokes while the input is focused.
 
-Production-preview/CDP validation:
+## Navigation failure recovery
 
-- searching `Sirius` exposed both OPEN and LOCATE;
-- LOCATE resolved to `c29786` and kept the current layer at GALACTIC OVERVIEW;
-- the native autopilot completed on `c29786`;
-- measured quaternion rotation from start to completion was `0.269212 rad`
-  (about 15.4 degrees), proving that the camera actually reoriented;
-- the on-screen caption reported `LOCATED // Sirius`;
-- reopening the navigator and pressing Enter on `Personal Universe` still
-  entered Spica / `c59669`, proving the direct-open path remained intact.
+Native YEIS camera failures remain part of the same shared destination
+execution path. `UniverseApp` preserves the exact failed
+`UniverseNavigationCameraRequest` and renders one persistent, non-modal
+recovery notice rather than falling back to console-only diagnostics.
 
-Full physical `goToPoint()` flight remains deliberately deferred until
-cross-frame arrival/switch semantics are integrated and validated.
+The notice follows the pinned-MIT YEIS single-notification concept without
+copying the legacy UI implementation. It is announced as an ARIA alert, does
+not take focus, and does not auto-dismiss. `RETRY` only refreshes
+`requestId` and reissues the same camera target/mode through
+`YeisGalaxyScene`; it does not re-resolve to a different destination or
+create another navigation authority. `DISMISS` clears only the active error
+feedback. Any new Search/Places/Canvas navigation or a successful native
+arrival clears stale failure state.
 
-### Locate keyboard correction
+A full toast queue/provider was intentionally not introduced: the product has
+one authoritative native navigation request at a time, so Radix/React Aria
+toast machinery would add queue and focus infrastructure without improving the
+destination contract.
 
-The initial Locate slice briefly used the plain `L` key while focus remained in
-the editable search input. That conflicts with ordinary queries containing the
-letter `l`. The binding is corrected to `Shift+Enter` for Locate while plain
-`Enter` remains Open. Printable search characters are never intercepted by
-result actions, and the explicit LOCATE button remains available for pointer
-users.
+## Navigator interaction lifecycle
 
-## Navigation lazy-load boundary
+The Navigator keeps YEIS/shared destination resolution authoritative while the
+React shell owns only presentation lifecycle.
 
-Search/Locate must not make the navigator a second eager path into the heavy YEIS
-runtime. The navigator shell and destination types remain in the static React graph,
-while `loadYeisCore()` and YEIS query normalization are imported only when an
-async navigation operation executes.
+- changing the query immediately invalidates the previous rows and marks the
+  result region busy before the debounced search starts, so a former Places row
+  cannot be activated as if it matched the new query;
+- loading has a visible `Scanning destinations…` state rather than a blank
+  list;
+- Open/Travel and Locate expose a single pending action, disable competing row
+  actions, and close the dialog only after the shared destination executor
+  accepts the action;
+- an immediate resolver/executor rejection stays visible in the dialog instead
+  of becoming console-only;
+- ArrowUp/ArrowDown, Enter, Shift+Enter and Escape remain the same keyboard
+  contract and do not introduce a second selection/search authority.
 
-Production validation on 2026-11-22:
+cmdk and XState were evaluated for this lifecycle. cmdk has strong generic
+loading/empty/group primitives but would duplicate selection/filter plumbing
+while dual Open/Locate remains custom; XState is disproportionate for the small
+local state surface. Existing React state/refs/effects therefore close this gap
+around the retained pinned-MIT YEIS destination model.
 
-- the previous Vite `INEFFECTIVE_DYNAMIC_IMPORT` warning is gone;
-- the production build keeps separate `Universe` / `yeis` / `YeisGalaxyScene`
-  chunks rather than folding the core through `navigation.ts`;
-- a fresh Chrome profile still searched Sirius, located `c29786`, completed the
-  same `0.269212 rad` native-camera turn, and opened Sirius System;
-- printable `l` input still remained ordinary search text.
+## Places / Destinations
 
-This is a module-graph change only; destination ranking and spatial semantics still
-come from the pinned MIT YEIS implementation.
+With an empty query the same navigator becomes a grouped Places surface.
 
-## Full pinned-MIT Places / Travel completion
+Personal groups are generated directly from Astro Content Collections and
+placement data:
 
-Completed on 2026-11-23.
+- Personal Signals
+- Featured
+- Projects
+- Research
+- Experience
+- Artifacts
+- Notes
 
-The navigator now restores the supported curated destination set from the
-pinned MIT YEIS `src/ui/places.ts` instead of keeping the earlier small sample:
+There is no second handwritten portfolio list.
 
-- 10 curated stars;
-- 10 black-hole systems;
-- 20 pulsar / nebula / cluster / record-star landmarks;
-- 11 galaxies;
-- Personal Signals from Astro content placement.
+Astronomical groups reuse stable refs from pinned MIT `src/ui/places.ts`:
 
-The catalogue refs and spatial semantics remain YEIS-owned. Personal Universe
-only supplies English-facing presentation for the curated galaxy names.
-Solar-System spacecraft / moon entries are intentionally not advertised in the
-browse list because the current R3F product renderer does not yet render those
-body classes as first-class travel targets.
+- Observed Exoplanet Hosts
+- Observed Exoplanets generated from the same NASA snapshot already used by the
+  v2 observed-system resolver
+- Planets & Bodies, including the pinned Solar System / mission destinations
+- Stars
+- Black Holes
+- Nebulae, Clusters & Landmarks
+- Galaxies
 
-Search also restores YEIS body discovery for directly renderable worlds:
-current-system and foreign-system planets/dwarfs are returned as `body`
-destinations. Opening one resolves its native YEIS star/system and enters the
-matching existing planet rather than creating a parallel body model. Locate for
-a body remains a galactic locate of its host star, so YEIS is still the only
-physical-coordinate authority.
+The product layer supplies English/neutral names. Legacy Turkish source strings
+are retained only where a pinned catalogue lookup requires the original ref.
 
-### GitHub-only browser validation
+The current destination receives explicit visual state and all sections remain
+operable on narrow/mobile layouts.
 
-The repository CI now runs a real headless Chrome pass after the production
-build. The navigation integration was validated in GitHub Actions without a
-local browser:
+## Product Open vs native travel
 
-- default route hydrated with `data-universe-engine="yeis"`;
-- native galaxy reached `data-yeis-native-galaxy="ready"`;
-- personal signal hydration remained present;
-- `?navigator=1&navq=Earth` opened the Universe Navigator;
-- the hydrated navigator reported a non-zero result count;
-- the rendered DOM contained the `Earth` destination.
+Personal Universe intentionally combines its React product scenes with YEIS
+native travel instead of rebuilding either side.
 
-This browser smoke is now part of the branch CI, in addition to Reuse Gate and
-the Astro production build.
+### Product-open path
 
-## Navigator discovery grouping
+Catalogue stars, native-mapped observed hosts, Hero and Personal Signals resolve
+through the existing product system adapter.
 
-Implemented under task `NAVIGATOR-DISCOVERY-002`.
+A Personal Signal destination carries the Content Collection `entryId`.
+Opening it resolves the system and then selects the planet that
+`attachContentToSystem()` actually attached that entry to. The app therefore
+enters the exact generated signal planet rather than merely opening its star.
 
-The navigator still consumes one flat array of destinations resolved by the
-pinned MIT YEIS search/Places model, so keyboard selection and Open/Locate
-semantics remain unchanged. Presentation now adds stable groups:
+Hero resolves to the HELION system and AURORA-01 body.
 
-1. Personal Signals
-2. Worlds
-3. Stars + Systems
-4. Black Holes
-5. Landmarks
-6. Galaxies
+If an ordinary pinned body also exists as a product planet, the same path opens
+that product planet.
 
-Browse uses the same grouping over the curated Places set. Search keeps the
-group order stable and ranks matches *within each group* by exact title,
-title prefix, token prefix, title substring and detail substring. This keeps
-Personal Signals visibly first-class without introducing a second fuzzy-search
-index or dependency.
+### Native fallback path
 
-Generic search packages remain escalation options rather than parallel
-authorities: cmdk/Fuse can later enhance palette ergonomics, while Pagefind
-remains reserved for document/article search.
+Some pinned Places bodies are moons, spacecraft or otherwise not represented by
+the current React `PlanetDefinition` model. Those destinations do not degrade
+to "open the Solar System". They fall back to pinned YEIS native semantics:
+switch the YEIS reference frame when needed and call
+`CameraController.goTo()` on the exact body.
 
-## Shareable star and world links
+Black holes always use the exact pinned `blackHole.entry.bodyId` after
+switching to the owning system.
 
-Implemented under task `SHAREABLE-NAV-LINKS-002`.
+Star-type landmarks are real systems in pinned YEIS and therefore resolve as
+star/system destinations. Non-stellar landmarks stay spatial.
 
-The existing debug URL contract is promoted into a stable single-page deep-link
-contract rather than introducing a router:
+### Spatial path
 
-- `phase=<phase>`
-- `star=<native YEIS star id>`
-- optional `body=<native YEIS body id>`
+Pinned MIT arrival behavior is preserved:
 
-On initial load, `body` is resolved inside the requested native YEIS system
-before the content/Hero/first-world fallback, so an exact shared world wins.
-Opening a star or world through normal navigation updates the same query
-parameters with the browser History API. Returning to the galactic overview
-removes only `phase`, `star` and `body`.
+- galaxy: `goToPoint` at approximately `2.6 * galaxyRadius`, with disc-normal
+  approach;
+- non-stellar landmark: `3.2 * radius`;
+- remnant landmark: `5 * radius`.
 
-Unrelated query state such as `engine`, `diagnostic`, `freeze`,
-`navigator` and `navq` is preserved because URL mutation starts from the
-current `window.location`.
+The native `CameraController` remains the single camera-flight authority.
+Personal Universe does not animate a competing R3F camera.
 
-The serialized identity remains YEIS-owned; Personal Universe does not create a
-second slug or route identity for astronomical objects.
+Native galaxy camera position/quaternion are retained across React phase
+changes.
+
+## World arrival and progressive planet bake
+
+Product arrival state is authoritative before high-cost visual refinement.
+When a destination resolves to a product `PlanetDefinition`, the app enters
+`approach`, updates the shared destination/deep-link identity, and renders the
+existing lightweight planet fallback immediately.
+
+The adopted `procedural-planets` `bakePlanet()` representation remains the
+hardware-world refinement layer, but its own documentation notes that baking
+blocks the GPU and should be treated as loading work. `PlanetScene` therefore
+renders the lightweight world first, leaves an intentional 1.8s interaction
+window in which quick travel/return can cancel the refinement entirely, and only
+then starts the deterministic bake in an idle slot. Auto quality uses a 512px
+bake and explicit high quality retains 1024px.
+
+Software WebGL renderers (SwiftShader/llvmpipe/softpipe) and explicit low-quality
+mode keep the interactive fallback instead of invoking `bakePlanet()`. Cloud
+traces showed software baking could block the page for roughly 20+ seconds,
+including preventing an in-flight navigation/reload from being aborted. This is
+a renderer capability fallback, not a different navigation or world identity.
+The root element exposes `data-planet-render-mode` for runtime evidence
+(`fallback-software-renderer`, `fallback-low-quality`, `fallback-warmup`,
+`baking`, `baked`, or `fallback-error`).
+
+This is a rendering/lifecycle optimization only. It does not change destination
+identity, Search/Places semantics, the native-body fallback rule, or the
+Galaxy → System → Planet → Approach contract. In particular Earth remains a
+product planet (`body:c0/earth` → `c0/earth` at `phase=approach`); moons or
+spacecraft absent from `PlanetDefinition` continue to use exact native YEIS
+travel.
+
+## Viewport-aware world framing
+
+Product-world framing reuses the already-installed `camera-controls` camera
+authority rather than maintaining separate desktop/tablet/mobile shot tables.
+`PLANET_RENDER_RADIUS` is shared by the fallback and baked planet
+representations. For Approach and Orbit, the existing cinematic shot direction
+and transition timing are retained, while the final camera distance comes from
+`CameraControls.getDistanceToFitSphere(PLANET_RENDER_RADIUS)` multiplied by a
+small phase-specific breathing-room factor.
+
+Because `getDistanceToFitSphere()` uses the active camera's effective FOV and
+aspect ratio, portrait viewports automatically move farther away when the
+horizontal FOV is the limiting dimension. A resize/orientation change recomputes
+the shot through the same control instance; no device-specific camera authority
+is introduced.
+
+Camera acceptance is based on the real current control state, not its target
+end-state. `getPosition(..., false)` and `getTarget(..., false)` must reach
+the shot tolerances before the root publishes
+`data-universe-camera-settled=<phase>` and before visual screenshots are
+captured. This prevents a transition command from being mistaken for a settled
+camera simply because camera-controls has already stored its destination.
+
+## Manual product-world camera takeover
+
+Product-world exploration reuses the same `camera-controls` instance that owns
+cinematic shots. No `OrbitControls`, second camera, or parallel navigation
+authority is mounted.
+
+Manual input is intentionally available only after the visitor reaches a stable
+`system`, `orbit`, or `surface` phase:
+
+- left-drag rotates around the current destination target;
+- middle drag may dolly inside the stable product-world phase;
+- one-finger touch rotates;
+- two-finger touch keeps the existing touch exploration behavior;
+- right drag and truck/pan remain disabled, so manual exploration cannot drift
+  the authoritative destination target away from the selected world/system.
+
+The **mouse wheel is no longer a local camera dolly**. It is reserved for the
+continuous-scale coordinator described below, so YEIS, camera-controls and the
+product shell cannot interpret the same wheel event as three different camera
+commands.
+
+`approach`, `atmosphere`, and `returning` remain cinematic transitions.
+When drag/touch manual control starts, the current shot is marked overridden,
+settled evidence is cleared, and the root publishes
+`data-universe-camera-mode="manual"`. The current destination, phase and deep
+link stay unchanged.
+
+If a Guided Journey is active, direct camera takeover stops that Journey
+immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
+intent wins, and orchestration must not fight the visitor for the same camera.
+
+## Continuous wheel scale navigation
+
+Implemented under task `CONTINUOUS-SCALE-WHEEL-NAV-001`.
+
+The default YEIS product now treats the mouse wheel as one **continuous scale
+intent**, not as a free-flight speed control in the galaxy plus a second dolly
+control in product-world scenes.
+
+The retained stack remains unchanged:
+
+- pinned MIT YEIS owns galaxy-scale coordinates, camera travel, catalogue
+  picking and native system/body identity;
+- the existing product destination model owns what a target means;
+- the existing `camera-controls` instance owns smooth System/Approach/Orbit/
+  Atmosphere/Surface camera shots;
+- ProceduralPlanets owns the close-world visual tier where that world supports
+  it.
+
+Personal Universe adds only a coordinator that converts wheel gestures into
+focus-preserving scale transitions. No second camera, RAF loop, renderer,
+spatial index or router is introduced.
+
+### Focus
+
+At galaxy scale, the scene reuses existing YEIS projection/picking primitives
+at the viewport centre. Explicit centre focus wins, with eligible priority:
+
+1. Personal Signal;
+2. Hero world;
+3. observed host;
+4. catalogue star;
+5. procedural star.
+
+The fresh opening view also has one **soft focus** fallback so a visitor can
+start diving with the wheel even when the auto-orbit composition has no object
+inside the centre-pick radius. That fallback prefers the first Personal Signal,
+then the Hero world, then a native catalogue star. It is consumed by the first
+scale-in gesture and is permanently disabled as soon as drag, touch, pinch,
+pan or keyboard camera input shows that the visitor has taken spatial control.
+After takeover, an empty centre remains empty instead of snapping back to a
+product-selected target.
+
+A completed **Locate** has affinity over coincident centre-screen overlays until
+the visitor manually changes the camera. This reuses the same pending/current
+semantics as Search/Places/Canvas navigation.
+
+At system scale, the already-rendered planet positions are projected to the
+viewport centre. The nearest eligible planet inside the bounded focus radius is
+reported to the coordinator. No separate planet-position database is built.
+
+For Hero/Personal destinations, the galaxy-scale destination is carried into
+the opened system as a preferred planet intent. This means the visitor does not
+have to reacquire AURORA-01 after crossing from the galaxy into HELION.
+
+### Scale ladder
+
+Wheel-in and wheel-out are reversible over the existing product ladder:
+
+```text
+Galaxy
+  ↕
+YEIS native star travel / focus
+  ↕
+Stellar System
+  ↕
+Approach
+  ↕
+Orbit
+  ↕
+Atmosphere
+  ↕
+Surface
+```
+
+The first inward wheel gesture on a centred galaxy target uses existing YEIS
+native camera travel. A further inward gesture after that target is promoted to
+the current destination enters the stellar-system renderer. If the visitor
+continues scrolling while native locate/travel is still settling, one
+enter-system intent is queued and consumed only after the existing destination
+becomes current; a competing camera request is not created.
+
+Inside the system, an inward gesture opens the current/preferred planet at
+`approach`. Product-world scale then advances over the same phase ladder, but
+wheel input is not discarded while a cinematic shot is moving. Additional
+same-direction threshold crossings are queued as scale intent and consumed as
+soon as each camera boundary settles, so a sustained wheel gesture can flow
+through Orbit and Atmosphere without requiring stop-scroll-stop repetition.
+Changing direction clears the queued intent and retargets one phase in the
+opposite direction immediately.
+
+Wheel-out performs the exact reverse ladder. At System it returns to the
+retained YEIS galaxy view; farther out it can travel back toward the Milky Way
+overview.
+
+### Wheel ownership and hysteresis
+
+Exactly one layer owns mouse-wheel scale input:
+
+- YEIS `Input.wheel` is zeroed before the native CameraController update;
+- camera-controls has its wheel ACTION disabled;
+- the product coordinator accumulates small trackpad deltas and applies
+  two-stage direction hysteresis: a lone tiny sample expires quickly, while an
+  established same-direction gesture keeps its partial progress through short
+  renderer/main-thread stalls.
+
+Traditional mouse-wheel notches therefore feel immediate while fine trackpad
+noise must accumulate before a scale boundary is crossed. A phase transition
+itself serializes committed steps: extra input is queued while the camera is
+unsettled, but distinct wheel events are never discarded solely because they
+arrived inside a wall-clock cooldown. Changing direction clears queued intent
+and resets the gesture lock.
+
+Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
+gesture is still processed as scale intent. Manual spatial takeover disables
+the opening soft-focus fallback so subsequent wheel navigation follows only
+what is actually centred.
+
+### Surface capability boundary
+
+Continuous navigation does not claim every generated body has a terrain
+surface. `PlanetSurfaceMode` remains authoritative.
+
+- `surface-terrain` / `custom` worlds may continue through Atmosphere to
+  Surface;
+- `none` worlds stop at Orbit and publish a blocked scale boundary rather
+  than inventing terrain.
+
+Today AURORA-01 is the canonical full Galaxy → System → Planet → Surface
+acceptance path. Ordinary generated and observed worlds remain astronomically
+valid even when their current product representation stops at Orbit.
+
+Search, Places, canvas clicks, deep links and Guided Journeys remain direct
+entry paths into the same destinations. Continuous wheel navigation changes
+interaction continuity, not destination identity.
+
+## Canvas picking
+
+Both galaxy-scale and system-scale canvas interactions route back into the
+same destination model. In the system view, a clicked planet is adapted to the
+same Personal Signal / observed-exoplanet / native-body / Hero destination used
+by Search, Places and deep links. The legacy direct planet callback remains only
+for the `?engine=v2` rollback path or an unmappable fallback.
+
+In the native YEIS galaxy view, pick priority is:
+
+1. Personal Signal overlay;
+2. Hero;
+3. HIP-less observed host overlay;
+4. LandmarkSprites;
+5. GalaxySprites;
+6. catalogue stars;
+7. procedural stars.
+
+Signal clicks therefore open the exact content planet. Landmark and galaxy
+picking use the pinned MIT renderers' pick APIs instead of a second spatial
+index.
+
+A completed **Locate** adds one bounded semantic exception without changing
+that global priority: while the native camera remains untouched after settling,
+a click inside the normal canvas-center hit radius resolves to the exact
+destination that was just located. This prevents unrelated sky overlays that
+happen to project near the same center pixel from stealing the deliberate
+Locate target. The affinity is one-shot and is cleared by a new navigation
+request or any manual camera input; clicks away from center continue through
+the priority list above.
+
+## Personal Signal semantics
+
+Signals remain generated from Content Collections; no fake biography/project
+entries are created.
+
+In the galaxy:
+
+- signals use a distinct cyan overlay;
+- point size/opacity receive a small pulse;
+- desktop hover projects the actual signal positions and shows content title
+  and kind;
+- touch/coarse-pointer users rely on direct picking instead of hover;
+- the geometry capacity is derived from content count rather than the former
+  fixed 256-entry allocation.
+
+In a system, the existing content planet emissive + cyan wireframe halo remains
+the visual language. The content card continues to be driven by the attached
+entry rather than duplicated metadata.
+
+This scales naturally when the collection grows from a handful of entries to
+tens or hundreds: placement, search, hover and picking iterate the generated
+placement list.
+
+## Deep links
+
+Destination deep links use the same resolver and executor:
+
+```text
+?destination=hero:aurora-01
+?destination=personal:<content-entry-id>
+?destination=star:<native-star-id>
+?destination=body:<star-id>/<body-id>
+?destination=exoplanet:<marker-id>:<planet-name>
+?destination=blackhole:<black-hole-id>
+?destination=landmark:<landmark-id>
+?destination=galaxy:<galaxy-index>
+?destination=observed:<marker-id>
+```
+
+Appending `&navigation=locate` requests Locate rather than Open/Travel.
+
+Normal product navigation also mirrors the currently open cinematic world into
+the existing native YEIS query identity:
+
+```text
+phase=<system|approach|orbit|atmosphere|surface>
+star=<native-star-id>
+body=<native-body-id>   # when a world is selected
+```
+
+This is supplementary state, not a second router. `destination` remains the
+cross-scale identity for Personal Signals, observed hosts/exoplanets, galaxies,
+landmarks and black holes, and wins when both contracts are present. The
+`phase/star/body` form remains reloadable for native YEIS stars/worlds and is
+kept in sync as the cinematic phase advances. Returning to Galaxy clears the
+spatial world identity. URL mutation uses `URLSearchParams` plus the browser
+History API, preserving unrelated parameters such as `engine`, diagnostics and
+feature flags without introducing a client router.
+
+## Landmarks and assets
+
+`LandmarkSprites`, landmark image metadata, physical coordinates and
+navigation semantics come from the pinned MIT boundary.
+
+The runtime exposes diagnostics for smoke tests:
+
+- `data-yeis-native-galaxy=ready`
+- `data-yeis-landmarks=<count>`
+- `data-yeis-landmark-photos=<declared-count>`
+- `data-yeis-landmark-photos-requested=<atlas-request-count>`
+- `data-yeis-landmark-photos-loaded=<successful-image-count>`
+- `data-yeis-landmark-photos-failed=<failed-image-count>`
+- `data-yeis-landmark-photos-complete=1` when the real image requests settle
+- `data-yeis-picked-target=<destination-id>`
+
+The pinned image set contains 15 deep-sky photographs. Source/license credits
+remain in `public/THIRD_PARTY_ASSETS.md`; the host must not substitute assets
+from current AGPL YEIS.
 
 ## Guided journeys
 
-Implemented under task `GUIDED-JOURNEYS-V3-001`.
+Journeys are deliberately orchestration, not a second navigation state machine.
 
-Journeys are deliberately orchestration over the existing destination model, not
-a second navigation state machine.
+The pinned MIT `src/core/TourPlayer.ts` was evaluated rather than ported
+wholesale. Three core ideas are retained:
 
-The pinned MIT YEIS `src/core/TourPlayer.ts` was evaluated directly. Personal
-Universe reuses three of its spatial-tour semantics:
-
-- user-initiated navigation interrupts the running journey;
-- automatic progression waits until navigation has settled, then applies a
+- a user-initiated navigation interrupts the running journey;
+- automatic progression waits until navigation is settled, then applies a
   short destination dwell;
 - step changes own and clean up only their temporary orchestration state.
 
-The upstream narration manifests, TTS playback, timed cue engine, render
-overrides, comparison/pulse effects, surface pins and simulation-time ownership
-are specific to YEIS's educational-tour product and are intentionally not
-ported.
+Its narration manifests, TTS playback, timed cue engine, render overrides,
+surface pins, comparison/pulse effects and simulation-time restoration are
+specific to the upstream educational-tour product and are intentionally not
+copied into Personal Universe.
 
-The Navigator derives three journeys from the same real Personal Signal
-destinations already generated from Astro Content Collections:
+The Places surface derives:
 
-- Featured Journey;
-- Projects Journey;
-- Research Journey.
+- Featured Journey
+- Projects Journey
+- Research Journey
 
-No second handwritten content list is maintained. Empty groups remain disabled
-instead of inventing portfolio entries.
-
-The journey coordinator stays inside the existing React runtime and calls the
-same `handleNavigateDestination` path used by Search and Places. A journey
-therefore cannot create an alternate star/body identity or camera authority.
+from the same destination sections. Each step calls the same destination
+executor used by Search/Places/canvas/deep links.
 
 Behavior:
 
-- manual Search navigation cancels the current journey;
-- Locate cancels the current journey;
-- Canvas system/planet selection cancels the current journey;
-- Return and Stop cancel it explicitly;
-- Prev/Next reuse the same destination executor;
-- normal mode auto-advances only after navigation is no longer traveling or
-  locating and the product is at a stable system/approach/orbit/surface phase;
-- `prefers-reduced-motion` disables automatic progression while keeping
-  Prev/Next/Done available;
-- camera controls remain outside the journey coordinator.
+- manual Search/Places/Canvas navigation, Locate, Return or Stop interrupts the
+  journey immediately;
+- the Journey adds no extra navigation lock: Search/Places, Canvas and Return
+  remain available while it is active;
+- ordinary mode advances only after the current destination has physically
+  settled. Product System/Approach/Orbit/Atmosphere/Surface use the existing
+  camera-controls current-position/current-target acceptance; native YEIS
+  spatial travel uses its existing arrived/located callback;
+- the 6.5 s destination dwell begins only after that settled signal. A
+  single-stop Journey therefore enters its visible completion state
+  automatically after one settled dwell instead of requiring a special DONE
+  click in ordinary motion;
+- `prefers-reduced-motion` disables automatic advance and keeps Prev/Next
+  manual controls;
+- a Journey never invents content: if the relevant Content Collection group is
+  empty, the corresponding journey is disabled.
 
-React Joyride and XState were both evaluated before implementation. Joyride is a
-mature DOM-target onboarding product, but it would not replace spatial
-destination resolution or camera travel. XState is a mature general state
-machine framework, but the current journey state is intentionally tiny and
-subordinate to the existing navigation state. Neither is introduced as a new
-runtime dependency at this stage. If journeys later gain branching,
-persistence, resumability or parallel invoked work, XState should be
-re-evaluated before expanding the local coordinator.
+This closes a former semantic mismatch where the React phase could switch to
+`approach` or `system` before the camera had actually arrived, allowing the
+dwell timer to start during flight. The implementation retains only a local
+`cameraSettledPhase` latch; it does not port TourPlayer's narration/cue state
+machine or create another destination executor.
+
+## Reuse Gate
+
+The navigation mainline retains the frozen `YEIS-FULL-PLACES-TRAVEL-001`
+approval for its original protected closure. Later productization units use
+independent immutable task approvals, including
+`PLANET-ARRIVAL-PROGRESSIVE-BAKE-001`,
+`NAVIGATOR-INTERACTION-LIFECYCLE-001`,
+`PLANET-VISUAL-ARRIVAL-COMPOSITION-001`,
+`NAVIGATION-FAILURE-RECOVERY-001`,
+`JOURNEY-SETTLED-ORCHESTRATION-001`,
+`NATIVE-BODY-ACCEPTANCE-001`,
+`NAVIGATION-ENTRY-COVERAGE-001`, and
+`WORLD-CAMERA-MANUAL-OVERRIDE-001`.
+
+Do not edit an approved record after implementation merely to make it describe
+new code: the gate intentionally hashes the research record at approval time.
+Each new protected implementation unit must create and commit its own task and
+approval metadata before its first implementation commit.
+
+## Runtime acceptance checklist
+
+A release candidate is accepted only after all of the following are exercised
+against a production build:
+
+- Search groups, title/summary/tag matching and keyboard behavior;
+- Personal Signal Open reaches the exact attached planet;
+- Places product Open, observed exoplanet Open, and native body fallback,
+  including `月球` → `body:c0/moon` → native `c0/moon` travel;
+- observed-host/exoplanet Locate, including a HIP-less physical point;
+- star/system, body, black-hole, landmark and galaxy navigation,
+  including Chinese `仙女座` → exact galaxy native travel;
+- real WebGL Canvas picks route through the same destinations after native
+  Locate, without a test-only picking API;
+- destination deep links, including Search → `hero:aurora-01` → exact Hero
+  world → cold reload of the same world identity;
+- galaxy → system → planet → approach → orbit → return → galaxy;
+- landmark sprite/photo counts and all 15 photograph requests;
+- mobile navigator/Journey layout;
+- Journey interruption, settled-before-dwell auto advance, visible completion,
+  and reduced-motion manual mode;
+- stable System/Orbit/Surface manual camera takeover preserves destination and
+  deep-link identity while interrupting an active Journey;
+- native galaxy camera persistence after returning from a product scene.
+
+### Cloud acceptance evidence — 2026-11-23
+
+PR #24 / GitHub Actions run `45051078091` exercised the production artifact
+without a Windows workstation:
+
+- Machine Reuse Gate: PASS;
+- Astro production build: PASS;
+- headless Chromium runtime smoke: PASS;
+- default boot reached `data-universe-engine="yeis"`,
+  `data-yeis-native-galaxy="ready"` and one generated Personal Signal;
+- `?navigator=1&navq=Earth` opened the product Navigator and produced a
+  non-empty Earth result set after the smoke deep-link compatibility regression
+  was fixed;
+- the uploaded dist artifact digest was
+  `sha256:973d5a6f392dc9a6fee7996ec6148bfd28fb27c52fb88745ded37ff7f44f9855`.
+
+The exact uploaded dist was then extracted into an independent container and
+served over HTTP. Every one of the 15 pinned deep-sky atlas sources under
+`/nebulae/*.jpg` returned HTTP 200, decoded as `image/jpeg`, and had a
+non-zero payload; the built YEIS scene bundle also contains the
+requested/loaded/failed/complete atlas diagnostics. Browser-side atlas
+completion remains observable through those diagnostics rather than being
+coupled to core galaxy readiness, because the photographs are intentionally a
+progressive enhancement.
 
 ## Exact native body and black-hole travel
 
@@ -322,3 +683,15 @@ reference frames or native body identity.
 If a stale/invalid body id is ever requested, the runtime records a diagnostic
 fallback/error instead of silently substituting a different celestial body.
 
+Browser acceptance now keeps this asymmetric contract explicit with the Moon:
+the Chinese alias `月球` resolves through the real Navigator to
+`body:c0/moon`; because moons are intentionally not mapped into
+`PlanetDefinition`, the shared executor must retain native target `c0/moon`
+through YEIS autopilot completion instead of opening a React product planet.
+
+A companion entry-point acceptance unit also exercises the real WebGL surface:
+Orion Nebula is first centered through the existing Locate action, then an
+actual pointer click at the canvas center must be resolved by the native
+landmark picker as `landmark:l-m42` and continue through the same shared
+destination executor. Hero and galaxy coverage likewise use the real Navigator
+and deep-link/native-travel paths rather than calling internal resolvers.

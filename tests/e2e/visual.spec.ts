@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { test, expect, type Page, type TestInfo } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "./support/test";
 import {
   observeRuntime,
   waitForYeis,
@@ -39,11 +39,21 @@ async function shot(
 ) {
   const path = testInfo.outputPath("visual", `${viewport}--${name}.png`);
   mkdirSync(dirname(path), { recursive: true });
-  await page.screenshot({ path, fullPage: true });
+  await page.screenshot({ path });
   await testInfo.attach(`${viewport}--${name}`, {
     path,
     contentType: "image/png",
   });
+}
+
+async function waitForCameraSettled(
+  page: Page,
+  phase: "approach" | "orbit" | "atmosphere" | "surface" | "returning",
+) {
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-camera-settled",
+    phase,
+  );
 }
 
 async function personalTarget(page: Page) {
@@ -79,6 +89,26 @@ async function visualCase(
   await exercise();
   await shot(page, testInfo, viewport.name, name);
 
+  const html = page.locator("html");
+  const webgl = {
+    software: await html.getAttribute("data-universe-webgl-software"),
+    geometries: Number(
+      (await html.getAttribute("data-universe-webgl-geometries")) ?? "0",
+    ),
+    textures: Number(
+      (await html.getAttribute("data-universe-webgl-textures")) ?? "0",
+    ),
+    programs: Number(
+      (await html.getAttribute("data-universe-webgl-programs")) ?? "0",
+    ),
+    calls: Number(
+      (await html.getAttribute("data-universe-webgl-calls")) ?? "0",
+    ),
+    triangles: Number(
+      (await html.getAttribute("data-universe-webgl-triangles")) ?? "0",
+    ),
+  };
+
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
       JSON.stringify(
@@ -86,6 +116,7 @@ async function visualCase(
           viewport: viewport.name,
           case: name,
           elapsedMs: Date.now() - startedAt,
+          webgl,
         },
         null,
         2,
@@ -113,7 +144,7 @@ test("visual: desktop search open", async ({ page }, testInfo) => {
 
     const dialog = page.getByRole("dialog", { name: "Universe navigator" });
     await expect(dialog).toBeVisible();
-    const search = page.getByRole("textbox", { name: "Search universe" });
+    const search = page.getByRole("combobox", { name: "Search universe" });
     await search.fill("Personal Universe");
     await expect
       .poll(async () =>
@@ -151,6 +182,16 @@ test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
         `/?phase=system&star=${encodeURIComponent(target)}&freeze=1`,
       );
       await waitForYeisEngine(page);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-system-renderer",
+        "yeis-native",
+        { timeout: 30_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-system-ready",
+        "true",
+        { timeout: 30_000 },
+      );
       await expect(page.locator(".content-signal-card")).toBeVisible();
     },
   );
@@ -169,6 +210,7 @@ test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
       );
       await waitForYeisEngine(page);
       await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+      await waitForCameraSettled(page, "orbit");
       await expect(page.locator(".world-content-card")).toBeVisible();
     },
   );
@@ -179,7 +221,101 @@ test("visual: desktop Hero world", async ({ page }, testInfo) => {
     await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
     await waitForYeisEngine(page);
     await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+    await waitForCameraSettled(page, "orbit");
   });
+});
+
+test("visual: desktop Hero world high-quality live renderer", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-world-live-high",
+    async () => {
+      await page.goto("/?phase=orbit&star=h-aurora&freeze=1");
+      await waitForYeisEngine(page);
+      await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+      await page.getByLabel("QUALITY").selectOption("high");
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "procedural-planets-pass",
+        { timeout: 60_000 },
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+    },
+  );
+});
+
+test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-surface-live-high",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      await waitForCameraSettled(page, "surface");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "procedural-planets-pass",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-renderer",
+        "procedural-planets-live-surface",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-anchor-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-frame",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-applied",
+        "true",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-screenshot-ready",
+        "true",
+        { timeout: 30_000 },
+      );
+    },
+  );
 });
 
 for (const viewport of [TABLET, MOBILE]) {
@@ -206,6 +342,7 @@ for (const viewport of [TABLET, MOBILE]) {
           );
           await waitForYeisEngine(page);
           await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
+          await waitForCameraSettled(page, "orbit");
           await expect(page.locator(".world-content-card")).toBeVisible();
         },
       );

@@ -1,0 +1,36 @@
+{
+  "schema": 3,
+  "task_id": "NAVIGATION-PENDING-CURRENT-SEMANTICS-001",
+  "approved_at": "2026-11-22T21:11:00.000Z",
+  "baseline_commit": "823030f52bd3cfe676ffb43c40617ef9c50185f5",
+  "record_path": "docs/reuse-gate/tasks/NAVIGATION-PENDING-CURRENT-SEMANTICS-001.json",
+  "record_sha256": "1394cf038ebbf17e8a767e5fc79684cad5bd25d6c63feb091b19891e008f03e6",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "yeis-native-travel-e520568": "c3ded8d14bd098a8bf2ef129c09c5dd48ada0e7a8b525494fc861ca7d95b6073",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep native YEIS travel and Locate destinations pending until autopilot completion so ACTIVE and aria-current=location never claim an unarrived or failed target"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "yeis-native-arrival-authority",
+    "react-explicit-pending-destination"
+  ],
+  "candidate_scores": {
+    "yeis-native-arrival-authority": 54,
+    "react-explicit-pending-destination": 57,
+    "optimistic-active-destination": 21
+  }
+}

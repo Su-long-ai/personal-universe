@@ -120,6 +120,7 @@ export interface WorldDefinition {
 }
 
 export const PLANET_ANCHOR: [number, number, number] = [6.7, 0.2, 0];
+export const PLANET_RENDER_RADIUS = 3.65;
 
 export const TEST_WORLD: WorldDefinition = {
   id: "aurora-01",

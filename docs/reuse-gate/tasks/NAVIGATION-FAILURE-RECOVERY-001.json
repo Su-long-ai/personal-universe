@@ -1,0 +1,166 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATION-FAILURE-RECOVERY-001",
+  "title": "Expose recoverable native navigation failures without a second notification system",
+  "scope": {
+    "level": "implementation",
+    "subject": "Turn YEIS camera-navigation failures into a visible persistent product notice with retry and dismiss while preserving the shared destination executor"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "The shared destination executor already reports native YEIS camera failures through handleNavigationFailed, but the product clears the request and leaves only a root dataset plus console output. The pinned MIT YEIS UI already uses a single non-modal toast surface for transient feedback, while WAI-ARIA's alert pattern requires important dynamic messages to be announced without stealing focus and warns against disappearing too quickly. Mature Radix/React Aria toast products add queueing, focus hotkeys, swipe and provider machinery that is unnecessary for a single navigation failure. Reuse the existing YEIS notification concept, the current galaxy locate-caption visual language and React state: keep one persistent failure notice, preserve the exact failed camera request, allow a safe exact-target retry with a fresh requestId, and allow dismiss without changing destination identity.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "Pinned MIT YEIS already exposes one non-modal showToast surface, supporting a small notification concept without importing the legacy UI wholesale."
+    },
+    {
+      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/alert/",
+      "finding": "ARIA alerts are for brief important dynamic messages, should not steal keyboard focus, and should not disappear so quickly that users miss them."
+    },
+    {
+      "url": "https://www.radix-ui.com/primitives/docs/components/toast",
+      "finding": "Radix Toast is a mature full notification component with provider, focus hotkey, swipe, queueing and foreground/background announcement semantics; that machinery is broader than this single exact-target recovery state."
+    },
+    {
+      "url": "https://react-spectrum.adobe.com/react-aria/Toast.html",
+      "finding": "React Aria provides a mature toast queue/accessibility subsystem, but adopting a new queue/provider is unnecessary when the product needs at most one navigation failure tied to the current camera request."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain pinned MIT YEIS as the full navigation product and reuse its single non-modal notification concept rather than adding another product shell."
+    },
+    {
+      "level": "framework_engine",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "No additional app framework is needed; accessibility requirements are satisfied by semantic HTML/ARIA in the current React surface."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Radix Toast and React Aria Toast are mature notification subsystems, but their queue/provider/focus/swipe machinery is globally disproportionate for one current navigation failure."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Existing React state/callback primitives plus the current caption styling close the exact gap with no new runtime dependency or authority."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-single-notification-semantics",
+      "name": "Pinned MIT YEIS single non-modal notification semantics",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned UI.ts showToast concept",
+      "license": "MIT at e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "partial",
+      "reason": "The notification concept fits the product, but legacy DOM/timing code and Turkish UI are not copied; Personal Universe owns the React presentation and persistent error behavior.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "radix-toast",
+      "name": "Radix Toast",
+      "level": "subsystem",
+      "source": "Radix Primitives Toast 1.2.x",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Excellent accessibility and interaction coverage, but adds provider/queue/focus/swipe machinery and a new dependency for a single current navigation failure.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-aria-toast",
+      "name": "React Aria Toast queue",
+      "level": "subsystem",
+      "source": "React Aria Toast",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Mature accessible queue model, but a queue/provider is unnecessary while navigation exposes one authoritative in-flight/failed request at a time.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-local-navigation-failure",
+      "name": "Existing React local failure/retry state",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Existing React 18 state and callbacks",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Preserves the failed UniverseNavigationCameraRequest exactly, refreshes only requestId on retry, and renders one persistent alert using the existing UI vocabulary.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-single-notification-semantics",
+      "react-local-navigation-failure"
+    ],
+    "rationale": "Reuse the pinned YEIS single-notification concept and current React primitives. Keep one persistent, non-focus-stealing failure notice styled from the existing galaxy navigation caption. Retry reissues the exact failed camera request with a new requestId through the same YeisGalaxyScene path; dismiss only hides feedback. No new navigation, toast queue or router authority is introduced.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If Personal Universe later accumulates multiple independent background notification sources, reassess Radix or React Aria as a single global notification subsystem rather than growing bespoke queues."
+  }
+}

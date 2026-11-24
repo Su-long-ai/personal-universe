@@ -57,7 +57,7 @@ jobs:
   build:
     name: Build + Bundle Guard
     needs: reuse-gate
-    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
+    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/webgl-surface-release-v1' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -137,19 +137,25 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
 
       - name: Cache Playwright Chromium
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium and host dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Verify cached Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
 
-      - name: Playwright shard
-        run: npx playwright test --shard=${{ matrix.shard }}/4
+      - name: Playwright release shard
+        run: npx playwright test --project=release --shard=${{ matrix.shard }}/4
 
       - name: Append runtime metrics
         if: always()
@@ -172,10 +178,74 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  webgl-heavy:
+    name: WebGL heavy renderer
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Deterministic install
+        run: npm ci
+
+      - name: Download validated dist
+        uses: actions/download-artifact@v4
+        with:
+          name: personal-universe-dist-${{ github.run_id }}
+          path: dist
+
+      - name: Install pinned Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
+
+      - name: Install Playwright Chromium and host dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify cached Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
+
+      - name: Verify browser tooling did not mutate lockfiles
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Playwright WebGL heavy lane
+        run: npx playwright test --project=webgl-heavy
+
+      - name: Upload WebGL heavy report, traces, screenshots, and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-universe-e2e-${{ github.run_id }}-webgl-heavy
+          path: |
+            blob-report
+            playwright-report
+            test-results
+            ci-artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
   e2e-report:
     name: Combined Playwright Report
-    needs: e2e
-    if: ${{ !cancelled() && needs.e2e.result != 'skipped' }}
+    needs: [e2e, webgl-heavy]
+    if: ${{ !cancelled() && needs.e2e.result != 'skipped' && needs.webgl-heavy.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -200,7 +270,7 @@ jobs:
       - name: Download all shard artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: personal-universe-e2e-${{ github.run_id }}-shard-*
+          pattern: personal-universe-e2e-${{ github.run_id }}-*
           path: merged-e2e-artifacts
           merge-multiple: true
 
@@ -231,7 +301,17 @@ jobs:
           {
             echo "## Playwright browser validation"
             echo
-            echo "- Sharded E2E result: **${{ needs.e2e.result }}**"
+            echo "- Sharded release result: **${{ needs.e2e.result }}**"
+            echo "- WebGL heavy result: **${{ needs.webgl-heavy.result }}**"
             echo '- Combined report artifact: `personal-universe-playwright-report-${{ github.run_id }}`'
-            echo "- Per-shard artifacts retain screenshots, traces, raw reports, and runtime metrics."
+            echo "- Release-shard and WebGL-heavy artifacts retain screenshots, traces, raw reports, and runtime metrics."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Propagate browser validation failures
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ needs.e2e.result }}" != "success" ] || [ "${{ needs.webgl-heavy.result }}" != "success" ]; then
+            echo "Browser validation did not fully succeed; merged diagnostics were preserved above." >&2
+            exit 1
+          fi

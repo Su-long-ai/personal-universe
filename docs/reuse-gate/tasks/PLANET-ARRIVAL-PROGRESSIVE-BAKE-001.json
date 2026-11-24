@@ -1,0 +1,172 @@
+{
+  "schema": 2,
+  "task_id": "PLANET-ARRIVAL-PROGRESSIVE-BAKE-001",
+  "title": "Keep world arrival responsive while procedural planet baking warms in",
+  "scope": {
+    "level": "implementation",
+    "subject": "Preserve the existing YEIS destination/Approach contract while moving expensive procedural planet baking behind an immediate usable fallback"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-23",
+  "research_summary": "Cloud Playwright traces show exact Earth destination resolution completes and identifies yeis-planet:earth, but the visible Approach arrival can remain unobservable for many seconds after the state handoff. The already-adopted ProceduralPlanets documentation explicitly states that bakePlanet cost scales with textureSize/meshResolution and blocks the GPU while it runs, recommending baking during loading. Keep the existing YEIS/R3F destination and scene stack, render the current lightweight fallback immediately, and schedule the already-integrated baked representation only after the arrival frame has had a chance to commit. This fixes product responsiveness without introducing a second renderer, navigation authority or planet visual system.",
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT YEIS snapshot remains the selected full universe/navigation backbone; body identity and cross-scale destination semantics should not be replaced to solve a rendering-arrival stall."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber is already the host renderer lifecycle and shared Canvas, so the fix should stay inside the existing scene lifecycle rather than add a parallel WebGL surface."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/main/docs/baking.md",
+      "finding": "ProceduralPlanets documents that bakePlanet can take milliseconds to seconds depending on textureSize and meshResolution, blocks the GPU while running, and should be performed during loading; its baked output is already the adopted ordinary-world representation."
+    },
+    {
+      "url": "https://react.dev/reference/react/hooks",
+      "finding": "React documents separating urgent UI updates from non-critical work and reusing memoized/effect primitives; the product can keep arrival feedback urgent while scheduling the existing visual bake as non-critical follow-up work."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the verified MIT YEIS backbone and its body/Approach semantics; the observed defect is rendering responsiveness after resolution, not a missing universe or navigation product."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Reuse the existing R3F Canvas lifecycle so fallback and baked representations stay in one scene and one camera stack."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep ProceduralPlanets as the adopted ordinary-world renderer, but use its documented baking cost as a loading concern instead of blocking the first observable arrival."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Use the React primitives already in the bundle for a small scheduling/lifecycle adapter; no new scheduler or loading framework is warranted."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-arrival-backbone",
+      "name": "Pinned MIT YEIS product arrival backbone",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing Personal Universe YEIS destination and Approach integration",
+      "license": "MIT source at pinned e520568 plus retained third-party notices",
+      "decision": "partial",
+      "reason": "Retains the authoritative body identity, system resolution and Approach semantics; it does not by itself prevent the separate baked planet renderer from occupying the GPU after arrival.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "r3f-existing-scene-host",
+      "name": "Existing React Three Fiber scene lifecycle",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current shared Canvas and component lifecycle",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "Provides the existing single renderer and lifecycle boundary needed to show the lightweight fallback first and mount the baked world later without a second scene.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-planets-progressive-bake",
+      "name": "ProceduralPlanets baked world behind progressive fallback",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Already-integrated bakePlanet subsystem with its documented loading boundary",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Preserves the adopted visual subsystem and deterministic world appearance while moving its documented expensive bake behind the already-present fallback instead of replacing it.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "react-arrival-scheduling",
+      "name": "React effect/ref scheduling glue",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Existing React 18 lifecycle primitives",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Enough for a bounded cancellation-safe deferred bake handoff; adding another task scheduler or loading framework would add authority without removing the GPU-bound bake cost.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "yeis-arrival-backbone",
+      "r3f-existing-scene-host",
+      "procedural-planets-progressive-bake",
+      "react-arrival-scheduling"
+    ],
+    "rationale": "Keep the full YEIS/R3F product stack and the already-adopted ProceduralPlanets visual subsystem. The only new code is narrow scheduling/cancellation glue that lets the lightweight fallback and Approach UI commit before the GPU-blocking bake begins, preserving the correct Earth product-world contract instead of weakening the test into native fallback travel.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If deferred baking still causes unacceptable interaction stalls, reduce non-high texture resolution or keep the fallback longer before considering a different planet renderer; do not change navigation identity to hide rendering latency."
+  }
+}

@@ -49,6 +49,14 @@ function gitRaw(args) {
   }
 }
 
+function gitBytes(args) {
+  try {
+    return execFileSync("git", args, { cwd: ROOT });
+  } catch (error) {
+    die("git " + args.join(" ") + " failed: " + error.message);
+  }
+}
+
 function gitOk(args) {
   try {
     execFileSync("git", args, { cwd: ROOT, stdio: "ignore" });
@@ -62,8 +70,9 @@ function normalize(path) {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
-function sha256(path) {
-  return createHash("sha256").update(readFileSync(path)).digest("hex");
+function sha256GitPath(ref, path) {
+  const rel = normalize(relative(ROOT, path));
+  return createHash("sha256").update(gitBytes(["show", ref + ":" + rel])).digest("hex");
 }
 
 function sha256Text(text) {
@@ -176,6 +185,7 @@ function validateRegistry(registry) {
 function validateEvaluation(candidate) {
   const evaluation = candidate.evaluation;
   if (!evaluation || typeof evaluation !== "object") {
+    if (candidate.decision === "reject") return false;
     die("candidate missing evaluation object: " + candidate.id);
   }
   const fields = [
@@ -193,10 +203,12 @@ function validateEvaluation(candidate) {
       die("candidate evaluation." + field + " must be a number from 0..5: " + candidate.id);
     }
   }
+  return true;
 }
 
 function globalValue(candidate) {
   const e = candidate.evaluation;
+  if (!e || typeof e !== "object") return null;
   return (
     e.coverage * 4 +
     e.license_fit * 2 +
@@ -313,7 +325,7 @@ function validateRecord(record, registryIndex) {
   const candidateIds = new Set();
   const candidatesById = new Map();
   for (const candidate of record.candidates) {
-    for (const key of ["id", "name", "level", "registry_id", "source", "license", "decision", "reason"]) {
+    for (const key of ["id", "name", "level", "source", "license", "decision", "reason"]) {
       requiredText(candidate[key], "candidate " + (candidate.id || "<unknown>") + "." + key);
     }
     if (candidateIds.has(candidate.id)) die("duplicate candidate id: " + candidate.id);
@@ -327,12 +339,17 @@ function validateRecord(record, registryIndex) {
       die("candidate decision must be reuse|partial|reject: " + candidate.id);
     }
 
-    const registryEntry = registryIndex.get(candidate.registry_id);
-    if (!registryEntry) {
-      die("candidate references unknown registry_id: " + candidate.id + " -> " + candidate.registry_id);
+    if (candidate.decision !== "reject") {
+      requiredText(candidate.registry_id, "candidate " + candidate.id + ".registry_id");
     }
-    if (registryEntry.status === "hold" && candidate.decision !== "reject") {
-      die("registry candidate on HOLD cannot be selected/partially reused: " + candidate.registry_id);
+    if (candidate.registry_id) {
+      const registryEntry = registryIndex.get(candidate.registry_id);
+      if (!registryEntry) {
+        die("candidate references unknown registry_id: " + candidate.id + " -> " + candidate.registry_id);
+      }
+      if (registryEntry.status === "hold" && candidate.decision !== "reject") {
+        die("registry candidate on HOLD cannot be selected/partially reused: " + candidate.registry_id);
+      }
     }
 
     validateEvaluation(candidate);
@@ -428,6 +445,7 @@ function validateRecord(record, registryIndex) {
     for (const candidate of record.candidates) {
       if (candidate.decision !== "reject") continue;
       const score = globalValue(candidate);
+      if (score === null) continue;
       if (score >= selectedScore) {
         const override = scoreOverrides.get(candidate.id);
         if (!override) {
@@ -574,7 +592,7 @@ function approve(recordPathArg) {
     approved_at: new Date().toISOString(),
     baseline_commit: git(["rev-parse", "HEAD"]),
     record_path: normalize(relative(ROOT, recordPath)),
-    record_sha256: sha256(recordPath),
+    record_sha256: sha256GitPath("HEAD", recordPath),
     registry_path: normalize(relative(ROOT, REGISTRY_PATH)),
     registry_entry_hashes: registryEntryHashes(record, registryIndex),
     scope: record.scope,
@@ -605,10 +623,16 @@ function approvalSources() {
   return paths;
 }
 
+class ApprovalTokenValidationError extends Error {}
+
+function rejectApproval(message) {
+  throw new ApprovalTokenValidationError(message);
+}
+
 function validateApprovalToken(approvalPath, registry, registryIndex, head) {
   const approval = readJson(approvalPath, "approval token");
   if (approval.schema !== 2 && approval.schema !== 3) {
-    die("approval token must use schema 2 or 3: " + normalize(relative(ROOT, approvalPath)));
+    rejectApproval("approval token must use schema 2 or 3: " + normalize(relative(ROOT, approvalPath)));
   }
 
   const recordPath = resolve(ROOT, approval.record_path || "");
@@ -616,22 +640,22 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
   const validation = validateRecord(record, registryIndex);
 
   if (approval.task_id !== record.task_id) {
-    die("approval task_id does not match research record: " + approval.task_id);
+    rejectApproval("approval task_id does not match research record: " + approval.task_id);
   }
-  if (approval.record_sha256 !== sha256(recordPath)) {
-    die("research record changed after approval: " + approval.task_id);
+  if (approval.record_sha256 !== sha256GitPath(head, recordPath)) {
+    rejectApproval("research record changed after approval: " + approval.task_id);
   }
   if (!gitOk(["merge-base", "--is-ancestor", approval.baseline_commit, head])) {
-    die("approval baseline is not an ancestor of HEAD: " + approval.task_id);
+    rejectApproval("approval baseline is not an ancestor of HEAD: " + approval.task_id);
   }
 
   const tokenCommit = approvalCommit(head, approvalPath);
   if (!tokenCommit) {
-    die("approval token is not committed in Git history: " + approval.task_id);
+    rejectApproval("approval token is not committed in Git history: " + approval.task_id);
   }
 
   if (approval.schema === 2) {
-    if (approval.registry_sha256 !== sha256(REGISTRY_PATH)) {
+    if (approval.registry_sha256 !== sha256GitPath(head, REGISTRY_PATH)) {
       const tokenRegistry = JSON.parse(
         gitRaw(["show", tokenCommit + ":" + normalize(relative(ROOT, REGISTRY_PATH))])
       );
@@ -640,25 +664,25 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
       const tokenHashes = registryEntryHashes(record, tokenIndex);
       for (const id of Object.keys(actual)) {
         if (tokenHashes[id] !== actual[id]) {
-          die("legacy approval referenced registry entry changed after approval: " + approval.task_id + " -> " + id);
+          rejectApproval("legacy approval referenced registry entry changed after approval: " + approval.task_id + " -> " + id);
         }
       }
     }
   } else {
     if (!gitOk(["merge-base", "--is-ancestor", approval.baseline_commit, tokenCommit])) {
-      die("schema-3 approval token precedes its declared baseline: " + approval.task_id);
+      rejectApproval("schema-3 approval token precedes its declared baseline: " + approval.task_id);
     }
 
     const tokenRecord = gitRaw(["show", tokenCommit + ":" + normalize(approval.record_path)]);
     if (sha256Text(tokenRecord) !== approval.record_sha256) {
-      die("approved research record was not frozen in the approval metadata commit: " + approval.task_id);
+      rejectApproval("approved research record was not frozen in the approval metadata commit: " + approval.task_id);
     }
 
     const expected = approval.registry_entry_hashes || {};
     const actual = registryEntryHashes(record, registryIndex);
     for (const id of Object.keys(actual)) {
       if (expected[id] !== actual[id]) {
-        die("registry entry changed after approval: " + approval.task_id + " -> " + id);
+        rejectApproval("registry entry changed after approval: " + approval.task_id + " -> " + id);
       }
     }
 
@@ -669,26 +693,27 @@ function validateApprovalToken(approvalPath, registry, registryIndex, head) {
     const tokenHashes = registryEntryHashes(record, tokenIndex);
     for (const id of Object.keys(actual)) {
       if (tokenHashes[id] !== expected[id]) {
-        die("registry entry was not frozen in the approval metadata commit: " + approval.task_id + " -> " + id);
+        rejectApproval("registry entry was not frozen in the approval metadata commit: " + approval.task_id + " -> " + id);
       }
     }
   }
 
   if (JSON.stringify(approval.planned_files) !== JSON.stringify(record.planned_files)) {
-    die("approval planned_files do not match research record: " + approval.task_id);
+    rejectApproval("approval planned_files do not match research record: " + approval.task_id);
   }
   if (JSON.stringify(approval.selected_ids) !== JSON.stringify(validation.selectedIds)) {
-    die("approval selected_ids do not match research record: " + approval.task_id);
+    rejectApproval("approval selected_ids do not match research record: " + approval.task_id);
   }
   if (JSON.stringify(approval.scope) !== JSON.stringify(record.scope)) {
-    die("approval scope does not match research record: " + approval.task_id);
+    rejectApproval("approval scope does not match research record: " + approval.task_id);
   }
   if (Boolean(approval.policy_change) !== Boolean(record.policy_change)) {
-    die("approval policy_change does not match research record: " + approval.task_id);
+    rejectApproval("approval policy_change does not match research record: " + approval.task_id);
   }
   for (const [id, score] of Object.entries(validation.scores)) {
+    if (score === null) continue;
     if (approval.candidate_scores?.[id] !== score) {
-      die("approval candidate score does not match research record: " + approval.task_id + " -> " + id);
+      rejectApproval("approval candidate score does not match research record: " + approval.task_id + " -> " + id);
     }
   }
 
@@ -732,11 +757,25 @@ function check(mode, baseArg, headArg) {
     const planned = Array.isArray(token.planned_files) ? token.planned_files : [];
     return implementation.some((file) => planned.some((pattern) => matchPlanned(file, pattern)));
   });
-  const approvals = relevantApprovalPaths.map((path) =>
-    validateApprovalToken(path, registry, registryIndex, head)
-  );
+  const approvals = [];
+  const rejectedApprovals = [];
+  for (const path of relevantApprovalPaths) {
+    try {
+      approvals.push(validateApprovalToken(path, registry, registryIndex, head));
+    } catch (error) {
+      if (!(error instanceof ApprovalTokenValidationError)) throw error;
+      rejectedApprovals.push({
+        path: normalize(relative(ROOT, path)),
+        reason: error.message,
+      });
+    }
+  }
   if (approvals.length === 0) {
-    die("protected implementation changed but no relevant reuse approval tokens exist.");
+    const details = rejectedApprovals.length
+      ? "\nRejected candidate approvals:\n  - " +
+        rejectedApprovals.map(({ path, reason }) => path + ": " + reason).join("\n  - ")
+      : "";
+    die("protected implementation changed but no valid relevant reuse approval tokens exist." + details);
   }
 
   const uncovered = [];
@@ -772,6 +811,10 @@ function check(mode, baseArg, headArg) {
       uncovered.join("\n  - ") +
       "\nFor schema-3 tasks, commit task + approval metadata in an earlier commit before implementation."
     );
+  }
+
+  for (const { path, reason } of rejectedApprovals) {
+    console.warn("[REUSE-GATE] IGNORE invalid approval candidate " + path + ": " + reason);
   }
 
   const taskIds = [...new Set([...coverage.values()].flat())].sort();

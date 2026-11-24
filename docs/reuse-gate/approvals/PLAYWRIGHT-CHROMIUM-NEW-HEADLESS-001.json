@@ -1,0 +1,28 @@
+{
+  "schema": 3,
+  "task_id": "PLAYWRIGHT-CHROMIUM-NEW-HEADLESS-001",
+  "approved_at": "2026-11-24T04:25:00.000Z",
+  "baseline_commit": "6ce6626599d79d90eb67013de6b5bc294e6d7e2e",
+  "record_path": "docs/reuse-gate/tasks/PLAYWRIGHT-CHROMIUM-NEW-HEADLESS-001.json",
+  "record_sha256": "a7e50e6e2d064f48818e111d20ec9663897b4ccca44bac79054a3b076d1e1c95",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Replace Playwright's default headless-shell execution with its official Chromium new-headless channel while preserving the existing browser, context, retry, sharding, and failure semantics"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "playwright.config.ts"
+  ],
+  "selected_ids": [
+    "playwright-chromium-new-headless"
+  ],
+  "candidate_scores": {
+    "playwright-chromium-new-headless": 54.5,
+    "retain-headless-shell-and-relax-flaky-gate": null,
+    "custom-context-setup-retry-wrapper": null
+  }
+}
