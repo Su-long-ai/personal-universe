@@ -14,56 +14,66 @@ export const CONTINUOUS_SCALE_WHEEL_THRESHOLD = 72;
 export const CONTINUOUS_SCALE_RESET_MS = 260;
 export const CONTINUOUS_SCALE_ACTIVE_RESET_MS = 2_000;
 
-// Product scale is a real coordinate rather than a phase counter.
-// Galaxy still uses native focus/travel. Once a stellar system is open, wheel
-// delta moves continuously from System (1) through Approach (2) to Surface (5).
+// Product scale is one real coordinate rather than a phase counter.
+// Galaxy (0) -> System (1) -> Approach (2) -> Orbit (3) -> Atmosphere (4)
+// -> Surface (5). Native YEIS owns 0->1; the existing product camera owns 1->5.
+export const GALAXY_SCALE_MIN = 0;
 export const SYSTEM_SCALE_MIN = 1;
 export const WORLD_SCALE_MIN = 2;
 export const WORLD_SCALE_MAX = 5;
+export const GALAXY_SCALE_WHEEL_SPAN = 384;
 export const WORLD_SCALE_WHEEL_SPAN = 192;
 export const WORLD_SCALE_EPSILON = 1e-3;
-
-// WheelEvent.deltaMode is not guaranteed to be pixels. Normalize line/page
-// devices into the same product-scale domain before applying the existing
-// coordinate response. Values below the tiny jitter floor are ignored, while
-// every real gesture sample remains immediately visible.
+export const WHEEL_LINE_PIXELS = 16;
+export const WHEEL_SAMPLE_LIMIT = 96;
 export const CONTINUOUS_SCALE_JITTER_FLOOR = 0.05;
-export const CONTINUOUS_SCALE_LINE_PIXELS = 40;
-export const CONTINUOUS_SCALE_MAX_DELTA = 96;
 
-export function continuousScaleDelta(
+export type WheelDeltaMode = 0 | 1 | 2;
+
+/**
+ * Convert browser wheel units to a bounded CSS-pixel-equivalent distance.
+ *
+ * Pixel devices (including high-resolution trackpads) retain every delivered
+ * sub-notch delta. Line wheels use the conventional 16px line height and page
+ * wheels use the current viewport height. The per-event cap makes a coalesced
+ * event after a main-thread stall no stronger than one ordinary mouse notch;
+ * subsequent events are still applied, so there is no queue or inertia.
+ */
+export function normalizeWheelDelta(
   deltaY: number,
-  deltaMode = 0,
+  deltaMode: number,
   pagePixels = 800,
 ): number {
   if (!Number.isFinite(deltaY)) return 0;
-
-  let normalized = deltaY;
-  if (deltaMode === 1) {
-    normalized *= CONTINUOUS_SCALE_LINE_PIXELS;
-  } else if (deltaMode === 2) {
-    const normalizedPage = Number.isFinite(pagePixels)
-      ? Math.min(960, Math.max(320, pagePixels))
-      : 800;
-    normalized *= normalizedPage;
-  }
-
+  const unit =
+    deltaMode === 1
+      ? WHEEL_LINE_PIXELS
+      : deltaMode === 2
+        ? Math.max(WHEEL_LINE_PIXELS, pagePixels)
+        : 1;
+  const normalized = deltaY * unit;
   if (Math.abs(normalized) < CONTINUOUS_SCALE_JITTER_FLOOR) return 0;
   return Math.min(
-    CONTINUOUS_SCALE_MAX_DELTA,
-    Math.max(-CONTINUOUS_SCALE_MAX_DELTA, normalized),
+    WHEEL_SAMPLE_LIMIT,
+    Math.max(-WHEEL_SAMPLE_LIMIT, normalized),
   );
 }
 
 export function continuousScaleDirection(
   deltaY: number,
-  deltaMode = 0,
-  pagePixels = 800,
 ): ContinuousScaleDirection | null {
-  const normalized = continuousScaleDelta(deltaY, deltaMode, pagePixels);
+  const normalized = continuousScaleDelta(deltaY);
   if (normalized === 0) return null;
   // Browser wheel convention: negative delta = wheel forward/up = zoom in.
   return normalized < 0 ? "in" : "out";
+}
+
+export function continuousScaleDelta(deltaY: number): number {
+  if (!Number.isFinite(deltaY)) return 0;
+  return Math.min(
+    WHEEL_SAMPLE_LIMIT,
+    Math.max(-WHEEL_SAMPLE_LIMIT, deltaY),
+  );
 }
 
 export function isWorldScalePhase(phase: UniversePhase): boolean {
@@ -84,19 +94,31 @@ export function worldScalePositionForPhase(
 export function scalePositionForPhase(
   phase: UniversePhase,
 ): number | null {
+  if (phase === "galaxy") return GALAXY_SCALE_MIN;
   if (phase === "system") return SYSTEM_SCALE_MIN;
   return worldScalePositionForPhase(phase);
+}
+
+export function applyGalaxyScaleWheel(
+  position: number,
+  deltaY: number,
+): number {
+  const delta = -continuousScaleDelta(deltaY) / GALAXY_SCALE_WHEEL_SPAN;
+  return Math.min(
+    SYSTEM_SCALE_MIN,
+    Math.max(GALAXY_SCALE_MIN, position + delta),
+  );
+}
+
+export function galaxyScaleSegmentProgress(position: number): number {
+  return Math.min(1, Math.max(0, position - GALAXY_SCALE_MIN));
 }
 
 export function applySystemScaleWheel(
   position: number,
   deltaY: number,
-  deltaMode = 0,
-  pagePixels = 800,
 ): number {
-  const delta =
-    -continuousScaleDelta(deltaY, deltaMode, pagePixels) /
-    WORLD_SCALE_WHEEL_SPAN;
+  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
   return Math.min(
     WORLD_SCALE_MIN,
     Math.max(SYSTEM_SCALE_MIN, position + delta),
@@ -107,9 +129,7 @@ export function continuousScaleResponse(progress: number): number {
   const linear = Math.min(1, Math.max(0, progress));
   const smooth = linear * linear * (3 - 2 * linear);
   // Keep substantial linear velocity at authored anchors so sustained wheel
-  // input does not feel like a sequence of stop/start cinematics. The smooth
-  // component still softens the middle of each segment, and the function is
-  // deterministic/reversible for the same product coordinate.
+  // input reads as one scale gesture instead of stop/start cinematics.
   return linear * 0.68 + smooth * 0.32;
 }
 
@@ -138,12 +158,8 @@ export function applyWorldScaleWheel(
   position: number,
   deltaY: number,
   surfaceMode: PlanetSurfaceMode,
-  deltaMode = 0,
-  pagePixels = 800,
 ): number {
-  const delta =
-    -continuousScaleDelta(deltaY, deltaMode, pagePixels) /
-    WORLD_SCALE_WHEEL_SPAN;
+  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
   return clampWorldScalePosition(position + delta, surfaceMode);
 }
 

@@ -327,10 +327,13 @@ at the viewport centre. Explicit centre focus wins, with eligible priority:
 
 The fresh opening view also has one **soft focus** fallback so a visitor can
 start diving with the wheel even when the auto-orbit composition has no object
-inside the centre-pick radius. That fallback prefers the first Personal Signal,
-then the Hero world, then a native catalogue star. It is consumed by the first
-scale-in gesture and is permanently disabled as soon as drag, touch, pinch,
-pan or keyboard camera input shows that the visitor has taken spatial control.
+inside the centre-pick radius. That fallback prefers the Hero world, then the
+first Personal Signal, then a native catalogue star. Hero is intentionally the
+opening fallback because it currently owns the complete Galaxy=0 → Surface=5
+product path; this does not change explicit centre-pick priority, where Personal
+Signals still win. The fallback is consumed by the first scale-in gesture and is
+permanently disabled as soon as drag, touch, pinch, pan or keyboard camera input
+shows that the visitor has taken spatial control.
 After takeover, an empty centre remains empty instead of snapping back to a
 product-selected target.
 
@@ -369,34 +372,48 @@ Surface
 Task `GALAXY-SYSTEM-SCALE-CONTINUITY-001` restores the pinned-MIT
 YEIS star→current-system LOD path that the earlier product integration had
 omitted. A completed Locate establishes focus/orientation only; it does not
-count as scale arrival. The first inward scale gesture normalizes any exact
-body/content focus to its owning native star for spatial travel, keeps the
-product phase at `galaxy`, switches the YEIS reference frame with
-`Universe.switchTo()`, preserves absolute camera position with
-`CameraController.shiftFrame()`, and approaches the target star's physical
-system overview.
+count as scale arrival. Exact body/content focus is normalized to its owning
+native star, the YEIS reference frame switches with `Universe.switchTo()`,
+and `CameraController.shiftFrame()` preserves the same absolute camera while
+the target system becomes the current native frame.
 
-The same native Galaxy scene now owns both the far-star catalogue and the
-current system's pinned `BodyRenderer`, `BodyPoints`, and `OrbitLines`.
+Task `GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001` then makes that restored
+native LOD path part of the same product scale coordinate. Galaxy is coordinate
+0 and System is coordinate 1. Every signed wheel/trackpad sample changes that
+coordinate immediately; a small sample therefore produces a small visible
+change instead of launching a full time-driven flight. The coordinator does
+not replace YEIS flight math. It reuses the pinned `CameraController.goToPoint`
+trajectory, including its logarithmic distance and orientation interpolation,
+and scrubs the native trajectory by normalized scale position.
+
+The same native Galaxy scene owns both the far-star catalogue and the current
+system's pinned `BodyRenderer`, `BodyPoints`, and `OrbitLines`.
 Pinned `StarPoints` already hides the current catalogue star because that
-object is expected to be represented by the local mesh, so a focused star can
-resolve from point into its native system without mounting the product System
-renderer on top of Galaxy. The native arrival distance and the product System
-overview use the same physical system span, viewport FOV and sphere-fit factor.
-At arrival, the native `starId + position + quaternion` is retained; only
-then does the product System take authority at the same view direction and
-apparent system size.
+object is expected to be represented by the local mesh, so a focused star
+resolves from point into its native system as coordinate 0→1 advances. The
+native endpoint and product System overview share the same physical system
+span, viewport FOV and sphere-fit factor. At coordinate 1 the native
+`starId + position + quaternion` is retained. Product System normally takes
+authority after the matched endpoint receives a real paint opportunity. That
+paint preference is bounded: if a throttled/software renderer does not deliver
+the required rAF pair within 64 ms, the already composition-matched System
+endpoint takes authority directly instead of turning renderer readiness into an
+input lock. Same-direction wheel samples pressed against coordinate 1 do not
+invalidate that in-flight handoff; only a real coordinate change or authority
+takeover advances the scale intent epoch.
+
+The bridge snapshot is retained across renderer ownership. System→Galaxy first
+re-enters the native scene at the matched coordinate-1 endpoint and evaluates
+the same trajectory backward toward coordinate 0. It does not call the legacy
+return jump. A newer Search, Journey or direct camera takeover invalidates the
+scale target instead of allowing a hidden flight to continue.
 
 Hero/body identity is still carried forward as the preferred planet intent.
-The scale travel itself stops at the owning stellar system; the subsequent
-System 1→2 coordinate performs the actual planet approach. This is intentionally
-different from Search/Places/canvas clicks, whose explicit exact-body travel
-continues to use the native body destination directly.
-
-If the visitor keeps scrolling while native scale travel is settling, the
-existing single enter-system intent is queued and consumed only after the
-native arrival becomes current; no competing Galaxy camera request or duplicate
-System scene is created.
+The scale coordinate stops at the owning stellar system; the subsequent System
+1→2 segment performs the actual planet approach. Search/Places/canvas clicks
+remain intentionally different: explicit exact-body navigation still uses the
+native navigation request/autopilot contract because those actions request a
+destination rather than scrubbing scale.
 
 Inside the system, Task `SYSTEM-WORLD-SCALE-CONTINUITY-001` extends
 the same product scale coordinate down to 1 (System). The first inward delta
@@ -439,14 +456,14 @@ Exactly one layer owns mouse-wheel scale input:
 - camera-controls has its wheel ACTION disabled;
 - the product coordinator is the only wheel owner.
 
-Galaxy acquisition still uses the established focus threshold and
-scheduler-safe hysteresis because native YEIS star travel is an asynchronous
-spatial operation rather than a product-camera interpolation. Once the visitor
-is inside a stellar system, that threshold is deliberately bypassed: even a
-small trackpad sample changes the System→Surface coordinate immediately.
+Focus acquisition remains bounded and centre-driven, but after a native stellar
+focus is locked there is no Galaxy-scale step threshold. Galaxy→System uses
+the same immediate-delta rule as System→Surface: even a small trackpad sample
+changes the normalized coordinate and the native YEIS camera path immediately.
 Mouse-wheel notches and trackpad samples therefore differ only in distance
 travelled, not in whether motion is visible. Semantic phase changes occur only
-when the continuous coordinate crosses their boundaries.
+when the coordinate crosses System=1, Approach=2, Orbit=3, Atmosphere=4 or
+Surface=5.
 
 Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
 gesture is still processed as scale intent. Manual spatial takeover disables
@@ -652,6 +669,31 @@ Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
 Each new protected implementation unit must create and commit its own task and
 approval metadata before its first implementation commit.
+
+### Continuous scale input dynamics
+
+Galaxy (0) through Surface (5) uses one real-valued coordinate and one wheel
+input authority in `UniverseApp`. Browser wheel samples are normalized to
+CSS-pixel-equivalent distance before they reach any scale segment: pixel input
+is retained, line input uses 16 pixels per line, page input uses the viewport
+height, and each delivered event is capped at 96 pixels. The cap bounds a
+coalesced delivery after a main-thread stall; it does not add an accumulator,
+animation, or inertia.
+
+The normalized physical sample is then interpreted by the active scale segment.
+A capped 96px sample advances 0.25 across Galaxy→System (span 384) and 0.5
+across System→Surface intervals (span 192). Small high-resolution trackpad
+deltas remain proportional and immediately visible on both sides of the
+renderer boundary.
+
+Gesture identity is diagnostic/cancellation state, not physics. A pause starts
+a new identity, a sign reversal immediately increments the intent epoch and
+invalidates pending handoff work, and Search/Places, Journey, deep links,
+manual camera takeover, return, or navigation failure clear the session through
+the shared cancellation path. Boundary samples clamp idempotently; no hidden
+delta is retained, so the first opposite sample moves away from the boundary
+immediately. Runtime acceptance exposes normalized input, signed delta, gesture
+identity, and reversal identity through `data-universe-*` attributes.
 
 ## Runtime acceptance checklist
 
