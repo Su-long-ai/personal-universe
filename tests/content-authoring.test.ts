@@ -15,6 +15,7 @@ import {
   validateUniverseContentCatalog,
   validateUniverseContentDestinations,
   validateUniverseContentMediaPresence,
+  universeContentSearchTerms,
 } from "../src/lib/universe/content/authoring.ts";
 import { placementForContentReference } from "../src/lib/universe/content/placement.ts";
 import type {
@@ -87,6 +88,35 @@ test("bilingual copy falls back without duplicating identity", () => {
     summary: "English summary",
   });
   assert.equal(value.id, "bilingual");
+});
+
+test("bilingual authored copy becomes deterministic discovery metadata", () => {
+  const value = entry({
+    id: "discoverable",
+    title: "Personal Universe",
+    summary: "English summary",
+    tags: ["portfolio"],
+    i18n: {
+      zh: {
+        title: "个人宇宙",
+        summary: "中文摘要",
+      },
+    },
+    aliases: {
+      en: ["Universe Home"],
+      zh: ["我的宇宙"],
+    },
+  });
+
+  assert.deepEqual(universeContentSearchTerms(value), [
+    "English summary",
+    "Personal Universe",
+    "Universe Home",
+    "portfolio",
+    "中文摘要",
+    "个人宇宙",
+    "我的宇宙",
+  ].sort((a, b) => a.localeCompare(b)));
 });
 
 test("explicit aliases cannot become ambiguous across content", () => {

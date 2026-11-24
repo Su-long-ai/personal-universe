@@ -602,6 +602,25 @@ export function universeContentAliases(
   );
 }
 
+export function universeContentSearchTerms(
+  entry: UniverseContentEntry,
+): string[] {
+  const localizedCopy = Object.values(entry.i18n ?? {}).flatMap((copy) =>
+    copy ? [copy.title, copy.summary, copy.body] : [],
+  );
+  const terms = [
+    ...universeContentAliases(entry),
+    entry.summary,
+    entry.body,
+    ...entry.tags,
+    ...localizedCopy,
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  return [...new Set(terms.map((value) => value.trim()))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
 export function universeContentReferenceIds(
   entry: UniverseContentEntry,
 ): string[] {

@@ -3439,7 +3439,20 @@ test("Search keyboard navigation reaches personal content", async ({
 
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
+
+  // Authored locale metadata must feed the existing Search contract instead
+  // of creating a duplicate Chinese content record.
+  await search.fill("个人宇宙");
+  const bilingualResult = page
+    .locator(".navigator-result-row")
+    .filter({ hasText: "Personal Universe" })
+    .first();
+  await expect(bilingualResult).toBeVisible();
+  await expect(bilingualResult.locator(".kind-project")).toBeVisible();
+
+  // The canonical English title resolves the same product destination.
   await search.fill("Personal Universe");
+  await expect(bilingualResult).toBeVisible();
   await expect
     .poll(async () =>
       Number(
@@ -3459,10 +3472,79 @@ test("Search keyboard navigation reaches personal content", async ({
   const personalWorld = page.locator(".world-content-card");
   await expect(personalWorld).toBeVisible();
   await expect(personalWorld).toContainText("Personal Universe");
-  const personalTarget = await page
-    .locator("html")
-    .getAttribute("data-universe-navigation-target");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "personal:personal-universe",
+  );
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("destination"))
+    .toBe("personal:personal-universe");
+  const personalTarget = await html.getAttribute(
+    "data-universe-navigation-target",
+  );
   expect(personalTarget).toBeTruthy();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Places exposes authored content and its canonical deep link survives reload", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const personalPlace = page
+    .locator(".navigator-result-row")
+    .filter({ hasText: "Personal Universe" })
+    .first();
+  await expect(personalPlace).toBeVisible();
+  await expect(personalPlace.locator(".kind-personal")).toBeVisible();
+  await personalPlace.locator(".navigator-result-open").click();
+
+  const html = page.locator("html");
+  await expect(dialog).toBeHidden();
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "personal:personal-universe",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.locator(".world-content-card")).toContainText(
+    "Personal Universe",
+  );
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("destination"))
+    .toBe("personal:personal-universe");
+
+  // Reload the exact product-generated share URL. It must resolve back to the
+  // same canonical authored identity without relying on the source filename.
+  await page.reload();
+  await waitForYeis(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-deep-link",
+    "personal:personal-universe",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "personal:personal-universe",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(page.locator(".world-content-card")).toContainText(
+    "Personal Universe",
+  );
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("destination"))
+    .toBe("personal:personal-universe");
 
   await runtime.assertClean(testInfo);
 });
