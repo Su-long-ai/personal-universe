@@ -415,52 +415,55 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
   expect(cycleTwo.second.pipelineLifecycle).toBe("parked");
 });
 
-test("AUTO LOW AUTO quality switching keeps one renderer and bounded pipeline churn @webgl-heavy", async ({
+test("AUTO LOW AUTO quality switching reuses the existing pipeline @webgl-heavy", async ({
   page,
 }, testInfo) => {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
   const quality = page.locator(".hud-actions select");
+  const html = page.locator("html");
   await expect(quality).toHaveValue("auto");
 
   const initial = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-quality-auto-before.json", initial);
 
-  await quality.selectOption("low");
-  await expect(quality).toHaveValue("low");
-  await expect
-    .poll(
-      async () =>
-        Number(
-          await page
-            .locator("html")
-            .getAttribute("data-universe-world-pipeline-allocations"),
-        ),
-      { timeout: 15_000 },
-    )
-    .toBe(initial.allocations + 1);
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    await quality.selectOption("low");
+    await expect(quality).toHaveValue("low");
+    await expect
+      .poll(
+        async () =>
+          Number(
+            await html.getAttribute(
+              "data-universe-world-pipeline-allocations",
+            ),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(initial.allocations);
 
-  await quality.selectOption("auto");
-  await expect(quality).toHaveValue("auto");
-  await expect
-    .poll(
-      async () =>
-        Number(
-          await page
-            .locator("html")
-            .getAttribute("data-universe-world-pipeline-allocations"),
-        ),
-      { timeout: 15_000 },
-    )
-    .toBe(initial.allocations + 2);
+    await quality.selectOption("auto");
+    await expect(quality).toHaveValue("auto");
+    await expect
+      .poll(
+        async () =>
+          Number(
+            await html.getAttribute(
+              "data-universe-world-pipeline-allocations",
+            ),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(initial.allocations);
+  }
 
   const restored = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-quality-auto-restored.json", restored);
 
   expect(restored.renderer).toBe(initial.renderer);
   expect(restored.software).toBe(initial.software);
-  expect(restored.allocations).toBe(initial.allocations + 2);
+  expect(restored.allocations).toBe(initial.allocations);
   expect(restored.geometries).toBeLessThanOrEqual(initial.geometries + 1);
   expect(restored.textures).toBeLessThanOrEqual(initial.textures + 1);
   expect(restored.programs).toBeLessThanOrEqual(initial.programs + 1);
