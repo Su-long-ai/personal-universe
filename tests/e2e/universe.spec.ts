@@ -987,6 +987,68 @@ test("wheel enters a centered YEIS star focus without clicking", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Galaxy inward scale resolves the focused star through native YEIS system LOD before product System", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -120);
+
+  // The first inward intent remains in the native Galaxy authority while YEIS
+  // switches reference frame and approaches the same focused star. The current
+  // target system's physical bodies/orbits are already mounted in that scene.
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-traveling",
+    "h-aurora",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-yeis-native-system",
+    "h-aurora",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-yeis-native-system-ready",
+    "true",
+  );
+  await expect(html).toHaveAttribute(
+    "data-yeis-native-system-overview",
+    "approaching:h-aurora",
+  );
+
+  const approachRatio = Number(
+    await html.getAttribute("data-universe-travel-arrival-ratio"),
+  );
+  expect(approachRatio).toBeGreaterThan(1);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-entry-view",
+    "yeis-native",
+    { timeout: 10_000 },
+  );
+  await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel follows Hero focus from galaxy through system to surface", async ({
   page,
 }, testInfo) => {

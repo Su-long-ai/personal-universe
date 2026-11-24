@@ -1,0 +1,206 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-SYSTEM-SCALE-CONTINUITY-001",
+  "title": "Restore pinned-YEIS native star-to-system LOD continuity at the Galaxy boundary",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the pinned MIT YEIS full-scale StarPoints + current-system BodyRenderer/BodyPoints/OrbitLines + CameraController frame-switch chain so a focused star is physically approached and resolves into its native system before the product System overview handoff"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The remaining Galaxy→System jump is primarily an integration omission rather than a missing rendering technique. At the pinned MIT YEIS commit e520568, the original App constructs StarPoints, BodyRenderer, BodyPoints and OrbitLines in the same scene, rebuilds the local renderables whenever Universe.current changes, and implements goToStar() by Universe.switchTo() + CameraController.shiftFrame() + CameraController.goTo(). StarPoints explicitly hides the current system's catalogue star because that star is expected to be rendered by the current-system mesh. Personal Universe currently mounts the catalogue/galaxy layers in YeisGalaxyScene but omitted the native current-system renderers and has no travel branch for target.kind='star'; after a locate, inward wheel can therefore phase-swap directly to the product System scene. The reuse-first fix is to restore that pinned native LOD chain inside YeisGalaxyScene, travel to a system-overview arrival distance rather than the stellar surface, and preserve the native arrival orientation into the product System overview. This keeps one native Galaxy camera and one product System camera on their existing sides of the boundary while matching their handoff frame.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/lib/universe/yeis/systemScale.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/main.ts",
+      "finding": "Pinned MIT YEIS constructs StarPoints, BodyRenderer, BodyPoints and OrbitLines together in one scene, calls loadSystemRenderables() on Universe system changes, and implements interstellar goToStar() with Universe.switchTo(), CameraController.shiftFrame(), then camera.goTo() in the new system."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/render/StarPoints.ts",
+      "finding": "Pinned StarPoints documents that the current system's star is hidden from the point catalogue because it is rendered as a mesh. This is the exact point→mesh LOD handoff currently missing from Personal Universe's Galaxy integration."
+    },
+    {
+      "url": "https://docs.openspaceproject.com/latest/getting-started/navigation/index.html",
+      "finding": "OpenSpace uses a persistent Focus as the anchor for continuous navigation across scale; choosing the focus and travelling toward it are distinct operations, which supports keeping the target star identity stable while physical scale changes."
+    },
+    {
+      "url": "https://docs.openspaceproject.com/latest/reference/scripting-api/openspace.navigation.html",
+      "finding": "OpenSpace exposes focus-relative distance/zoom operations, reinforcing that the boundary should be expressed as movement relative to the same focused object rather than a view/page replacement."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Restore the pinned YEIS full-scale local-system LOD chain that already coexists with StarPoints instead of building a new transition renderer."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the current single R3F Canvas; native YEIS system renderables are attached inside the existing Galaxy scene lifecycle and disposed with it."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse Universe.switchTo, CameraController.shiftFrame/goToPoint, BodyRenderer, BodyPoints, OrbitLines and StarPoints together. The native system remains the visual authority until the matched System-overview boundary."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Keep camera-controls only on the product System side. It is used to reconstruct a viewport-aware System overview at the native arrival orientation; it must not become a competing Galaxy camera."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "restore-pinned-yeis-system-lod",
+      "name": "Pinned YEIS StarPoints + current-system native renderers + CameraController travel",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned MIT YEIS main.ts / render stack",
+      "license": "MIT at e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "reuse",
+      "reason": "This is the original engine's intended full-scale LOD architecture: far stars are points, the current star is excluded from StarPoints because its system mesh is rendered locally, and frame switches preserve the absolute camera position while interstellar travel continues.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "product-system-overlap-in-galaxy",
+      "name": "Mount the product similarity-scaled System renderer during Galaxy travel",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing YeisSystemScene adapter",
+      "license": "MIT reused renderer + product adapter",
+      "decision": "reject",
+      "reason": "Would mix parsec/km floating-origin native Galaxy coordinates with product overview coordinates and create overlapping System visual authorities. Native YEIS already has the physical current-system renderer needed before the boundary."
+    },
+    {
+      "id": "third-transition-renderer",
+      "name": "Dedicated star-to-system transition scene/LOD renderer",
+      "level": "subsystem",
+      "source": "New project renderer",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates a capability present in pinned YEIS and adds another resource/camera/coordinate lifetime at the hardest boundary."
+    },
+    {
+      "id": "fade-boundary",
+      "name": "Fade or bloom-mask the Galaxy→System scene replacement",
+      "level": "component_asset",
+      "source": "UI/compositor effect",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Can hide a cut but does not produce scale continuity or preserve the focused star as a spatial object."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Focused star remains one spatial object while it grows from point to native mesh",
+      "importance": "high",
+      "coverage": {
+        "restore-pinned-yeis-system-lod": "full",
+        "product-system-overlap-in-galaxy": "partial",
+        "third-transition-renderer": "partial",
+        "fade-boundary": "none"
+      },
+      "decision": "Use the pinned StarPoints/current-system mesh handoff exactly as designed by YEIS."
+    },
+    {
+      "capability": "Interstellar travel preserves absolute camera position across target-system frame switch",
+      "importance": "high",
+      "coverage": {
+        "restore-pinned-yeis-system-lod": "full",
+        "product-system-overlap-in-galaxy": "none",
+        "third-transition-renderer": "none",
+        "fade-boundary": "none"
+      },
+      "decision": "Use Universe.switchTo() followed by CameraController.shiftFrame() on the existing native controller."
+    },
+    {
+      "capability": "Planets/orbits progressively resolve before product System handoff",
+      "importance": "high",
+      "coverage": {
+        "restore-pinned-yeis-system-lod": "full",
+        "product-system-overlap-in-galaxy": "full",
+        "third-transition-renderer": "partial",
+        "fade-boundary": "none"
+      },
+      "decision": "Attach pinned BodyRenderer/BodyPoints/OrbitLines to YeisGalaxyScene's current native system and retarget them on frame changes."
+    },
+    {
+      "capability": "Product System begins with matched framing instead of a fixed-shot snap",
+      "importance": "high",
+      "coverage": {
+        "restore-pinned-yeis-system-lod": "full",
+        "product-system-overlap-in-galaxy": "partial",
+        "third-transition-renderer": "partial",
+        "fade-boundary": "none"
+      },
+      "decision": "Capture native arrival quaternion and rebuild the product System overview at the same viewing direction with its existing viewport-aware fit-sphere distance."
+    },
+    {
+      "capability": "Existing camera authority boundary remains intact",
+      "importance": "high",
+      "coverage": {
+        "restore-pinned-yeis-system-lod": "full",
+        "product-system-overlap-in-galaxy": "partial",
+        "third-transition-renderer": "none",
+        "fade-boundary": "full"
+      },
+      "decision": "YEIS CameraController owns Galaxy/native travel; camera-controls starts only after the System phase handoff."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "restore-pinned-yeis-system-lod"
+    ],
+    "rationale": "Restore the omitted pinned-YEIS current-system rendering/travel chain in YeisGalaxyScene. A star travel request first switches the YEIS reference frame while preserving absolute camera position, retargets native local renderers, and flies to a system-overview distance based on the same physical system span used by the product similarity adapter. The star point disappears because it is now the current star while its mesh/body/orbit LOD resolves in place. At native arrival, preserve the camera quaternion and hand off to the existing product System renderer at its viewport-aware overview distance. Reverse System→Galaxy will reuse the retained native view state/current frame rather than invent another renderer.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If full planet/orbit detail is too expensive at extreme Galaxy distance, keep the pinned renderers mounted but rely on their existing apparent-size culling and point/line fade rules; do not add a separate transition representation."
+  }
+}

@@ -1708,10 +1708,19 @@ export default function UniverseApp({
 
   const beginGalaxyScaleTravel = useCallback(
     (destination: UniverseNavigationDestination) => {
-      const cameraTarget = navigationCameraTarget(
+      const resolvedCameraTarget = navigationCameraTarget(
         destination,
         galaxy.markers,
       );
+      // Scale travel enters the owning stellar system, never the exact body.
+      // Exact body travel remains available to Search/Places/click navigation.
+      const cameraTarget =
+        resolvedCameraTarget?.kind === "body"
+          ? {
+              kind: "star" as const,
+              nativeId: resolvedCameraTarget.starId,
+            }
+          : resolvedCameraTarget;
       if (!cameraTarget) {
         void handleNavigateDestination(destination);
         return;
@@ -2112,11 +2121,14 @@ export default function UniverseApp({
           }
           lockedGalaxyScaleFocusRef.current = focus;
 
-          // The frozen pending/current contract promotes activeDestinationId
-          // only after native locate/travel has completed. Current wins over
-          // any stale pending render from the same completion batch.
+          // A located destination is only orientation state. Even when it is
+          // already active, inward scale must still perform the native YEIS
+          // star→system approach before product System takes visual authority.
           if (activeDestinationId === focus.id) {
-            void enterScaleFocusedSystem(focus);
+            pendingScaleEnterSystemRef.current = focus;
+            document.documentElement.dataset.universeScaleQueued =
+              "enter-system:" + focus.id;
+            beginGalaxyScaleTravel(focus);
             return;
           }
 
@@ -2127,6 +2139,9 @@ export default function UniverseApp({
             return;
           }
 
+          pendingScaleEnterSystemRef.current = focus;
+          document.documentElement.dataset.universeScaleQueued =
+            "enter-system:" + focus.id;
           beginGalaxyScaleTravel(focus);
           return;
         }

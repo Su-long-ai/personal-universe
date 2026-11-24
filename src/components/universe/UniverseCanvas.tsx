@@ -203,6 +203,7 @@ export function UniverseCanvas({
           quality={quality}
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
+          galaxyViewState={yeisViewStateRef.current}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />

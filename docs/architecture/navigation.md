@@ -366,12 +366,37 @@ Atmosphere
 Surface
 ```
 
-The first inward wheel gesture on a centred galaxy target uses existing YEIS
-native camera travel. A further inward gesture after that target is promoted to
-the current destination enters the stellar-system renderer. If the visitor
-continues scrolling while native locate/travel is still settling, one
-enter-system intent is queued and consumed only after the existing destination
-becomes current; a competing camera request is not created.
+Task `GALAXY-SYSTEM-SCALE-CONTINUITY-001` restores the pinned-MIT
+YEIS star→current-system LOD path that the earlier product integration had
+omitted. A completed Locate establishes focus/orientation only; it does not
+count as scale arrival. The first inward scale gesture normalizes any exact
+body/content focus to its owning native star for spatial travel, keeps the
+product phase at `galaxy`, switches the YEIS reference frame with
+`Universe.switchTo()`, preserves absolute camera position with
+`CameraController.shiftFrame()`, and approaches the target star's physical
+system overview.
+
+The same native Galaxy scene now owns both the far-star catalogue and the
+current system's pinned `BodyRenderer`, `BodyPoints`, and `OrbitLines`.
+Pinned `StarPoints` already hides the current catalogue star because that
+object is expected to be represented by the local mesh, so a focused star can
+resolve from point into its native system without mounting the product System
+renderer on top of Galaxy. The native arrival distance and the product System
+overview use the same physical system span, viewport FOV and sphere-fit factor.
+At arrival, the native `starId + position + quaternion` is retained; only
+then does the product System take authority at the same view direction and
+apparent system size.
+
+Hero/body identity is still carried forward as the preferred planet intent.
+The scale travel itself stops at the owning stellar system; the subsequent
+System 1→2 coordinate performs the actual planet approach. This is intentionally
+different from Search/Places/canvas clicks, whose explicit exact-body travel
+continues to use the native body destination directly.
+
+If the visitor keeps scrolling while native scale travel is settling, the
+existing single enter-system intent is queued and consumed only after the
+native arrival becomes current; no competing Galaxy camera request or duplicate
+System scene is created.
 
 Inside the system, Task `SYSTEM-WORLD-SCALE-CONTINUITY-001` extends
 the same product scale coordinate down to 1 (System). The first inward delta

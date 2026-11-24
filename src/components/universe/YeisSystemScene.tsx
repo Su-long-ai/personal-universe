@@ -18,6 +18,7 @@ import type {
   SimpleElements,
 } from "../../vendor/yeis/data/types";
 import { starLightColor } from "../../vendor/yeis/astro/stellar";
+import { productSystemScale } from "../../lib/universe/yeis/systemScale";
 import { BodyRenderer } from "../../vendor/yeis/render/BodyRenderer";
 import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
@@ -48,17 +49,6 @@ function nativePlanetId(planet: PlanetDefinition) {
   return planet.id.startsWith("yeis-planet:")
     ? planet.id.slice("yeis-planet:".length)
     : planet.id;
-}
-
-function systemScale(system: StarSystem) {
-  system.update(J2000_JD, 0);
-  const star = system.star;
-  let span = star.radius * 120;
-  for (const body of system.bodies) {
-    if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
-    span = Math.max(span, body.position.distanceTo(star.position));
-  }
-  return SYSTEM_OVERVIEW_RADIUS / Math.max(span, 1);
 }
 
 function scaledOrbit(body: CelestialBody, scale: number): OrbitElements | undefined {
@@ -132,7 +122,7 @@ function scaledBody(body: CelestialBody, scale: number): BodyData {
 
 function createRenderSystem(source: StarSystem) {
   source.update(J2000_JD, 0);
-  const scale = systemScale(source);
+  const scale = productSystemScale(source);
   const retained = source.bodies.filter(
     (body) =>
       body.data.type !== "spacecraft" &&
