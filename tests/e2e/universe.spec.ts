@@ -1596,6 +1596,99 @@ test("LOW Surface handoff keeps the globe until retained terrain is actually rea
   await runtime.assertClean(testInfo);
 });
 
+test("live landing frame is revoked at four and reacquired on re-entry @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "HIGH forces the live ProceduralPlanets path on hosted software WebGL",
+  );
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("high");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.000",
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.600",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-planets-live-surface",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-camera-frame",
+    "ready",
+    { timeout: 15_000 },
+  );
+
+  // Crossing back to the exact Atmosphere anchor removes the live landing
+  // anchor and clears the published frame. Rotation is allowed to resume only
+  // at/below this boundary.
+  await dispatchScaleWheel(page, 96);
+  await dispatchScaleWheel(page, 48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.000",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-camera-frame",
+    /.+/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-planets-live-surface",
+  );
+
+  await page.waitForTimeout(320);
+
+  // A new inward crossing gets a fresh anchor instance/frame from the current
+  // planet transform rather than reviving the stale frame from the prior pass.
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.200",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-planets-live-surface",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-camera-frame",
+    "ready",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("LOW fallback prewarm cancels on immediate reverse and resumes before Surface", async ({
   page,
 }, testInfo) => {
