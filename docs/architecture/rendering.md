@@ -204,13 +204,39 @@ The product reuses ProceduralPlanets inside that host:
 - HIGH quality explicitly requests the live renderer and is used by the
   release visual acceptance test.
 
+The handoff exposes separate readiness layers instead of collapsing them into
+one boolean:
+
+1. `data-universe-world-scene-ready` means the close-world React/R3F scene is
+   mounted. It is not permission to remove System presentation.
+2. `data-universe-world-capability` identifies the concrete renderer capability
+   selected for the current planet/quality/hardware identity.
+3. `data-universe-world-paint-ready="true"` means that concrete renderer has
+   participated in real visible frames. This is the only renderer signal used
+   by `CinematicCamera` settlement and the System -> Approach presentation
+   handoff.
+4. `data-universe-camera-settled` remains camera-controls' physical arrival
+   signal. It cannot be published for a close-world phase before first paint.
+5. `data-universe-world-ready` and
+   `data-universe-world-screenshot-ready` belong to pipeline convergence and
+   capture acceptance. They may be stricter than first paint and never act as
+   substitutes for it.
+
+Returning to System invalidates first-paint authority even though the same
+Planet/material resources remain warm. Re-entering Approach must therefore
+paint the retained renderer again before System presentation is released.
+Quality or planet identity changes invalidate the same token for the replacement
+renderer, preventing readiness from leaking across capabilities.
+
 Runtime evidence:
 
 - `data-universe-world-renderer`
+- `data-universe-world-capability`
 - `data-universe-world-pipeline`
 - `data-universe-world-ready`
+- `data-universe-world-screenshot-ready`
 - `data-universe-world-scene-ready`
-- `data-universe-world-scene-lifecycle="prewarming|active"`
+- `data-universe-world-scene-lifecycle="prewarming|active|parked"`
 - `data-universe-world-paint-ready="true"`
 - `data-universe-world-pipeline-lifecycle="parked|active"`
 - `data-universe-world-pipeline-allocations`
@@ -275,14 +301,30 @@ terrain subsystem, not a second terrain engine. The fallback publishes
 `"infinite-hardware"`.
 
 Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
-fallback begins preparing during the inward Atmosphere interval at an
-idle/stable boundary instead of waiting for the Surface boundary. If navigation
-reverses before construction begins, the scheduled prime is cancelled. Once
-created, one retained Infinite World instance is reused; leaving Surface hides
-the same scene and pauses its `terrain.update` call, but does not synchronously
-dispose streamed GPU/chunk resources on the wheel transition path. The retained
-instance is disposed only when its R3F Canvas host is actually destroyed. This remains a bounded one-instance residency tradeoff,
-not a terrain cache and not a second renderer or navigation authority.
+fallback begins real terrain construction and driver preparation during the
+inward Atmosphere interval at an idle/stable boundary instead of merely mounting
+a dormant component and deferring `createInfiniteTerrain().prepare()` until
+Surface. If navigation reverses before construction begins, the scheduled prime
+is cancelled. Once construction has begun, that same instance remains retained
+and may finish preparing while parked; it is not restarted on a later inward
+gesture.
+
+At coordinate 5, fallback presentation has an explicit readiness handoff. The
+lightweight close-world globe remains the visible authority while the terrain is
+still deferred/preparing. `SurfaceTerrain` publishes ready only after the
+complete initial radial chunk ring exists. Only then does the retained terrain
+become the Surface renderer, the fallback Surface camera begin its local-frame
+move, the close-world scene enter `parked`, and pipeline/screenshot readiness
+become eligible. This keeps navigation coordinate ownership direct while
+preventing a semantic Surface state from exposing a blank or partially streamed
+terrain frame.
+
+Once created, one retained Infinite World instance is reused; leaving Surface
+hides the same scene and pauses its `terrain.update` call, but does not
+synchronously dispose streamed GPU/chunk resources on the wheel transition path.
+The retained instance is disposed only when its R3F Canvas host is actually
+destroyed. This remains a bounded one-instance residency tradeoff, not a terrain
+cache and not a second renderer or navigation authority.
 
 Runtime evidence:
 
