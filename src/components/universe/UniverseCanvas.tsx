@@ -335,7 +335,10 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPaintReady}
+          // Camera settlement depends on the first concrete world frame.
+          // Full handoff/screenshot readiness remains stricter and continues
+          // to use worldPaintReady / pipeline convergence elsewhere.
+          worldFrameReady={worldPaintStarted}
           surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
