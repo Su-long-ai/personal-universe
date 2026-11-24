@@ -464,17 +464,19 @@ function LiveSurfaceAnchor({
                   : undefined
               }
             >
-              <mesh
-                name={`surface-signal-hit-${anchor.id}`}
-                position={[0, 0.008, 0]}
-              >
-                <sphereGeometry args={[0.011, 8, 6]} />
-                <meshBasicMaterial
-                  transparent
-                  opacity={0}
-                  depthWrite={false}
-                />
-              </mesh>
+              {expanded ? (
+                <mesh
+                  name={`surface-signal-hit-${anchor.id}`}
+                  position={[0, 0.008, 0]}
+                >
+                  <sphereGeometry args={[0.011, 8, 6]} />
+                  <meshBasicMaterial
+                    transparent
+                    opacity={0}
+                    depthWrite={false}
+                  />
+                </mesh>
+              ) : null}
               <mesh scale={[0.003, 0.011, 0.003]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
                 <meshBasicMaterial
