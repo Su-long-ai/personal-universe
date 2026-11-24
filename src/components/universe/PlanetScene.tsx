@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
@@ -470,7 +470,8 @@ export function PlanetScene({
   phase,
   worldScalePosition,
   presentationActive = true,
-  onPaintReady,
+  surfaceFallbackReady = false,
+  onPaintReadyChange,
   onSurfaceCameraFrame,
 }: {
   planet: PlanetDefinition;
@@ -478,7 +479,8 @@ export function PlanetScene({
   phase: UniversePhase;
   worldScalePosition: number;
   presentationActive?: boolean;
-  onPaintReady?: () => void;
+  surfaceFallbackReady?: boolean;
+  onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const { gl } = useThree();
@@ -493,6 +495,12 @@ export function PlanetScene({
   );
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const fallbackSurfaceOwnsPresentation =
+    phase === "surface" &&
+    Boolean(fallbackReason) &&
+    surfaceFallbackReady;
+  const worldPresentationActive =
+    presentationActive && !fallbackSurfaceOwnsPresentation;
   const fallbackSurfaceTexture = useMemo(
     () =>
       fallbackReason === "software-renderer"
@@ -505,6 +513,19 @@ export function PlanetScene({
   const liveEnabled = warmedKey === liveKey && !fallbackReason;
   const paintedFrames = useRef(0);
   const paintReported = useRef(false);
+  const onPaintReadyChangeRef = useRef(onPaintReadyChange);
+  onPaintReadyChangeRef.current = onPaintReadyChange;
+
+  const publishPaintReady = useCallback((ready: boolean) => {
+    if (paintReported.current === ready) return;
+    paintReported.current = ready;
+    if (ready) {
+      document.documentElement.dataset.universeWorldPaintReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldPaintReady;
+    }
+    onPaintReadyChangeRef.current?.(ready);
+  }, []);
 
   useEffect(() => {
     if (fallbackReason) return;
@@ -594,22 +615,54 @@ export function PlanetScene({
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
+      worldPresentationActive
+        ? "active"
+        : presentationActive
+          ? "parked"
+          : "prewarming";
     return () => {
+      publishPaintReady(false);
       delete document.documentElement.dataset.universeWorldSceneReady;
       delete document.documentElement.dataset.universeWorldSceneLifecycle;
+      delete document.documentElement.dataset.universeWorldCapability;
     };
-  }, []);
+  }, [publishPaintReady]);
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
-    if (!presentationActive) {
-      paintedFrames.current = 0;
-      paintReported.current = false;
-      delete document.documentElement.dataset.universeWorldPaintReady;
-    }
-  }, [presentationActive]);
+      worldPresentationActive
+        ? "active"
+        : presentationActive
+          ? "parked"
+          : "prewarming";
+  }, [presentationActive, worldPresentationActive]);
+
+  useEffect(() => {
+    const capability = fallbackReason
+      ? `fallback-${fallbackReason}`
+      : "procedural-planets-live";
+    document.documentElement.dataset.universeWorldCapability = capability;
+
+    // First-paint readiness is valid only for the currently visible renderer
+    // identity. Hiding the world for the System endpoint, changing quality, or
+    // selecting another planet invalidates the old paint even if the retained
+    // resource instance can be reused underneath.
+    paintedFrames.current = 0;
+    publishPaintReady(false);
+
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldCapability === capability
+      ) {
+        delete document.documentElement.dataset.universeWorldCapability;
+      }
+    };
+  }, [
+    fallbackReason,
+    liveKey,
+    worldPresentationActive,
+    publishPaintReady,
+  ]);
 
   useEffect(() => {
     const mode = livePlanet
@@ -642,32 +695,23 @@ export function PlanetScene({
     }
 
     if (
-      presentationActive &&
+      worldPresentationActive &&
       !paintReported.current &&
       (Boolean(fallbackReason) || Boolean(livePlanet))
     ) {
       paintedFrames.current += 1;
       if (paintedFrames.current >= 2) {
-        paintReported.current = true;
-        document.documentElement.dataset.universeWorldPaintReady = "true";
-        onPaintReady?.();
+        publishPaintReady(true);
       }
     }
   });
 
-  if (phase === "surface" && fallbackReason) {
-    // UniverseCanvas owns the longer-lived fallback SurfaceScene. Keeping
-    // that host mounted across phase changes prevents FiniteTerrain.dispose()
-    // from landing on the Surface -> Atmosphere input-critical path.
-    return null;
-  }
-
   return (
     <>
-      {presentationActive ? (
+      {worldPresentationActive ? (
         <color attach="background" args={["#000106"]} />
       ) : null}
-      <group visible={presentationActive}>
+      <group visible={worldPresentationActive}>
       <DeepSky />
       <Stars
         radius={78}
