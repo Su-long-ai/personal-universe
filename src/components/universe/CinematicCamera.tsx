@@ -8,7 +8,7 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
-import { Quaternion, Vector3 } from "three";
+import { PerspectiveCamera, Quaternion, Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
@@ -18,6 +18,7 @@ import {
 } from "../../lib/universe/types";
 import {
   WORLD_SCALE_EPSILON,
+  continuousScaleResponse,
   isWorldScalePhase,
   scalePhaseIndex,
 } from "../../lib/universe/continuousScale";
@@ -217,6 +218,23 @@ export function CinematicCamera({
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
+  const scratchWorldUp = useRef(new Vector3(0, 1, 0));
+  const scratchSurfaceUp = useRef(new Vector3());
+  const scratchSystemTarget = useRef(new Vector3());
+  const scratchSystemPosition = useRef(new Vector3());
+  const scratchForward = useRef(new Vector3());
+  const scratchApproachTarget = useRef(new Vector3());
+  const scratchApproachPosition = useRef(new Vector3());
+  const scratchApproachDirection = useRef(new Vector3());
+  const scratchEndpointOffset = useRef(new Vector3());
+  const scratchEndpointTarget = useRef(new Vector3());
+  const scratchSystemDirection = useRef(new Vector3());
+  const scratchFrameCenter = useRef(new Vector3());
+  const scratchFromPosition = useRef(new Vector3());
+  const scratchFromTarget = useRef(new Vector3());
+  const scratchToPosition = useRef(new Vector3());
+  const scratchToTarget = useRef(new Vector3());
+  const scratchNativeQuaternion = useRef(new Quaternion());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
 
@@ -332,6 +350,38 @@ export function CinematicCamera({
     ],
   );
 
+  const publishScaleFrameDiagnostics = useCallback(
+    (center: Vector3, radius: number) => {
+      const distance = Math.max(1e-8, camera.position.distanceTo(center));
+      document.documentElement.dataset.universeCameraDistance =
+        distance.toExponential(4);
+
+      if (camera instanceof PerspectiveCamera && viewportHeight > 0) {
+        const verticalFov =
+          (camera.fov * Math.PI) / 180;
+        const projectedRadius =
+          (Math.max(radius, 1e-8) /
+            Math.max(distance * Math.tan(verticalFov / 2), 1e-8)) *
+          (viewportHeight / 2);
+        document.documentElement.dataset.universeProjectedRadius =
+          projectedRadius.toFixed(2);
+      } else {
+        delete document.documentElement.dataset.universeProjectedRadius;
+      }
+
+      const quaternion = camera.quaternion;
+      document.documentElement.dataset.universeCameraQuaternion = [
+        quaternion.x,
+        quaternion.y,
+        quaternion.z,
+        quaternion.w,
+      ]
+        .map((value) => value.toFixed(6))
+        .join(",");
+    },
+    [camera, viewportHeight],
+  );
+
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
@@ -405,7 +455,7 @@ export function CinematicCamera({
     const nativeSystemEntryView =
       phase === "system" && galaxyViewState?.systemOverview === true;
     const nativeSystemEntryQuaternion = nativeSystemEntryView
-      ? new Quaternion().fromArray(galaxyViewState.quaternion)
+      ? scratchNativeQuaternion.current.fromArray(galaxyViewState.quaternion)
       : null;
     if (nativeSystemEntryView) {
       document.documentElement.dataset.universeSystemEntryView =
@@ -444,8 +494,20 @@ export function CinematicCamera({
     ) {
       camera.up.set(...activeSurfaceCameraFrame.up).normalize();
     } else if (
+      continuousSystemCamera &&
       nativeSystemEntryQuaternion
     ) {
+      const linearUpT = Math.min(
+        1,
+        Math.max(0, worldScalePosition - 1),
+      );
+      const upT = continuousScaleResponse(linearUpT);
+      camera.up
+        .set(0, 1, 0)
+        .applyQuaternion(nativeSystemEntryQuaternion)
+        .lerp(scratchWorldUp.current.set(0, 1, 0), upT)
+        .normalize();
+    } else if (nativeSystemEntryQuaternion) {
       camera.up
         .set(0, 1, 0)
         .applyQuaternion(nativeSystemEntryQuaternion)
@@ -455,11 +517,15 @@ export function CinematicCamera({
       activeSurfaceCameraFrame &&
       worldScalePosition > 4
     ) {
-      const surfaceInfluence = Math.min(1, worldScalePosition - 4);
+      const surfaceInfluence = continuousScaleResponse(
+        Math.min(1, worldScalePosition - 4),
+      );
       camera.up
         .set(0, 1, 0)
         .lerp(
-          new Vector3(...activeSurfaceCameraFrame.up).normalize(),
+          scratchSurfaceUp.current
+            .set(...activeSurfaceCameraFrame.up)
+            .normalize(),
           surfaceInfluence,
         )
         .normalize();
@@ -488,15 +554,20 @@ export function CinematicCamera({
       const approachShot = SHOTS.approach;
       if (!systemShot || !approachShot) return;
 
-      const systemTarget = new Vector3(...systemShot.target);
-      const systemPosition = new Vector3(...systemShot.position);
+      const systemTarget = scratchSystemTarget.current.set(
+        ...systemShot.target,
+      );
+      const systemPosition = scratchSystemPosition.current.set(
+        ...systemShot.position,
+      );
       if (systemShot.frameScale) {
         const distance =
           controls.getDistanceToFitSphere(
             systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
           ) * systemShot.frameScale;
         if (nativeSystemEntryQuaternion) {
-          const forward = new Vector3(0, 0, -1)
+          const forward = scratchForward.current
+            .set(0, 0, -1)
             .applyQuaternion(nativeSystemEntryQuaternion)
             .normalize();
           systemPosition
@@ -513,30 +584,37 @@ export function CinematicCamera({
 
       // Preserve the authored Approach composition at the renderer boundary:
       // the target offset is expressed as a fraction of planet radius, while
-      // the viewing direction comes from the existing Approach shot.
-      const approachTarget = new Vector3(...approachShot.target);
-      const approachPosition = new Vector3(...approachShot.position);
-      const approachDirection = approachPosition
+      // the viewing direction comes from the existing Approach shot. Reuse
+      // scratch vectors here because this path runs for every continuous frame.
+      const approachTarget = scratchApproachTarget.current.set(
+        ...approachShot.target,
+      );
+      const approachPosition = scratchApproachPosition.current.set(
+        ...approachShot.position,
+      );
+      const approachDirection = scratchApproachDirection.current
+        .copy(approachPosition)
         .sub(approachTarget)
         .normalize();
-      const endpointTargetOffset = new Vector3(...approachShot.target)
-        .sub(new Vector3(...WORLD))
+      const endpointTargetOffset = scratchEndpointOffset.current
+        .set(...approachShot.target)
+        .sub(scratchFrameCenter.current.set(...WORLD))
         .multiplyScalar(
           Math.max(systemScaleFrame.radius, 1e-8) / PLANET_RENDER_RADIUS,
         );
-      const endpointTarget = new Vector3(...systemScaleFrame.position).add(
-        endpointTargetOffset,
-      );
+      const endpointTarget = scratchEndpointTarget.current
+        .set(...systemScaleFrame.position)
+        .add(endpointTargetOffset);
 
-      const systemDirection = systemPosition
-        .clone()
+      const systemDirection = scratchSystemDirection.current
+        .copy(systemPosition)
         .sub(systemTarget)
         .normalize();
       const linearT = Math.min(
         1,
         Math.max(0, worldScalePosition - 1),
       );
-      const t = linearT * linearT * (3 - 2 * linearT);
+      const t = continuousScaleResponse(linearT);
       const direction = systemDirection
         .lerp(approachDirection, t)
         .normalize();
@@ -593,8 +671,25 @@ export function CinematicCamera({
         "scale-continuous";
       document.documentElement.dataset.universeScaleCameraSegment =
         "system:approach";
+      document.documentElement.dataset.universeScaleSegment =
+        "system:approach";
       document.documentElement.dataset.universeSystemScaleDistance =
         distance.toExponential(4);
+      publishScaleFrameDiagnostics(
+        scratchFrameCenter.current.set(...systemScaleFrame.position),
+        systemScaleFrame.radius,
+      );
+      if (worldScalePosition >= 2 - WORLD_SCALE_EPSILON) {
+        const html = document.documentElement;
+        if (html.dataset.universeProjectedRadius) {
+          html.dataset.universeHandoffExitProjectedRadius =
+            html.dataset.universeProjectedRadius;
+        }
+        if (html.dataset.universeCameraQuaternion) {
+          html.dataset.universeHandoffExitQuaternion =
+            html.dataset.universeCameraQuaternion;
+        }
+      }
       return;
     }
 
@@ -625,35 +720,45 @@ export function CinematicCamera({
         upperPhase === "surface" ? surfaceShot : SHOTS[upperPhase];
       if (!lowerShot || !upperShot) return;
 
-      const resolveShot = (shot: CameraShot) => {
-        const target = new Vector3(...shot.target);
-        const position = new Vector3(...shot.position);
-        if (shot.frameScale) {
-          const distance =
-            controls.getDistanceToFitSphere(
-              shot.fitRadius ?? PLANET_RENDER_RADIUS,
-            ) * shot.frameScale;
-          position
-            .sub(target)
-            .normalize()
-            .multiplyScalar(distance)
-            .add(target);
-        }
-        return { position, target };
-      };
+      const fromTarget = scratchFromTarget.current.set(...lowerShot.target);
+      const fromPosition = scratchFromPosition.current.set(
+        ...lowerShot.position,
+      );
+      if (lowerShot.frameScale) {
+        const distance =
+          controls.getDistanceToFitSphere(
+            lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          ) * lowerShot.frameScale;
+        fromPosition
+          .sub(fromTarget)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(fromTarget);
+      }
 
-      const from = resolveShot(lowerShot);
-      const to = resolveShot(upperShot);
+      const toTarget = scratchToTarget.current.set(...upperShot.target);
+      const toPosition = scratchToPosition.current.set(...upperShot.position);
+      if (upperShot.frameScale) {
+        const distance =
+          controls.getDistanceToFitSphere(
+            upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          ) * upperShot.frameScale;
+        toPosition
+          .sub(toTarget)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(toTarget);
+      }
       const linearT =
         lowerIndex === upperIndex
           ? 0
           : clampedPosition - lowerIndex;
-      // Smoothstep keeps velocity continuous at the authored shot anchors
-      // while remaining exactly reversible for the same scale coordinate.
-      const t = linearT * linearT * (3 - 2 * linearT);
+      // Preserve non-zero motion through authored anchors so continuous input
+      // reads as one descent rather than a sequence of eased cinematics.
+      const t = continuousScaleResponse(linearT);
 
-      desiredPosition.current.lerpVectors(from.position, to.position, t);
-      desiredTarget.current.lerpVectors(from.target, to.target, t);
+      desiredPosition.current.lerpVectors(fromPosition, toPosition, t);
+      desiredTarget.current.lerpVectors(fromTarget, toTarget, t);
       desiredPositionTolerance.current = Math.min(
         lowerShot.positionTolerance,
         upperShot.positionTolerance,
@@ -668,18 +773,18 @@ export function CinematicCamera({
       controls.maxSpeed = 1000;
       controls.stop();
       void controls.lerpLookAt(
-        from.position.x,
-        from.position.y,
-        from.position.z,
-        from.target.x,
-        from.target.y,
-        from.target.z,
-        to.position.x,
-        to.position.y,
-        to.position.z,
-        to.target.x,
-        to.target.y,
-        to.target.z,
+        fromPosition.x,
+        fromPosition.y,
+        fromPosition.z,
+        fromTarget.x,
+        fromTarget.y,
+        fromTarget.z,
+        toPosition.x,
+        toPosition.y,
+        toPosition.z,
+        toTarget.x,
+        toTarget.y,
+        toTarget.z,
         t,
         false,
       );
@@ -689,6 +794,12 @@ export function CinematicCamera({
         "scale-continuous";
       document.documentElement.dataset.universeScaleCameraSegment =
         lowerPhase + ":" + upperPhase;
+      document.documentElement.dataset.universeScaleSegment =
+        lowerPhase + ":" + upperPhase;
+      publishScaleFrameDiagnostics(
+        scratchFrameCenter.current.set(...WORLD),
+        PLANET_RENDER_RADIUS,
+      );
 
       if (
         Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
@@ -700,6 +811,7 @@ export function CinematicCamera({
     }
 
     delete document.documentElement.dataset.universeScaleCameraSegment;
+    delete document.documentElement.dataset.universeScaleSegment;
 
     const shot =
       phase === "surface"
@@ -747,8 +859,19 @@ export function CinematicCamera({
     }
 
     configuredPhase.current = phase;
-    const enableTransition =
-      shot.transition ?? (!reducedMotion && !softwareRenderer);
+    const matchedSystemApproachHandoff =
+      phase === "approach" &&
+      Math.abs(worldScalePosition - 2) <= WORLD_SCALE_EPSILON &&
+      Boolean(
+        document.documentElement.dataset.universeHandoffExitProjectedRadius,
+      );
+    // The continuous System segment already performed the travel. At the
+    // renderer boundary the new coordinate space must paint the matched
+    // Approach frame immediately; starting another camera-controls transition
+    // here would expose the old System-space camera to the close-world scene.
+    const enableTransition = matchedSystemApproachHandoff
+      ? false
+      : shot.transition ?? (!reducedMotion && !softwareRenderer);
     const transition = controls.setLookAt(
       desiredPosition.current.x,
       desiredPosition.current.y,
@@ -764,6 +887,22 @@ export function CinematicCamera({
       // immediately. Validate and publish from that same authority without
       // waiting for an R3F frame that software WebGL may deliver very late.
       controls.update(0);
+      if (matchedSystemApproachHandoff) {
+        publishScaleFrameDiagnostics(
+          scratchFrameCenter.current.set(...WORLD),
+          PLANET_RENDER_RADIUS,
+        );
+        const html = document.documentElement;
+        if (html.dataset.universeProjectedRadius) {
+          html.dataset.universeHandoffEntryProjectedRadius =
+            html.dataset.universeProjectedRadius;
+        }
+        if (html.dataset.universeCameraQuaternion) {
+          html.dataset.universeHandoffEntryQuaternion =
+            html.dataset.universeCameraQuaternion;
+        }
+        html.dataset.universeHandoffState = "system:approach-matched";
+      }
       publishIfReached(generation);
     }
     void transition.then(() => publishIfReached(generation));
@@ -837,6 +976,7 @@ export function CinematicCamera({
     worldScaleContinuous,
     worldScalePosition,
     publishIfReached,
+    publishScaleFrameDiagnostics,
   ]);
 
   useEffect(() => {
@@ -880,6 +1020,14 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;
       delete document.documentElement.dataset.universeScaleCameraSegment;
+      delete document.documentElement.dataset.universeScaleSegment;
+      delete document.documentElement.dataset.universeCameraDistance;
+      delete document.documentElement.dataset.universeProjectedRadius;
+      delete document.documentElement.dataset.universeCameraQuaternion;
+      delete document.documentElement.dataset.universeHandoffExitProjectedRadius;
+      delete document.documentElement.dataset.universeHandoffEntryProjectedRadius;
+      delete document.documentElement.dataset.universeHandoffExitQuaternion;
+      delete document.documentElement.dataset.universeHandoffEntryQuaternion;
       delete document.documentElement.dataset.universeSystemScaleFrame;
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;

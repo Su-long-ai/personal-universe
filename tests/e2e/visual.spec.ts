@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { test, expect, type Page, type TestInfo } from "./support/test";
 import {
@@ -6,6 +6,7 @@ import {
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+import sharp from "sharp";
 
 type Viewport = {
   name: string;
@@ -28,8 +29,15 @@ const MOBILE: Viewport = {
   width: 390,
   height: 844,
 };
+const ULTRAWIDE: Viewport = {
+  name: "ultrawide-3440x1440",
+  width: 3440,
+  height: 1440,
+};
 
 test.describe.configure({ retries: 0 });
+
+const pendingReadableWorldFrame = new WeakMap<Page, Buffer>();
 
 async function shot(
   page: Page,
@@ -39,11 +47,33 @@ async function shot(
 ) {
   const path = testInfo.outputPath("visual", `${viewport}--${name}.png`);
   mkdirSync(dirname(path), { recursive: true });
-  await page.screenshot({ path });
+  const pendingFrame = pendingReadableWorldFrame.get(page);
+  if (pendingFrame) {
+    pendingReadableWorldFrame.delete(page);
+    writeFileSync(path, pendingFrame);
+  } else {
+    await page.screenshot({ path });
+  }
   await testInfo.attach(`${viewport}--${name}`, {
     path,
     contentType: "image/png",
   });
+}
+
+async function dispatchVisualWheel(page: Page, deltaY: number) {
+  await page.locator("main.universe-root").evaluate(
+    (root, value) => {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: value,
+        }),
+      );
+    },
+    deltaY,
+  );
 }
 
 async function waitForCameraSettled(
@@ -57,49 +87,79 @@ async function waitForCameraSettled(
 }
 
 async function expectReadableWorldFrame(page: Page, label: string) {
-  const png = await page.locator(".universe-canvas canvas").screenshot();
-  const stats = await page.evaluate(async ({ base64 }) => {
-    const response = await fetch(`data:image/png;base64,${base64}`);
-    const bitmap = await createImageBitmap(await response.blob());
-    const sample = document.createElement("canvas");
-    sample.width = 160;
-    sample.height = 100;
-    const context = sample.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("2D canvas unavailable for visual probe");
-    context.drawImage(bitmap, 0, 0, sample.width, sample.height);
-    bitmap.close();
+  // Capture the final viewport once and let visualCase reuse the exact same
+  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
+  // seconds on one screenshot, so a second identical read would make the
+  // acceptance itself stall the renderer it is measuring.
+  const png = await page.screenshot();
+  pendingReadableWorldFrame.set(page, png);
+  const image = sharp(png);
+  const metadata = await image.metadata();
+  const width = metadata.width ?? 0;
+  const height = metadata.height ?? 0;
+  if (width <= 0 || height <= 0) {
+    throw new Error(`${label} visual probe received an empty screenshot`);
+  }
 
-    const pixels = context.getImageData(
-      0,
-      0,
-      sample.width,
-      sample.height,
-    ).data;
-    let readable = 0;
-    let luminanceSum = 0;
-    const total = sample.width * sample.height;
-    for (let offset = 0; offset < pixels.length; offset += 4) {
-      const luminance =
-        pixels[offset] * 0.2126 +
-        pixels[offset + 1] * 0.7152 +
-        pixels[offset + 2] * 0.0722;
-      luminanceSum += luminance;
-      if (luminance > 20) readable += 1;
-    }
-    return {
-      meanLuminance: luminanceSum / total,
-      readableFraction: readable / total,
-    };
-  }, { base64: png.toString("base64") });
+  // Measure the spatial subject, not the full black-space composition. On
+  // ultrawide and portrait viewports a correctly framed planet can occupy a
+  // small fraction of the whole canvas while remaining large and readable.
+  // Keep this probe off the browser main thread: decoding a PNG with
+  // createImageBitmap can block hosted SwiftShader long enough to distort the
+  // renderer acceptance that the probe is supposed to observe.
+  const left = Math.floor(width * 0.2);
+  const top = Math.floor(height * 0.2);
+  const roiWidth = Math.max(1, Math.floor(width * 0.6));
+  const roiHeight = Math.max(1, Math.floor(height * 0.6));
+  const { data, info } = await image
+    .extract({
+      left,
+      top,
+      width: Math.min(roiWidth, width - left),
+      height: Math.min(roiHeight, height - top),
+    })
+    .resize(160, 100, { fit: "fill" })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let readable = 0;
+  let luminanceSum = 0;
+  let luminanceSquaredSum = 0;
+  const total = info.width * info.height;
+  for (let offset = 0; offset < data.length; offset += info.channels) {
+    const luminance =
+      data[offset] * 0.2126 +
+      data[offset + 1] * 0.7152 +
+      data[offset + 2] * 0.0722;
+    luminanceSum += luminance;
+    luminanceSquaredSum += luminance * luminance;
+    if (luminance > 20) readable += 1;
+  }
+
+  const meanLuminance = luminanceSum / total;
+  const luminanceVariance = Math.max(
+    0,
+    luminanceSquaredSum / total - meanLuminance * meanLuminance,
+  );
+  const stats = {
+    meanLuminance,
+    readableFraction: readable / total,
+    luminanceContrast: Math.sqrt(luminanceVariance),
+  };
 
   expect(
     stats.readableFraction,
-    `${label} should render a readable world instead of a near-black canvas`,
-  ).toBeGreaterThan(0.08);
+    `${label} central world region should contain a visible spatial subject`,
+  ).toBeGreaterThan(0.06);
   expect(
     stats.meanLuminance,
-    `${label} should produce visible world luminance`,
-  ).toBeGreaterThan(8);
+    `${label} central world region should not be blank/near-black`,
+  ).toBeGreaterThan(4);
+  expect(
+    stats.luminanceContrast,
+    `${label} central world region should retain visible geometry/lighting contrast`,
+  ).toBeGreaterThan(7);
 }
 
 async function expectCompactNarrowHud(page: Page) {
@@ -255,6 +315,139 @@ test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
       await expect(page.locator(".content-signal-card")).toBeVisible();
     },
   );
+});
+
+test("visual: desktop System to Approach midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "system-approach-midpoint",
+    async () => {
+      await page.goto("/?phase=system&star=h-aurora&freeze=1");
+      await waitForYeisEngine(page);
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-system-renderer",
+        "yeis-native",
+        { timeout: 30_000 },
+      );
+      await expect
+        .poll(
+          async () => html.getAttribute("data-universe-system-focus"),
+          { timeout: 30_000 },
+        )
+        .not.toBeNull();
+
+      await dispatchVisualWheel(page, -96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "1.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-segment",
+        "system:approach",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "system:approach",
+      );
+      await expect
+        .poll(
+          async () =>
+            Number(await html.getAttribute("data-universe-projected-radius")),
+          { timeout: 10_000 },
+        )
+        .toBeGreaterThan(0);
+    },
+  );
+});
+
+test("visual: desktop Hero approach", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "hero-approach", async () => {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "approach");
+    await expectReadableWorldFrame(page, "AUTO Hero approach");
+  });
+});
+
+test("visual: desktop Hero atmosphere", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "hero-atmosphere", async () => {
+    await page.goto(
+      "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "atmosphere");
+    await expectReadableWorldFrame(page, "AUTO Hero atmosphere");
+  });
+});
+
+test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "atmosphere-surface-midpoint-live",
+    async () => {
+      await page.goto(
+        "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "atmosphere");
+
+      await dispatchVisualWheel(page, -96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "4.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-segment",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-render-authority",
+        "world",
+      );
+      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+    },
+  );
+});
+
+test("visual: ultrawide close-world composition", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, ULTRAWIDE, "approach-orbit-midpoint", async () => {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "approach");
+    await dispatchVisualWheel(page, -96);
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-segment",
+      "approach:orbit",
+    );
+    await expectReadableWorldFrame(page, "ultrawide Approach/Orbit midpoint");
+  });
 });
 
 test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
@@ -434,6 +627,40 @@ for (const viewport of [TABLET, MOBILE]) {
             { timeout: 30_000 },
           );
           await expect(page.locator(".content-signal-card")).toBeVisible();
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
+
+  test(
+    `visual: ${viewport.name} Hero close-world midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "hero-approach-orbit-midpoint",
+        async () => {
+          await page.goto(
+            "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          await waitForCameraSettled(page, "approach");
+          await dispatchVisualWheel(page, -96);
+          const html = page.locator("html");
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "2.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-segment",
+            "approach:orbit",
+          );
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} Approach/Orbit midpoint`,
+          );
           await expectCompactNarrowHud(page);
         },
       );
