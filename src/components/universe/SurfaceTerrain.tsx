@@ -7,7 +7,8 @@ import {
 } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { createTerrain, type FiniteTerrain } from "procedural-terrains";
+import { type FiniteTerrain } from "procedural-terrains";
+import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 
@@ -53,6 +54,9 @@ export function SurfaceTerrain({
   const [activated, setActivated] = useState(active);
   const softwareRenderer = isSoftwareRenderer(gl);
   const terrainViewInitialized = useRef(false);
+  const terrainReadyPublished = useRef(false);
+  const softwareStreamUpdates = useRef(0);
+  const softwareStreamAccumulator = useRef(0);
   const lastCameraPosition = useRef(new THREE.Vector3());
   const lastCameraQuaternion = useRef(new THREE.Quaternion());
   const lastProjection = useRef(new THREE.Matrix4());
@@ -71,21 +75,33 @@ export function SurfaceTerrain({
     const controller = new AbortController();
 
     void (async () => {
-      instance = await createTerrain({
+      instance = await createInfiniteTerrain({
         renderer: gl,
         signal: controller.signal,
         configuration: {
           layout: softwareRenderer
             ? {
-                // Preserve the same 72-unit footprint with only four chunks.
-                // Hosted SwiftShader traces show the first visible draw is now
-                // the dominant Surface cost, so minimize its mesh/shader fanout.
-                chunkCount: 2,
-                chunkSize: 36,
+                // Infinite World removes the visible finite-board boundary while
+                // keeping software rendering bounded to a small camera-centred
+                // window. The runtime streams no more than three chunks per
+                // scheduled update and keeps its clipmap at the minimum supported
+                // resolution.
+                chunkSize: 32,
+                viewRadius: 2,
+                triangleBudget: 35000,
+                maxCreatesPerFrame: 3,
+                streamBudgetMs: 0.6,
+                cacheResolution: 64,
               }
             : {
-                chunkCount: 6,
-                chunkSize: 12,
+                // LOW-quality hardware fallback can afford a slightly broader
+                // horizon without becoming a second high-detail renderer.
+                chunkSize: 30,
+                viewRadius: 3,
+                triangleBudget: 180000,
+                maxCreatesPerFrame: 8,
+                streamBudgetMs: 1.2,
+                cacheResolution: 128,
               },
           source: {
             kind: "noise",
@@ -166,10 +182,12 @@ export function SurfaceTerrain({
         return;
       }
       terrainViewInitialized.current = false;
+      terrainReadyPublished.current = false;
+      softwareStreamUpdates.current = softwareRenderer ? 9 : 0;
+      softwareStreamAccumulator.current = 0;
       document.documentElement.dataset.universeSurfaceTerrainProfile =
-        softwareRenderer ? "software-performance" : "gpu-default";
+        softwareRenderer ? "infinite-software" : "infinite-hardware";
       setTerrain(instance);
-      onAnchorHeight?.((instance.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
     })().catch((error) => {
       const code = terrainErrorCode(error);
       const expectedTeardown =
@@ -219,13 +237,11 @@ export function SurfaceTerrain({
     if (!active || phaseRef.current !== "surface" || !terrain) return;
 
     if (softwareRenderer) {
-      // FiniteTerrain.update() performs LOD/culling and optional detail-cache
-      // work. Repeating it every frame for an unchanged camera is redundant,
-      // and under SwiftShader one already-running update can monopolize the
-      // main thread long enough to starve the React/R3F phase handoff. Keep
-      // software fallback updates camera-driven: first visible frame plus any
-      // real camera/projection change (manual exploration and resize still
-      // update normally).
+      // Infinite World needs several bounded updates to populate the initial
+      // camera-centred ring. SwiftShader still must not run streaming work every
+      // frame forever, so schedule a short warm-up burst, then return to the
+      // previous camera-driven policy. Any real manual camera/projection change
+      // restarts the bounded burst.
       camera.updateWorldMatrix(true, false);
       camera.getWorldPosition(currentCameraPosition.current);
       camera.getWorldQuaternion(currentCameraQuaternion.current);
@@ -243,15 +259,35 @@ export function SurfaceTerrain({
         !terrainViewInitialized.current ||
         !camera.projectionMatrix.equals(lastProjection.current);
 
-      if (!positionChanged && !rotationChanged && !projectionChanged) return;
+      if (positionChanged || rotationChanged || projectionChanged) {
+        lastCameraPosition.current.copy(currentCameraPosition.current);
+        lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
+        lastProjection.current.copy(camera.projectionMatrix);
+        terrainViewInitialized.current = true;
+        softwareStreamUpdates.current = Math.max(
+          softwareStreamUpdates.current,
+          9,
+        );
+        softwareStreamAccumulator.current = 0;
+      }
 
-      lastCameraPosition.current.copy(currentCameraPosition.current);
-      lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
-      lastProjection.current.copy(camera.projectionMatrix);
-      terrainViewInitialized.current = true;
+      if (softwareStreamUpdates.current <= 0) return;
+      softwareStreamAccumulator.current += delta;
+      if (softwareStreamAccumulator.current < 0.09) return;
+      softwareStreamAccumulator.current = 0;
+      softwareStreamUpdates.current -= 1;
     }
 
     terrain.update(delta, { camera });
+
+    if (!terrainReadyPublished.current) {
+      const diagnostics = terrain.getDiagnostics() as { chunks?: number };
+      const readyChunkCount = softwareRenderer ? 16 : 9;
+      if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
+        terrainReadyPublished.current = true;
+        onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
+      }
+    }
   });
 
   const rockInstances = useMemo(() => {
