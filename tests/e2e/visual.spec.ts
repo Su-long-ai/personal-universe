@@ -692,6 +692,16 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
         { timeout: 60_000 },
       );
       await expect(html).toHaveAttribute(
+        "data-universe-surface-profile",
+        /^surface:/,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-landmarks",
+        /[1-9][0-9]*/,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
         "data-universe-surface-anchor-ready",
         "true",
         { timeout: 60_000 },
@@ -942,6 +952,16 @@ for (const viewport of [TABLET, MOBILE]) {
           await expect(html).toHaveAttribute(
             "data-universe-surface-horizon",
             "generated-gradient",
+            { timeout: 60_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-profile",
+            /^surface:/,
+            { timeout: 60_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-landmarks",
+            /[1-9][0-9]*/,
             { timeout: 60_000 },
           );
           await waitForCameraSettled(page, "surface");
