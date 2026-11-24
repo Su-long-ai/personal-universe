@@ -11,8 +11,12 @@ type WebglMetrics = {
   calls: number;
   triangles: number;
   allocations: number;
+  planetAllocations: number;
+  planetPassAllocations: number;
+  fallbackTextureAllocations: number;
   lifecycle: string | null;
   pipelineLifecycle: string | null;
+  sceneLifecycle: string | null;
 };
 
 async function dispatchScaleWheel(page: Page, deltaY: number) {
@@ -174,8 +178,16 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       calls: Number(data.universeWebglCalls ?? 0),
       triangles: Number(data.universeWebglTriangles ?? 0),
       allocations: Number(data.universeWorldPipelineAllocations ?? 0),
+      planetAllocations: Number(data.universeWorldPlanetAllocations ?? 0),
+      planetPassAllocations: Number(
+        data.universeWorldPlanetPassAllocations ?? 0,
+      ),
+      fallbackTextureAllocations: Number(
+        data.universeWorldFallbackTextureAllocations ?? 0,
+      ),
       lifecycle: data.universeWebglLifecycle ?? null,
       pipelineLifecycle: data.universeWorldPipelineLifecycle ?? null,
+      sceneLifecycle: data.universeWorldSceneLifecycle ?? null,
     };
   });
 }
@@ -401,6 +413,15 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
   expect(cycleTwo.second.renderer).toBe(cycleOne.second.renderer);
   expect(cycleTwo.second.software).toBe(cycleOne.second.software);
   expect(cycleTwo.second.allocations).toBe(cycleOne.second.allocations);
+  expect(cycleTwo.second.planetAllocations).toBe(
+    cycleOne.second.planetAllocations,
+  );
+  expect(cycleTwo.second.planetPassAllocations).toBe(
+    cycleOne.second.planetPassAllocations,
+  );
+  expect(cycleTwo.second.fallbackTextureAllocations).toBe(
+    cycleOne.second.fallbackTextureAllocations,
+  );
 
   // A second identical 0 -> 5 -> 0 journey must reuse/retire resources instead
   // of leaving another persistent resource world behind. Keep this strict:
@@ -418,6 +439,7 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
 
   expect(cycleTwo.second.lifecycle).toBe("active");
   expect(cycleTwo.second.pipelineLifecycle).toBe("parked");
+  expect(cycleTwo.second.sceneLifecycle).toBe("parked");
 });
 
 test("AUTO LOW AUTO quality switching reuses the existing pipeline @webgl-heavy", async ({
