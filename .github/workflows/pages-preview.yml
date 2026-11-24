@@ -214,6 +214,9 @@ jobs:
               if (
                 path.includes("/_astro/") ||
                 path.includes("/vendor/yeis/") ||
+                path.includes("/textures/") ||
+                path.includes("/audio/") ||
+                path.includes("/nebulae/") ||
                 path.endsWith("/stars.bin")
               ) {
                 criticalFailures.push(
@@ -298,6 +301,14 @@ jobs:
 
             await page.waitForTimeout(500);
 
+            const finalCanvasCount = await page.locator("canvas").count();
+            if (finalCanvasCount !== 1) {
+              throw new Error(
+                `Expected one canvas after live scale reversal, found ${finalCanvasCount}`,
+              );
+            }
+            await page.screenshot({ path: "pages-live-smoke.png" });
+
             if (pageErrors.length) {
               throw new Error(
                 `Live browser page errors: ${pageErrors.join(" | ")}`,
@@ -319,3 +330,12 @@ jobs:
             echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
             echo "- Live critical asset/browser error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload live Pages browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-live-smoke-${{ github.run_id }}
+          path: pages-live-smoke.png
+          if-no-files-found: warn
+          retention-days: 14
