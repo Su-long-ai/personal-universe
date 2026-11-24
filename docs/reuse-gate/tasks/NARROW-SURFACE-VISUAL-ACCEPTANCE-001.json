@@ -1,0 +1,93 @@
+{
+  "schema": 2,
+  "task_id": "NARROW-SURFACE-VISUAL-ACCEPTANCE-001",
+  "title": "Add hosted narrow-screen Surface visual acceptance before changing Surface composition",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing Playwright viewport and screenshot pipeline to capture settled Surface on tablet and mobile, using current renderer readiness evidence so any later polish is driven by hosted visual proof rather than a new test framework or speculative camera changes"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The release suite already proves Surface navigation semantics and captures a desktop Surface visual, while tablet/mobile visuals stop at Orbit. This leaves the final landing composition unobserved on the viewports where HUD density and camera framing are most constrained. The lowest-risk next step is an acceptance probe: extend the existing Playwright visual matrix to tablet and mobile Surface, wait for the same settled renderer/camera evidence already used by desktop, and inspect those hosted artifacts before modifying camera or layout. Do not add Percy, Chromatic, a custom screenshot runner, or a Surface-specific rendering path.",
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "Playwright directly captures viewport screenshots and is already the project's hosted browser evidence path, so narrow Surface evidence can use the current runner and artifact pipeline."
+    },
+    {
+      "url": "https://playwright.dev/docs/next/test-snapshots",
+      "finding": "Playwright visual comparison guidance emphasizes consistent execution environments; extending the existing hosted matrix avoids introducing a second screenshot environment whose rendering differences would confound Surface evaluation."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [0, 1],
+      "conclusion": "A separate visual-regression service would duplicate the existing hosted Playwright release pipeline for a two-viewport evidence gap and is therefore unnecessary."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": ["playwright-test"],
+      "source_refs": [0, 1],
+      "conclusion": "Playwright Test already owns browser lifecycle, viewport emulation, screenshots, traces and release artifacts, covering the complete acceptance mechanism needed for this probe."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": ["playwright-test"],
+      "source_refs": [0],
+      "conclusion": "Reuse the current visualCase helper and existing tablet/mobile viewport definitions so the new Surface captures remain comparable to the rest of the product visual matrix."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [0],
+      "conclusion": "No screenshot component or image-processing dependency is needed; the existing page screenshot attachment is the required evidence."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-playwright-narrow-surface-cases",
+      "name": "Existing Playwright visual matrix extended to Surface",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current visualCase helper, tablet/mobile viewports and hosted release artifacts",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Closes the exact evidence gap with the same browser, viewport definitions, runtime readiness signals and artifacts already trusted by the protected release suite.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-surface-screenshot-runner",
+      "name": "Dedicated Surface screenshot script or service",
+      "level": "component_asset",
+      "source": "New project-owned browser/image harness",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate Playwright browser setup, viewport configuration, artifact upload and readiness waits while producing less comparable evidence."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": ["existing-playwright-narrow-surface-cases"],
+    "rationale": "Use the existing hosted Playwright visual pipeline as an acceptance probe and add only the missing tablet/mobile Surface states. The purpose is to obtain comparable visual evidence before any product implementation is changed; if the screenshots expose a composition defect, that defect will become a separate reuse-first implementation unit.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If ordinary AUTO Surface capture is too slow on the hosted software renderer, move only this evidence into the existing WebGL-heavy lane or narrow it to mobile first; do not create a new browser runner."
+  }
+}
