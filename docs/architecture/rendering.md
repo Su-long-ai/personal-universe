@@ -262,6 +262,50 @@ Runtime evidence:
 - the existing `data-universe-world-renderer="procedural-planets-live"`
 - the existing `data-universe-world-pipeline="procedural-planets-pass"`
 
+### Surface world product model
+
+Task `SURFACE-WORLD-PRODUCTIZATION-V3-001` adds one semantic Surface model
+above the existing renderer choices. `buildSurfaceWorldProfile(planet)` is a
+pure deterministic adapter over `PlanetDefinition`: the stable planet seed,
+archetype, hero identity and already-attached content entries derive the biome,
+atmosphere, light, terrain parameters, landing point, regions, paths, landmarks
+and content anchors. It is product/layout state only; it is not another terrain,
+camera, navigation or content authority.
+
+The same profile is consumed by both renderer adapters:
+
+- the primary ProceduralPlanets path keeps the existing live planet and projects
+  the generated product geography into the landing tangent frame returned by
+  `Planet.getSurfacePoint()`;
+- the ProceduralTerrains Infinite fallback consumes the same terrain seed,
+  palette, lighting, landing point and product layout while retaining its
+  camera-centred world transform;
+- Astro Content Collections and the existing planet `content` array remain the
+  only authored content source. Surface content anchors spatialize those entries
+  by stable placement key instead of copying them into a Surface-only CMS.
+
+Hero worlds set `authored=true` and receive denser geography through the same
+model. Generated and observed terrestrial archetypes automatically expose
+`surface-terrain` and can therefore become complete Surface destinations
+without per-world scene authoring. Gas and ice giants retain
+`surfaceMode="none"`; even a forced deep link must not invent a ground layer.
+
+The product UI reads this same profile to show biome, region, landmark and
+content-location context. Multiple world-content cards are laid out as one
+bounded readable stack rather than competing absolute overlays, so Surface
+remains a page-like destination instead of a game HUD or a separate application.
+
+Runtime evidence is shared across live and fallback paths:
+
+- `data-universe-surface-profile="surface:…"` identifies the deterministic
+  semantic world;
+- `data-universe-surface-biome` publishes the selected world archetype style;
+- `data-universe-surface-landmarks` and
+  `data-universe-surface-content-anchors` expose generated layout density;
+- fallback additionally publishes
+  `data-universe-surface-terrain-world="<same profile id>"`, proving the
+  terrain adapter and product layout are using the same world identity.
+
 If live rendering is intentionally disabled by LOW quality or an AUTO software
 renderer, the existing ProceduralTerrains subsystem remains the fallback inside
 the same near-surface product frame. Task `SURFACE-INFINITE-FALLBACK-001`
