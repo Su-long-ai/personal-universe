@@ -860,6 +860,10 @@ test("LOW Surface handoff keeps the globe until retained terrain is actually rea
     "data-universe-world-paint-ready",
     "true",
   );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-renderer",
+    /.+/,
+  );
 
   const events = await page.evaluate(() =>
     (
