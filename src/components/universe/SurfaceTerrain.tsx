@@ -339,6 +339,7 @@ export function SurfaceTerrain({
         const dz = z1 - z0;
         return {
           id: `${path.id}:${index}`,
+          landmarkId: path.landmarkId,
           position: [
             x,
             (terrain.sampleHeight(x, z) ?? 0) + 0.09,
@@ -423,21 +424,33 @@ export function SurfaceTerrain({
   return (
     <>
       <primitive object={terrain.object} />
-      {pathSegments.map((segment) => (
-        <mesh
-          key={segment.id}
-          position={segment.position}
-          rotation={[0, segment.rotationY, 0]}
-        >
-          <boxGeometry args={[segment.width, 0.035, segment.length]} />
-          <meshBasicMaterial
-            color={profile.accent}
-            transparent
-            opacity={softwareRenderer ? 0.18 : 0.14}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
+      {pathSegments.map((segment) => {
+        const focused =
+          segment.landmarkId === focusedAnchor?.landmarkId;
+        return (
+          <mesh
+            key={segment.id}
+            position={segment.position}
+            rotation={[0, segment.rotationY, 0]}
+          >
+            <boxGeometry
+              args={[
+                segment.width * (focused ? 1.3 : 1),
+                0.035,
+                segment.length,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={
+                focused ? 0.38 : softwareRenderer ? 0.18 : 0.14
+              }
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
       {visibleClusters.map((cluster) => {
         const height =
           (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) + 0.08;
