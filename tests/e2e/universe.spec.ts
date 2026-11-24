@@ -1244,6 +1244,84 @@ test("surface reversal starts a new gesture and moves outward immediately", asyn
   await runtime.assertClean(testInfo);
 });
 
+test("manual Surface exploration survives one wheel departure and return", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+    { timeout: 30_000 },
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width * 0.52;
+  const y = box!.y + box!.height * 0.52;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 54, y + 18, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "manual",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-manual-view",
+    "captured",
+    { timeout: 10_000 },
+  );
+
+  await page.mouse.wheel(0, 120);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-manual-view",
+    "scale-endpoint",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-camera-segment",
+    "atmosphere:surface",
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-manual-view",
+    "restored",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+    { timeout: 30_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("surface boundary stays settled and outward wheel returns all the way to galaxy", async ({
   page,
 }, testInfo) => {
