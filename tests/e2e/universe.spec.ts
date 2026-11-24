@@ -176,6 +176,36 @@ async function dispatchScaleWheel(
   );
 }
 
+async function driveCloseWorldScaleTo(
+  page: Page,
+  targetPosition: 2 | 3 | 4 | 5,
+) {
+  const html = page.locator("html");
+  const currentPosition = Number(
+    await html.getAttribute("data-universe-scale-position"),
+  );
+  expect(Number.isFinite(currentPosition)).toBe(true);
+
+  const currentDistance = continuousScaleResponseDistance(currentPosition);
+  const targetDistance = continuousScaleResponseDistance(targetPosition);
+  const direction = targetDistance >= currentDistance ? -1 : 1;
+  let remaining = Math.abs(targetDistance - currentDistance);
+
+  while (remaining > 0.01) {
+    const magnitude = Math.min(96, remaining);
+    await dispatchScaleWheel(page, direction * magnitude);
+    remaining -= magnitude;
+  }
+
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-scale-position")),
+      { timeout: 10_000 },
+    )
+    .toBeCloseTo(targetPosition, 2);
+}
+
 test("public page publishes canonical and social preview metadata", async ({
   page,
 }, testInfo) => {
@@ -1302,11 +1332,15 @@ test("manual Surface exploration survives one wheel departure and return", async
     "atmosphere:surface",
   );
 
-  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.600",
+  );
+  await driveCloseWorldScaleTo(page, 5);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
-    { timeout: 30_000 },
+    { timeout: 10_000 },
   );
   await expect(html).toHaveAttribute(
     "data-universe-surface-manual-view",
@@ -1322,7 +1356,7 @@ test("manual Surface exploration survives one wheel departure and return", async
   await runtime.assertClean(testInfo);
 });
 
-test("surface boundary stays settled and outward wheel returns all the way to galaxy", async ({
+test("surface boundary blocks inward input and reverses cleanly to galaxy", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -1343,32 +1377,28 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
     { timeout: 15_000 },
   );
 
-  await wheelScale(page, "in");
+  await dispatchScaleWheel(page, -96);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
   );
   await expect(html).toHaveAttribute(
-    "data-universe-camera-settled",
-    "surface",
+    "data-universe-scale-position",
+    "5.000",
   );
   await expect(html).toHaveAttribute(
     "data-universe-scale-blocked",
     "surface-limit",
   );
 
-  for (const phase of ["atmosphere", "orbit", "approach"] as const) {
-    await wheelScale(page, "out");
+  for (const [phase, position] of [
+    ["atmosphere", 4],
+    ["orbit", 3],
+    ["approach", 2],
+  ] as const) {
+    await driveCloseWorldScaleTo(page, position);
     await expect(html).toHaveAttribute(
       "data-universe-navigation-phase",
-      phase,
-    );
-    await expect(html).not.toHaveAttribute(
-      "data-universe-camera-settled",
-      phase === "atmosphere" ? "surface" : phase === "orbit" ? "atmosphere" : "orbit",
-    );
-    await expect(html).toHaveAttribute(
-      "data-universe-camera-settled",
       phase,
       { timeout: 10_000 },
     );
