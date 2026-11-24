@@ -196,9 +196,12 @@ The product reuses ProceduralPlanets inside that host:
 - the System renderer remains mounted across the semantic boundary until the
   close world has participated in two real composer frames, so lazy import or
   shader warmup cannot expose an empty Canvas;
-- one `PlanetPass` is allocated with the stable EffectComposer and is enabled
-  or parked as presentation changes; phase changes do not dispose and recreate
-  the composer/pass pair;
+- on real GPU paths the retained `PlanetPass` host is provisioned as soon as
+  the System target is locked, while System still owns presentation; software
+  WebGL keeps that allocation lazy until live presentation so hidden prewarm
+  cannot create expensive hosted-runner resources. The pass is then enabled or
+  parked as presentation changes, and phase changes never dispose/recreate the
+  composer/pass pair;
 - LOW quality always uses the lightweight fallback;
 - AUTO quality falls back on software renderers such as SwiftShader/llvmpipe;
 - HIGH quality explicitly requests the live renderer and is used by the
@@ -318,10 +321,14 @@ mounting a dormant component and deferring `createInfiniteTerrain().prepare()`
 until Surface. Once the instance exists, the hidden Atmosphere phase also uses
 the detached landing view for bounded destination-ring streaming, so coordinate
 5 does not have to start camera-centred chunk creation from zero. If navigation
-reverses before construction begins, the scheduled prime is cancelled; if it
-reverses after construction has begun, hidden streaming pauses immediately and
-the same instance remains retained/parked for the next inward journey rather
-than being restarted.
+reverses before construction begins, the scheduled prime is cancelled. The
+idle callback re-checks the navigation coordinator's synchronous `phaseRef`
+both before scheduling construction and again at enable time, so a saturated
+software renderer cannot let a stale Atmosphere effect cross into
+non-interruptible terrain preparation after outward intent. If reversal happens
+after construction has begun, hidden streaming pauses immediately and the same
+instance remains retained/parked for the next inward journey rather than being
+restarted.
 
 At coordinate 5, fallback presentation has an explicit readiness handoff. The
 lightweight close-world globe remains the visible authority while the terrain is
@@ -474,7 +481,11 @@ retention key: changing/clearing the Galaxy target unmounts the old world and
 releases its GPU resources, so this is one bounded retained world rather than a
 growing cache. Software WebGL never begins construction of a missing live
 Planet while that retained scene is hidden; it only reuses an already-warmed
-instance there.
+instance there. Parked PlanetScene paint polling and live-only pipeline
+diagnostics also stop, and the retained Surface beacon animation pauses when
+Surface is not presenting. Hardware-only Surface rock glTF loading is isolated
+behind the real-GPU decoration subtree, so software fallback never fetches,
+parses or compiles those unused assets.
 
 Runtime evidence:
 
