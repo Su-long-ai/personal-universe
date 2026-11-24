@@ -282,7 +282,13 @@ export function SurfaceScene({
         document.documentElement.dataset.universeSurfacePrewarm = "preparing";
         setTerrainEnabled(true);
       };
-      if (idleWindow.requestIdleCallback) {
+      if (phase === "surface") {
+        // Once Surface owns the coordinate this is required presentation work,
+        // not speculative prewarm. Hosted SwiftShader can stay continuously
+        // busy enough to starve requestIdleCallback, so begin the already-
+        // bounded terrain prepare on this task. Atmosphere keeps idle prewarm.
+        enable();
+      } else if (idleWindow.requestIdleCallback) {
         idleHandle = idleWindow.requestIdleCallback(enable, { timeout: 650 });
       } else {
         enable();
