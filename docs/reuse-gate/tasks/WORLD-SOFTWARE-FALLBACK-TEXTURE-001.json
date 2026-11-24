@@ -1,0 +1,185 @@
+{
+  "schema": 2,
+  "task_id": "WORLD-SOFTWARE-FALLBACK-TEXTURE-001",
+  "title": "Give the AUTO/software close-world fallback deterministic surface structure with installed Three.js primitives",
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve Approach/Orbit/Atmosphere visual quality on AUTO/software rendering by keeping the existing lightweight R3F sphere and generating one small deterministic archetype-aware color texture with the installed Three.js ImprovedNoise + DataTexture primitives; do not enable live ProceduralPlanets on software renderers, add a custom shader, external texture pack, second planet renderer or new camera authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted visual acceptance on current main shows a large quality gap inside the same product framing: the default AUTO/software close-world is a smooth single-color MeshStandardMaterial sphere, while the HIGH live ProceduralPlanets path has immediately readable land/cloud/ocean structure. This is not a camera or destination defect. ProceduralPlanets remains the correct high-quality world authority, but the project already classifies software WebGL as a fallback because live construction can block hosted SwiftShader for tens of seconds. The installed Three.js 0.185.1 package already includes the official ImprovedNoise addon and DataTexture; MeshStandardMaterial already accepts a color map. The lowest-cost fallback improvement is therefore to generate a small static equirectangular texture once per planet seed/archetype, reuse the existing sphere/material/light/camera, and dispose the texture with the component. No custom noise algorithm, downloaded planet asset, additional draw call or live procedural renderer is needed.",
+  "planned_files": [
+    "src/components/universe/PlanetScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "ProceduralPlanets remains the adopted close-world renderer for capable GPUs; this task retains it unchanged as the high-quality authority rather than replacing it."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/ImprovedNoise.html",
+      "finding": "The installed Three.js addon provides an official 3D ImprovedNoise utility, so deterministic procedural texture structure can reuse shipped Three.js code instead of adding a noise dependency or project-owned algorithm."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/DataTexture.html",
+      "finding": "Three.js DataTexture creates a texture directly from typed-array pixel data and supports explicit color-space/filter configuration, allowing a small generated map with no network asset."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/MeshStandardMaterial.html",
+      "finding": "The existing MeshStandardMaterial supports a color map whose texels are modulated by the material color; the fallback can gain surface variation without changing its material family or adding another mesh."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/advanced/scaling-performance",
+      "finding": "React Three Fiber performance guidance favors resource reuse and keeping draw calls bounded; a single generated map on the existing sphere preserves the one-mesh fallback."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "The existing hosted visual cases can compare AUTO/software worlds across desktop/tablet/mobile and keep the change evidence inside the current release suite."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep ProceduralPlanets as the full high-quality close-world solution, but do not force its live path onto the software renderer tier that the product deliberately protects with a lightweight fallback."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        4,
+        5
+      ],
+      "conclusion": "Keep the existing R3F Canvas/one sphere and existing Playwright acceptance; no new rendering or visual-test framework is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The planet subsystem already owns capable-GPU detail. The software gap should remain a bounded fallback representation rather than introducing another planet generator subsystem."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Reuse Three.js ImprovedNoise, DataTexture and the existing MeshStandardMaterial map slot to add deterministic surface information on the same mesh."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "three-noise-datatexture-existing-sphere",
+      "name": "Three.js ImprovedNoise + DataTexture on the existing fallback sphere",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Installed three@0.185.1 ImprovedNoise/DataTexture plus current PlanetScene MeshStandardMaterial",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Adds archetype/seed-specific surface structure with one small static texture on the existing draw call, no network asset, no custom shader and no new renderer.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1.8,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.8,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-world-playwright-acceptance",
+      "name": "Existing close-world Playwright visual acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current desktop/tablet/mobile Hero and Personal Signal world visual cases",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Directly proves whether the default software representation becomes materially more planet-like without changing the release evidence stack.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-planets-live-on-software",
+      "name": "Force ProceduralPlanets live renderer on AUTO/software",
+      "level": "full_solution",
+      "registry_id": "procedural-planets",
+      "source": "Existing adopted ProceduralPlanets runtime",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Hosted evidence already established software live construction can block the page for roughly 20+ seconds; visual fidelity does not justify violating the fallback performance contract."
+    },
+    {
+      "id": "external-planet-texture-pack",
+      "name": "Downloaded per-archetype planet texture assets",
+      "level": "component_asset",
+      "source": "External image texture packs",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "Creates provenance, download and asset-selection work for automatically generated worlds, while installed Three primitives can derive deterministic texture data from existing seed/archetype identity."
+    },
+    {
+      "id": "custom-glsl-fallback-planet",
+      "name": "Project-owned custom GLSL procedural planet shader",
+      "level": "subsystem",
+      "source": "New local shader implementation",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would create another planet-rendering authority and add fragment-shader complexity specifically on the software tier; the existing material map slot covers the observed gap more cheaply."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "three-noise-datatexture-existing-sphere",
+      "existing-world-playwright-acceptance"
+    ],
+    "rationale": "Retain ProceduralPlanets unchanged as the capable-GPU authority and improve only its existing software fallback representation. Generate a small deterministic equirectangular color DataTexture from the current planet seed/archetype with Three.js ImprovedNoise, attach it to the same MeshStandardMaterial/sphere, and keep current lighting, camera, radius, phase semantics and draw-call count. Promote only if hosted-equivalent visual screenshots show clear structure and the software world navigation/runtime remains healthy.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "procedural-planets-live-on-software",
+        "reason": "It has the best visual coverage but violates the already-proven SwiftShader responsiveness and teardown constraints, so global product reliability outweighs that local fidelity gain."
+      },
+      {
+        "candidate_id": "external-planet-texture-pack",
+        "reason": "Automatic generated worlds need deterministic identity without asset curation/provenance; generated in-memory data scales better for this fallback."
+      },
+      {
+        "candidate_id": "custom-glsl-fallback-planet",
+        "reason": "A custom shader would duplicate the existing planet renderer authority and place more work on the software GPU than a sampled static texture."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If a single small color texture is visually noisy, artificial, or measurably harms software timing, reduce texture resolution/contrast or close the task without promotion; do not escalate to live ProceduralPlanets, a custom shader or an external texture library inside this unit."
+  }
+}
