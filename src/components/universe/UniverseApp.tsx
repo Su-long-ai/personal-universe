@@ -22,7 +22,10 @@ import {
   resolveSystem,
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
-import { buildSurfaceWorldProfile } from "../../lib/universe/surface";
+import {
+  buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
+} from "../../lib/universe/surface";
 import {
   attachContentToSystem,
   placeUniverseContent,
@@ -279,19 +282,60 @@ export default function UniverseApp({
         : null,
     [selectedPlanet],
   );
-  const surfaceContentLocations = useMemo(() => {
-    if (!surfaceProfile) return new Map<string, string>();
+  const surfaceContentPresentation = useMemo(() => {
+    if (!surfaceProfile) {
+      return new Map<
+        string,
+        {
+          location: string;
+          cluster: string;
+          priority: "primary" | "secondary" | "ambient";
+        }
+      >();
+    }
     const landmarkNames = new Map(
       surfaceProfile.landmarks.map((landmark) => [landmark.id, landmark.name]),
+    );
+    const regionNames = new Map(
+      surfaceProfile.regions.map((region) => [region.id, region.name]),
+    );
+    const clusterLabels = new Map(
+      surfaceProfile.contentClusters.map((cluster) => [
+        cluster.index,
+        cluster.label,
+      ]),
     );
     return new Map(
       surfaceProfile.contentAnchors.map((anchor) => [
         anchor.entryId,
-        (anchor.landmarkId && landmarkNames.get(anchor.landmarkId)) ||
-          surfaceProfile.biome,
+        {
+          location:
+            (anchor.landmarkId && landmarkNames.get(anchor.landmarkId)) ||
+            (anchor.regionId && regionNames.get(anchor.regionId)) ||
+            surfaceProfile.biome,
+          cluster:
+            clusterLabels.get(anchor.cluster) ?? surfaceProfile.biome,
+          priority: anchor.priority,
+        },
       ]),
     );
   }, [surfaceProfile]);
+  const worldContentEntries = useMemo(() => {
+    const entries = selectedPlanet?.content ?? [];
+    if (phase !== "surface" || !surfaceProfile) return entries;
+
+    const rank = new Map(
+      rankSurfaceContentAnchors(surfaceProfile.contentAnchors).map(
+        (anchor, index) => [anchor.entryId, index],
+      ),
+    );
+    return [...entries].sort(
+      (a, b) =>
+        (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title),
+    );
+  }, [phase, selectedPlanet, surfaceProfile]);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -3062,25 +3106,50 @@ export default function UniverseApp({
 
       {phase !== "galaxy" &&
         phase !== "system" &&
-        selectedPlanet?.content?.length ? (
+        worldContentEntries.length ? (
           <div className="world-content-stack" aria-label="World content">
-            {selectedPlanet.content.map((entry) => {
-              const surfaceLocation =
+            {worldContentEntries.map((entry) => {
+              const surfacePresentation =
                 phase === "surface"
-                  ? surfaceContentLocations.get(entry.id)
+                  ? surfaceContentPresentation.get(entry.id)
                   : undefined;
               return (
-                <section className="world-content-card" key={entry.id}>
+                <section
+                  className="world-content-card"
+                  data-surface-priority={surfacePresentation?.priority}
+                  key={entry.id}
+                >
                   <span>
                     {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
                   </span>
                   <strong>{entry.title}</strong>
                   <small>{entry.summary}</small>
-                  {surfaceLocation && (
-                    <em className="world-content-location">
-                      {locale === "zh" ? "地表位置" : "SURFACE LOCATION"} //{" "}
-                      {surfaceLocation}
-                    </em>
+                  {surfacePresentation && (
+                    <>
+                      <em className="world-content-location">
+                        {locale === "zh" ? "地表位置" : "SURFACE LOCATION"} //{" "}
+                        {surfacePresentation.location}
+                      </em>
+                      <em className="world-content-cluster">
+                        {locale === "zh" ? "区域簇" : "CLUSTER"} //{" "}
+                        {surfacePresentation.cluster}
+                      </em>
+                      <em
+                        className={
+                          "world-content-priority priority-" +
+                          surfacePresentation.priority
+                        }
+                      >
+                        {locale === "zh"
+                          ? surfacePresentation.priority === "primary"
+                            ? "重点信号"
+                            : surfacePresentation.priority === "secondary"
+                              ? "次级信号"
+                              : "环境信号"
+                          : surfacePresentation.priority.toUpperCase() +
+                            " SIGNAL"}
+                      </em>
+                    </>
                   )}
                   {entry.tags.length > 0 && (
                     <em className="world-content-tags">
@@ -3119,6 +3188,26 @@ export default function UniverseApp({
               <span key={region.id}>{region.name}</span>
             ))}
           </div>
+          {surfaceProfile.contentClusters.length > 0 && (
+            <div
+              className="surface-cluster-index"
+              aria-label="Surface signal clusters"
+            >
+              {surfaceProfile.contentClusters.slice(0, 3).map((cluster) => (
+                <span
+                  data-priority={cluster.priority}
+                  key={cluster.id}
+                >
+                  {cluster.label} · {cluster.anchorIds.length}
+                </span>
+              ))}
+            </div>
+          )}
+          <em className="surface-explore-hint">
+            {locale === "zh"
+              ? "拖动探索 · 双指调整视角 · 滚轮离开地表"
+              : "DRAG TO EXPLORE · PINCH TO FRAME · WHEEL TO DEPART"}
+          </em>
         </section>
       )}
 
