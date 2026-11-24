@@ -153,30 +153,11 @@ function createRenderSystem(source: StarSystem) {
 }
 
 function disposeResources(resources: NativeResources) {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-
-  resources.scene.traverse((object) => {
-    const mesh = object as THREE.Mesh;
-    if (mesh.geometry) geometries.add(mesh.geometry);
-    const material = (object as THREE.Mesh).material;
-    if (Array.isArray(material)) {
-      for (const entry of material) materials.add(entry);
-    } else if (material) {
-      materials.add(material);
-    }
-  });
-
-  for (const view of resources.bodies.views) {
-    view.dispose(resources.scene);
-  }
-  for (const line of resources.orbits.lines) {
-    resources.scene.remove(line.line);
-  }
-  resources.scene.remove(resources.points.points);
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
+  resources.bodies.dispose();
+  resources.points.dispose();
+  resources.orbits.dispose();
   resources.scene.clear();
+
 }
 
 function ProductPlanetTarget({

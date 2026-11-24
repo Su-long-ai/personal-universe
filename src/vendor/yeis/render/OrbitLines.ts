@@ -80,8 +80,7 @@ export class OrbitLines {
 
   constructor(private readonly scene: Scene) {}
 
-  /** Rebuild the orbit lines for a (new) system. */
-  setSystem(system: StarSystem): void {
+  private clear(): void {
     for (const l of this.lines) {
       this.scene.remove(l.line);
       l.geometry.dispose();
@@ -89,6 +88,11 @@ export class OrbitLines {
     }
     this.lines.length = 0;
     this.byId.clear();
+  }
+
+  /** Rebuild the orbit lines for a (new) system. */
+  setSystem(system: StarSystem): void {
+    this.clear();
     for (const b of system.bodies) {
       if (!b.data.orbit || !b.parent || !isKeplerian(b.data.orbit)) continue;
       const l = new OrbitLine(b);
@@ -149,5 +153,10 @@ export class OrbitLines {
       l.material.uniforms.uOpacity.value = (selectedId === b.id ? 0.95 : 0.55) * fade;
       l.update(camPos);
     }
+  }
+
+  /** Terminal release for host-owned renderer lifecycles. */
+  dispose(): void {
+    this.clear();
   }
 }

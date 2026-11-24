@@ -11,7 +11,7 @@ source boundary.
 
 ## Host patches
 
-The vendored code is kept structurally close to upstream. There are six
+The vendored code is kept structurally close to upstream. There are eight
 intentional Personal Universe host adaptations:
 
 1. `core/Universe.ts`
@@ -103,3 +103,14 @@ listed below before release.
      the same pinned source identifier `e520568` already used by `StarCatalog`.
    - Rendering, body materials, loading semantics and model selection remain
      the pinned MIT implementation.
+
+8. `render/BodyRenderer.ts`, `render/BodyPoints.ts`, `render/OrbitLines.ts`
+   - Add explicit terminal `dispose()` methods for React/R3F host lifecycles.
+   - `BodyRenderer.dispose()` releases the shared sphere geometry, current body
+     views, and renderer-owned lights; `BodyPoints.dispose()` releases its final
+     dynamic point geometry/material; `OrbitLines.dispose()` releases the current
+     line geometries/materials.
+   - System retargeting and rendering algorithms are unchanged. The adaptation
+     only makes ownership deterministic so repeated Galaxy/System mounts do not
+     depend on host scene traversal or deferred garbage collection.
+
