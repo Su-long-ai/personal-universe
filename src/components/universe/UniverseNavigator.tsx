@@ -67,9 +67,21 @@ export function UniverseNavigator({
   } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const displaySections = useMemo(() => {
+    const seenDestinations = new Set<string>();
+    return sections.flatMap((section) => {
+      const destinations = section.destinations.filter((destination) => {
+        if (seenDestinations.has(destination.id)) return false;
+        seenDestinations.add(destination.id);
+        return true;
+      });
+      return destinations.length ? [{ ...section, destinations }] : [];
+    });
+  }, [sections]);
+
   const results = useMemo(
-    () => sections.flatMap((section) => section.destinations),
-    [sections],
+    () => displaySections.flatMap((section) => section.destinations),
+    [displaySections],
   );
 
   const journeyOptions = useMemo(() => {
@@ -412,7 +424,7 @@ export function UniverseNavigator({
               </div>
             )}
 
-          {sections.map((section) => (
+          {displaySections.map((section) => (
             <section
               className="navigator-result-group"
               key={section.id}
