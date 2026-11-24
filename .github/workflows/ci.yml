@@ -145,7 +145,18 @@ jobs:
           path: dist
 
       - name: Install pinned Playwright test runner
-        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+        shell: bash
+        run: |
+          playwright_prefix="${RUNNER_TEMP}/playwright-runner-${PLAYWRIGHT_VERSION}"
+          rm -rf "$playwright_prefix"
+          npm install --prefix "$playwright_prefix" --no-save --package-lock=false \
+            "@playwright/test@${PLAYWRIGHT_VERSION}"
+          mkdir -p node_modules/@playwright
+          rm -rf node_modules/@playwright/test node_modules/playwright node_modules/playwright-core
+          ln -s "$playwright_prefix/node_modules/@playwright/test" node_modules/@playwright/test
+          ln -s "$playwright_prefix/node_modules/playwright" node_modules/playwright
+          ln -s "$playwright_prefix/node_modules/playwright-core" node_modules/playwright-core
+          echo "$playwright_prefix/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright Chromium
         id: playwright-cache
@@ -156,17 +167,17 @@ jobs:
 
       - name: Install Playwright Chromium and host dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: playwright install --with-deps chromium
 
       - name: Verify cached Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install chromium
+        run: playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
 
       - name: Playwright release shard
-        run: npx playwright test --project=release --shard=${{ matrix.shard }}/4
+        run: playwright test --project=release --shard=${{ matrix.shard }}/4
 
       - name: Append runtime metrics
         if: always()
@@ -217,7 +228,18 @@ jobs:
           path: dist
 
       - name: Install pinned Playwright test runner
-        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+        shell: bash
+        run: |
+          playwright_prefix="${RUNNER_TEMP}/playwright-runner-${PLAYWRIGHT_VERSION}"
+          rm -rf "$playwright_prefix"
+          npm install --prefix "$playwright_prefix" --no-save --package-lock=false \
+            "@playwright/test@${PLAYWRIGHT_VERSION}"
+          mkdir -p node_modules/@playwright
+          rm -rf node_modules/@playwright/test node_modules/playwright node_modules/playwright-core
+          ln -s "$playwright_prefix/node_modules/@playwright/test" node_modules/@playwright/test
+          ln -s "$playwright_prefix/node_modules/playwright" node_modules/playwright
+          ln -s "$playwright_prefix/node_modules/playwright-core" node_modules/playwright-core
+          echo "$playwright_prefix/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright Chromium
         id: playwright-cache
@@ -228,17 +250,17 @@ jobs:
 
       - name: Install Playwright Chromium and host dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: playwright install --with-deps chromium
 
       - name: Verify cached Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install chromium
+        run: playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
 
       - name: Playwright WebGL heavy lane
-        run: npx playwright test --project=webgl-heavy
+        run: playwright test --project=webgl-heavy
 
       - name: Upload WebGL heavy report, traces, screenshots, and metrics
         if: always()
@@ -276,7 +298,18 @@ jobs:
         run: npm ci
 
       - name: Install pinned Playwright report tooling
-        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+        shell: bash
+        run: |
+          playwright_prefix="${RUNNER_TEMP}/playwright-runner-${PLAYWRIGHT_VERSION}"
+          rm -rf "$playwright_prefix"
+          npm install --prefix "$playwright_prefix" --no-save --package-lock=false \
+            "@playwright/test@${PLAYWRIGHT_VERSION}"
+          mkdir -p node_modules/@playwright
+          rm -rf node_modules/@playwright/test node_modules/playwright node_modules/playwright-core
+          ln -s "$playwright_prefix/node_modules/@playwright/test" node_modules/@playwright/test
+          ln -s "$playwright_prefix/node_modules/playwright" node_modules/playwright
+          ln -s "$playwright_prefix/node_modules/playwright-core" node_modules/playwright-core
+          echo "$playwright_prefix/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Download all shard artifacts
         uses: actions/download-artifact@v4
@@ -294,7 +327,7 @@ jobs:
             echo "No Playwright blob reports were produced by the shards." >&2
             exit 1
           fi
-          npx playwright merge-reports --reporter=html merged-e2e-artifacts/blob-report
+          playwright merge-reports --reporter=html merged-e2e-artifacts/blob-report
 
       - name: Upload combined Playwright HTML report
         if: always()
