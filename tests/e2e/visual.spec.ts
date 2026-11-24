@@ -483,6 +483,11 @@ for (const viewport of [TABLET, MOBILE]) {
             "software-beacon",
             { timeout: 60_000 },
           );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-horizon",
+            "generated-gradient",
+            { timeout: 60_000 },
+          );
           await waitForCameraSettled(page, "surface");
           await expectReadableWorldFrame(
             page,

@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-SOFTWARE-HORIZON-BLEND-001",
+  "approved_at": "2026-11-24T09:40:55.021Z",
+  "baseline_commit": "6585a89a1d735552cafb932385c7fe06b3b88e48",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-SOFTWARE-HORIZON-BLEND-001.json",
+  "record_sha256": "e9bfcdfc90fe717924a8f7590f7d6008d2e6d9f5f7a7a02c92dcb34bb4382544",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reduce the software Surface fallback's hard black-sky/terrain horizon seam by reusing the existing Three.js Scene background color and the installed ProceduralTerrains fog-color contract, without adding textures, alpha compositing, sky/cloud/water layers, new geometry, post-processing or another renderer"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "three-scene-background-fog-match",
+    "existing-surface-playwright-acceptance"
+  ],
+  "candidate_scores": {
+    "three-scene-background-fog-match": 55.4,
+    "existing-surface-playwright-acceptance": 56.5,
+    "three-background-texture-skybox": null,
+    "transparent-canvas-css-background": null,
+    "software-sky-cloud-water-stack": null
+  }
+}

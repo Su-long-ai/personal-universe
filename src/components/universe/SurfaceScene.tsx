@@ -2,6 +2,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -141,6 +142,27 @@ export function SurfaceScene({
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
+  const softwareHorizonBackground = useMemo(() => {
+    // 1x8 vertical gradient stored bottom -> top. It stays near-black at the
+    // zenith while lifting only the software horizon band.
+    const data = new Uint8Array([
+      0x59, 0x64, 0x5e, 0xff,
+      0x59, 0x64, 0x5e, 0xff,
+      0x59, 0x64, 0x5e, 0xff,
+      0x56, 0x60, 0x5b, 0xff,
+      0x50, 0x5a, 0x55, 0xff,
+      0x43, 0x50, 0x4c, 0xff,
+      0x1c, 0x28, 0x28, 0xff,
+      0x01, 0x02, 0x04, 0xff,
+    ]);
+    const texture = new THREE.DataTexture(data, 1, 8, THREE.RGBAFormat);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    return texture;
+  }, []);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
@@ -150,6 +172,13 @@ export function SurfaceScene({
     hasPlanet &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
+
+  useEffect(
+    () => () => {
+      softwareHorizonBackground.dispose();
+    },
+    [softwareHorizonBackground],
+  );
 
   const handleAnchorHeight = useCallback((height: number) => {
     setAnchorHeight(height);
@@ -259,6 +288,9 @@ export function SurfaceScene({
     document.documentElement.dataset.universeSurfaceDepthCues = softwareRenderer
       ? "software-beacon"
       : "full";
+    document.documentElement.dataset.universeSurfaceHorizon = softwareRenderer
+      ? "generated-gradient"
+      : "gpu-fog";
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -267,6 +299,7 @@ export function SurfaceScene({
         delete document.documentElement.dataset.universeSurfaceRenderer;
       }
       delete document.documentElement.dataset.universeSurfaceDepthCues;
+      delete document.documentElement.dataset.universeSurfaceHorizon;
     };
   }, [active, softwareRenderer]);
 
@@ -274,7 +307,14 @@ export function SurfaceScene({
     <>
       {active ? (
         <>
-          <color attach="background" args={["#030b12"]} />
+          {softwareRenderer ? (
+            <primitive
+              attach="background"
+              object={softwareHorizonBackground}
+            />
+          ) : (
+            <color attach="background" args={["#030b12"]} />
+          )}
           {!softwareRenderer ? (
             <fog attach="fog" args={["#07141d", 34, 118]} />
           ) : null}

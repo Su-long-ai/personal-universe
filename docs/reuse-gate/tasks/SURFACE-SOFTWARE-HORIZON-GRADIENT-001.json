@@ -1,0 +1,178 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-SOFTWARE-HORIZON-GRADIENT-001",
+  "title": "Test a tiny generated Three.js background gradient for software Surface horizon depth",
+  "scope": {
+    "level": "implementation",
+    "subject": "Soften the software Surface fallback's remaining black-sky/bright-terrain seam with one tiny generated static Three.js background texture inside the existing Scene background authority, without external assets, animation, geometry, sky/cloud/water subsystems, alpha-canvas changes, post-processing or terrain changes"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "SURFACE-SOFTWARE-HORIZON-BLEND-001 tested exact solid-color alignment to ProceduralTerrains' installed default fog color and was visually neutral, so the implementation was reverted. Pixel sampling of the tested mobile frame showed the sky immediately above the visible horizon near #010204 while first visible terrain is around #6f776d, confirming that a single dark solid background cannot bridge the value discontinuity. Three.js Scene.background natively accepts a Texture as well as Color. The next bounded probe is therefore a tiny program-generated vertical DataTexture with a near-black zenith and a muted blue-gray/terrain-adjacent horizon band. It requires no downloaded asset or new scene object and is static for the entire software Surface visit. GPU fallback keeps its current solid background and fog.",
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://threejs.org/docs/pages/Scene",
+      "finding": "Three.js Scene.background accepts either Color or Texture, so a generated texture can remain within the existing scene-background authority."
+    },
+    {
+      "url": "https://threejs.org/manual/pages/backgrounds.html",
+      "finding": "Three.js documents texture-backed Scene backgrounds as a native background mechanism; no separate sky scene is required."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/DataTexture.html",
+      "finding": "Three.js DataTexture allows a texture to be constructed directly from a small typed-array pixel buffer, avoiding downloaded assets or DOM canvas generation."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "Existing narrow Surface visual cases provide direct before/after evidence for the generated background without another testing stack."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/releases/tag/v2.0.5",
+      "finding": "The installed ProceduralTerrains 2.0.5 remains the terrain subsystem; earlier approved probes already exhausted its style/fog controls for this composition gap, so this task deliberately does not modify the terrain subsystem."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "A full sky/environment solution is still disproportionate; the remaining defect is a narrow screen-space horizon value transition."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1,
+        3
+      ],
+      "conclusion": "Reuse the current R3F/Three Scene background and current Playwright acceptance."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        4
+      ],
+      "conclusion": "No terrain or atmosphere subsystem change is required; terrain settings are frozen after prior negative probes."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "A tiny generated Three.js DataTexture is the lowest-cost asset-level candidate and has no external provenance or load dependency."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "generated-three-background-gradient",
+      "name": "Tiny generated Three.js DataTexture background gradient",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Three.js DataTexture attached to the existing R3F Scene background",
+      "license": "MIT dependency / generated project data",
+      "decision": "reuse",
+      "reason": "Can bridge the very dark zenith to a muted horizon value with one tiny static texture, no geometry or downloaded asset, while keeping scene ownership unchanged.",
+      "evaluation": {
+        "coverage": 4.8,
+        "integration_cost": 1.8,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.7,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-surface-playwright-gradient-acceptance",
+      "name": "Existing narrow Surface Playwright acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current mobile/tablet Surface screenshot cases",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Directly judges seam reduction and catches any software-renderer timing regression.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "external-sky-texture",
+      "name": "Downloaded sky/background texture",
+      "level": "component_asset",
+      "source": "External image/equirectangular/cubemap asset",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "Adds asset provenance, loading and memory for a gradient that can be generated from a few bytes."
+    },
+    {
+      "id": "shader-sky-dome",
+      "name": "Custom or third-party shader sky dome",
+      "level": "subsystem",
+      "source": "Sky mesh/shader runtime",
+      "license": "varies / project code",
+      "decision": "reject",
+      "reason": "Adds geometry and per-pixel shader work on SwiftShader where a static background texture can test the same composition hypothesis first."
+    },
+    {
+      "id": "transparent-css-gradient",
+      "name": "Transparent renderer with CSS gradient",
+      "level": "framework_engine",
+      "source": "WebGL alpha plus CSS background",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Changes shared Canvas alpha/compositing ownership across every phase for a Surface-only fallback problem."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "generated-three-background-gradient",
+      "existing-surface-playwright-gradient-acceptance"
+    ],
+    "rationale": "Probe one static generated DataTexture only on the software Surface background. Keep its resolution tiny, use linear filtering, dispose it with the component, and leave terrain, camera, GPU Surface, post-processing and navigation untouched. Promote only if mobile/tablet screenshots materially soften the seam and the existing software Surface timing remains healthy.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "external-sky-texture",
+        "reason": "Generated color data provides the needed tonal transition without asset provenance or I/O."
+      },
+      {
+        "candidate_id": "shader-sky-dome",
+        "reason": "A shader dome adds draw/shader work on the protected software tier before a static background texture is exhausted."
+      },
+      {
+        "candidate_id": "transparent-css-gradient",
+        "reason": "Changing renderer alpha is a cross-phase ownership change and therefore too broad."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the generated gradient reads artificial, hurts legibility, or shows no material improvement, revert it and close the software Surface visual-polish sequence at the beacon improvement rather than escalating to a heavier sky system."
+  }
+}

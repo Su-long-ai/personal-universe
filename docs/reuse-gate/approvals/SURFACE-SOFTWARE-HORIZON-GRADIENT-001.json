@@ -1,0 +1,35 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-SOFTWARE-HORIZON-GRADIENT-001",
+  "approved_at": "2026-11-24T09:44:56.690Z",
+  "baseline_commit": "7594567261f96c52c69d55937fff0087aee5f9b0",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-SOFTWARE-HORIZON-GRADIENT-001.json",
+  "record_sha256": "174ad88d71e97a1abea5fc2c01e4e6c627d1546a8107142a50f0c33b20e74b61",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Soften the software Surface fallback's remaining black-sky/bright-terrain seam with one tiny generated static Three.js background texture inside the existing Scene background authority, without external assets, animation, geometry, sky/cloud/water subsystems, alpha-canvas changes, post-processing or terrain changes"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "generated-three-background-gradient",
+    "existing-surface-playwright-gradient-acceptance"
+  ],
+  "candidate_scores": {
+    "generated-three-background-gradient": 53.50000000000001,
+    "existing-surface-playwright-gradient-acceptance": 56.5,
+    "external-sky-texture": null,
+    "shader-sky-dome": null,
+    "transparent-css-gradient": null
+  }
+}
