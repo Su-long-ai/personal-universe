@@ -198,6 +198,35 @@ export function rankSurfaceContentClusters(
   );
 }
 
+export function rankSurfaceWorldRegions(
+  regions: readonly SurfaceWorldRegion[],
+  focusedRegionId: string | null = null,
+): SurfaceWorldRegion[] {
+  return [...regions].sort(
+    (a, b) =>
+      Number(b.id === focusedRegionId) -
+        Number(a.id === focusedRegionId) ||
+      b.radius - a.radius ||
+      a.name.localeCompare(b.name) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+export function rankSurfaceWorldLandmarks(
+  landmarks: readonly SurfaceWorldLandmark[],
+  focusedLandmarkId: string | null = null,
+): SurfaceWorldLandmark[] {
+  return [...landmarks].sort(
+    (a, b) =>
+      Number(b.id === focusedLandmarkId) -
+        Number(a.id === focusedLandmarkId) ||
+      b.prominence - a.prominence ||
+      b.scale - a.scale ||
+      a.name.localeCompare(b.name) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
 function rgb(hex: string): SurfaceRgb {
   const value = Number.parseInt(hex.replace("#", ""), 16);
   return [
