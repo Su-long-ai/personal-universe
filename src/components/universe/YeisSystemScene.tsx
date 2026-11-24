@@ -22,7 +22,7 @@ import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import { SystemScene } from "./SystemScene";
 
-const TARGET_SYSTEM_RADIUS = 8.2;
+const TARGET_SYSTEM_RADIUS = 7.0;
 const HIT_RADIUS = 0.34;
 
 type NativeResources = {
