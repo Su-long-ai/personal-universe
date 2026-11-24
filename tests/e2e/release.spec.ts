@@ -12,6 +12,69 @@ async function openNavigator(page: import("@playwright/test").Page) {
   return dialog;
 }
 
+
+test("fresh BrowserContext preserves one-canvas Galaxy midpoint reversal", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  const runtime = await observeRuntime(page);
+
+  try {
+    await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+    await waitForYeis(page);
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-active-destination",
+      "hero:aurora-01",
+      { timeout: 20_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    const root = page.locator("main.universe-root");
+    await root.evaluate((node) => {
+      node.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -96,
+        }),
+      );
+    });
+    await expect(html).toHaveAttribute("data-universe-scale-position", "0.250");
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-bridge",
+      "active",
+      { timeout: 10_000 },
+    );
+
+    await root.evaluate((node) => {
+      node.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: 96,
+        }),
+      );
+    });
+    await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "galaxy",
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await runtime.assertClean(testInfo);
+  } finally {
+    await context.close();
+  }
+});
+
 test("Hero deep link returns through system to galaxy", async ({
   page,
 }, testInfo) => {
