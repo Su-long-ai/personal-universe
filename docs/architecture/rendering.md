@@ -487,6 +487,13 @@ Surface is not presenting. Hardware-only Surface rock glTF loading is isolated
 behind the real-GPU decoration subtree, so software fallback never fetches,
 parses or compiles those unused assets.
 
+When a captured destination is actually replaced, the retained pipeline also
+follows ProceduralPlanets' native removal contract: the sole `PlanetRenderer`
+owner calls `release(planet)` before the caller-owned `Planet` is disposed.
+Ordinary scale reversal does not trigger that release because the same world is
+only parked; target replacement does, so renderer-side impostor/cache residency
+cannot accumulate until Canvas teardown.
+
 Runtime evidence:
 
 - `data-universe-world-pipeline-allocations` counts shared composer allocation;
