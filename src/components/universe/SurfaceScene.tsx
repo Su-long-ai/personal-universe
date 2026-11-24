@@ -338,6 +338,14 @@ export function SurfaceScene({
         String(profile.landmarks.length);
       document.documentElement.dataset.universeSurfaceContentAnchors =
         String(profile.contentAnchors.length);
+      document.documentElement.dataset.universeSurfaceContentClusters =
+        String(profile.contentClusters.length);
+      document.documentElement.dataset.universeSurfacePrimarySignals =
+        String(
+          profile.contentAnchors.filter(
+            (anchor) => anchor.priority === "primary",
+          ).length,
+        );
     }
     return () => {
       if (
@@ -352,6 +360,8 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceBiome;
       delete document.documentElement.dataset.universeSurfaceLandmarks;
       delete document.documentElement.dataset.universeSurfaceContentAnchors;
+      delete document.documentElement.dataset.universeSurfaceContentClusters;
+      delete document.documentElement.dataset.universeSurfacePrimarySignals;
     };
   }, [active, profile, softwareRenderer]);
 
