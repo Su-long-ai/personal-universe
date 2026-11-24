@@ -11,6 +11,7 @@ import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
+import { FALLBACK_SURFACE_CAMERA_FRAME } from "./CinematicCamera";
 
 const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
@@ -45,11 +46,13 @@ function seededClone(source: THREE.Object3D, index: number) {
 export function SurfaceTerrain({
   prepare,
   active,
+  presenting,
   phaseRef,
   onAnchorHeight,
 }: {
   prepare: boolean;
   active: boolean;
+  presenting: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   onAnchorHeight?: (height: number) => void;
 }) {
@@ -58,6 +61,7 @@ export function SurfaceTerrain({
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
   const [activated, setActivated] = useState(prepare || active);
   const softwareRenderer = isSoftwareRenderer(gl);
+  const landingStreamCamera = useMemo(() => camera.clone(false), [camera]);
   const terrainViewInitialized = useRef(false);
   const terrainReadyPublished = useRef(false);
   const softwareStreamUpdates = useRef(0);
@@ -78,6 +82,22 @@ export function SurfaceTerrain({
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
     const controller = new AbortController();
+
+    // ProceduralTerrains Infinite World streams around the camera supplied to
+    // prepare/update. Prime it at the actual fallback landing frame instead of
+    // the still-visible globe camera, otherwise a "full" ring can be centred on
+    // the wrong world-space region and immediately churn when presentation
+    // hands over.
+    landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+    landingStreamCamera.projectionMatrixInverse.copy(
+      camera.projectionMatrixInverse,
+    );
+    landingStreamCamera.position.set(
+      ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+    );
+    landingStreamCamera.up.set(0, 1, 0);
+    landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+    landingStreamCamera.updateMatrixWorld(true);
 
     void (async () => {
       const html = document.documentElement;
@@ -184,7 +204,9 @@ export function SurfaceTerrain({
         },
       });
 
-      await instance.prepare(camera, { signal: controller.signal });
+      await instance.prepare(landingStreamCamera, {
+        signal: controller.signal,
+      });
 
       if (cancelled) {
         instance.dispose();
@@ -219,7 +241,14 @@ export function SurfaceTerrain({
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
     };
-  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
+  }, [
+    activated,
+    camera,
+    gl,
+    landingStreamCamera,
+    onAnchorHeight,
+    softwareRenderer,
+  ]);
 
   useEffect(() => {
     const lifecycle = !activated
@@ -247,15 +276,32 @@ export function SurfaceTerrain({
     // ref first so no *new* Surface work starts after an outward wheel intent.
     if (!active || phaseRef.current !== "surface" || !terrain) return;
 
+    const streamCamera = presenting ? camera : landingStreamCamera;
+    if (!presenting) {
+      // Keep projection identical to the product camera, but use a detached
+      // non-rendered view at the final terrain landing pose. camera-controls
+      // remains the only visible/product camera authority.
+      landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+      landingStreamCamera.projectionMatrixInverse.copy(
+        camera.projectionMatrixInverse,
+      );
+      landingStreamCamera.position.set(
+        ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+      );
+      landingStreamCamera.up.set(0, 1, 0);
+      landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+      landingStreamCamera.updateMatrixWorld(true);
+    }
+
     if (softwareRenderer) {
       // Infinite World needs several bounded updates to populate the initial
       // camera-centred ring. SwiftShader still must not run streaming work every
       // frame forever, so schedule a short warm-up burst, then return to the
       // previous camera-driven policy. Any real manual camera/projection change
       // restarts the bounded burst.
-      camera.updateWorldMatrix(true, false);
-      camera.getWorldPosition(currentCameraPosition.current);
-      camera.getWorldQuaternion(currentCameraQuaternion.current);
+      streamCamera.updateWorldMatrix(true, false);
+      streamCamera.getWorldPosition(currentCameraPosition.current);
+      streamCamera.getWorldQuaternion(currentCameraQuaternion.current);
       const positionChanged =
         !terrainViewInitialized.current ||
         currentCameraPosition.current.distanceToSquared(
@@ -268,12 +314,12 @@ export function SurfaceTerrain({
         ) > 1e-8;
       const projectionChanged =
         !terrainViewInitialized.current ||
-        !camera.projectionMatrix.equals(lastProjection.current);
+        !streamCamera.projectionMatrix.equals(lastProjection.current);
 
       if (positionChanged || rotationChanged || projectionChanged) {
         lastCameraPosition.current.copy(currentCameraPosition.current);
         lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
-        lastProjection.current.copy(camera.projectionMatrix);
+        lastProjection.current.copy(streamCamera.projectionMatrix);
         terrainViewInitialized.current = true;
         softwareStreamUpdates.current = Math.max(
           softwareStreamUpdates.current,
@@ -289,7 +335,7 @@ export function SurfaceTerrain({
       softwareStreamUpdates.current -= 1;
     }
 
-    terrain.update(delta, { camera });
+    terrain.update(delta, { camera: streamCamera });
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };
@@ -302,6 +348,8 @@ export function SurfaceTerrain({
         : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
+        document.documentElement.dataset.universeSurfaceTerrainReadyView =
+          presenting ? "product-camera" : "landing-prestream";
         onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
       }
     }
