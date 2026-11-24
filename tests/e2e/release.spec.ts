@@ -177,6 +177,90 @@ test("fresh BrowserContext preserves one-canvas Galaxy midpoint reversal", async
   }
 });
 
+test("fresh BrowserContext boots AUTO close-world renderer and reverses without duplicating Canvas", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+  });
+  const page = await context.newPage();
+  const runtime = await observeRuntime(page);
+
+  try {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-camera-settled",
+      "approach",
+      { timeout: 30_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-world-fallback-surface",
+      "generated-texture",
+      { timeout: 60_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await dispatchReleaseWheel(page, -96);
+    await expect
+      .poll(
+        async () =>
+          Number(await html.getAttribute("data-universe-scale-position")),
+        { timeout: 20_000 },
+      )
+      .toBeCloseTo(2.5, 3);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-camera-segment",
+      "approach:orbit",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "approach",
+      { timeout: 10_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await dispatchReleaseWheel(page, 96);
+    await expect
+      .poll(
+        async () =>
+          Number(await html.getAttribute("data-universe-scale-position")),
+        { timeout: 20_000 },
+      )
+      .toBeCloseTo(2, 3);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-direction",
+      "out",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "approach",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-camera-settled",
+      "approach",
+      { timeout: 30_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-world-fallback-surface",
+      "generated-texture",
+      { timeout: 30_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await runtime.assertClean(testInfo);
+  } finally {
+    await context.close();
+  }
+});
+
 test("Hero deep link returns through system to galaxy", async ({
   page,
 }, testInfo) => {
