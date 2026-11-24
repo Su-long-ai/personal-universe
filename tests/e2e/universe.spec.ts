@@ -33,7 +33,8 @@ async function wheelScale(
   const startingPhase = await html.getAttribute(
     "data-universe-navigation-phase",
   );
-  const closeWorld = [
+  const continuousScaleDomain = [
+    "system",
     "approach",
     "orbit",
     "atmosphere",
@@ -41,18 +42,18 @@ async function wheelScale(
   ].includes(startingPhase ?? "");
   const deltaY = direction === "in" ? -120 : 120;
 
-  // Close-world input is now a real coordinate. A normal wheel sample moves
-  // half a semantic interval so the camera visibly travels before the phase
-  // boundary changes. Semantic transition tests use two samples to reach the
-  // next authored anchor; galaxy/system retain their native one-sample entry.
+  // System and close-world input now share one real coordinate. A normal
+  // wheel sample moves half a semantic interval so the camera visibly travels
+  // before a boundary changes. Semantic transition tests use a second sample
+  // only when the first one remains inside the same continuous interval.
   await page.mouse.wheel(0, deltaY);
-  if (closeWorld) {
+  if (continuousScaleDomain) {
     await page.waitForTimeout(80);
     const phaseAfterFirst = await html.getAttribute(
       "data-universe-navigation-phase",
     );
     if (
-      ["approach", "orbit", "atmosphere", "surface"].includes(
+      ["system", "approach", "orbit", "atmosphere", "surface"].includes(
         phaseAfterFirst ?? "",
       )
     ) {
@@ -60,6 +61,25 @@ async function wheelScale(
         await html.getAttribute("data-universe-scale-position"),
       );
       if (Number.isFinite(position) && Math.abs(position - Math.round(position)) > 0.01) {
+        await page.mouse.wheel(0, deltaY);
+      }
+    }
+
+    // Reaching the System overview anchor (1.0) is still inside System. One
+    // further outward intent crosses the remaining semantic boundary to Galaxy.
+    if (startingPhase === "system" && direction === "out") {
+      await page.waitForTimeout(80);
+      const phaseAfterSystemTravel = await html.getAttribute(
+        "data-universe-navigation-phase",
+      );
+      const positionAfterSystemTravel = Number(
+        await html.getAttribute("data-universe-scale-position"),
+      );
+      if (
+        phaseAfterSystemTravel === "system" &&
+        Number.isFinite(positionAfterSystemTravel) &&
+        positionAfterSystemTravel <= 1.01
+      ) {
         await page.mouse.wheel(0, deltaY);
       }
     }
@@ -227,6 +247,84 @@ test("default YEIS boots with native galaxy and personal signals", async ({
     body: Buffer.from(JSON.stringify(metrics, null, 2)),
     contentType: "application/json",
   });
+  await runtime.assertClean(testInfo);
+});
+
+test("System wheel approaches the focused planet before the Approach boundary", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await dispatchScaleWheel(page, -72);
+
+  // The System renderer is still authoritative, but the same camera has
+  // already moved 37.5% toward the focused planet. Renderer identity only
+  // changes after the continuous coordinate reaches the Approach endpoint.
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.375",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "scale-continuous",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-camera-segment",
+    "system:approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-scale-frame",
+    "ready",
+    { timeout: 10_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+  );
+
+  const radius = Number(
+    await html.getAttribute("data-universe-system-scale-radius"),
+  );
+  const distance = Number(
+    await html.getAttribute("data-universe-system-scale-distance"),
+  );
+  expect(radius).toBeGreaterThan(0);
+  expect(distance).toBeGreaterThan(0);
+
+  await dispatchScaleWheel(page, 72);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 10_000 },
+  );
+
   await runtime.assertClean(testInfo);
 });
 

@@ -1,0 +1,235 @@
+{
+  "schema": 2,
+  "task_id": "SYSTEM-WORLD-SCALE-CONTINUITY-001",
+  "title": "Continuous focus-relative System to Approach scale bridge",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing YEIS/native System renderer, product fallback System renderer and camera-controls authority to make wheel input continuously approach the locked planet before the System to Approach renderer handoff"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The remaining System→Approach discontinuity is not a missing renderer problem. Both system renderers already know the exact focused planet position/radius, and camera-controls already owns the R3F camera plus fit-sphere calculations. OpenSpace's navigation model reinforces the reusable interaction principle: set an object as Focus, center navigation on it, and zoom relative to that focus/bounding sphere instead of treating arrival as an unrelated page/state jump. The product can therefore extend the existing scale coordinate with a System interval (1→2), lock the current planet focus on first inward intent, expose that body's render-space center/radius from the existing System scene, and drive the same camera along a focus-relative logarithmic-distance approach. At the 2.0 boundary, the close-world Approach shot uses the same view direction and fit-sphere framing, so the renderer handoff occurs at matched apparent framing rather than from the overview shot. No second camera, renderer, tween engine, or cloned system model is needed.",
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.openspaceproject.com/latest/getting-started/navigation/index.html",
+      "finding": "OpenSpace keeps navigation relative to a current Focus and treats zoom as motion toward or away from that focus; choosing the target and flying toward it are separable, so a selected planet can remain the navigation anchor throughout a continuous approach."
+    },
+    {
+      "url": "https://docs.openspaceproject.com/latest/reference/scripting-api/openspace.navigation.html",
+      "finding": "OpenSpace exposes distance-to-focus/bounding-sphere and relative zoom-to-distance operations, supporting a focus-relative scale model rather than a fixed phase jump."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "The installed camera-controls authority already provides getDistanceToFitSphere, setLookAt and lerpLookAt; fit-sphere distance can match the System body's apparent size to the existing Approach framing without another camera controller."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the native System visual authority. Its existing render-only similarity transform preserves body hierarchy and radii, so the body frame should be exposed from the current adapter instead of reconstructing an approximate planet position elsewhere."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        3
+      ],
+      "conclusion": "Retain the existing YEIS-backed system/navigation product. Adopt the focus-relative travel principle inside the current product coordinator rather than replacing the universe engine."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the single R3F Canvas and camera lifecycle. System and close-world already share this host, so continuity belongs at the scene/camera boundary rather than in another render surface."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "procedural-planets"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Keep the existing native/product System renderer until the scale boundary and keep ProceduralPlanets as the close-world authority after it; expose a narrow body frame contract between them instead of merging renderer internals."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse camera-controls fit-sphere and setLookAt on the existing camera. Product code only maps the normalized scale coordinate to focus target and logarithmic distance."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "focus-relative-system-world-bridge",
+      "name": "Existing System renderer body frame + camera-controls focus-relative bridge",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YeisSystemScene/SystemScene + CinematicCamera",
+      "license": "MIT reused stack + project orchestration",
+      "decision": "reuse",
+      "reason": "Uses exact current System body geometry as the approach anchor and the existing camera authority; the final framing can be matched to the existing close-world Approach shot before the renderer handoff.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-focus-fit",
+      "name": "camera-controls fit-sphere / setLookAt",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Installed camera-controls API",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Already owns camera state and can compute viewport-correct distance for an arbitrary focused-body radius; no second transition executor is needed.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "duplicate-transition-planet",
+      "name": "Temporary duplicate planet mesh/renderer between System and Approach",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "New overlapping renderer state",
+      "license": "MIT dependency but new product glue",
+      "decision": "reject",
+      "reason": "Would create overlapping visual authorities and resource lifetime complexity. Matching focused-body angular framing at the boundary solves the continuity problem without a third transition representation.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2.5,
+        "performance_fit": 2.5,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    },
+    {
+      "id": "fade-jump-handoff",
+      "name": "Fade-to-black / cinematic wash renderer jump",
+      "level": "component_asset",
+      "source": "Existing UI overlay",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Masks the discontinuity instead of making scale continuous, contradicting the product goal of wheel-only spatial continuity.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Small wheel/trackpad deltas visibly move the System camera before Approach",
+      "importance": "high",
+      "coverage": {
+        "focus-relative-system-world-bridge": "full",
+        "camera-controls-focus-fit": "full",
+        "duplicate-transition-planet": "partial",
+        "fade-jump-handoff": "none"
+      },
+      "decision": "Extend the existing scale coordinate to a System interval and drive camera target/distance from every delta."
+    },
+    {
+      "capability": "The focused System planet remains the same target through the approach",
+      "importance": "high",
+      "coverage": {
+        "focus-relative-system-world-bridge": "full",
+        "camera-controls-focus-fit": "partial",
+        "duplicate-transition-planet": "partial",
+        "fade-jump-handoff": "none"
+      },
+      "decision": "Lock the first valid system focus and have the existing scene expose that exact body's render-space frame."
+    },
+    {
+      "capability": "Renderer handoff preserves apparent planet framing",
+      "importance": "high",
+      "coverage": {
+        "focus-relative-system-world-bridge": "full",
+        "camera-controls-focus-fit": "full",
+        "duplicate-transition-planet": "full",
+        "fade-jump-handoff": "none"
+      },
+      "decision": "Use the same Approach view direction and camera-controls fit-sphere factor against the System body radius before swapping to the close-world PLANET_RENDER_RADIUS."
+    },
+    {
+      "capability": "Reverse Approach→System follows the same path",
+      "importance": "high",
+      "coverage": {
+        "focus-relative-system-world-bridge": "full",
+        "camera-controls-focus-fit": "full",
+        "duplicate-transition-planet": "partial",
+        "fade-jump-handoff": "none"
+      },
+      "decision": "On outward crossing, retain the selected planet as the System scale target and hold the current camera until its System body frame is available, then evaluate the same coordinate backward."
+    },
+    {
+      "capability": "One camera and existing renderers remain authoritative",
+      "importance": "high",
+      "coverage": {
+        "focus-relative-system-world-bridge": "full",
+        "camera-controls-focus-fit": "full",
+        "duplicate-transition-planet": "none",
+        "fade-jump-handoff": "partial"
+      },
+      "decision": "No duplicate renderer, no new camera controller and no fade-jump path."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "focus-relative-system-world-bridge",
+      "camera-controls-focus-fit"
+    ],
+    "rationale": "Extend the normalized scale coordinate from System=1 to Surface=5. The current System renderer exposes only a narrow render-space frame for the locked planet. CinematicCamera keeps sole camera ownership, interpolates target toward that body and changes distance in log space using camera-controls' fit-sphere result. At scale=2 the System body's angular framing matches the existing Approach anchor; only then does product identity/rendering switch to the already-adopted close-world path.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If the native body's exact physical render radius is too small for stable hosted rendering, clamp only the System endpoint's fit radius to the existing interactive body hit radius while preserving target identity and monotonic distance; do not introduce a transition renderer or fade."
+  }
+}

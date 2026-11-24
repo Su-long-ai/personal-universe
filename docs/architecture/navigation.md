@@ -373,26 +373,38 @@ continues scrolling while native locate/travel is still settling, one
 enter-system intent is queued and consumed only after the existing destination
 becomes current; a competing camera request is not created.
 
-Inside the system, an inward gesture opens the current/preferred planet at
-`approach`. From that point the product no longer treats Approach, Orbit,
-Atmosphere and Surface as four wheel-triggered camera jumps. Task
-`WORLD-CONTINUOUS-SCALE-COORDINATE-001` introduces one close-world coordinate
-from 2 (Approach) through 5 (Surface). Every wheel/trackpad delta moves that
-coordinate immediately; `camera-controls.lerpLookAt()` evaluates the adjacent
-authored shots at the same coordinate, so the camera moves before a semantic
-phase boundary is crossed. The phase remains useful for copy, loading, renderer
-lifetime and deep-link identity, but it is no longer the source of close-world
-camera motion.
+Inside the system, Task `SYSTEM-WORLD-SCALE-CONTINUITY-001` extends
+the same product scale coordinate down to 1 (System). The first inward delta
+locks the current/preferred planet focus, but it does not immediately replace
+the System renderer. The existing System scene exposes that body's exact
+render-space center and radius; the existing `camera-controls` instance then
+moves focus-relative toward the planet on every wheel/trackpad sample. Distance
+is interpolated logarithmically because the ratio between a stellar-system
+overview and a physical planet radius spans orders of magnitude.
+
+At coordinate 2, the System endpoint uses the same Approach view direction,
+viewport-aware fit-sphere factor and radius-relative composition as the
+close-world shot. Only after that matched frame has been painted does product
+identity cross to `approach` and the existing ProceduralPlanets/product world
+take visual authority. No duplicate transition planet or fade is inserted.
+
+Task `WORLD-CONTINUOUS-SCALE-COORDINATE-001` continues that single coordinate
+through 3 (Orbit), 4 (Atmosphere) and 5 (Surface). Every wheel/trackpad delta
+moves the coordinate immediately; `camera-controls.lerpLookAt()` evaluates
+the adjacent close-world shot anchors at the same coordinate, so the camera
+moves before a semantic phase boundary is crossed. Phase remains useful for
+copy, loading, renderer lifetime and deep-link identity, but it is no longer
+the source of System/close-world camera motion.
 
 The coordinate is exactly reversible. Reversing the wheel evaluates the same
 path in the opposite direction rather than cancelling one cinematic animation
-and starting another. Search, Journey takeover or another higher-priority
-navigation authority freezes the coordinate where the visitor left it; there
-is no hidden close-world phase-step queue to drain afterward.
-
-Wheel-out performs the exact reverse scale path. At the Approach minimum, the
-next outward intent returns to System; at System it returns to the retained
-YEIS galaxy view.
+and starting another. Approach→System retains the selected planet as the scale
+focus and first mounts the System renderer at the matched 2.0 endpoint; further
+outward input follows the same 2→1 focus-relative path back to the overview.
+Only another outward intent from the System overview crosses back to the
+retained YEIS galaxy view. Search, Journey takeover or another higher-priority
+navigation authority freezes the current coordinate instead of draining a
+hidden phase-step queue.
 
 ### Wheel ownership and scale domains
 
@@ -402,14 +414,14 @@ Exactly one layer owns mouse-wheel scale input:
 - camera-controls has its wheel ACTION disabled;
 - the product coordinator is the only wheel owner.
 
-Galaxy/System acquisition still uses the established focus threshold and
-scheduler-safe hysteresis because native YEIS travel is an asynchronous spatial
-operation rather than a product-camera interpolation. Once a world is open,
-that threshold is deliberately bypassed: even a small trackpad sample changes
-the close-world scale coordinate immediately. Mouse-wheel notches and trackpad
-samples therefore differ only in distance travelled, not in whether motion is
-visible. Semantic phase changes occur only when the continuous coordinate
-crosses their boundaries.
+Galaxy acquisition still uses the established focus threshold and
+scheduler-safe hysteresis because native YEIS star travel is an asynchronous
+spatial operation rather than a product-camera interpolation. Once the visitor
+is inside a stellar system, that threshold is deliberately bypassed: even a
+small trackpad sample changes the System→Surface coordinate immediately.
+Mouse-wheel notches and trackpad samples therefore differ only in distance
+travelled, not in whether motion is visible. Semantic phase changes occur only
+when the continuous coordinate crosses their boundaries.
 
 Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
 gesture is still processed as scale intent. Manual spatial takeover disables

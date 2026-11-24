@@ -1,0 +1,41 @@
+{
+  "schema": 3,
+  "task_id": "SYSTEM-WORLD-SCALE-CONTINUITY-001",
+  "approved_at": "2026-11-24T11:11:22.547Z",
+  "baseline_commit": "ca8c99a8fce726bf44ffcc24359e9c523c042622",
+  "record_path": "docs/reuse-gate/tasks/SYSTEM-WORLD-SCALE-CONTINUITY-001.json",
+  "record_sha256": "1d2de08f3c16cce25c3fa1df501618cdfcd98bfefcd3af644686e47a0bfb9e7b",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing YEIS/native System renderer, product fallback System renderer and camera-controls authority to make wheel input continuously approach the locked planet before the System to Approach renderer handoff"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "focus-relative-system-world-bridge",
+    "camera-controls-focus-fit"
+  ],
+  "candidate_scores": {
+    "focus-relative-system-world-bridge": 54,
+    "camera-controls-focus-fit": 57,
+    "duplicate-transition-planet": 33.5,
+    "fade-jump-handoff": 41
+  }
+}
