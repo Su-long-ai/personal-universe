@@ -96,9 +96,13 @@ type CameraShot = {
   transition?: boolean;
 };
 
-const FALLBACK_SURFACE_SHOT: CameraShot = {
+export const FALLBACK_SURFACE_CAMERA_FRAME = {
   position: [0.5, 22.0, 18.0] as [number, number, number],
   target: [0, 8.0, -16.0] as [number, number, number],
+} as const;
+
+const FALLBACK_SURFACE_SHOT: CameraShot = {
+  ...FALLBACK_SURFACE_CAMERA_FRAME,
   smoothTime: 0.38,
   maxSpeed: 24,
   positionTolerance: 0.14,
