@@ -56,7 +56,10 @@ import { GalaxyCloud } from "../../vendor/yeis/render/GalaxyCloud";
 import { GalaxySprites } from "../../vendor/yeis/render/GalaxySprites";
 import { LandmarkSprites } from "../../vendor/yeis/render/LandmarkSprites";
 import { LANDMARK_IMAGES } from "../../vendor/yeis/data/landmarkImages";
-import { WORLD_SCALE_EPSILON } from "../../lib/universe/continuousScale";
+import {
+  WORLD_SCALE_EPSILON,
+  galaxyScaleVisualResponse,
+} from "../../lib/universe/continuousScale";
 
 type NativeGalaxyState = {
   runtime: YeisCoreRuntime;
@@ -1150,9 +1153,13 @@ export function YeisGalaxyScene({
           scaleBridgeControllerKeyRef.current = bridgeControllerKey;
         }
 
-        state.controller.setAutopilotProgress(scalePosition);
+        const visualScalePosition =
+          galaxyScaleVisualResponse(scalePosition);
+        state.controller.setAutopilotProgress(visualScalePosition);
         document.documentElement.dataset.universeGalaxyScaleExecutor =
           "native-progress";
+        document.documentElement.dataset.universeGalaxyScaleVisualProgress =
+          visualScalePosition.toFixed(4);
         state.controller.autoOrbit = 0;
         state.controller.speed = 0;
         state.systemOverview =
@@ -1191,6 +1198,7 @@ export function YeisGalaxyScene({
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.universeGalaxyScaleExecutor;
+      delete document.documentElement.dataset.universeGalaxyScaleVisualProgress;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
 

@@ -357,7 +357,7 @@ test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
     await dispatchVisualScaleWheel(page, -96);
     await expect(html).toHaveAttribute(
       "data-universe-scale-position",
-      "1.500",
+      "1.333",
     );
     await expect(html).toHaveAttribute(
       "data-universe-scale-camera-segment",
@@ -402,7 +402,7 @@ test("visual: desktop Atmosphere-Surface midpoint", async ({ page }, testInfo) =
     await dispatchVisualScaleWheel(page, -96);
     await expect(html).toHaveAttribute(
       "data-universe-scale-position",
-      "4.500",
+      "4.400",
     );
     await expect(html).toHaveAttribute(
       "data-universe-scale-camera-segment",
@@ -470,7 +470,7 @@ test("visual: desktop System to Approach midpoint", async ({ page }, testInfo) =
       await dispatchVisualWheel(page, -96);
       await expect(html).toHaveAttribute(
         "data-universe-scale-position",
-        "1.500",
+        "1.333",
       );
       await expect(html).toHaveAttribute(
         "data-universe-scale-segment",
@@ -538,7 +538,7 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
       await dispatchVisualWheel(page, -96);
       await expect(html).toHaveAttribute(
         "data-universe-scale-position",
-        "4.500",
+        "4.400",
       );
       await expect(html).toHaveAttribute(
         "data-universe-scale-segment",
@@ -743,7 +743,7 @@ for (const viewport of [TABLET, MOBILE]) {
           await dispatchVisualScaleWheel(page, -96);
           await expect(html).toHaveAttribute(
             "data-universe-scale-position",
-            "1.500",
+            "1.333",
           );
           await expect(html).toHaveAttribute(
             "data-universe-scale-camera-segment",
@@ -774,7 +774,7 @@ for (const viewport of [TABLET, MOBILE]) {
           await dispatchVisualScaleWheel(page, -96);
           await expect(html).toHaveAttribute(
             "data-universe-scale-position",
-            "4.500",
+            "4.400",
           );
           await expect(html).toHaveAttribute(
             "data-universe-scale-camera-segment",

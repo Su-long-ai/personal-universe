@@ -21,8 +21,41 @@ export const GALAXY_SCALE_MIN = 0;
 export const SYSTEM_SCALE_MIN = 1;
 export const WORLD_SCALE_MIN = 2;
 export const WORLD_SCALE_MAX = 5;
-export const GALAXY_SCALE_WHEEL_SPAN = 384;
-export const WORLD_SCALE_WHEEL_SPAN = 192;
+
+// Normalized CSS-pixel budgets for each semantic scale interval. These are not
+// timers or thresholds: they define a monotonic, stateless response-distance
+// coordinate that is inverted back into the existing 0..5 product coordinate.
+//
+// 0->1 stays deliberate enough for the native Galaxy composition, 1->2 removes
+// the old 384px -> 192px gain cliff, the middle world intervals remain direct,
+// and 4->5 slows slightly to avoid overshooting the landing composition.
+export const CONTINUOUS_SCALE_SEGMENT_PIXELS = [
+  384, // Galaxy -> System: preserve native trajectory resolution
+  288, // System -> Approach: remove the old 2x gain cliff
+  192, // Approach -> Orbit: retain established direct close-world cadence
+  192, // Orbit -> Atmosphere: retain established direct close-world cadence
+  240, // Atmosphere -> Surface: reduce landing overshoot
+] as const;
+
+// Compatibility exports for diagnostics/tests that still refer to the old
+// single-span names. Product movement uses the full response-distance map.
+export const GALAXY_SCALE_WHEEL_SPAN =
+  CONTINUOUS_SCALE_SEGMENT_PIXELS[0];
+export const WORLD_SCALE_WHEEL_SPAN =
+  CONTINUOUS_SCALE_SEGMENT_PIXELS[2];
+
+const CONTINUOUS_SCALE_RESPONSE_DISTANCE = [
+  0,
+  384,
+  672,
+  864,
+  1056,
+  1296,
+] as const;
+export const CONTINUOUS_SCALE_RESPONSE_MAX =
+  CONTINUOUS_SCALE_RESPONSE_DISTANCE[
+    CONTINUOUS_SCALE_RESPONSE_DISTANCE.length - 1
+  ];
 export const WORLD_SCALE_EPSILON = 1e-3;
 export const WHEEL_LINE_PIXELS = 16;
 export const WHEEL_SAMPLE_LIMIT = 96;
@@ -76,6 +109,81 @@ export function continuousScaleDelta(deltaY: number): number {
   );
 }
 
+function clampContinuousScalePosition(position: number): number {
+  if (!Number.isFinite(position)) return GALAXY_SCALE_MIN;
+  return Math.min(
+    WORLD_SCALE_MAX,
+    Math.max(GALAXY_SCALE_MIN, position),
+  );
+}
+
+/**
+ * Convert the product's 0..5 coordinate into cumulative normalized input
+ * distance. The map is monotonic and piecewise linear, so it carries no hidden
+ * gesture state and can be inverted exactly for immediate reversal.
+ */
+export function continuousScaleResponseDistance(position: number): number {
+  const value = clampContinuousScalePosition(position);
+  if (value >= WORLD_SCALE_MAX) return CONTINUOUS_SCALE_RESPONSE_MAX;
+
+  const segment = Math.min(
+    CONTINUOUS_SCALE_SEGMENT_PIXELS.length - 1,
+    Math.floor(value),
+  );
+  const progress = value - segment;
+  return (
+    CONTINUOUS_SCALE_RESPONSE_DISTANCE[segment] +
+    progress * CONTINUOUS_SCALE_SEGMENT_PIXELS[segment]
+  );
+}
+
+export function continuousScalePositionForResponseDistance(
+  distance: number,
+): number {
+  if (!Number.isFinite(distance)) return GALAXY_SCALE_MIN;
+  const value = Math.min(
+    CONTINUOUS_SCALE_RESPONSE_MAX,
+    Math.max(0, distance),
+  );
+  if (value >= CONTINUOUS_SCALE_RESPONSE_MAX) return WORLD_SCALE_MAX;
+
+  let segment = 0;
+  while (
+    segment < CONTINUOUS_SCALE_SEGMENT_PIXELS.length - 1 &&
+    value >= CONTINUOUS_SCALE_RESPONSE_DISTANCE[segment + 1]
+  ) {
+    segment += 1;
+  }
+
+  const local =
+    value - CONTINUOUS_SCALE_RESPONSE_DISTANCE[segment];
+  return segment + local / CONTINUOUS_SCALE_SEGMENT_PIXELS[segment];
+}
+
+/**
+ * Return the signed product-coordinate movement for one already-normalized
+ * wheel sample. Negative browser delta moves inward (positive product scale).
+ * No time, velocity, queue, damping or gesture history participates.
+ */
+export function continuousScaleInputResponseDelta(
+  position: number,
+  deltaY: number,
+): number {
+  const normalized = continuousScaleDelta(deltaY);
+  if (normalized === 0) return 0;
+
+  const currentPosition = clampContinuousScalePosition(position);
+  const currentDistance = continuousScaleResponseDistance(currentPosition);
+  const nextDistance = Math.min(
+    CONTINUOUS_SCALE_RESPONSE_MAX,
+    Math.max(0, currentDistance - normalized),
+  );
+  return (
+    continuousScalePositionForResponseDistance(nextDistance) -
+    currentPosition
+  );
+}
+
 export function isWorldScalePhase(phase: UniversePhase): boolean {
   return (
     phase === "approach" ||
@@ -103,7 +211,7 @@ export function applyGalaxyScaleWheel(
   position: number,
   deltaY: number,
 ): number {
-  const delta = -continuousScaleDelta(deltaY) / GALAXY_SCALE_WHEEL_SPAN;
+  const delta = continuousScaleInputResponseDelta(position, deltaY);
   return Math.min(
     SYSTEM_SCALE_MIN,
     Math.max(GALAXY_SCALE_MIN, position + delta),
@@ -114,11 +222,20 @@ export function galaxyScaleSegmentProgress(position: number): number {
   return Math.min(1, Math.max(0, position - GALAXY_SCALE_MIN));
 }
 
+export function galaxyScaleVisualResponse(progress: number): number {
+  const linear = Math.min(1, Math.max(0, progress));
+  const easeOut = 1 - (1 - linear) * (1 - linear);
+  // Native YEIS spans enormous physical distances. Give early delivered input
+  // a modest visual lift while retaining a non-zero endpoint slope and exact
+  // reversibility from the same product coordinate.
+  return linear * 0.75 + easeOut * 0.25;
+}
+
 export function applySystemScaleWheel(
   position: number,
   deltaY: number,
 ): number {
-  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
+  const delta = continuousScaleInputResponseDelta(position, deltaY);
   return Math.min(
     WORLD_SCALE_MIN,
     Math.max(SYSTEM_SCALE_MIN, position + delta),
@@ -128,9 +245,10 @@ export function applySystemScaleWheel(
 export function continuousScaleResponse(progress: number): number {
   const linear = Math.min(1, Math.max(0, progress));
   const smooth = linear * linear * (3 - 2 * linear);
-  // Keep substantial linear velocity at authored anchors so sustained wheel
-  // input reads as one scale gesture instead of stop/start cinematics.
-  return linear * 0.68 + smooth * 0.32;
+  // Keep most of the mapping linear so authored anchors do not read as
+  // stop/start cinematics. The small smooth component preserves composition
+  // without creating a zero-velocity endpoint.
+  return linear * 0.84 + smooth * 0.16;
 }
 
 export function systemScaleSegmentProgress(position: number): number {
@@ -159,7 +277,7 @@ export function applyWorldScaleWheel(
   deltaY: number,
   surfaceMode: PlanetSurfaceMode,
 ): number {
-  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
+  const delta = continuousScaleInputResponseDelta(position, deltaY);
   return clampWorldScalePosition(position + delta, surfaceMode);
 }
 
