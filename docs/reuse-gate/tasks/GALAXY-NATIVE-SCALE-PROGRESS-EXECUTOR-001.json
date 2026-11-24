@@ -1,0 +1,132 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-NATIVE-SCALE-PROGRESS-EXECUTOR-001",
+  "title": "Scrub the pinned YEIS Galaxy trajectory from the continuous scale coordinate",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse pinned MIT YEIS CameraController logarithmic gotoPoint trajectory as a wheel-owned progress executor for Galaxy=0 to System=1, eliminating elapsed-time advancement without adding another camera or tween authority."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The merged Galaxy direct-scale bridge already captures one stable target/path and writes every wheel or trackpad sample into the product continuous scale coordinate. Its remaining executor still mutates CameraController autopilot time and then calls update(dt), which preserves the correct native logarithmic path but retains elapsed-time completion lifecycle semantics at the endpoint. The pinned MIT CameraController already contains the exact distance interpolation, direction slerp, orientation blend, floating-origin reference inheritance and input takeover logic required here. The smallest reuse-first change is therefore to keep the same native gotoPoint Autopilot object and let CameraController optionally evaluate it at a caller-supplied normalized progress instead of incrementing t by dt. YeisGalaxyScene supplies the existing scalePosition to that narrow override while scale ownership is active. Normal Search/Places/click travel leaves the override absent and remains fully time-driven. No second trajectory implementation, camera, RAF loop, renderer, router or scale state machine is introduced.",
+  "planned_files": [
+    "src/vendor/yeis/camera/CameraController.ts",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/berkcomba/youreyesinspace/e52056897364e060fbd6d00951628f163b57d7a1/src/camera/CameraController.ts",
+      "finding": "Pinned MIT CameraController already evaluates goto/gotoPoint with smoothstep progress, logarithmic distance interpolation, direction slerp, quaternion blending, reference-frame inheritance and manual-input cancellation."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/main/docs/reuse-gate/tasks/GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001.json",
+      "finding": "The approved direct-scale research already selects the native YEIS trajectory plus the existing product continuous coordinate and explicitly calls for a narrow native scale-progress executor rather than another camera or tween."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "The downstream System-to-Surface side already proves the product contract: normalized external scale progress may own camera motion while wheel actions on the underlying camera controller remain disabled."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep the pinned YEIS CameraController and its existing gotoPoint trajectory as the complete Galaxy-side spatial executor."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing R3F frame loop and scene lifecycle; progress override is evaluated inside the existing controller update rather than by a new RAF/tween system."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Compose the existing product scale coordinate with the native YEIS trajectory using one optional progress override, preserving each camera authority on its current side of coordinate 1."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "No new interpolation library or transition asset is needed because the pinned controller already owns the desired logarithmic physical-scale curve."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-autopilot-progress-override",
+      "name": "Optional normalized progress override inside pinned YEIS CameraController",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned MIT CameraController gotoPoint path plus existing product scale coordinate",
+      "license": "MIT pinned YEIS plus project glue",
+      "decision": "reuse",
+      "reason": "Reuses the exact native logarithmic distance/orientation trajectory and reference-frame semantics while changing only the source of progress from elapsed time to the already-authoritative wheel coordinate.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "yeis-time-scrub-from-scene",
+      "name": "Continue mutating autopilot.t from YeisGalaxyScene before update(dt)",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current merged direct-scale implementation",
+      "license": "MIT pinned YEIS plus project glue",
+      "decision": "reject",
+      "reason": "It visually follows the correct curve but still leaks timed autopilot completion and endpoint lifecycle semantics into a wheel-owned scale path."
+    },
+    {
+      "id": "project-owned-log-tween",
+      "name": "Reimplement logarithmic camera interpolation in product code",
+      "level": "component_asset",
+      "source": "New project implementation",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates the selected mother engine's camera math and risks diverging from floating-origin, quaternion and manual-takeover semantics."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-autopilot-progress-override"
+    ],
+    "rationale": "Add one optional normalized progress field/method to the retained native CameraController trajectory and have the existing Galaxy bridge set it from scalePosition while continuous-scale ownership is active. The controller continues to evaluate the original smoothstep/log-distance/direction/quaternion path and to own reference-frame inheritance. Without the override, all existing native time-driven navigation behaves exactly as before. This removes elapsed time as 0-to-1 motion authority without creating any duplicate camera or interpolation subsystem.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a target cannot resolve into the existing native gotoPoint path, keep the current product fallback and do not fabricate a separate scale trajectory."
+  }
+}
