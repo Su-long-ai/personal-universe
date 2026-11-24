@@ -266,7 +266,7 @@ jobs:
               box.x + box.width * 0.5,
               box.y + box.height * 0.5,
             );
-            await page.mouse.wheel(0, -120);
+            await page.mouse.wheel(0, -96);
 
             await page.waitForFunction(
               () => {
@@ -294,12 +294,81 @@ jobs:
               );
             }
 
-            // Preserve the frame that actually proves direct live scale motion.
-            // The reversed Galaxy endpoint is already covered by state + Canvas
-            // assertions below, so avoid a second redundant SwiftShader read.
+            // Preserve the frame that proves real deployed intermediate scale
+            // movement. The remaining acceptance uses DOM/runtime state so the
+            // smoke does not add redundant SwiftShader framebuffer reads.
             await page.screenshot({ path: "pages-live-smoke.png" });
 
-            await page.mouse.wheel(0, 120);
+            // Cross the real Galaxy -> System renderer boundary with the same
+            // physical wheel path used by the product. Four -96 samples are
+            // the release contract for the native Galaxy scale interval.
+            for (let sample = 1; sample < 4; sample += 1) {
+              await page.mouse.wheel(0, -96);
+              await page.waitForTimeout(80);
+            }
+
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
+                return (
+                  data.universeNavigationPhase === "system" &&
+                  data.universeSystemRenderer === "yeis-native" &&
+                  data.universeSystemReady === "true" &&
+                  Number.isFinite(position) &&
+                  Math.abs(position - 1) < 0.001
+                );
+              },
+              undefined,
+              { timeout: 20_000 },
+            );
+
+            const systemCanvasCount = await page.locator("canvas").count();
+            if (systemCanvasCount !== 1) {
+              throw new Error(
+                `Expected one canvas after live Galaxy->System handoff, found ${systemCanvasCount}`,
+              );
+            }
+
+            // Reverse on the very next physical wheel sample. This must cross
+            // back into the native Galaxy interval immediately rather than
+            // waiting for a semantic dwell or a stale renderer settlement.
+            await page.mouse.wheel(0, 96);
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
+                return (
+                  data.universeNavigationPhase === "galaxy" &&
+                  data.universeScaleDirection === "out" &&
+                  Number.isFinite(position) &&
+                  position > 0 &&
+                  position < 1 &&
+                  data.universeGalaxyScaleBridge === "active"
+                );
+              },
+              undefined,
+              { timeout: 10_000 },
+            );
+
+            const reversePosition = await page.evaluate(() =>
+              Number(document.documentElement.dataset.universeScalePosition),
+            );
+            if (!(reversePosition > 0 && reversePosition < 1)) {
+              throw new Error(
+                `Expected immediate System->Galaxy reverse midpoint, got ${reversePosition}`,
+              );
+            }
+
+            for (let sample = 0; sample < 6; sample += 1) {
+              const position = await page.evaluate(() =>
+                Number(document.documentElement.dataset.universeScalePosition),
+              );
+              if (Number.isFinite(position) && position <= 0.001) break;
+              await page.mouse.wheel(0, 96);
+              await page.waitForTimeout(80);
+            }
+
             await page.waitForFunction(
               () => {
                 const data = document.documentElement.dataset;
@@ -315,7 +384,7 @@ jobs:
               { timeout: 10_000 },
             );
 
-            await page.waitForTimeout(500);
+            await page.waitForTimeout(250);
 
             const finalCanvasCount = await page.locator("canvas").count();
             if (finalCanvasCount !== 1) {
@@ -346,7 +415,7 @@ jobs:
           {
             echo "- Live Chromium YEIS native Galaxy ready: PASS"
             echo "- Live single-Canvas probe: PASS"
-            echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
+            echo "- Live Galaxy midpoint + Galaxy→System handoff + immediate reverse probe: PASS"
             echo "- Live midpoint screenshot evidence: PASS"
             echo "- Live critical asset/browser/console error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
