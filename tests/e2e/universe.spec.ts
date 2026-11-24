@@ -12,6 +12,7 @@ import { generateProceduralMarkers } from "../../src/lib/universe/generation/gal
 import {
   decorateAuthoredSystem,
   decorateGeneratedSystem,
+  decorateNativeSystemPopulation,
   PopulationSystemCache,
   POPULATION_GENERATOR_VERSION,
   POPULATION_SCHEMA_VERSION,
@@ -3371,6 +3372,87 @@ test("generated system deep link preserves canonical identity across reload", as
   await expect(systemName).toHaveText(firstName!);
   expect(new URL(page.url()).searchParams.get("star")).toBe("proc:0");
 
+  await runtime.assertClean(testInfo);
+});
+
+test("native catalogue population remains hybrid without a second identity graph", () => {
+  const generated = generateSystem(
+    "native-catalog:synthetic",
+    [0.5, 0.1, -0.25],
+    "CATALOG PRIMARY",
+  );
+  generated.source = "catalog";
+  generated.star.source = "catalog";
+
+  const hybrid = decorateNativeSystemPopulation(
+    generated,
+    "catalog-generated",
+  );
+  expect(validateSystemPopulation(hybrid)).toEqual([]);
+  expect(hybrid.population?.provenance).toBe("hybrid");
+  expect(hybrid.star.population?.provenance).toBe("observed");
+  expect(
+    hybrid.planets.every(
+      (planet) => planet.population?.provenance === "generated",
+    ),
+  ).toBeTruthy();
+  expect(
+    hybrid.planets
+      .filter(
+        (planet) =>
+          planet.archetype === "gas_giant" ||
+          planet.archetype === "ice_giant",
+      )
+      .every((planet) => planet.population?.capability === "orbit-only"),
+  ).toBeTruthy();
+});
+
+test("default YEIS Solar system publishes observed population provenance", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-engine", "yeis");
+  await expect(html).toHaveAttribute(
+    "data-universe-population-provenance",
+    "observed",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-population-generator",
+    POPULATION_GENERATOR_VERSION,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-population-schema",
+    String(POPULATION_SCHEMA_VERSION),
+  );
+  await runtime.assertClean(testInfo);
+});
+
+test("default YEIS hero keeps authored system and surface capability metadata", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-population-provenance",
+    "authored",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-population-provenance",
+    "authored",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-capability",
+    "authored-surface",
+  );
   await runtime.assertClean(testInfo);
 });
 

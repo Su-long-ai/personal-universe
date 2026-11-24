@@ -747,6 +747,33 @@ export default function UniverseApp({
   );
 
   useEffect(() => {
+    const root = document.documentElement;
+    const systemPopulation = selectedSystem?.population;
+    if (systemPopulation) {
+      root.dataset.universePopulationProvenance = systemPopulation.provenance;
+      root.dataset.universePopulationGenerator =
+        systemPopulation.generatorVersion;
+      root.dataset.universePopulationSchema = String(
+        systemPopulation.schemaVersion,
+      );
+    } else {
+      delete root.dataset.universePopulationProvenance;
+      delete root.dataset.universePopulationGenerator;
+      delete root.dataset.universePopulationSchema;
+    }
+
+    const worldPopulation = selectedPlanet?.population;
+    if (worldPopulation) {
+      root.dataset.universeWorldPopulationProvenance =
+        worldPopulation.provenance;
+      root.dataset.universeWorldCapability = worldPopulation.capability;
+    } else {
+      delete root.dataset.universeWorldPopulationProvenance;
+      delete root.dataset.universeWorldCapability;
+    }
+  }, [selectedPlanet, selectedSystem]);
+
+  useEffect(() => {
     document.documentElement.dataset.personalContent = String(contentEntries.length);
     document.documentElement.dataset.personalSignals = String(contentPlacements.length);
     document.documentElement.dataset.personalSignalTargets = contentPlacements
