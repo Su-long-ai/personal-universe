@@ -225,6 +225,7 @@ export function UniverseNavigator({
             placements,
             markers,
             currentSystem ?? null,
+            recentDestinationIds,
           );
 
       void request
