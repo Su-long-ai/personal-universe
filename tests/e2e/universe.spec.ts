@@ -50,6 +50,61 @@ async function dispatchScaleWheel(page: Page, deltaY: number) {
   );
 }
 
+test("public page publishes canonical and social preview metadata", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const canonicalHref = await page
+    .locator('link[rel="canonical"]')
+    .getAttribute("href");
+  expect(canonicalHref).toBeTruthy();
+
+  const pageUrl = new URL(page.url());
+  const canonicalUrl = new URL(canonicalHref!);
+  expect(canonicalUrl.pathname).toBe(pageUrl.pathname);
+  expect(canonicalUrl.search).toBe("");
+
+  const description = await page
+    .locator('meta[name="description"]')
+    .getAttribute("content");
+  expect(description).toContain("projects, research, and artifacts");
+
+  const ogTitle = await page
+    .locator('meta[property="og:title"]')
+    .getAttribute("content");
+  const ogUrl = await page
+    .locator('meta[property="og:url"]')
+    .getAttribute("content");
+  const ogImage = await page
+    .locator('meta[property="og:image"]')
+    .getAttribute("content");
+  const twitterCard = await page
+    .locator('meta[name="twitter:card"]')
+    .getAttribute("content");
+  const twitterImage = await page
+    .locator('meta[name="twitter:image"]')
+    .getAttribute("content");
+
+  expect(ogTitle).toBe("Personal Universe");
+  expect(ogUrl).toBe(canonicalHref);
+  expect(ogImage).toBeTruthy();
+  expect(twitterCard).toBe("summary_large_image");
+  expect(twitterImage).toBe(ogImage);
+
+  const previewUrl = new URL(ogImage!);
+  expect(previewUrl.pathname).toMatch(/\/social-preview\.png$/);
+
+  const previewResponse = await page.request.get(previewUrl.pathname);
+  expect(previewResponse.ok()).toBeTruthy();
+  expect(previewResponse.headers()["content-type"]).toContain("image/png");
+  expect((await previewResponse.body()).byteLength).toBeGreaterThan(100_000);
+
+  await runtime.assertClean(testInfo);
+});
+
 test("default YEIS boots with native galaxy and personal signals", async ({
   page,
 }, testInfo) => {
