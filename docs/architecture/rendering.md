@@ -259,10 +259,21 @@ disposed with the component. It adds no draw call, downloaded asset, custom
 shader or second planet renderer. Explicit LOW quality intentionally retains
 the older solid lightweight representation.
 
+The software fallback texture is retained per planet for the shared Canvas
+lifetime instead of being keyed to the active quality selector. LOW still uses
+the intentional solid lightweight material, but switching LOW -> AUTO reuses
+the already-generated map rather than rebuilding the DataTexture. HIGH on
+software may keep that tiny map parked underneath the live world so a later
+AUTO fallback can resume without CPU texture generation on the quality-change
+path.
+
 Runtime evidence:
 
 - `data-universe-world-fallback-surface="generated-texture"` identifies the
-  AUTO/software generated-map path.
+  active AUTO/software generated-map path;
+- `data-universe-world-fallback-texture-allocations` counts generated fallback
+  map allocations and remains stable across LOW/AUTO/HIGH switches for one
+  planet.
 
 ## Surface continuity
 
