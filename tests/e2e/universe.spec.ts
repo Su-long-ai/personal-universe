@@ -29,6 +29,7 @@ async function wheelScale(
     box!.x + box!.width * 0.5,
     box!.y + box!.height * 0.5,
   );
+
   const html = page.locator("html");
   const startingPhase = await html.getAttribute(
     "data-universe-navigation-phase",
@@ -43,66 +44,53 @@ async function wheelScale(
   ].includes(startingPhase ?? "");
   const deltaY = direction === "in" ? -120 : 120;
 
-  // Galaxy through Surface now share one normalized product scale. Keep a
-  // semantic-step helper for tests, but let each individual wheel sample move
-  // only its real proportional distance. Galaxy 0->1 deliberately spans more
-  // samples than the close-world intervals.
-  await page.mouse.wheel(0, deltaY);
-  if (continuousScaleDomain) {
-    for (let sample = 0; sample < 7; sample += 1) {
-      await page.waitForTimeout(80);
-      const phaseAfterSample = await html.getAttribute(
-        "data-universe-navigation-phase",
-      );
-      if (phaseAfterSample !== startingPhase) break;
+  if (!continuousScaleDomain) {
+    await page.mouse.wheel(0, deltaY);
+    await page.waitForTimeout(320);
+    return;
+  }
 
-      const blocked = await html.getAttribute("data-universe-scale-blocked");
-      if (blocked) break;
+  const startingPosition = Number(
+    await html.getAttribute("data-universe-scale-position"),
+  );
+  if (!Number.isFinite(startingPosition)) {
+    await page.mouse.wheel(0, deltaY);
+    await page.waitForTimeout(320);
+    return;
+  }
 
-      const position = Number(
-        await html.getAttribute("data-universe-scale-position"),
-      );
-      if (!Number.isFinite(position)) break;
+  // A semantic phase boundary can occur halfway between authored camera
+  // anchors on the continuous coordinate (for example 4.0 -> 3.5 changes
+  // Atmosphere to Orbit). The helper therefore advances to the next integer
+  // scale anchor, not merely until the phase label changes. Settlement is only
+  // expected at those anchors.
+  const targetPosition =
+    direction === "in"
+      ? Math.min(5, Math.ceil(startingPosition + 0.001))
+      : Math.max(0, Math.floor(startingPosition - 0.001));
 
-      // Integer scale anchors are not all semantic boundaries in both
-      // directions. For example Atmosphere spans [4, 5), so outward 4.5 -> 4.0
-      // is still Atmosphere and needs another physical sample to reach Orbit.
-      // Stop only at true domain endpoints or at asynchronous renderer
-      // handoffs that need paint time rather than more input.
-      if (
-        startingPhase === "galaxy" &&
-        direction === "out" &&
-        position <= 0.001
-      ) {
-        break;
-      }
-      if (
-        startingPhase === "galaxy" &&
-        direction === "in" &&
-        position >= 0.999
-      ) {
-        await page.waitForTimeout(160);
-        break;
-      }
-      if (
-        startingPhase === "system" &&
-        direction === "in" &&
-        position >= 1.999
-      ) {
-        await page.waitForTimeout(160);
-        break;
-      }
-      if (
-        startingPhase === "surface" &&
-        direction === "in" &&
-        position >= 4.999
-      ) {
-        break;
-      }
+  for (let sample = 0; sample < 12; sample += 1) {
+    await page.mouse.wheel(0, deltaY);
+    await page.waitForTimeout(80);
 
-      await page.mouse.wheel(0, deltaY);
+    const blocked = await html.getAttribute("data-universe-scale-blocked");
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    if (!Number.isFinite(position)) break;
+
+    const reached =
+      direction === "in"
+        ? position >= targetPosition - 0.001
+        : position <= targetPosition + 0.001;
+    if (reached || blocked) {
+      // Renderer authority can change exactly at 1/2, so allow the matched
+      // endpoint frame to paint before callers assert phase/camera evidence.
+      await page.waitForTimeout(160);
+      break;
     }
   }
+
   await page.waitForTimeout(320);
 }
 
