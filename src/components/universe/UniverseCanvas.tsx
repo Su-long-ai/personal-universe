@@ -170,7 +170,6 @@ export function UniverseCanvas({
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [worldPaintReady, setWorldPaintReady] = useState(false);
-  const [worldPipelineReady, setWorldPipelineReady] = useState(false);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -192,7 +191,6 @@ export function UniverseCanvas({
     // remains selected; keep the System handoff frame until the new authority
     // has painted as well.
     setWorldPaintReady(false);
-    setWorldPipelineReady(false);
     delete document.documentElement.dataset.universeWorldPaintReady;
   }, [quality, worldPrewarmPlanet?.id]);
 
@@ -228,7 +226,7 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPipelineReady}
+          worldFrameReady={worldPaintReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -340,7 +338,6 @@ export function UniverseCanvas({
       <CinematicPipeline
         quality={quality}
         liveWorld={liveWorld}
-        onReadyChange={setWorldPipelineReady}
       />
     </Canvas>
   );

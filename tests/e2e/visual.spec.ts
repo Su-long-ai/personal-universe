@@ -103,6 +103,15 @@ async function waitForCameraSettled(
 }
 
 async function expectReadableWorldFrame(page: Page, label: string) {
+  // Camera settlement means the concrete renderer has painted. Screenshot
+  // acceptance is deliberately stricter: wait for the existing pipeline
+  // signal that combines stable renderer work with the camera-ready state.
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-world-screenshot-ready",
+    "true",
+    { timeout: 60_000 },
+  );
+
   // Capture the final viewport once and let visualCase reuse the exact same
   // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
   // seconds on one screenshot, so a second identical read would make the
