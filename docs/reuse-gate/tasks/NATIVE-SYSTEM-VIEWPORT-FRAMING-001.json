@@ -1,0 +1,147 @@
+{
+  "schema": 2,
+  "task_id": "NATIVE-SYSTEM-VIEWPORT-FRAMING-001",
+  "title": "Fit native stellar-system overview to the active viewport with the existing camera authority",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing YEIS native-system adapter and camera-controls fit-sphere path so the 7.0-unit overview remains fully framed on portrait and narrow viewports without shrinking the system or adding device-specific shots"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted tablet/mobile System screenshots added after the floating-origin fix show the native system itself is now correctly scaled, but the fixed System camera distance is not viewport-aware: the 390x844 case clips the outer orbit through both horizontal edges because PerspectiveCamera horizontal FOV narrows with aspect ratio. Personal Universe already uses camera-controls getDistanceToFitSphere() for Approach/Orbit framing. Reuse that same camera authority for System: expose the existing 7.0 native overview radius as one shared product/render budget, preserve the current System view direction and transition semantics, and derive only the camera distance from the active camera aspect/FOV. Do not shrink YEIS geometry, add mobile shot tables, or mount another camera.",
+  "planned_files": [
+    "src/lib/universe/types.ts",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "docs/architecture/rendering.md",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The already-installed camera-controls implementation provides getDistanceToFitSphere(), which derives the required distance from the active perspective camera FOV/aspect and therefore matches the existing close-world framing authority."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber exposes one active Three.js camera/viewport lifecycle; the existing CinematicCamera can react to that camera projection without a second mobile camera or renderer."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/cameras/PerspectiveCamera",
+      "finding": "A perspective camera's visible horizontal extent depends on aspect ratio, so a fixed world-space distance that looks correct at 1440x900 can crop the same bounded system on a portrait viewport."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep the pinned YEIS native-system renderer and the corrected floating-origin adapter as the full system authority; the geometry should not be replaced or rescaled per device."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Keep the single R3F PerspectiveCamera and viewport lifecycle; the framing correction belongs in the existing camera host rather than a parallel mobile render path."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "camera-controls already owns cinematic transitions and viewport-aware fit-distance calculation, covering the framing gap directly."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse getDistanceToFitSphere() with the existing System shot direction and shared overview radius; no new camera component is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-system-authority",
+      "name": "Existing pinned-YEIS native system plus product adapter",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YeisSystemScene native renderer and floating-origin adapter",
+      "license": "MIT at pinned e520568 boundary",
+      "decision": "reuse",
+      "reason": "The hosted evidence confirms the native system geometry and restored floating-origin coordinates are correct; only camera framing changes with viewport aspect.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-system-fit",
+      "name": "Existing camera-controls fit-sphere distance for System",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "CinematicCamera plus CameraControls.getDistanceToFitSphere",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It already solves the same aspect/FOV-aware framing problem for product worlds while preserving the existing camera transition and settlement authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "device-specific-system-shots",
+      "name": "Separate desktop/tablet/mobile System camera tables",
+      "level": "component_asset",
+      "source": "New project-owned viewport breakpoints and shot constants",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate framing policy, create breakpoint drift, and solve a projection-math problem less robustly than the existing camera-controls fit calculation."
+    },
+    {
+      "id": "shrink-native-system-on-narrow-screens",
+      "name": "Viewport-specific native-system geometry shrink",
+      "level": "subsystem",
+      "source": "New adapter scale branch by viewport",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would undo the corrected native overview scale, alter click/focus geometry presentation by device, and mix camera composition concerns into the renderer adapter."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-native-system-authority",
+      "camera-controls-system-fit"
+    ],
+    "rationale": "Keep the corrected YEIS native-system geometry unchanged and reuse the existing camera-controls fit-sphere computation to derive System camera distance from the active viewport. Share the existing 7.0 overview radius between renderer and camera, retain the current System direction/target/transition semantics, and validate desktop/tablet/mobile System screenshots with the already-running Playwright visual suite.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a sphere fit proves visually too conservative, adjust only the shared framing breathing-room factor while retaining the same camera-controls authority; do not add device-specific shots or rescale native system geometry."
+  }
+}
