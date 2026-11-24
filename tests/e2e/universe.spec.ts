@@ -4492,6 +4492,85 @@ test("high-frequency wheel bursts publish at most one scale render per frame", a
   await runtime.assertClean(testInfo);
 });
 
+test("mixed-sign 144Hz-like oscillation never creates a deferred world queue", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const queuedValues: string[] = [];
+    Object.assign(window, { __worldScaleQueueHistory: queuedValues });
+    new MutationObserver(() => {
+      const value = root.dataset.universeScaleQueued;
+      if (value) queuedValues.push(value);
+    }).observe(root, {
+      attributes: true,
+      attributeFilter: ["data-universe-scale-queued"],
+    });
+  });
+
+  const startingGesture = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  ) || 0;
+
+  // Alternate every ~7ms to model a high-frequency touchpad correction burst.
+  // Every delivered sample must act on the live coordinate immediately; no
+  // old-direction phase step may be stored for camera settlement to drain.
+  for (let pair = 0; pair < 24; pair += 1) {
+    await dispatchScaleWheel(page, -8);
+    await page.waitForTimeout(7);
+    await dispatchScaleWheel(page, 8);
+    await page.waitForTimeout(7);
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  const stoppedAt = await html.getAttribute("data-universe-scale-position");
+  await page.waitForTimeout(400);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    stoppedAt!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+
+  const queueHistory = await page.evaluate(() =>
+    ((window as typeof window & { __worldScaleQueueHistory?: string[] })
+      .__worldScaleQueueHistory ?? []),
+  );
+  expect(queueHistory.filter((value) => value.startsWith("world:"))).toEqual([]);
+  expect(
+    Number(await html.getAttribute("data-universe-scale-gesture")),
+  ).toBeGreaterThan(startingGesture + 20);
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-cancelled-queue",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("apparent target radius grows monotonically during System approach", async ({
   page,
 }, testInfo) => {
