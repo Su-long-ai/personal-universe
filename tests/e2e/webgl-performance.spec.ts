@@ -1,6 +1,6 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { test, expect } from "./support/test";
-import { waitForYeis } from "./support/runtime";
+import { waitForYeis, waitForYeisEngine } from "./support/runtime";
 
 type WebglMetrics = {
   renderer: string;
@@ -325,10 +325,15 @@ test("retained Surface fallback parks without resource growth @webgl-heavy", asy
   await page.goto(
     "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
   );
-  await waitForYeis(page);
+  await waitForYeisEngine(page);
   await page.locator(".hud-actions select").selectOption("low");
 
   const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-lifecycle",
+    "active",
+    { timeout: 15_000 },
+  );
   await expect(html).toHaveAttribute(
     "data-universe-surface-terrain-lifecycle",
     "active",
