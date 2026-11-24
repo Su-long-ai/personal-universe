@@ -343,6 +343,7 @@ export async function loadUniverseNavigation(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
   currentSystem: SystemDefinition | null = null,
+  recentDestinationIds: string[] = [],
 ): Promise<UniverseNavigationDestination[]> {
   const [{ loadYeisCore }, { normalizeQuery }] = await Promise.all([
     import("./index"),
@@ -362,6 +363,7 @@ export async function loadUniverseNavigation(
     placements,
     markers,
     currentSystem,
+    recentDestinationIds,
     normalizeQuery,
   );
 }
@@ -912,6 +914,7 @@ function searchDestinations(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
   currentSystem: SystemDefinition | null,
+  recentDestinationIds: string[],
   normalize: (value: string) => string,
 ): UniverseNavigationDestination[] {
   const queries = queryVariants(rawQuery, normalize);
@@ -1036,6 +1039,7 @@ function searchDestinations(
     normalize,
     placements,
     currentSystem,
+    recentDestinationIds,
   ).slice(0, 80);
 }
 
@@ -1518,7 +1522,7 @@ function destinationMatchesQuery(
   return matchesAny(corpus, queries);
 }
 
-function destinationSystemId(
+export function universeDestinationSystemId(
   destination: UniverseNavigationDestination,
 ): string | null {
   if (destination.target.kind === "star") return destination.target.nativeId;
@@ -1534,6 +1538,7 @@ function rankSearchDestinations(
   normalize: (value: string) => string,
   placements: UniverseContentPlacement[],
   currentSystem: SystemDefinition | null,
+  recentDestinationIds: string[],
 ): UniverseNavigationDestination[] {
   const exactRaw = normalize(rawQuery);
   const currentSystemId = currentSystem?.id.startsWith("yeis-system:")
@@ -1592,9 +1597,15 @@ function rankSearchDestinations(
       if (destination.featured) productScore += 300;
       if (
         currentSystemId &&
-        destinationSystemId(destination) === currentSystemId
+        universeDestinationSystemId(destination) === currentSystemId
       ) {
         productScore += 600;
+      }
+      const recentIndex = recentDestinationIds.indexOf(destination.id);
+      if (recentIndex >= 0) {
+        // Recent history is a light product prior only. Exact/title/alias
+        // relevance stays authoritative, and older visits decay predictably.
+        productScore += Math.max(80, 320 - recentIndex * 30);
       }
 
       return {
