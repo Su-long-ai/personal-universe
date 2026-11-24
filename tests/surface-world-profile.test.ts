@@ -108,6 +108,33 @@ test("existing content anchors do not move when unrelated content is added", () 
   }
 });
 
+test("content cluster geometry stays stable when unrelated content is inserted", () => {
+  const base = buildSurfaceWorldProfile(
+    planet("cluster-insertion-stable", "temperate", {
+      content: [content("alpha"), content("omega")],
+    }),
+  );
+  const expanded = buildSurfaceWorldProfile(
+    planet("cluster-insertion-stable", "temperate", {
+      content: [
+        content("alpha"),
+        content("middle", { importance: 5 }),
+        content("omega"),
+      ],
+    }),
+  );
+
+  for (const cluster of base.contentClusters) {
+    const after = expanded.contentClusters.find(
+      (candidate) => candidate.id === cluster.id,
+    );
+    assert.ok(after, `cluster ${cluster.id} should retain its spatial identity`);
+    assert.deepEqual(after.center, cluster.center);
+    assert.equal(after.label, cluster.label);
+    assert.equal(after.regionId, cluster.regionId);
+  }
+});
+
 test("surface content ranking preserves product importance without moving anchors", () => {
   const source = buildSurfaceWorldProfile(
     planet("priority-world", "temperate", {
