@@ -23,17 +23,47 @@ export const WORLD_SCALE_MAX = 5;
 export const WORLD_SCALE_WHEEL_SPAN = 192;
 export const WORLD_SCALE_EPSILON = 1e-3;
 
-export function continuousScaleDirection(
+// WheelEvent.deltaMode is not guaranteed to be pixels. Normalize line/page
+// devices into the same product-scale domain before applying the existing
+// coordinate response. Values below the tiny jitter floor are ignored, while
+// every real gesture sample remains immediately visible.
+export const CONTINUOUS_SCALE_JITTER_FLOOR = 0.05;
+export const CONTINUOUS_SCALE_LINE_PIXELS = 40;
+export const CONTINUOUS_SCALE_MAX_DELTA = 96;
+
+export function continuousScaleDelta(
   deltaY: number,
-): ContinuousScaleDirection | null {
-  if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.5) return null;
-  // Browser wheel convention: negative delta = wheel forward/up = zoom in.
-  return deltaY < 0 ? "in" : "out";
+  deltaMode = 0,
+  pagePixels = 800,
+): number {
+  if (!Number.isFinite(deltaY)) return 0;
+
+  let normalized = deltaY;
+  if (deltaMode === 1) {
+    normalized *= CONTINUOUS_SCALE_LINE_PIXELS;
+  } else if (deltaMode === 2) {
+    const normalizedPage = Number.isFinite(pagePixels)
+      ? Math.min(960, Math.max(320, pagePixels))
+      : 800;
+    normalized *= normalizedPage;
+  }
+
+  if (Math.abs(normalized) < CONTINUOUS_SCALE_JITTER_FLOOR) return 0;
+  return Math.min(
+    CONTINUOUS_SCALE_MAX_DELTA,
+    Math.max(-CONTINUOUS_SCALE_MAX_DELTA, normalized),
+  );
 }
 
-export function continuousScaleDelta(deltaY: number): number {
-  if (!Number.isFinite(deltaY)) return 0;
-  return Math.min(96, Math.max(-96, deltaY));
+export function continuousScaleDirection(
+  deltaY: number,
+  deltaMode = 0,
+  pagePixels = 800,
+): ContinuousScaleDirection | null {
+  const normalized = continuousScaleDelta(deltaY, deltaMode, pagePixels);
+  if (normalized === 0) return null;
+  // Browser wheel convention: negative delta = wheel forward/up = zoom in.
+  return normalized < 0 ? "in" : "out";
 }
 
 export function isWorldScalePhase(phase: UniversePhase): boolean {
@@ -61,8 +91,12 @@ export function scalePositionForPhase(
 export function applySystemScaleWheel(
   position: number,
   deltaY: number,
+  deltaMode = 0,
+  pagePixels = 800,
 ): number {
-  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
+  const delta =
+    -continuousScaleDelta(deltaY, deltaMode, pagePixels) /
+    WORLD_SCALE_WHEEL_SPAN;
   return Math.min(
     WORLD_SCALE_MIN,
     Math.max(SYSTEM_SCALE_MIN, position + delta),
@@ -94,8 +128,12 @@ export function applyWorldScaleWheel(
   position: number,
   deltaY: number,
   surfaceMode: PlanetSurfaceMode,
+  deltaMode = 0,
+  pagePixels = 800,
 ): number {
-  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
+  const delta =
+    -continuousScaleDelta(deltaY, deltaMode, pagePixels) /
+    WORLD_SCALE_WHEEL_SPAN;
   return clampWorldScalePosition(position + delta, surfaceMode);
 }
 
