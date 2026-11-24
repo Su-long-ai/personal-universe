@@ -154,7 +154,15 @@ export function CinematicPipeline({
     gl.toneMappingExposure = 1.0;
     gl.outputColorSpace = THREE.SRGBColorSpace;
 
-    const next = new EffectComposer(gl);
+    // EffectComposer otherwise allocates its initial ping-pong targets at
+    // the renderer drawing-buffer size before the later parking effect can
+    // shrink them. Software AUTO/LOW spends most of its lifetime parked, so
+    // start the same composer at 1x1 and only grow it when HIGH live rendering
+    // explicitly needs the post-processing path.
+    const initialTarget = softwareRenderer
+      ? new THREE.WebGLRenderTarget(1, 1)
+      : undefined;
+    const next = new EffectComposer(gl, initialTarget);
     next.addPass(new RenderPass(scene, camera));
 
     // Keep one composer for the lifetime of this R3F renderer. PlanetPass is
