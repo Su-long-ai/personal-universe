@@ -361,7 +361,7 @@ export default function UniverseApp({
   }, [surfaceProfile]);
   const worldContentEntries = useMemo(() => {
     const entries = selectedPlanet?.content ?? [];
-    if (phase !== "surface" || !surfaceProfile) return entries;
+    if (!surfaceProfile) return entries;
 
     const rank = new Map(
       rankSurfaceContentAnchors(
@@ -375,7 +375,7 @@ export default function UniverseApp({
           (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
         a.title.localeCompare(b.title),
     );
-  }, [phase, selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
