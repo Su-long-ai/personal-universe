@@ -13,6 +13,9 @@ import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
+const SOFTWARE_FULL_COVERAGE_CHUNKS = 13;
+const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
+const SOFTWARE_STREAM_WARMUP_UPDATES = 16;
 
 const ROCKS = [
   { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
@@ -183,7 +186,9 @@ export function SurfaceTerrain({
       }
       terrainViewInitialized.current = false;
       terrainReadyPublished.current = false;
-      softwareStreamUpdates.current = softwareRenderer ? 9 : 0;
+      softwareStreamUpdates.current = softwareRenderer
+        ? SOFTWARE_STREAM_WARMUP_UPDATES
+        : 0;
       softwareStreamAccumulator.current = 0;
       document.documentElement.dataset.universeSurfaceTerrainProfile =
         softwareRenderer ? "infinite-software" : "infinite-hardware";
@@ -266,7 +271,7 @@ export function SurfaceTerrain({
         terrainViewInitialized.current = true;
         softwareStreamUpdates.current = Math.max(
           softwareStreamUpdates.current,
-          9,
+          SOFTWARE_STREAM_WARMUP_UPDATES,
         );
         softwareStreamAccumulator.current = 0;
       }
@@ -282,7 +287,13 @@ export function SurfaceTerrain({
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };
-      const readyChunkCount = softwareRenderer ? 16 : 9;
+      // ProceduralTerrains uses radial (not square) coverage. Radius 2 has
+      // exactly 13 desired chunks and radius 3 has 29. Publish readiness only
+      // when the complete initial ring exists, so the product never treats a
+      // partially streamed horizon as settled.
+      const readyChunkCount = softwareRenderer
+        ? SOFTWARE_FULL_COVERAGE_CHUNKS
+        : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
         onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
