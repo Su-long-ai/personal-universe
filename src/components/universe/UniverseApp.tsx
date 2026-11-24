@@ -297,6 +297,13 @@ export default function UniverseApp({
         : null,
     [selectedPlanet],
   );
+  const surfaceFocusedAnchor = useMemo(
+    () =>
+      surfaceProfile?.contentAnchors.find(
+        (anchor) => anchor.entryId === surfaceFocusEntryId,
+      ) ?? null,
+    [surfaceFocusEntryId, surfaceProfile],
+  );
   const surfaceContentPresentation = useMemo(() => {
     if (!surfaceProfile) {
       return new Map<
@@ -3224,7 +3231,10 @@ export default function UniverseApp({
               className="surface-cluster-index"
               aria-label="Surface signal clusters"
             >
-              {rankSurfaceContentClusters(surfaceProfile.contentClusters)
+              {rankSurfaceContentClusters(
+                surfaceProfile.contentClusters,
+                surfaceFocusedAnchor?.cluster ?? null,
+              )
                 .slice(0, 3)
                 .map((cluster) => (
                   <span
