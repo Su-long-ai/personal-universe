@@ -92,7 +92,7 @@ export function UniverseNavigator({
       sections.find((section) => section.id === "research")
         ?.destinations ?? [];
 
-    return [
+    const candidates = [
       {
         id: "featured",
         title: "Featured Journey",
@@ -109,6 +109,17 @@ export function UniverseNavigator({
         destinations: research,
       },
     ];
+
+    const seenRoutes = new Set<string>();
+    return candidates.filter((journey) => {
+      if (journey.destinations.length === 0) return false;
+      const routeKey = journey.destinations
+        .map((destination) => destination.id)
+        .join("\u0000");
+      if (seenRoutes.has(routeKey)) return false;
+      seenRoutes.add(routeKey);
+      return true;
+    });
   }, [sections]);
 
   useEffect(() => {
@@ -341,7 +352,7 @@ export function UniverseNavigator({
           </small>
         </div>
 
-        {!query.trim() && onStartJourney && (
+        {!query.trim() && onStartJourney && journeyOptions.length > 0 && (
           <div
             className="navigator-journeys"
             aria-label={text(locale, "guidedJourneys")}
@@ -354,20 +365,14 @@ export function UniverseNavigator({
                 <button
                   type="button"
                   key={journey.id}
-                  disabled={journey.destinations.length === 0}
                   onClick={() => {
-                    if (!journey.destinations.length) return;
                     onStartJourney(journey.title, journey.destinations);
                     onClose();
                   }}
                 >
                   <strong>{journeyTitle(locale, journey.title)}</strong>
                   <small>
-                    {journey.destinations.length
-                      ? journey.destinations.length +
-                        " " +
-                        text(locale, "stops")
-                      : text(locale, "noSignalsYet")}
+                    {journey.destinations.length + " " + text(locale, "stops")}
                   </small>
                 </button>
               ))}

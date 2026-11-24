@@ -1560,6 +1560,12 @@ test("Guided Journey completes visibly and competing navigation interrupts", asy
     name: /Featured Journey/,
   });
   await expect(featuredJourney).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: /Projects Journey/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Research Journey/ }),
+  ).toHaveCount(0);
   await featuredJourney.click();
 
   await expect(dialog).toBeHidden();
