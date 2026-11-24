@@ -98,6 +98,7 @@ export function SurfaceScene({
   hasPlanet: boolean;
 }) {
   const { gl } = useThree();
+  const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
@@ -111,6 +112,19 @@ export function SurfaceScene({
     setAnchorHeight(height);
     document.documentElement.dataset.universeSurfaceTerrainState = "ready";
   }, []);
+
+  useFrame(() => {
+    const group = surfaceGroupRef.current;
+    if (!group) return;
+
+    // React may not have reconciled the new phase into the R3F subtree yet
+    // when software rendering is saturated. The navigation coordinator updates
+    // phaseRef synchronously in the wheel handler, so hide the heavy retained
+    // Surface group before the next render as soon as that intent leaves
+    // Surface. This is presentation-only gating; React phase remains the
+    // navigation authority and will reconcile the same visibility normally.
+    group.visible = active && phaseRef.current === "surface";
+  }, -100);
 
   useEffect(() => {
     if (!active) {
@@ -206,7 +220,7 @@ export function SurfaceScene({
           <fog attach="fog" args={["#07141d", 34, 118]} />
         </>
       ) : null}
-      <group visible={active}>{content}</group>
+      <group ref={surfaceGroupRef} visible={active}>{content}</group>
     </>
   );
 }
