@@ -30,6 +30,12 @@ interface Autopilot {
   q0: Quaternion;
   /** 'goto': screen-up at arrival (unit); default keeps the roll the flight started with */
   up1?: Vector3;
+  /**
+   * Optional product-owned scrub coordinate. When present, elapsed time no
+   * longer advances this trajectory; update() evaluates the same native YEIS
+   * logarithmic path at this exact normalized progress instead.
+   */
+  progressOverride?: number;
 }
 
 const _v = new Vector3();
@@ -301,6 +307,24 @@ export class CameraController {
     this.setMode(this.mode === 'free' ? 'orbit' : 'free');
   }
 
+  /**
+   * Scrub the current native YEIS autopilot trajectory from an external,
+   * normalized coordinate. This deliberately reuses the controller's own
+   * logarithmic distance/orientation semantics while removing elapsed time as
+   * the motion authority. Pass null to return the trajectory to normal timed
+   * execution.
+   */
+  setAutopilotProgress(progress: number | null): boolean {
+    const ap = this.autopilot;
+    if (!ap) return false;
+    if (progress === null || !Number.isFinite(progress)) {
+      delete ap.progressOverride;
+      return true;
+    }
+    ap.progressOverride = Math.min(1, Math.max(0, progress));
+    return true;
+  }
+
   update(dt: number, input: Input, viewportW: number, viewportH: number, fovRad: number): void {
     // 1. Inherit reference-frame motion
     if (this.reference) {
@@ -316,7 +340,9 @@ export class CameraController {
     // 2. Autopilot
     if (this.autopilot) {
       const ap = this.autopilot;
-      ap.t += dt;
+      const progressOverride = ap.progressOverride;
+      if (progressOverride === undefined) ap.t += dt;
+      else ap.t = progressOverride * ap.duration;
       const s = smoothstep(ap.t / ap.duration);
       const tgt = ap.target;
       const tgtPos = tgt ? tgt.position : ap.point;
@@ -347,7 +373,7 @@ export class CameraController {
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, s);
       }
-      if (ap.t >= ap.duration || dx !== 0 || dy !== 0 || touching || input.down('KeyW') || input.down('KeyS')) {
+      if ((progressOverride === undefined && ap.t >= ap.duration) || dx !== 0 || dy !== 0 || touching || input.down('KeyW') || input.down('KeyS')) {
         if (ap.kind === 'goto' && tgt) {
           this.mode = 'orbit';
           this.setReference(tgt);

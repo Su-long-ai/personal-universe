@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "GALAXY-NATIVE-SCALE-PROGRESS-EXECUTOR-001",
+  "approved_at": "2026-11-24T14:41:48.395Z",
+  "baseline_commit": "30f7175b77d6fbc6dcd39c6926f1fd20bf01061f",
+  "record_path": "docs/reuse-gate/tasks/GALAXY-NATIVE-SCALE-PROGRESS-EXECUTOR-001.json",
+  "record_sha256": "4079096ff133d21d9a84820ae79397f6886dcc2f8245b15c101d097ce3344672",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse pinned MIT YEIS CameraController logarithmic gotoPoint trajectory as a wheel-owned progress executor for Galaxy=0 to System=1, eliminating elapsed-time advancement without adding another camera or tween authority."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/vendor/yeis/camera/CameraController.ts",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "yeis-autopilot-progress-override"
+  ],
+  "candidate_scores": {
+    "yeis-autopilot-progress-override": 57,
+    "yeis-time-scrub-from-scene": null,
+    "project-owned-log-tween": null
+  }
+}
