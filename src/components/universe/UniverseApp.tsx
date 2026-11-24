@@ -963,6 +963,8 @@ export default function UniverseApp({
       journeyRef.current = null;
       setJourney(null);
       replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       const system = resolveMarker(marker);
@@ -1009,6 +1011,8 @@ export default function UniverseApp({
         journeyRef.current = null;
         setJourney(null);
         replaceJourneyUrl(null);
+        delete document.documentElement.dataset.universeJourneyRoute;
+        delete document.documentElement.dataset.universeJourneyDeepLink;
         delete document.documentElement.dataset.universeJourney;
         delete document.documentElement.dataset.universeJourneyComplete;
       }
@@ -1249,6 +1253,8 @@ export default function UniverseApp({
       journeyRef.current = null;
       setJourney(null);
       replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       if (activeEngine !== "yeis") return;
@@ -1794,6 +1800,10 @@ export default function UniverseApp({
       journeyRef.current = null;
       setJourney(null);
       replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
+      delete document.documentElement.dataset.universeJourney;
+      delete document.documentElement.dataset.universeJourneyComplete;
       setCameraSettledPhase(null);
       setSelectedPlanet(planet);
       ensurePlaying();
