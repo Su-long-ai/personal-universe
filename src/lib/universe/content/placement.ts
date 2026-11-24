@@ -89,6 +89,27 @@ export function placementsForMarker(
   return placements.filter((placement) => placement.markerId === markerId);
 }
 
+/**
+ * Resolve one authored content placement by canonical or migration-era identity.
+ * Legacy IDs are exact aliases only; the returned placement always retains the
+ * canonical entry.id used by current Personal destinations.
+ */
+export function placementForContentReference(
+  placements: readonly UniverseContentPlacement[],
+  reference: string,
+): UniverseContentPlacement | undefined {
+  const entryId = reference.startsWith("personal:")
+    ? reference.slice("personal:".length)
+    : reference;
+  if (!entryId) return undefined;
+
+  return placements.find(
+    (placement) =>
+      placement.entry.id === entryId ||
+      placement.entry.legacyIds?.includes(entryId),
+  );
+}
+
 function resolvePinnedMarker(
   entry: UniverseContentEntry,
   markers: GalaxyMarker[],

@@ -7,12 +7,18 @@ import {
   derivePersonalSignalMetadata,
   localizeUniverseContent,
   migrateContentRecord,
+  normalizeImportedContentBatch,
   normalizeImportedContentRecord,
   resolveUniverseContentReference,
   validateUniverseContentCatalog,
   validateUniverseContentDestinations,
+  validateUniverseContentMediaPresence,
 } from "../src/lib/universe/content/authoring.ts";
-import type { UniverseContentEntry } from "../src/lib/universe/content/types.ts";
+import { placementForContentReference } from "../src/lib/universe/content/placement.ts";
+import type {
+  UniverseContentEntry,
+  UniverseContentPlacement,
+} from "../src/lib/universe/content/types.ts";
 
 function entry(
   overrides: Partial<UniverseContentEntry> = {},
@@ -107,6 +113,32 @@ test("legacy ids resolve old deep-link identities", () => {
   );
 });
 
+test("placement lookup canonicalizes legacy Personal deep-link ids", () => {
+  const canonical = entry({
+    id: "current-id",
+    legacyIds: ["old-id"],
+  });
+  const placement: UniverseContentPlacement = {
+    entry: canonical,
+    markerId: "marker-1",
+    nativeId: "c1",
+    planetSlotSeed: 1,
+  };
+
+  assert.equal(
+    placementForContentReference([placement], "personal:current-id")?.entry.id,
+    "current-id",
+  );
+  assert.equal(
+    placementForContentReference([placement], "personal:old-id")?.entry.id,
+    "current-id",
+  );
+  assert.equal(
+    placementForContentReference([placement], "personal:missing"),
+    undefined,
+  );
+});
+
 test("schema v0 records migrate deterministically", () => {
   const legacy = {
     id: "legacy-project",
@@ -141,6 +173,93 @@ test("imports reject unknown fields rather than silently dropping them", () => {
         unexpected: true,
       }),
     /unknown field/,
+  );
+});
+
+test("batch import normalizes deterministically and preserves import provenance", () => {
+  const batch = normalizeImportedContentBatch(
+    [
+      {
+        schemaVersion: 1,
+        contentId: "z-item",
+        title: "Z",
+        summary: "Z summary",
+        kind: "note",
+      },
+      {
+        schemaVersion: 1,
+        contentId: "a-item",
+        title: "A",
+        summary: "A summary",
+        kind: "project",
+      },
+    ],
+    { source: "import:fixture.json" },
+  );
+  assert.deepEqual(
+    batch.map((item) => item.contentId),
+    ["a-item", "z-item"],
+  );
+  assert.deepEqual(batch[0]?.provenance, {
+    kind: "authored",
+    source: "import:fixture.json",
+  });
+  assert.throws(
+    () =>
+      normalizeImportedContentBatch([
+        {
+          contentId: "same",
+          title: "One",
+          summary: "One",
+          kind: "note",
+        },
+        {
+          contentId: "same",
+          title: "Two",
+          summary: "Two",
+          kind: "note",
+        },
+      ]),
+    /duplicate contentId/,
+  );
+});
+
+test("authoring normalization rejects invalid URLs", () => {
+  assert.throws(
+    () =>
+      normalizeImportedContentRecord({
+        contentId: "bad-link",
+        title: "Bad link",
+        summary: "Bad link",
+        kind: "note",
+        links: [{ label: "bad", url: "not-a-url" }],
+      }),
+    /absolute URL/,
+  );
+});
+
+test("media type and existence validation is actionable", () => {
+  const value = entry({
+    id: "with-media",
+    media: [
+      {
+        src: "/content/missing.exe",
+        alt: "missing",
+        kind: "image",
+      },
+    ],
+  });
+  const catalogIssues = validateUniverseContentCatalog([value]);
+  assert.ok(
+    catalogIssues.some((issue) => issue.code === "unsupported_media_type"),
+  );
+  const presenceIssues = validateUniverseContentMediaPresence(
+    [value],
+    () => false,
+  );
+  assert.deepEqual(
+    presenceIssues.map((issue) => issue.code),
+    ["missing_media_asset"],
   );
 });
 

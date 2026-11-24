@@ -4,19 +4,23 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, extname, resolve, sep } from "node:path";
+import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   authoringRecordToUniverseContentEntry,
   buildUniverseContentIndex,
   derivePersonalSignalMetadata,
   migrateContentRecord,
+  normalizeImportedContentBatch,
   normalizeImportedContentRecord,
   resolveUniverseContentReference,
   validateUniverseContentCatalog,
+  validateUniverseContentMediaPresence,
 } from "../src/lib/universe/content/authoring.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -149,15 +153,47 @@ function loadJsonContentRecords() {
   return { entries, sources, failures, files };
 }
 
+const MEDIA_MAX_BYTES = {
+  image: 8 * 1024 * 1024,
+  video: 64 * 1024 * 1024,
+  audio: 32 * 1024 * 1024,
+  document: 16 * 1024 * 1024,
+};
+
+function publicAssetPath(src) {
+  let clean;
+  try {
+    clean = decodeURIComponent(src.split(/[?#]/, 1)[0]);
+  } catch {
+    return null;
+  }
+  const target = resolve(PUBLIC_DIR, "." + clean);
+  const publicPrefix = PUBLIC_DIR.endsWith(sep) ? PUBLIC_DIR : PUBLIC_DIR + sep;
+  return target === PUBLIC_DIR || target.startsWith(publicPrefix) ? target : null;
+}
+
 function mediaFailures(entries, sources) {
   const failures = [];
+  const presenceIssues = validateUniverseContentMediaPresence(
+    entries,
+    (src) => {
+      const target = publicAssetPath(src);
+      return Boolean(target && existsSync(target) && statSync(target).isFile());
+    },
+  );
+  for (const issue of presenceIssues) {
+    failures.push(
+      (issue.entryId ? sources.get(issue.entryId) ?? issue.entryId : "catalog") +
+        ": " +
+        issue.message,
+    );
+  }
+
   for (const entry of entries) {
     for (const media of entry.media ?? []) {
       if (!media.src.startsWith("/")) continue;
-      const clean = decodeURIComponent(media.src.split(/[?#]/, 1)[0]);
-      const target = resolve(PUBLIC_DIR, "." + clean);
-      const publicPrefix = PUBLIC_DIR.endsWith(sep) ? PUBLIC_DIR : PUBLIC_DIR + sep;
-      if (target !== PUBLIC_DIR && !target.startsWith(publicPrefix)) {
+      const target = publicAssetPath(media.src);
+      if (!target) {
         failures.push(
           (sources.get(entry.id) ?? entry.id) +
             ': media path escapes public/: "' +
@@ -166,17 +202,64 @@ function mediaFailures(entries, sources) {
         );
         continue;
       }
-      if (!existsSync(target) || !statSync(target).isFile()) {
+      if (!existsSync(target) || !statSync(target).isFile()) continue;
+      const size = statSync(target).size;
+      const limit = MEDIA_MAX_BYTES[media.kind];
+      if (size > limit) {
         failures.push(
           (sources.get(entry.id) ?? entry.id) +
-            ': media asset does not exist: "' +
+            ': media asset "' +
             media.src +
-            '".',
+            '" is ' +
+            Math.ceil(size / 1024 / 1024) +
+            " MiB; " +
+            media.kind +
+            " limit is " +
+            Math.floor(limit / 1024 / 1024) +
+            " MiB.",
         );
       }
     }
   }
   return failures;
+}
+
+function mediaWarnings(entries) {
+  const warnings = [];
+  const owners = new Map();
+  for (const entry of entries) {
+    for (const media of entry.media ?? []) {
+      if (!media.src.startsWith("/")) continue;
+      const list = owners.get(media.src) ?? [];
+      list.push(entry.id);
+      owners.set(media.src, list);
+    }
+  }
+  for (const [src, ids] of owners) {
+    if (ids.length > 1) {
+      warnings.push(
+        'shared media "' + src + '" is referenced by: ' + ids.sort().join(", "),
+      );
+    }
+  }
+
+  const managed = resolve(PUBLIC_DIR, "content");
+  if (existsSync(managed)) {
+    const referenced = new Set(
+      [...owners.keys()]
+        .map((src) => publicAssetPath(src))
+        .filter(Boolean),
+    );
+    for (const path of walkFiles(managed)) {
+      if (statSync(path).isFile() && !referenced.has(path)) {
+        warnings.push(
+          "unused public/content asset: " +
+            relative(ROOT, path).replaceAll("\\", "/"),
+        );
+      }
+    }
+  }
+  return warnings.sort();
 }
 
 function allValidationFailures() {
@@ -193,7 +276,12 @@ function allValidationFailures() {
   const nonJson = files.filter((path) =>
     [".md", ".mdx"].includes(extname(path).toLowerCase()),
   );
-  return { entries, failures, nonJson };
+  return {
+    entries,
+    failures,
+    warnings: mediaWarnings(entries),
+    nonJson,
+  };
 }
 
 function commandNew(args) {
@@ -258,32 +346,19 @@ function commandNew(args) {
   );
 }
 
-function importItems(value) {
-  if (Array.isArray(value)) return value;
-  if (value && typeof value === "object" && Array.isArray(value.items)) {
-    return value.items;
-  }
-  return [value];
-}
-
 function commandImport(args) {
   const sourceArg = args.positionals[0];
   if (!sourceArg) fail("content:import requires a JSON file path.");
   const source = resolve(process.cwd(), sourceArg);
-  const normalized = importItems(readJson(source)).map((item, index) => {
-    try {
-      return normalizeImportedContentRecord(item);
-    } catch (error) {
-      fail(source + " item " + index + ": " + error.message);
-    }
+  const provenanceSource =
+    typeof option(args, "source") === "string"
+      ? String(option(args, "source"))
+      : "import:" + basename(source);
+  const normalized = normalizeImportedContentBatch(readJson(source), {
+    source: provenanceSource,
   });
 
-  const ids = new Set();
   for (const record of normalized) {
-    if (ids.has(record.contentId)) {
-      fail(source + ': duplicate contentId "' + record.contentId + '".');
-    }
-    ids.add(record.contentId);
     if (existsSync(contentPath(record.contentId))) {
       fail(
         source +
@@ -295,12 +370,49 @@ function commandImport(args) {
   }
 
   const dryRun = hasFlag(args, "dry-run");
-  for (const record of normalized.sort((a, b) =>
-    String(a.contentId).localeCompare(String(b.contentId)),
-  )) {
-    const { target } = writeRecord(record, dryRun);
-    process.stdout.write((dryRun ? "[dry-run] " : "") + "imported " + target + "\n");
+  if (dryRun) {
+    for (const record of normalized) {
+      process.stdout.write(
+        "[dry-run] imported " + contentPath(record.contentId) + "\n",
+      );
+    }
+    process.stdout.write("normalized " + normalized.length + " content item(s).\n");
+    return;
   }
+
+  mkdirSync(CONTENT_DIR, { recursive: true });
+  const staged = [];
+  const committed = [];
+  try {
+    for (const record of normalized) {
+      const target = contentPath(record.contentId);
+      const temporary =
+        target + ".tmp-" + process.pid + "-" + randomUUID().slice(0, 8);
+      writeFileSync(temporary, JSON.stringify(record, null, 2) + "\n", {
+        encoding: "utf8",
+        flag: "wx",
+      });
+      staged.push({ temporary, target });
+    }
+
+    for (const item of staged) {
+      renameSync(item.temporary, item.target);
+      committed.push(item.target);
+      process.stdout.write("imported " + item.target + "\n");
+    }
+  } catch (error) {
+    for (const item of staged) {
+      if (existsSync(item.temporary)) unlinkSync(item.temporary);
+    }
+    for (const target of committed.reverse()) {
+      if (existsSync(target)) unlinkSync(target);
+    }
+    throw new Error(
+      "batch import rolled back after write failure: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+
   process.stdout.write("normalized " + normalized.length + " content item(s).\n");
 }
 
@@ -321,12 +433,15 @@ function commandMigrate(args) {
 }
 
 function commandValidate() {
-  const { entries, failures, nonJson } = allValidationFailures();
+  const { entries, failures, warnings, nonJson } = allValidationFailures();
   if (failures.length > 0) {
     fail(
       "Personal content validation failed:\n" +
         failures.map((failure) => "- " + failure).join("\n"),
     );
+  }
+  for (const warning of warnings) {
+    process.stderr.write("[CONTENT] warning: " + warning + "\n");
   }
   process.stdout.write(
     "[CONTENT] valid " +
@@ -409,7 +524,7 @@ Commands:
   new --title <text> --summary <text> --kind <kind> [--id <stable-id>]
       [--title-zh <text>] [--summary-zh <text>] [--tag <tag>]...
       [--placement auto|hero|pinned] [--star <native-id>] [--draft] [--dry-run]
-  import <batch.json> [--dry-run]
+  import <batch.json> [--source <provenance>] [--dry-run]
   migrate <record.json> [--write]
   validate
   preview --id <canonical-or-legacy-id>

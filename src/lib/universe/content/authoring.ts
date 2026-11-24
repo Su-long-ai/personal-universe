@@ -91,6 +91,25 @@ function optionalString(value: unknown, field: string): string | undefined {
   return nonEmptyString(value, field);
 }
 
+function absoluteUrl(value: unknown, field: string): string {
+  const text = nonEmptyString(value, field);
+  try {
+    new URL(text);
+  } catch {
+    throw new Error(field + " must be an absolute URL.");
+  }
+  return text;
+}
+
+function httpUrl(value: unknown, field: string): string {
+  const text = absoluteUrl(value, field);
+  const protocol = new URL(text).protocol;
+  if (protocol !== "http:" && protocol !== "https:") {
+    throw new Error(field + " must use http(s).");
+  }
+  return text;
+}
+
 function stringArray(value: unknown, field: string): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error(field + " must be an array.");
@@ -232,10 +251,10 @@ function normalizeMedia(value: unknown): UniverseContentMedia[] {
     const field = "media[" + index + "]";
     if (!isRecord(item)) throw new Error(field + " must be an object.");
     rejectUnknownKeys(item, ["src", "alt", "kind", "width", "height"], field);
-    const src = nonEmptyString(item.src, field + ".src");
-    if (!src.startsWith("/") && !/^https?:\/\//.test(src)) {
-      throw new Error(field + ".src must be root-relative or http(s).");
-    }
+    const rawSrc = nonEmptyString(item.src, field + ".src");
+    const src = rawSrc.startsWith("/")
+      ? rawSrc
+      : httpUrl(rawSrc, field + ".src");
     const alt = nonEmptyString(item.alt, field + ".alt");
     const kind = nonEmptyString(item.kind ?? "image", field + ".kind");
     if (!["image", "video", "audio", "document"].includes(kind)) {
@@ -270,7 +289,7 @@ function normalizeLinks(
     rejectUnknownKeys(item, ["label", "url"], field);
     return {
       label: nonEmptyString(item.label, field + ".label"),
-      url: nonEmptyString(item.url, field + ".url"),
+      url: absoluteUrl(item.url, field + ".url"),
     };
   });
 }
@@ -423,6 +442,11 @@ export function normalizeImportedContentRecord(
     }
   }
 
+  const placementKey = optionalString(migrated.placementKey, "placementKey");
+  const href =
+    migrated.href === undefined ? undefined : absoluteUrl(migrated.href, "href");
+  const surface = normalizeSurface(migrated.surface);
+
   return {
     schemaVersion: CURRENT_CONTENT_SCHEMA_VERSION,
     contentId,
@@ -444,24 +468,65 @@ export function normalizeImportedContentRecord(
       "signalVisible",
     ),
     placement,
-    ...(optionalString(migrated.placementKey, "placementKey")
-      ? { placementKey: optionalString(migrated.placementKey, "placementKey") }
-      : {}),
+    ...(placementKey ? { placementKey } : {}),
     ...(starId ? { starId } : {}),
-    ...(optionalString(migrated.href, "href")
-      ? { href: optionalString(migrated.href, "href") }
-      : {}),
+    ...(href ? { href } : {}),
     links: normalizeLinks(migrated.links),
     media: normalizeMedia(migrated.media),
-    ...(normalizeSurface(migrated.surface)
-      ? { surface: normalizeSurface(migrated.surface) }
-      : {}),
+    ...(surface ? { surface } : {}),
     provenance: normalizeProvenance(migrated.provenance),
     relations: normalizeRelations(migrated.relations),
     journeys: stringArray(migrated.journeys, "journeys"),
     legacyIds,
     draft: booleanValue(migrated.draft, false, "draft"),
   };
+}
+
+export function normalizeImportedContentBatch(
+  input: unknown,
+  options: { source?: string } = {},
+): Record<string, unknown>[] {
+  const items =
+    Array.isArray(input)
+      ? input
+      : isRecord(input) && Array.isArray(input.items)
+        ? input.items
+        : [input];
+
+  const normalized = items.map((item, index) => {
+    try {
+      const withSource =
+        options.source &&
+        isRecord(item) &&
+        item.provenance === undefined
+          ? {
+              ...item,
+              provenance: { kind: "authored", source: options.source },
+            }
+          : item;
+      return normalizeImportedContentRecord(withSource);
+    } catch (error) {
+      throw new Error(
+        "batch item " +
+          index +
+          ": " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  });
+
+  const seen = new Set<string>();
+  for (const record of normalized) {
+    const id = record.contentId as string;
+    if (seen.has(id)) {
+      throw new Error('batch contains duplicate contentId "' + id + '".');
+    }
+    seen.add(id);
+  }
+
+  return normalized.sort((left, right) =>
+    String(left.contentId).localeCompare(String(right.contentId)),
+  );
 }
 
 export function authoringRecordToUniverseContentEntry(
@@ -581,6 +646,44 @@ function normalizedAlias(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase("en-US");
 }
 
+const LOCAL_MEDIA_EXTENSIONS: Record<
+  UniverseContentMedia["kind"],
+  ReadonlySet<string>
+> = {
+  image: new Set(["avif", "gif", "jpeg", "jpg", "png", "svg", "webp"]),
+  video: new Set(["m4v", "mp4", "webm"]),
+  audio: new Set(["aac", "flac", "m4a", "mp3", "ogg", "wav"]),
+  document: new Set(["csv", "json", "md", "pdf", "txt", "zip"]),
+};
+
+function mediaPathExtension(src: string): string {
+  const clean = src.split(/[?#]/, 1)[0] ?? src;
+  const slash = clean.lastIndexOf("/");
+  const dot = clean.lastIndexOf(".");
+  return dot > slash ? clean.slice(dot + 1).toLowerCase() : "";
+}
+
+export function validateUniverseContentMediaPresence(
+  entries: readonly UniverseContentEntry[],
+  assetExists: (publicPath: string) => boolean,
+): UniverseContentValidationIssue[] {
+  const issues: UniverseContentValidationIssue[] = [];
+  for (const entry of entries) {
+    for (const [index, media] of (entry.media ?? []).entries()) {
+      if (!media.src.startsWith("/")) continue;
+      if (!assetExists(media.src)) {
+        issues.push({
+          code: "missing_media_asset",
+          entryId: entry.id,
+          path: "media[" + index + "].src",
+          message: 'Local media asset does not exist: "' + media.src + '".',
+        });
+      }
+    }
+  }
+  return issues;
+}
+
 export function validateUniverseContentCatalog(
   entries: readonly UniverseContentEntry[],
 ): UniverseContentValidationIssue[] {
@@ -665,6 +768,7 @@ export function validateUniverseContentCatalog(
       });
     }
 
+    const entryMedia = new Set<string>();
     for (const [index, media] of (entry.media ?? []).entries()) {
       if (!media.alt.trim()) {
         issues.push({
@@ -672,6 +776,46 @@ export function validateUniverseContentCatalog(
           entryId: entry.id,
           path: "media[" + index + "].alt",
           message: "Media alt text must not be empty.",
+        });
+      }
+
+      const extension = mediaPathExtension(media.src);
+      if (
+        media.src.startsWith("/") &&
+        (!extension || !LOCAL_MEDIA_EXTENSIONS[media.kind].has(extension))
+      ) {
+        issues.push({
+          code: "unsupported_media_type",
+          entryId: entry.id,
+          path: "media[" + index + "].src",
+          message:
+            'Local media "' +
+            media.src +
+            '" is not a supported ' +
+            media.kind +
+            " asset.",
+        });
+      }
+
+      if (entryMedia.has(media.src)) {
+        issues.push({
+          code: "duplicate_media_reference",
+          entryId: entry.id,
+          path: "media[" + index + "].src",
+          message: 'Media "' + media.src + '" is repeated in the same item.',
+        });
+      }
+      entryMedia.add(media.src);
+
+      if (
+        media.kind === "image" &&
+        ((media.width === undefined) !== (media.height === undefined))
+      ) {
+        issues.push({
+          code: "incomplete_media_dimensions",
+          entryId: entry.id,
+          path: "media[" + index + "]",
+          message: "Image width and height must be supplied together.",
         });
       }
     }
