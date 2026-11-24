@@ -1144,6 +1144,219 @@ test("Galaxy native LOD reaches the matched System endpoint only at scale one", 
   await runtime.assertClean(testInfo);
 });
 
+test("release scale trace is monotonic from Galaxy zero to Surface five and back", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  const trace: Array<{
+    direction: "in" | "out";
+    position: number;
+    phase: string | null;
+    bridge: string | null;
+    renderer: string | null;
+  }> = [];
+
+  const sample = async (direction: "in" | "out") => {
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    trace.push({
+      direction,
+      position,
+      phase: await html.getAttribute("data-universe-navigation-phase"),
+      bridge: await html.getAttribute("data-universe-galaxy-scale-bridge"),
+      renderer:
+        (await html.getAttribute("data-universe-world-renderer")) ??
+        (await html.getAttribute("data-universe-system-renderer")) ??
+        (await html.getAttribute("data-yeis-native-system")),
+    });
+    return position;
+  };
+
+  // Use one fixed physical sample size throughout. Nothing in the test asks
+  // the product to jump to a semantic phase.
+  let previous = 0;
+  for (let index = 0; index < 18; index += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(100);
+    const position = await sample("in");
+    expect(position).toBeGreaterThanOrEqual(previous - 0.001);
+    expect(position).toBeLessThanOrEqual(5.001);
+    previous = position;
+    if (position >= 4.999) break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "5.000",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+
+  previous = 5;
+  for (let index = 0; index < 24; index += 1) {
+    await dispatchScaleWheel(page, 96);
+    await page.waitForTimeout(100);
+    const position = await sample("out");
+    expect(position).toBeLessThanOrEqual(previous + 0.001);
+    expect(position).toBeGreaterThanOrEqual(-0.001);
+    previous = position;
+    const phase = await html.getAttribute("data-universe-navigation-phase");
+    if (position <= 0.001 && phase === "galaxy") break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.000",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-navigation-phase",
+    "returning",
+  );
+
+  expect(trace.some((entry) => entry.position > 0 && entry.position < 1))
+    .toBeTruthy();
+  expect(trace.some((entry) => entry.position > 1 && entry.position < 2))
+    .toBeTruthy();
+  expect(trace.some((entry) => entry.position > 2 && entry.position < 3))
+    .toBeTruthy();
+  expect(trace.some((entry) => entry.position > 3 && entry.position < 4))
+    .toBeTruthy();
+  expect(trace.some((entry) => entry.position > 4 && entry.position < 5))
+    .toBeTruthy();
+
+  await testInfo.attach("continuous-scale-release-trace.json", {
+    body: Buffer.from(JSON.stringify(trace, null, 2)),
+    contentType: "application/json",
+  });
+  await runtime.assertClean(testInfo);
+});
+
+test("Search freezes and resumes a partial Galaxy scale path", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+
+  const beforeSearch = Number(
+    await html.getAttribute("data-universe-travel-arrival-ratio"),
+  );
+  const dialog = await openNavigator(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-superseded",
+    "navigator-open",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+
+  await page.waitForTimeout(500);
+  const duringSearch = Number(
+    await html.getAttribute("data-universe-travel-arrival-ratio"),
+  );
+  expect(Math.abs(duringSearch - beforeSearch)).toBeLessThan(0.02);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
+    )
+    .toBeLessThan(beforeSearch);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("partial Galaxy scale tolerates repeated direction changes without hidden travel", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  const sequence = [
+    [-96, "0.250"],
+    [-96, "0.500"],
+    [96, "0.250"],
+    [-96, "0.500"],
+    [96, "0.250"],
+    [96, "0.000"],
+    [-96, "0.250"],
+  ] as const;
+
+  for (const [deltaY, position] of sequence) {
+    await dispatchScaleWheel(page, deltaY);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      position,
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "galaxy",
+    );
+    await expect(html).not.toHaveAttribute("data-universe-traveling");
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel follows Hero focus from galaxy through system to surface", async ({
   page,
 }, testInfo) => {
