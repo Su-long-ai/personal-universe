@@ -21,6 +21,7 @@ const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
 const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
+let surfaceTerrainInstanceSequence = 0;
 
 function terrainErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return null;
@@ -73,6 +74,7 @@ export function SurfaceTerrain({
     setTerrain(null);
 
     void (async () => {
+      const instanceId = ++surfaceTerrainInstanceSequence;
       instance = await createInfiniteTerrain({
         renderer: gl,
         signal: controller.signal,
@@ -174,6 +176,8 @@ export function SurfaceTerrain({
       document.documentElement.dataset.universeSurfaceTerrainProfile =
         softwareRenderer ? "infinite-software" : "infinite-hardware";
       document.documentElement.dataset.universeSurfaceTerrainWorld = profile.id;
+      document.documentElement.dataset.universeSurfaceTerrainInstance =
+        `${profile.id}:${instanceId}`;
       setTerrain(instance);
     })().catch((error) => {
       const code = terrainErrorCode(error);
@@ -195,6 +199,7 @@ export function SurfaceTerrain({
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
       delete document.documentElement.dataset.universeSurfaceTerrainWorld;
+      delete document.documentElement.dataset.universeSurfaceTerrainInstance;
     };
   }, [camera, gl, onAnchorHeight, profile.id, softwareRenderer]);
 
