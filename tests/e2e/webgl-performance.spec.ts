@@ -36,14 +36,21 @@ async function dispatchScaleWheel(page: Page, deltaY: number) {
 
 async function forceWebglLossAndRestore(page: Page) {
   return page.evaluate(async () => {
+    const unavailable = () => ({
+      supported: false,
+      lost: false,
+      restored: false,
+      duringLoss: null,
+      lifecycleAfterRestore: null,
+      generationBefore: 0,
+      generationAfter: 0,
+    });
     const canvas = document.querySelector("canvas");
-    if (!canvas) return { supported: false, lost: false, restored: false };
+    if (!canvas) return unavailable();
     const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
-    if (!gl) return { supported: false, lost: false, restored: false };
+    if (!gl) return unavailable();
     const extension = gl.getExtension("WEBGL_lose_context");
-    if (!extension) {
-      return { supported: false, lost: false, restored: false };
-    }
+    if (!extension) return unavailable();
 
     const html = document.documentElement;
     const generationBefore = Number(
@@ -71,7 +78,19 @@ async function forceWebglLossAndRestore(page: Page) {
     const lostPromise = waitFor("webglcontextlost");
     extension.loseContext();
     const lost = await lostPromise;
-    if (!lost) return { supported: true, lost: false, restored: false };
+    if (!lost) {
+      return {
+        supported: true,
+        lost: false,
+        restored: false,
+        duringLoss: null,
+        lifecycleAfterRestore: html.dataset.universeWebglLifecycle ?? null,
+        generationBefore,
+        generationAfter: Number(
+          html.dataset.universeWebglContextGeneration ?? "0",
+        ),
+      };
+    }
 
     const duringLoss = {
       lifecycle: html.dataset.universeWebglLifecycle ?? null,
