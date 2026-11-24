@@ -3234,6 +3234,60 @@ test("personal signal deep link reaches system and world content", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Personal Signal deep link keeps its Surface focus through product landing @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?destination=personal%3Apersonal-universe&navigation=open&phase=surface&freeze=1",
+  );
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-deep-link",
+    "personal:personal-universe",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-entry",
+    "personal-universe",
+  );
+
+  await page.getByLabel("QUALITY").selectOption("low");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 60_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-anchor",
+    /^surface:/,
+    { timeout: 30_000 },
+  );
+
+  const focusedCard = page.locator(
+    '.world-content-card[data-surface-focus="true"]',
+  );
+  await expect(focusedCard).toHaveCount(1);
+  await expect(focusedCard).toBeVisible();
+  await expect(focusedCard).toContainText("Personal Universe");
+  await expect(focusedCard.locator(".world-content-focus-label")).toHaveText(
+    "CURRENT TARGET",
+  );
+  await expect(page.locator(".world-content-card").first()).toHaveAttribute(
+    "data-surface-focus",
+    "true",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("blocking YEIS stars.bin exercises the real v2 fallback", async ({
   page,
 }, testInfo) => {
