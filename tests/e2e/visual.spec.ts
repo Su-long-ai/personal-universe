@@ -540,7 +540,10 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
       );
       await waitForYeisEngine(page);
       await page.getByLabel("QUALITY").selectOption("high");
-      await waitForCameraSettled(page, "surface");
+      // HIGH live Surface derives its landing shot from the displaced terrain.
+      // Do not require camera settlement before that renderer-owned anchor
+      // exists; the later settlement check intentionally follows the live
+      // renderer/anchor/camera-frame readiness contract.
       const html = page.locator("html");
       await expect(html).toHaveAttribute(
         "data-universe-world-renderer",
