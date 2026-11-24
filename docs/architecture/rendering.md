@@ -41,12 +41,17 @@ The product adapter instead builds a render-only similarity-transformed
   content authority.
 
 The outer native system is fitted to the existing product system shot rather
-than moving the product camera into astronomical kilometre ranges. The adapter
-fits planet/dwarf orbital extent to the overview radius and independently caps
-the star's *rendered* overview radius, then applies the smaller of those two
-limits as one global similarity scale. This keeps the physical hierarchy and
-shader units coherent while preventing intrinsically large stars from shrinking
-their entire orbit map into a tiny central cluster.
+than moving the product camera into astronomical kilometre ranges.
+
+Pinned YEIS body, point and orbit renderers emit camera-relative child
+coordinates because their native floating-origin host keeps the camera at zero.
+The R3F product camera instead remains at its real cinematic shot position. The
+adapter therefore translates the shared native render-only sub-scene by the
+current product camera position once per frame. This restores the scene-graph
+world coordinates while preserving YEIS camera-relative distances, apparent
+sizes and shader uniforms. Without this host translation the camera displacement
+would be applied twice, making the whole native system appear artificially
+small.
 
 Product-only interaction remains a thin overlay. Invisible hit targets use the
 same native body ids and call the existing `onSelectPlanet` contract.

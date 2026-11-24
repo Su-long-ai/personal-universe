@@ -23,7 +23,6 @@ import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import { SystemScene } from "./SystemScene";
 
 const TARGET_SYSTEM_RADIUS = 8.2;
-const MAX_OVERVIEW_STAR_RADIUS = 0.12;
 const HIT_RADIUS = 0.34;
 
 type NativeResources = {
@@ -51,24 +50,12 @@ function nativePlanetId(planet: PlanetDefinition) {
 function systemScale(system: StarSystem) {
   system.update(J2000_JD, 0);
   const star = system.star;
-  let orbitalSpan = 0;
+  let span = star.radius * 120;
   for (const body of system.bodies) {
     if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
-    orbitalSpan = Math.max(
-      orbitalSpan,
-      body.position.distanceTo(star.position),
-    );
+    span = Math.max(span, body.position.distanceTo(star.position));
   }
-
-  // Fit the orbit map first, then cap the rendered star size with the same
-  // global similarity scale. The previous star.radius * 120 proxy made hot,
-  // physically large stars such as Spica shrink every orbit into a tiny
-  // central cluster even when there was ample screen space.
-  const orbitScale =
-    TARGET_SYSTEM_RADIUS / Math.max(orbitalSpan, 1);
-  const starScale =
-    MAX_OVERVIEW_STAR_RADIUS / Math.max(star.radius, 1);
-  return Math.min(orbitScale, starScale);
+  return TARGET_SYSTEM_RADIUS / Math.max(span, 1);
 }
 
 function scaledOrbit(body: CelestialBody, scale: number): OrbitElements | undefined {
@@ -352,6 +339,14 @@ export function YeisSystemScene({
 
   useFrame((state) => {
     if (!resources) return;
+
+    // Pinned YEIS renderers intentionally emit camera-relative coordinates
+    // because their native host keeps the camera at a floating origin. Our R3F
+    // product camera lives at its real shot position, so restore that origin
+    // offset once at the shared native sub-scene boundary. Child positions and
+    // shader uniforms remain camera-relative; the product camera is no longer
+    // applied a second time by the scene graph.
+    resources.scene.position.copy(camera.position);
 
     const native = resources.system;
     native.update(J2000_JD, state.clock.elapsedTime * 3600);
