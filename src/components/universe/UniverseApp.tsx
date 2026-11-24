@@ -361,11 +361,13 @@ export default function UniverseApp({
 
   const publishWorldScalePosition = useCallback(
     (position: number, immediate = false) => {
+      // Camera authority is always this imperative coordinate. React receives
+      // at most one mirror commit per RAF so diagnostics/semantic consumers
+      // stay current without making wheel sample frequency drive renders.
       worldScalePositionRef.current = position;
-      pendingWorldScaleRenderPositionRef.current = position;
       document.documentElement.dataset.universeScalePosition =
         position.toFixed(3);
-
+      pendingWorldScaleRenderPositionRef.current = position;
       if (immediate) {
         if (worldScaleRenderFrameRef.current !== null) {
           window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
@@ -579,10 +581,12 @@ export default function UniverseApp({
   }, [phase, systemScaleTargetPlanet]);
 
   useEffect(() => {
-    worldScalePositionRef.current = worldScalePosition;
+    // Every scale publisher updates the imperative ref before React state.
+    // Never mirror state back into the ref here: an older endpoint commit can
+    // otherwise overwrite a newer high-frequency Galaxy reversal.
     worldScaleRenderCommitCountRef.current += 1;
     document.documentElement.dataset.universeScalePosition =
-      worldScalePosition.toFixed(3);
+      worldScalePositionRef.current.toFixed(3);
     document.documentElement.dataset.universeScaleReactCommits = String(
       worldScaleRenderCommitCountRef.current,
     );
@@ -2246,12 +2250,17 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleQueued;
             delete document.documentElement.dataset.universeScaleBlocked;
 
-            // Native YEIS consumes Galaxy 0→1 scale through the React
-            // scene boundary, so every physical wheel sample must publish
-            // immediately. System/world camera positions can still batch to
-            // one React commit per animation frame because camera-controls
-            // owns their imperative interpolation.
-            publishWorldScalePosition(nextPosition, true);
+            // Native YEIS consumes Galaxy 0→1 directly from the shared
+            // imperative coordinate. React mirrors that coordinate at most
+            // once per RAF for semantic/diagnostic freshness; exact endpoints
+            // publish immediately for renderer handoff.
+            const semanticGalaxyEndpoint =
+              nextPosition === GALAXY_SCALE_MIN ||
+              nextPosition === SYSTEM_SCALE_MIN;
+            publishWorldScalePosition(
+              nextPosition,
+              semanticGalaxyEndpoint,
+            );
             setWorldScaleContinuous(true);
             document.documentElement.dataset.universeScaleDirection =
               direction;
@@ -2774,6 +2783,7 @@ export default function UniverseApp({
           phase={phase}
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
+          worldScalePositionRef={worldScalePositionRef}
           worldScaleContinuous={worldScaleContinuous}
           galaxyScaleTarget={galaxyScaleTarget}
           engineMode={activeEngine}
