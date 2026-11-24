@@ -515,9 +515,23 @@ identity is mirrored in a ref, so a callback whose captured identity is already
 stale is discarded before it can mutate parent readiness at all. Old cleanup
 work therefore cannot either authorize a new world or revoke a new world's
 already-earned authority. Runtime diagnostics
-`data-universe-system-handoff-target` and
-`data-universe-system-target-suppressed` make the intermediate ownership stage
-machine-verifiable.
+`data-universe-system-handoff-target`,
+`data-universe-system-target-suppressed` and
+`data-universe-system-target-sprite-suppressed` make the intermediate
+ownership stage machine-verifiable. YEIS BodyPoints is an independent sprite
+layer, so the handoff frame temporarily presents only the selected public
+`BodyView.apparentRadiusPx` as fully resolved while BodyPoints updates, then
+restores the real radius before orbit/focus consumers run. That zeros only the
+target sprite without changing the vendored renderer or hiding other System
+points.
+
+Drei `Stars@9.122.0` regenerates its position/color/size buffers whenever
+`count` changes. Renderer continuity therefore keeps star-buffer capacity
+stable across LOW/AUTO/HIGH instead of using star count as a quality switch:
+YEIS System retains 1800 points, real-GPU close-world retains 1400, and software
+close-world retains its bounded 600-point capacity. Quality changes can alter
+the substantive planet/pipeline features without reallocating the decorative
+star geometry.
 
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
