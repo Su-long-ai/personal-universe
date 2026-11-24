@@ -300,6 +300,7 @@ export function SurfaceScene({
           <SurfaceTerrain
             prepare={prepare}
             active={surfaceRequested}
+            presenting={presentationActive}
             phaseRef={phaseRef}
             onAnchorHeight={handleAnchorHeight}
           />
