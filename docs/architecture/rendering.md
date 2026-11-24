@@ -519,7 +519,10 @@ promotes only the associated signal, cluster, region and landmark; unrelated
 generated ordering is left intact. This matters most on software/LOW tiers,
 where only a bounded subset of landmarks and regions is drawn.
 
-The focused objects are presentation cues, not a new renderer authority. 3D
-signal clicks and the equivalent DOM card/cluster controls feed the same local
-Surface focus callback, while the existing CinematicCamera and destination
-coordinator retain camera and navigation ownership.
+The focused objects are presentation cues, not a new renderer authority. When
+a focused signal is attached to a generated landmark that already belongs to
+the bounded path network, that existing path is promoted/highlighted as part of
+the same context; focus never synthesizes extra roads or increases geometry
+density. 3D signal clicks and the equivalent DOM card/cluster controls feed the
+same local Surface focus callback, while the existing CinematicCamera and
+destination coordinator retain camera and navigation ownership.
