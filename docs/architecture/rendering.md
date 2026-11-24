@@ -526,3 +526,9 @@ the same context; focus never synthesizes extra roads or increases geometry
 density. 3D signal clicks and the equivalent DOM card/cluster controls feed the
 same local Surface focus callback, while the existing CinematicCamera and
 destination coordinator retain camera and navigation ownership.
+
+Cluster controls are not capped to the renderer's 3D signal budget. Every
+generated content cluster remains represented in the DOM, and repeated
+activation cycles through that cluster's signals in deterministic
+priority/title order. This keeps content reachable when software/LOW rendering
+or narrow layouts intentionally draw/show fewer anchors and cards.
