@@ -144,7 +144,11 @@ The product layer supplies English/neutral names. Legacy Turkish source strings
 are retained only where a pinned catalogue lookup requires the original ref.
 
 The current destination receives explicit visual state and all sections remain
-operable on narrow/mobile layouts.
+operable on narrow/mobile layouts. Places presentation assigns each destination
+to its first visible group, so one Personal Signal is not repeated again under
+Featured or its content-kind facet. The underlying grouped sections remain
+intact for Guided Journey derivation and Search semantics; this is display
+de-duplication, not a second destination index.
 
 ## Product Open vs native travel
 

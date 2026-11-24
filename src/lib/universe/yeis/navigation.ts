@@ -427,7 +427,7 @@ export function navigationDestinationForMarker(
       kind: "star",
       group: "stars",
       title: marker.name,
-      detail: (marker.spectralType || "STAR") + " · YEIS SYSTEM",
+      detail: (marker.spectralType || "STAR") + " · CATALOG STAR",
       target: { kind: "star", nativeId: marker.nativeId },
       markerId: marker.id,
       keywords: markerKeywords(marker),
@@ -684,7 +684,7 @@ export async function resolveUniverseNavigationDestination(
       kind: "star",
       group: "stars",
       title: runtime.universe.starName(nativeId),
-      detail: "STAR · YEIS SYSTEM",
+      detail: "STAR · CATALOG",
       target: { kind: "star", nativeId },
     };
   }
@@ -1351,7 +1351,7 @@ function blackHoleDestination(
     kind: "blackhole",
     group: "black-holes",
     title: blackHole.entry.name,
-    detail: "BLACK HOLE · YEIS PLACE",
+    detail: "BLACK HOLE · CATALOG",
     target: { kind: "blackhole", id: blackHole.entry.id },
     keywords: [
       blackHole.entry.summary,
