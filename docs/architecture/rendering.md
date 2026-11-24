@@ -510,6 +510,14 @@ or scaled onto the live globe. The primary high-quality path remains the
 continuous ProceduralPlanets globe; the fallback prioritizes correctness and
 availability over pretending to share the live globe frame.
 
+Close-world lighting keeps one stellar source axis across the boundary.
+ProceduralPlanets, the lightweight Planet fallback and the stable
+ProceduralTerrains Surface fallback all reuse
+`SURFACE_STELLAR_LIGHT_DIRECTION`; generated Surface profile azimuth/elevation
+describe that same axis while the profile remains free to vary intensity,
+palette-derived sun color and ambient/bounce metadata per world. Landing no
+longer swaps to an unrelated hard-coded Surface light direction.
+
 ### Surface spatial-focus budget
 
 Both the live ProceduralPlanets tangent layout and the retained
