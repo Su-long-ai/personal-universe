@@ -895,6 +895,138 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
   await runtime.assertClean(testInfo);
 });
 
+test("YEIS native System suppresses only the matched handoff target after first world draw", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-system-renderer",
+    "yeis-native",
+    { timeout: 20_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 20_000 },
+    )
+    .not.toBeNull();
+  const focus = await html.getAttribute("data-universe-system-focus");
+  expect(focus).toBeTruthy();
+
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const events: Array<{
+      phase: string | null;
+      started: string | null;
+      ready: string | null;
+      renderer: string | null;
+      target: string | null;
+      suppressed: string | null;
+    }> = [];
+    const sample = () => {
+      events.push({
+        phase: root.dataset.universeNavigationPhase ?? null,
+        started: root.dataset.universeWorldPaintStarted ?? null,
+        ready: root.dataset.universeWorldPaintReady ?? null,
+        renderer: root.dataset.universeSystemRenderer ?? null,
+        target: root.dataset.universeSystemHandoffTarget ?? null,
+        suppressed:
+          root.dataset.universeSystemTargetSuppressed ?? null,
+      });
+    };
+    sample();
+    const observer = new MutationObserver(sample);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: [
+        "data-universe-navigation-phase",
+        "data-universe-world-paint-started",
+        "data-universe-world-paint-ready",
+        "data-universe-system-renderer",
+        "data-universe-system-handoff-target",
+        "data-universe-system-target-suppressed",
+      ],
+    });
+    Object.assign(window, {
+      __nativeWorldHandoffEvents: events,
+      __nativeWorldHandoffObserver: observer,
+    });
+  });
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 20_000 },
+  );
+
+  const events = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __nativeWorldHandoffEvents?: Array<{
+          phase: string | null;
+          started: string | null;
+          ready: string | null;
+          renderer: string | null;
+          target: string | null;
+          suppressed: string | null;
+        }>;
+      }
+    ).__nativeWorldHandoffEvents ?? [],
+  );
+  const firstDraw = events.findIndex(
+    (event) =>
+      event.phase === "approach" &&
+      event.started === "true" &&
+      event.renderer === "yeis-native",
+  );
+  const targetTransfer = events.findIndex(
+    (event) =>
+      event.phase === "approach" &&
+      event.started === "true" &&
+      event.ready !== "true" &&
+      event.renderer === "yeis-native" &&
+      event.target === focus &&
+      event.suppressed === focus,
+  );
+  const fullHandoff = events.findIndex(
+    (event) =>
+      event.phase === "approach" &&
+      event.ready === "true",
+  );
+
+  expect(firstDraw).toBeGreaterThanOrEqual(0);
+  expect(targetTransfer).toBeGreaterThanOrEqual(firstDraw);
+  expect(fullHandoff).toBeGreaterThan(targetTransfer);
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-renderer",
+    /.+/,
+    { timeout: 10_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-target-suppressed",
+    /.+/,
+  );
+
+  await page.evaluate(() => {
+    const runtimeWindow = window as typeof window & {
+      __nativeWorldHandoffObserver?: MutationObserver;
+    };
+    runtimeWindow.__nativeWorldHandoffObserver?.disconnect();
+  });
+  await runtime.assertClean(testInfo);
+});
+
 test("Orbit capability switches reacquire paint without resurfacing System", async ({
   page,
 }, testInfo) => {
