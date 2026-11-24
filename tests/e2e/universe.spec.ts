@@ -762,6 +762,71 @@ test("apparent target radius grows monotonically during System approach", async 
   await runtime.assertClean(testInfo);
 });
 
+test("desktop aspect ratios preserve comparable apparent scale", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const viewports = [
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+    { width: 3440, height: 1440 },
+  ];
+  const normalizedRadii: number[] = [];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-camera-settled",
+      "approach",
+      { timeout: 15_000 },
+    );
+
+    await dispatchScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-segment",
+      "approach:orbit",
+    );
+    await expect
+      .poll(
+        async () =>
+          Number(await html.getAttribute("data-universe-projected-radius")),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
+
+    const projectedRadius = Number(
+      await html.getAttribute("data-universe-projected-radius"),
+    );
+    const normalizedRadius = projectedRadius / viewport.height;
+    expect(
+      normalizedRadius,
+      `${viewport.width}x${viewport.height} projected target should stay visibly framed`,
+    ).toBeGreaterThan(0.15);
+    expect(
+      normalizedRadius,
+      `${viewport.width}x${viewport.height} projected target should not clip vertically`,
+    ).toBeLessThan(0.45);
+    normalizedRadii.push(normalizedRadius);
+  }
+
+  expect(
+    Math.max(...normalizedRadii) - Math.min(...normalizedRadii),
+    "desktop projected scale should remain comparable across 16:9 and ultrawide viewports",
+  ).toBeLessThan(0.08);
+
+  await runtime.assertClean(testInfo);
+});
+
 test("rapid mid-segment reversal cancels stale scale settlement", async ({
   page,
 }, testInfo) => {
