@@ -1373,6 +1373,15 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.500",
   );
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
+    .toBeCloseTo(0.5, 2);
   const inwardRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
@@ -1386,6 +1395,15 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.250",
   );
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
+    .toBeCloseTo(0.25, 2);
   await expect
     .poll(async () =>
       Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
@@ -1912,15 +1930,14 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
 
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
-  // English "Moon" is intentionally ambiguous across native systems. Reuse
-  // the existing localized identity contract: "月球" resolves uniquely to
-  // Sol's native Moon, which remains a real Galaxy time-driven travel target.
+  // The localized alias resolves into the live native body catalogue. Detail
+  // text is runtime-owned (for example "MOON · Sol"), so select the canonical
+  // native title and let the identity assertions below prove the exact body.
   await search.fill("月球");
   const moon = page
     .locator(".navigator-result-row")
     .filter({ has: page.locator(".kind-body") })
-    .filter({ hasText: "Moon" })
-    .filter({ hasText: "EARTH'S NATURAL SATELLITE" })
+    .filter({ has: page.locator("strong", { hasText: /^Moon$/ }) })
     .first();
   await expect(moon).toBeVisible();
   await moon.locator(".navigator-result-open").click();

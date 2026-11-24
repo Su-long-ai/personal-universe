@@ -153,7 +153,8 @@ export class CameraController {
     if (_v.lengthSq() === 0) return;
     // keep current up vector where possible
     _v2.set(0, 1, 0).applyQuaternion(this.quaternion);
-    _m.lookAt(new Vector3(0, 0, 0), _v, _v2);
+    _origin.set(0, 0, 0);
+    _m.lookAt(_origin, _v, _v2);
     this.quaternion.setFromRotationMatrix(_m);
   }
 
