@@ -1,0 +1,41 @@
+{
+  "schema": 3,
+  "task_id": "WORLD-CONTINUOUS-SCALE-COORDINATE-001",
+  "approved_at": "2026-11-24T10:44:34.854Z",
+  "baseline_commit": "063f1430ce49780493767c09ce04d619a42a275a",
+  "record_path": "docs/reuse-gate/tasks/WORLD-CONTINUOUS-SCALE-COORDINATE-001.json",
+  "record_sha256": "3d7e4ead1caf22f5cce461f2b3ff9145a3824154a1601dc330f11ed1fc7db1c7",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse camera-controls lerpLookAt with the existing ProceduralPlanets close-world renderer so wheel delta continuously drives the Approach to Surface camera path while UniversePhase remains only a semantic/rendering boundary"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "compose-current-stack-continuous-coordinate",
+    "camera-controls-lerp-lookat",
+    "procedural-planets-continuous-world"
+  ],
+  "candidate_scores": {
+    "compose-current-stack-continuous-coordinate": 54,
+    "camera-controls-lerp-lookat": 57,
+    "procedural-planets-continuous-world": 55,
+    "custom-raf-scale-camera": 34.5
+  }
+}
