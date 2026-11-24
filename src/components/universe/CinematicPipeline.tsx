@@ -74,7 +74,13 @@ export function CinematicPipeline({
           : null;
   const useLiveWorld = liveWorld && !fallbackReason;
   const softwareHigh = softwareRenderer && quality === "high";
+  const impostorPixels = softwareRenderer
+    ? 180
+    : quality === "high"
+      ? 90
+      : 120;
   const stableFrames = useRef(0);
+  const appliedImpostorPixels = useRef<number | null>(null);
   const metricFrame = useRef(0);
   const reportedReady = useRef<boolean | null>(null);
   const onReadyChangeRef = useRef(onReadyChange);
@@ -120,7 +126,11 @@ export function CinematicPipeline({
             background: "transparent",
             output: "linear",
             impostors: true,
-            impostorPixels: softwareRenderer ? 180 : 90,
+            // AUTO keeps the existing bounded 120 px impostor threshold.
+            // HIGH is applied through PlanetRenderer.setOptions once the
+            // lazily-created renderer exists, so quality changes do not force
+            // a composer/PlanetPass allocation.
+            impostorPixels: softwareRenderer ? 180 : 120,
           })
         : null;
     if (planetPass) next.addPass(planetPass);
@@ -231,6 +241,8 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
+      delete document.documentElement.dataset.universeWorldImpostorPixels;
+      appliedImpostorPixels.current = null;
       composer.planetPass?.dispose();
       composer.bloomPass?.dispose();
       composer.composer.dispose();
@@ -238,9 +250,22 @@ export function CinematicPipeline({
   }, [composer]);
 
   useFrame((_, delta) => {
-    composer.composer.render(delta);
-
     const html = document.documentElement;
+    const planetRenderer = composer.planetPass?.planetRenderer;
+    if (
+      planetRenderer &&
+      appliedImpostorPixels.current !== impostorPixels
+    ) {
+      planetRenderer.setOptions({ impostorPixels });
+      appliedImpostorPixels.current = impostorPixels;
+      publishDatasetMetric(
+        html,
+        "universeWorldImpostorPixels",
+        String(impostorPixels),
+      );
+    }
+
+    composer.composer.render(delta);
 
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
