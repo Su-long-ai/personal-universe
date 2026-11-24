@@ -339,6 +339,12 @@ test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
       "yeis-native",
       { timeout: 15_000 },
     );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-handoff",
+      /galaxy-system:(?:paint|deadline)/,
+      { timeout: 10_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
 
     await dispatchVisualScaleWheel(page, -96);
     await expect(html).toHaveAttribute(
@@ -720,6 +726,12 @@ for (const viewport of [TABLET, MOBILE]) {
             "system",
             { timeout: 10_000 },
           );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-handoff",
+            /galaxy-system:(?:paint|deadline)/,
+            { timeout: 10_000 },
+          );
+          expect(await page.locator("canvas").count()).toBe(1);
           await dispatchVisualScaleWheel(page, -96);
           await expect(html).toHaveAttribute(
             "data-universe-scale-position",
