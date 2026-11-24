@@ -3575,4 +3575,3 @@ test("desktop aspect ratios preserve comparable apparent scale", async ({
 
   await runtime.assertClean(testInfo);
 });
-
