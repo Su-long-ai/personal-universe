@@ -427,8 +427,11 @@ function liveStructuralQuality(
 ) {
   if (softwareRenderer) {
     return {
+      // Software HIGH stays on the same live ProceduralPlanets world but uses
+      // one less quadtree level. This cuts the close-world chunk set sharply
+      // while preserving the package's terrain/atmosphere/cloud renderer.
       chunkRes: 16,
-      maxDepth: 5,
+      maxDepth: 4,
     } as const;
   }
 
@@ -446,9 +449,13 @@ function liveDynamicQuality(
   // package's supported Planet.set() path.
   if (softwareRenderer) {
     return {
-      cloudQuality: 32,
-      cloudResolution: 0.35,
-      splitFactor: 2.3,
+      // Volumetric clouds dominate SwiftShader frame cost. Keep them live,
+      // but use the package's documented minimum cloud resolution and a lower
+      // terrain split range so input and screenshots do not stall for tens of
+      // seconds on hosted software WebGL.
+      cloudQuality: 20,
+      cloudResolution: 0.25,
+      splitFactor: 1.8,
     } as const;
   }
 
@@ -527,14 +534,11 @@ export function PlanetScene({
   useEffect(() => {
     if (fallbackReason || warmedKey === liveKey) return;
 
-    // Hidden System prewarm is useful on a real GPU, where constructing the
-    // live ProceduralPlanets world can happen without stalling the scale
-    // gesture. On software WebGL, doing that same heavy construction while
-    // the visitor is still inside System blocks input. Keep the lightweight
-    // scene/pipeline mounted there, then start the live world only once the
-    // close-world presentation becomes active; UniverseCanvas retains the
-    // matched System frame until this world has painted.
-    if (softwareRenderer && phase === "system" && !presentationActive) {
+    // Hidden prewarm is useful on a real GPU. On software WebGL, never start
+    // a new heavy Planet while presentation is hidden (System prewarm or a
+    // parked Galaxy target). A retained instance still exits above via
+    // warmedKey and remains reusable; missing work starts only when visible.
+    if (softwareRenderer && !presentationActive) {
       return;
     }
 
