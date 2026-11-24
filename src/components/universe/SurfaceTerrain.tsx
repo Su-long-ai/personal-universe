@@ -10,19 +10,12 @@ import { useGLTF } from "@react-three/drei";
 import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
-import { isSoftwareRenderer } from "./CinematicPipeline";
+import type { SurfaceWorldProfile } from "../../lib/universe/surface";\nimport { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
 const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
-
-const ROCKS = [
-  { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
-  { x: 11.0, z: 2.6, scale: 2.8, ry: 2.0, tilt: -0.06 },
-  { x: -9.8, z: -13.5, scale: 2.8, ry: 2.6, tilt: 0.03 },
-  { x: 9.6, z: -18.0, scale: 3.3, ry: 0.9, tilt: -0.04 },
-] as const;
 
 function terrainErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return null;
@@ -45,10 +38,12 @@ function seededClone(source: THREE.Object3D, index: number) {
 export function SurfaceTerrain({
   active,
   phaseRef,
+  profile,
   onAnchorHeight,
 }: {
   active: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
+  profile: SurfaceWorldProfile;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
@@ -76,6 +71,7 @@ export function SurfaceTerrain({
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
     const controller = new AbortController();
+    setTerrain(null);
 
     void (async () => {
       instance = await createInfiniteTerrain({
@@ -108,22 +104,22 @@ export function SurfaceTerrain({
               },
           source: {
             kind: "noise",
-            seed: 73021,
+            seed: profile.terrain.noiseSeed,
             // The pinned ProceduralTerrains shader specializes its octave
             // count at compile time. Driver compilation itself cannot be
             // interrupted, so use the package's formal lower-complexity
             // configuration on software WebGL instead of starting the
             // seven-octave shader and trying to cancel it later.
             octaves: softwareRenderer ? 2 : 7,
-            scale: 0.025,
-            ridge: 0.7,
-            warp: 0.3,
-            persistence: 0.54,
-            lacunarity: 2.08,
+            scale: profile.terrain.scale,
+            ridge: profile.terrain.ridge,
+            warp: profile.terrain.warp,
+            persistence: profile.terrain.persistence,
+            lacunarity: profile.terrain.lacunarity,
             edgeFalloffMode: "mountains",
           },
-          heightScale: 34,
-          seaLevel: -20,
+          heightScale: profile.terrain.heightScale,
+          seaLevel: profile.terrain.seaLevel,
           quality: softwareRenderer
             ? {
                 lodSegments: [16, 8, 4, 2],
@@ -147,34 +143,20 @@ export function SurfaceTerrain({
             terrainTriplanar: !softwareRenderer,
           },
           style: {
-            paletteSaturation: 0.7,
-            paletteContrast: 1.16,
-            paletteTint: [0.72, 0.82, 0.9],
-            sunColor: [1.0, 0.69, 0.42],
-            sunIntensity: 1.45,
-            skyAmbient: [0.07, 0.13, 0.2],
-            groundBounce: [0.04, 0.075, 0.08],
+            paletteSaturation: profile.terrain.saturation,
+            paletteContrast: profile.terrain.contrast,
+            paletteTint: profile.terrain.tint,
+            sunColor: profile.lighting.sunColor,
+            sunIntensity: profile.lighting.sunIntensity,
+            skyAmbient: profile.lighting.skyAmbient,
+            groundBounce: profile.lighting.groundBounce,
           },
           lighting: {
-            sunAzimuth: 145,
-            sunElevation: 14,
-            fogDensity: 0.0025,
+            sunAzimuth: profile.lighting.sunAzimuth,
+            sunElevation: profile.lighting.sunElevation,
+            fogDensity: profile.atmosphere.fogDensity,
           },
-          palette: {
-            sand: [0.19, 0.2, 0.18],
-            dune: [0.16, 0.17, 0.16],
-            dryGrass: [0.12, 0.16, 0.13],
-            grass: [0.055, 0.12, 0.1],
-            forest: [0.025, 0.075, 0.065],
-            jungle: [0.02, 0.07, 0.065],
-            swamp: [0.025, 0.065, 0.07],
-            tundra: [0.19, 0.22, 0.23],
-            redRock: [0.26, 0.2, 0.18],
-            redRock2: [0.18, 0.16, 0.16],
-            rock: [0.13, 0.15, 0.16],
-            rockHi: [0.26, 0.29, 0.31],
-            snow: [0.62, 0.69, 0.73],
-          },
+          palette: profile.terrain.palette,
         },
       });
 
@@ -192,6 +174,7 @@ export function SurfaceTerrain({
       softwareStreamAccumulator.current = 0;
       document.documentElement.dataset.universeSurfaceTerrainProfile =
         softwareRenderer ? "infinite-software" : "infinite-hardware";
+      document.documentElement.dataset.universeSurfaceTerrainWorld = profile.id;
       setTerrain(instance);
     })().catch((error) => {
       const code = terrainErrorCode(error);
@@ -212,8 +195,9 @@ export function SurfaceTerrain({
       controller.abort();
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
+      delete document.documentElement.dataset.universeSurfaceTerrainWorld;
     };
-  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
+  }, [activated, camera, gl, onAnchorHeight, profile.id, softwareRenderer]);
 
   useEffect(() => {
     const lifecycle = !activated
@@ -296,29 +280,79 @@ export function SurfaceTerrain({
         : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
-        onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
+        onAnchorHeight?.(
+          (terrain.sampleHeight(profile.landing[0], profile.landing[1]) ?? 0) +
+            0.75,
+        );
       }
     }
   });
 
   const rockInstances = useMemo(() => {
-    // Decorative PBR glTF rocks add first-use shader programs but do not
-    // contribute to terrain identity. Keep them on real GPUs only.
+    // Reuse the existing glTF boulder asset for the most prominent generated
+    // landmarks. The semantic placement comes from the stable world profile;
+    // the asset is only a hardware-tier visual adapter.
     if (!terrain || softwareRenderer) return [];
 
-    return ROCKS.map((placement, index) => {
+    return profile.landmarks.slice(0, 4).map((landmark, index) => {
       const object = seededClone(boulder.scene, index);
-      const localHeight = terrain.sampleHeight(placement.x, placement.z) ?? 0;
+      const localHeight =
+        terrain.sampleHeight(landmark.position[0], landmark.position[1]) ?? 0;
+      const scale = 1.45 + landmark.scale * 1.55;
       object.position.set(
-        placement.x,
-        TERRAIN_Y + localHeight - placement.scale * 0.52,
-        placement.z,
+        landmark.position[0],
+        TERRAIN_Y + localHeight - scale * 0.52,
+        landmark.position[1],
       );
-      object.rotation.set(placement.tilt, placement.ry, placement.tilt * 0.4);
-      object.scale.setScalar(placement.scale);
+      object.rotation.set(
+        landmark.prominence * 0.08,
+        landmark.prominence * Math.PI * 1.7,
+        -landmark.prominence * 0.04,
+      );
+      object.scale.setScalar(scale);
       return object;
     });
-  }, [boulder.scene, softwareRenderer, terrain]);
+  }, [boulder.scene, profile.id, softwareRenderer, terrain]);
+
+  const pathSegments = useMemo(() => {
+    if (!terrain) return [];
+    const subdivisions = softwareRenderer ? 3 : 6;
+    return profile.paths.flatMap((path) =>
+      Array.from({ length: subdivisions }, (_, index) => {
+        const t0 = index / subdivisions;
+        const t1 = (index + 1) / subdivisions;
+        const x0 = THREE.MathUtils.lerp(path.from[0], path.to[0], t0);
+        const z0 = THREE.MathUtils.lerp(path.from[1], path.to[1], t0);
+        const x1 = THREE.MathUtils.lerp(path.from[0], path.to[0], t1);
+        const z1 = THREE.MathUtils.lerp(path.from[1], path.to[1], t1);
+        const x = (x0 + x1) * 0.5;
+        const z = (z0 + z1) * 0.5;
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        return {
+          id: `${path.id}:${index}`,
+          position: [
+            x,
+            (terrain.sampleHeight(x, z) ?? 0) + 0.09,
+            z,
+          ] as [number, number, number],
+          length: Math.hypot(dx, dz),
+          rotationY: Math.atan2(dx, dz),
+          width: path.width,
+        };
+      }),
+    );
+  }, [profile.id, softwareRenderer, terrain]);
+
+  const visibleLandmarks = softwareRenderer
+    ? profile.landmarks.slice(0, 3)
+    : profile.landmarks;
+  const visibleRegions = softwareRenderer
+    ? profile.regions.slice(0, 2)
+    : profile.regions;
+  const visibleContent = softwareRenderer
+    ? profile.contentAnchors.slice(0, 3)
+    : profile.contentAnchors;
 
   useEffect(() => {
     return () => {
@@ -338,6 +372,92 @@ export function SurfaceTerrain({
   return (
     <>
       <primitive object={terrain.object} />
+      {pathSegments.map((segment) => (
+        <mesh
+          key={segment.id}
+          position={segment.position}
+          rotation={[0, segment.rotationY, 0]}
+        >
+          <boxGeometry args={[segment.width, 0.035, segment.length]} />
+          <meshBasicMaterial
+            color={profile.accent}
+            transparent
+            opacity={softwareRenderer ? 0.18 : 0.14}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+      {visibleRegions.map((region) => {
+        const height =
+          (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) + 0.12;
+        return (
+          <mesh
+            key={region.id}
+            position={[region.center[0], height, region.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[
+                Math.max(0.34, region.radius * 0.1),
+                Math.max(0.5, region.radius * 0.14),
+                softwareRenderer ? 12 : 24,
+              ]}
+            />
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={softwareRenderer ? 0.2 : 0.12}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+      {visibleLandmarks.map((landmark) => {
+        const height =
+          (terrain.sampleHeight(landmark.position[0], landmark.position[1]) ??
+            0) + 0.34 * landmark.scale;
+        return (
+          <mesh
+            key={landmark.id}
+            position={[landmark.position[0], height, landmark.position[1]]}
+            scale={[0.32 * landmark.scale, 0.9 * landmark.scale, 0.32 * landmark.scale]}
+          >
+            {landmark.kind === "crater" || landmark.kind === "basin" ? (
+              <torusGeometry args={[0.68, 0.13, 6, softwareRenderer ? 10 : 18]} />
+            ) : landmark.kind === "ridge" ? (
+              <boxGeometry args={[1.1, 0.46, 0.34]} />
+            ) : (
+              <coneGeometry args={[0.55, 1.55, softwareRenderer ? 5 : 8]} />
+            )}
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={0.38 + landmark.prominence * 0.22}
+            />
+          </mesh>
+        );
+      })}
+      {visibleContent.map((anchor) => {
+        const height =
+          (terrain.sampleHeight(anchor.position[0], anchor.position[1]) ?? 0) +
+          0.42;
+        return (
+          <group
+            key={anchor.id}
+            position={[anchor.position[0], height, anchor.position[1]]}
+          >
+            <mesh>
+              <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
+              <meshBasicMaterial color={profile.accent} transparent opacity={0.8} />
+            </mesh>
+            <mesh position={[0, 0.48, 0]}>
+              <octahedronGeometry args={[0.12, 0]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+          </group>
+        );
+      })}
       {rockInstances.map((object) => (
         <primitive key={object.name} object={object} />
       ))}
