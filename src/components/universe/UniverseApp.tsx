@@ -46,7 +46,6 @@ import {
   normalizeWheelDelta,
   galaxyScaleSegmentProgress,
   isWorldScalePhase,
-  nextWorldScalePhase,
   scalePhaseIndex,
   scalePositionForPhase,
   systemScaleSegmentProgress,
@@ -341,10 +340,7 @@ export default function UniverseApp({
   const pendingScaleEnterSystemRef =
     useRef<UniverseNavigationDestination | null>(null);
   const galaxySoftFocusAvailableRef = useRef(true);
-  const pendingWorldScaleStepsRef = useRef(0);
   const continuousScaleIntentEpochRef = useRef(0);
-  const worldScaleBoundaryLockedRef = useRef(false);
-  const worldScaleBoundaryUnlockFrameRef = useRef<number | null>(null);
   const scaleWheelRef = useRef<{
     accumulated: number;
     direction: ContinuousScaleDirection | null;
@@ -406,14 +402,6 @@ export default function UniverseApp({
       options: { preserveGalaxyScaleBridge?: boolean } = {},
     ) => {
       continuousScaleIntentEpochRef.current += 1;
-      const queuedWorldSteps = pendingWorldScaleStepsRef.current;
-      if (queuedWorldSteps !== 0) {
-        document.documentElement.dataset.universeScaleCancelledQueue =
-          "world:" +
-          (queuedWorldSteps > 0 ? "+" : "") +
-          String(queuedWorldSteps);
-      }
-      pendingWorldScaleStepsRef.current = 0;
       pendingScaleEnterSystemRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
       lockedSystemScaleFocusRef.current = null;
@@ -1785,16 +1773,6 @@ export default function UniverseApp({
           setWorldScaleContinuous(false);
         }
       }
-      worldScaleBoundaryLockedRef.current = true;
-      if (worldScaleBoundaryUnlockFrameRef.current !== null) {
-        window.cancelAnimationFrame(worldScaleBoundaryUnlockFrameRef.current);
-      }
-      worldScaleBoundaryUnlockFrameRef.current = window.requestAnimationFrame(
-        () => {
-          worldScaleBoundaryLockedRef.current = false;
-          worldScaleBoundaryUnlockFrameRef.current = null;
-        },
-      );
       cameraSettledPhaseRef.current = null;
       setCameraSettledPhase(null);
       // The navigation coordinator owns invalidation of the previous phase's
@@ -1839,91 +1817,6 @@ export default function UniverseApp({
     },
     [galaxy.markers, selectedPlanet, selectedSystem],
   );
-
-  useEffect(() => {
-    if (
-      pendingWorldScaleStepsRef.current === 0 ||
-      cameraSettledPhase !== phase ||
-      !selectedPlanet ||
-      phase === "galaxy" ||
-      phase === "system" ||
-      phase === "returning"
-    ) {
-      return;
-    }
-
-    const queued = pendingWorldScaleStepsRef.current;
-    const direction: ContinuousScaleDirection = queued > 0 ? "in" : "out";
-    const nextPhase = nextWorldScalePhase(
-      phase,
-      direction,
-      selectedPlanet.surfaceMode,
-    );
-
-    if (!nextPhase) {
-      pendingWorldScaleStepsRef.current = 0;
-      delete document.documentElement.dataset.universeScaleQueued;
-      document.documentElement.dataset.universeScaleBlocked =
-        direction === "in" && phase !== "surface"
-          ? "no-surface"
-          : direction === "in"
-            ? "surface-limit"
-            : "system-limit";
-      return;
-    }
-
-    pendingWorldScaleStepsRef.current += direction === "in" ? -1 : 1;
-    const remaining = pendingWorldScaleStepsRef.current;
-    if (remaining === 0) {
-      delete document.documentElement.dataset.universeScaleQueued;
-    } else {
-      document.documentElement.dataset.universeScaleQueued =
-        "world:" + (remaining > 0 ? "+" : "") + String(remaining);
-    }
-
-    const sourcePhase = phase;
-    const intentEpoch = continuousScaleIntentEpochRef.current;
-    const frame = window.requestAnimationFrame(() => {
-      if (
-        continuousScaleIntentEpochRef.current !== intentEpoch ||
-        phaseRef.current !== sourcePhase
-      ) {
-        return;
-      }
-      setWorldScalePhase(nextPhase);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [
-    cameraSettledPhase,
-    phase,
-    selectedPlanet,
-    setWorldScalePhase,
-  ]);
-
-  useEffect(() => {
-    if (phase !== "system" || pendingWorldScaleStepsRef.current >= 0) return;
-
-    pendingWorldScaleStepsRef.current += 1;
-    const remaining = pendingWorldScaleStepsRef.current;
-    if (remaining === 0) {
-      delete document.documentElement.dataset.universeScaleQueued;
-    } else {
-      document.documentElement.dataset.universeScaleQueued =
-        "world:" + String(remaining);
-    }
-
-    const intentEpoch = continuousScaleIntentEpochRef.current;
-    const frame = window.requestAnimationFrame(() => {
-      if (
-        continuousScaleIntentEpochRef.current !== intentEpoch ||
-        phaseRef.current !== "system"
-      ) {
-        return;
-      }
-      handleReturn();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [handleReturn, phase]);
 
   const beginGalaxyScaleTravel = useCallback(
     (destination: UniverseNavigationDestination) => {
@@ -2097,7 +1990,6 @@ export default function UniverseApp({
       );
       const direction = continuousScaleDirection(normalizedDelta);
       if (!direction) return;
-      const settledPhase = cameraSettledPhaseRef.current;
 
       const now = performance.now();
       const wheel = scaleWheelRef.current;
@@ -2117,8 +2009,6 @@ export default function UniverseApp({
         wheel.direction = direction;
         if (directionChanged) {
           continuousScaleIntentEpochRef.current += 1;
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
           document.documentElement.dataset.universeScaleReversal = String(
             wheel.gesture,
           );
@@ -2151,7 +2041,6 @@ export default function UniverseApp({
       // trackpad delta crosses the currentPhase threshold. This stops Journey
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
-      delete document.documentElement.dataset.universeScaleCancelledQueue;
 
       if (currentPhase === "galaxy") {
         const currentPosition = Math.min(
@@ -2241,7 +2130,6 @@ export default function UniverseApp({
             continuousScaleIntentEpochRef.current += 1;
             const intentEpoch = continuousScaleIntentEpochRef.current;
             pendingScaleEnterSystemRef.current = null;
-            pendingWorldScaleStepsRef.current = 0;
             setNavigationRequest(null);
             setPendingDestinationId(null);
             setPendingDestinationMode(null);
@@ -2340,7 +2228,6 @@ export default function UniverseApp({
           return;
         }
 
-        pendingWorldScaleStepsRef.current = 0;
         delete document.documentElement.dataset.universeScaleQueued;
         delete document.documentElement.dataset.universeScaleBlocked;
 
@@ -2535,19 +2422,19 @@ export default function UniverseApp({
         return;
       }
 
-      const worldTransitionUnsettled =
-        currentPhase !== "galaxy" &&
-        currentPhase !== "system" &&
-        currentPhase !== "returning" &&
-        (settledPhase !== currentPhase ||
-          worldScaleBoundaryLockedRef.current);
+      // World phases are owned exclusively by the continuous 2→5 coordinate
+      // above. If the semantic phase exists without its planet authority,
+      // there is nothing safe to execute for this delivered sample: report the
+      // invalid state and stop. Never cache the sample for later phase stepping.
+      if (isWorldScalePhase(currentPhase)) {
+        document.documentElement.dataset.universeScaleBlocked =
+          "no-world-focus";
+        delete document.documentElement.dataset.universeScaleQueued;
+        return;
+      }
 
-      // Do not discard committed wheel samples merely because the previous
-      // phase settled quickly. On SwiftShader a 220ms time cooldown caused
-      // distinct wheel events in one sustained gesture to disappear. The
-      // threshold already limits each browser event to at most one boundary,
-      // while unsettled phases serialize extra steps through the existing
-      // queue.
+      // The threshold path below is retained only for non-scale navigation
+      // outside the 0→5 coordinate (for example outward Galaxy return).
       if (wheel.samples === 1) {
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
@@ -2572,32 +2459,6 @@ export default function UniverseApp({
         scalePhaseIndex(currentPhase),
       );
       delete document.documentElement.dataset.universeScaleBlocked;
-
-      if (worldTransitionUnsettled) {
-        if (directionChanged && selectedPlanet) {
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
-          const reversePhase = nextWorldScalePhase(
-            currentPhase,
-            direction,
-            selectedPlanet.surfaceMode,
-          );
-          if (reversePhase) {
-            setWorldScalePhase(reversePhase);
-          }
-          return;
-        }
-
-        const step = direction === "in" ? 1 : -1;
-        pendingWorldScaleStepsRef.current = Math.max(
-          -6,
-          Math.min(6, pendingWorldScaleStepsRef.current + step),
-        );
-        const queued = pendingWorldScaleStepsRef.current;
-        document.documentElement.dataset.universeScaleQueued =
-          "world:" + (queued > 0 ? "+" : "") + String(queued);
-        return;
-      }
 
       if (direction === "in") {
         if (currentPhase === "galaxy") {
@@ -2688,19 +2549,6 @@ export default function UniverseApp({
           return;
         }
 
-        if (selectedPlanet) {
-          const nextPhase = nextWorldScalePhase(
-            currentPhase,
-            "in",
-            selectedPlanet.surfaceMode,
-          );
-          if (nextPhase) {
-            setWorldScalePhase(nextPhase);
-          } else {
-            document.documentElement.dataset.universeScaleBlocked =
-              currentPhase === "surface" ? "surface-limit" : "no-surface";
-          }
-        }
         return;
       }
 
@@ -2732,14 +2580,8 @@ export default function UniverseApp({
         return;
       }
 
-      if (selectedPlanet) {
-        const nextPhase = nextWorldScalePhase(
-          currentPhase,
-          "out",
-          selectedPlanet.surfaceMode,
-        );
-        if (nextPhase) setWorldScalePhase(nextPhase);
-      }
+      // A world phase without selectedPlanet returned above; no deferred
+      // world-step fallback remains here.
     },
     [
       activeDestinationId,
