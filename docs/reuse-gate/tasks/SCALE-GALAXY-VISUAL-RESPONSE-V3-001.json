@@ -1,0 +1,131 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-GALAXY-VISUAL-RESPONSE-V3-001",
+  "title": "Native Galaxy scale visual response product feel",
+  "scope": {
+    "level": "implementation",
+    "subject": "Tune the existing pinned MIT YEIS Galaxy scale bridge so the product coordinate directly scrubs a modest stateless visual response curve with earlier perceptible target growth, exact endpoints, immediate reversal, and no time-driven continuation"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Personal Universe already feeds one product-owned continuous scale coordinate into the retained native YEIS CameraController trajectory. The remaining Galaxy feel gap is perceptual: early raw trajectory progress can read as dead across astronomical distances. Reuse the existing YEIS gotoPoint/autopilot-progress bridge and apply only a small monotonic stateless progress remap before setAutopilotProgress. Product coordinate, target identity, endpoint semantics, reference-frame handling, manual takeover, and wheel ownership remain unchanged. No second camera, tween, inertia loop, or autonomous progress is added.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the approved native Galaxy renderer and CameraController trajectory authority; product scale should scrub that retained path rather than create another camera or path."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "The close-world camera executor is separate and its wheel action remains disabled; Galaxy response tuning must stay inside the existing native bridge and not introduce another wheel or damping authority."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain the existing YEIS-native Galaxy scale path and tune only how the already-owned product coordinate scrubs it."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the current R3F host and imperative native bridge; no new animation framework is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse CameraController gotoPoint plus setAutopilotProgress as the trajectory executor and remap only the supplied progress."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Do not re-enable camera-controls wheel physics or add damping; it remains the close-world executor only."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "native-yeis-progress-response",
+      "name": "Stateless visual response over retained YEIS native progress",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YeisGalaxyScene native scale bridge",
+      "license": "MIT pinned upstream plus project bridge",
+      "decision": "reuse",
+      "reason": "Improves early Galaxy perceptibility while preserving the existing physical path, target, endpoint, reversal, reference frame, and single input authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "new-galaxy-camera-tween",
+      "name": "Project-owned Galaxy camera tween",
+      "level": "component_asset",
+      "source": "New custom machinery",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate the native path and create stale time-driven motion after delivered input ends."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Early Galaxy input produces perceptible motion without changing product coordinate semantics",
+      "importance": "high",
+      "coverage": {
+        "native-yeis-progress-response": "full",
+        "new-galaxy-camera-tween": "partial"
+      },
+      "decision": "Apply a monotonic stateless visual progress function immediately before setAutopilotProgress."
+    },
+    {
+      "capability": "Reverse input retraces the same native path immediately",
+      "importance": "high",
+      "coverage": {
+        "native-yeis-progress-response": "full",
+        "new-galaxy-camera-tween": "none"
+      },
+      "decision": "The remap depends only on the current product coordinate, so no old-direction state can survive a sign change."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "native-yeis-progress-response"
+    ],
+    "rationale": "Reuse the current native bridge and pinned YEIS trajectory executor. Only transform the scalar progress passed to the retained setAutopilotProgress call; all input, target, cancellation, and endpoint authority stays where it is.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If visual evidence shows the curve is too strong, reduce its easing weight while preserving monotonicity and non-zero endpoint slope; never replace it with elapsed-time tweening or project-owned inertia."
+  }
+}
