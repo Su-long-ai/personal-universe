@@ -449,21 +449,34 @@ fallback/quality switches; bloom is likewise retained and toggled rather than
 rebuilt. This keeps AUTO/software cheap before a live request while preventing
 quality changes from reallocating the complete post-processing chain. The live
 ProceduralPlanets world follows the same lifetime rule: its resource identity is
-planet + renderer class, not the current LOW/AUTO/HIGH selector. A real-GPU
-world uses the retained HIGH-capability budget for its lifetime; software HIGH
-uses the bounded hosted-runner budget. Switching temporarily to a fallback mode
-hides and parks that same live Planet instead of disposing terrain/material/LOD
-state, so returning to a live capability reuses the warmed world immediately.
-The same Planet/material/LOD identity therefore survives forward and reverse
-travel as well as quality fallback cycles. LOW/AUTO-software retain the same
-Surface terrain instance, with cancellable Atmosphere-time preparation before
-the final boundary.
+planet + renderer class, not the current LOW/AUTO/HIGH selector. Real-GPU AUTO
+and HIGH keep their distinct performance profiles, but they are applied through
+the package's live `Planet.set()` API to the same retained Planet instead of
+reconstructing the world. The last applied profile is tracked per Planet, so a
+temporary LOW fallback followed by a return to the same live quality does not
+even repeat the parameter update. Software HIGH keeps the bounded hosted-runner
+profile. Switching temporarily to a fallback mode hides and parks that same live
+Planet instead of disposing terrain/material/LOD state, so returning to a live
+capability reuses the warmed world immediately. The same Planet identity
+therefore survives forward and reverse travel as well as quality fallback
+cycles, while AUTO does not silently inherit HIGH's cost. LOW/AUTO-software
+retain the same Surface terrain instance, with cancellable Atmosphere-time
+preparation before the final boundary.
 
 Runtime evidence:
 
 - `data-universe-world-pipeline-allocations` counts shared composer allocation;
 - `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation;
-- `data-universe-world-planet-allocations` counts live Planet construction.
+- `data-universe-world-planet-allocations` counts live Planet construction;
+- `data-universe-world-live-profile` reports the currently active retained
+  profile (`gpu-auto`, `gpu-high`, or `software-high`).
+
+Live pipeline convergence tokens are capability-scoped. Entering any fallback
+mode clears the retained PlanetPass consecutive-stable-frame counter; returning
+to live rendering must earn fresh `pending=0` frames before
+`data-universe-world-ready` / screenshot readiness can be republished. First
+paint remains a separate earlier authority and only requires that the concrete
+`procedural-planets-pass` is installed and has painted consecutive frames.
 
 Large renderer paths are lazy-loaded. The pinned native current-system LOD
 resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
