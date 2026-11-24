@@ -5203,6 +5203,76 @@ test("rapid mid-segment reversal cancels stale scale settlement", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("retained fallback terrain releases when product navigation changes world @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Preparing the software Surface fallback before switching world identity is intentionally heavy",
+  );
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 60_000 },
+  );
+  const previousTerrainWorld = await html.getAttribute(
+    "data-universe-surface-terrain-world",
+  );
+  const previousTerrainInstance = await html.getAttribute(
+    "data-universe-surface-terrain-instance",
+  );
+  expect(previousTerrainWorld).toBeTruthy();
+  expect(previousTerrainInstance).toBeTruthy();
+
+  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Universe navigator" });
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("Gliese 12 b");
+  const exoplanet = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-exoplanet") })
+    .filter({ hasText: "Gliese 12 b" })
+    .first();
+  await expect(exoplanet).toBeVisible();
+  await exoplanet.locator(".navigator-result-open").click();
+
+  await expect(dialog).toBeHidden();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-terrain-world",
+    previousTerrainWorld!,
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-terrain-instance",
+    previousTerrainInstance!,
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-terrain-world",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-terrain-instance",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-prewarm",
+    "cancelled",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("fallback Surface terrain parks and resumes across reverse scale @webgl-heavy", async ({
   page,
 }, testInfo) => {
