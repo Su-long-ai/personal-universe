@@ -281,7 +281,10 @@ export default function UniverseApp({
   const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
     null,
   );
-  const surfaceFocusEntryId = useMemo(() => {
+  const [surfaceLocalFocusEntryId, setSurfaceLocalFocusEntryId] = useState<
+    string | null
+  >(null);
+  const surfaceNavigationFocusEntryId = useMemo(() => {
     if (!selectedPlanet || !activeDestinationId?.startsWith("personal:")) {
       return null;
     }
@@ -290,12 +293,37 @@ export default function UniverseApp({
       ? entryId
       : null;
   }, [activeDestinationId, selectedPlanet]);
+  const surfaceFocusEntryId = useMemo(() => {
+    if (
+      surfaceLocalFocusEntryId &&
+      selectedPlanet?.content?.some(
+        (entry) => entry.id === surfaceLocalFocusEntryId,
+      )
+    ) {
+      return surfaceLocalFocusEntryId;
+    }
+    return surfaceNavigationFocusEntryId;
+  }, [
+    selectedPlanet,
+    surfaceLocalFocusEntryId,
+    surfaceNavigationFocusEntryId,
+  ]);
+
+  useEffect(() => {
+    setSurfaceLocalFocusEntryId(null);
+  }, [selectedPlanet?.id]);
+
   useEffect(() => {
     if (surfaceFocusEntryId) {
       document.documentElement.dataset.universeSurfaceFocusEntry =
         surfaceFocusEntryId;
+      document.documentElement.dataset.universeSurfaceFocusSource =
+        surfaceLocalFocusEntryId === surfaceFocusEntryId
+          ? "surface-selection"
+          : "navigation";
     } else {
       delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusSource;
     }
     return () => {
       if (
@@ -303,9 +331,10 @@ export default function UniverseApp({
         surfaceFocusEntryId
       ) {
         delete document.documentElement.dataset.universeSurfaceFocusEntry;
+        delete document.documentElement.dataset.universeSurfaceFocusSource;
       }
     };
-  }, [surfaceFocusEntryId]);
+  }, [surfaceFocusEntryId, surfaceLocalFocusEntryId]);
 
   const surfaceProfile = useMemo(
     () =>
@@ -376,6 +405,18 @@ export default function UniverseApp({
         a.title.localeCompare(b.title),
     );
   }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  const handleSurfaceFocusEntry = useCallback(
+    (entryId: string) => {
+      if (phaseRef.current !== "surface") return;
+      if (!selectedPlanet?.content?.some((entry) => entry.id === entryId)) {
+        return;
+      }
+      setSurfaceLocalFocusEntryId((current) =>
+        current === entryId ? null : entryId,
+      );
+    },
+    [selectedPlanet],
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -2895,6 +2936,7 @@ export default function UniverseApp({
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
           surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={handleSurfaceFocusEntry}
           systemScaleTargetPlanet={systemScaleTargetPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
@@ -3220,6 +3262,23 @@ export default function UniverseApp({
                             " SIGNAL"}
                       </em>
                     </>
+                  )}
+                  {surfacePresentation && (
+                    <button
+                      type="button"
+                      className="world-content-focus-action"
+                      data-surface-entry={entry.id}
+                      aria-pressed={surfaceFocusEntryId === entry.id}
+                      onClick={() => handleSurfaceFocusEntry(entry.id)}
+                    >
+                      {surfaceFocusEntryId === entry.id
+                        ? locale === "zh"
+                          ? "已聚焦地表位置"
+                          : "SURFACE SIGNAL FOCUSED"
+                        : locale === "zh"
+                          ? "聚焦地表位置"
+                          : "FOCUS SURFACE SIGNAL"}
+                    </button>
                   )}
                   {entry.tags.length > 0 && (
                     <em className="world-content-tags">
