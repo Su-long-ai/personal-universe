@@ -148,6 +148,24 @@ Runtime evidence:
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
 - `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget.
 
+Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
+fallback could gain useful visual depth from ProceduralTerrains' existing
+height, palette, lighting and fog uniforms alone. Hosted-equivalent mobile
+screenshots showed either destructive dark clipping at aggressive settings or
+no material composition improvement at conservative settings, so none of those
+terrain-profile changes were promoted.
+
+Task `SURFACE-SOFTWARE-DEPTH-CUES-001` therefore reuses the product's
+existing arrival-marker concept instead. On software rendering the marker is a
+static, low-polygon Three.js beacon built from basic materials; it adds no
+scene lights, continuous animation, imported asset, post-processing pass or
+second renderer. The real-GPU path keeps its existing full beacon, moon and
+lighting. A software-lite moon candidate was also screenshot-tested and rejected
+because narrow/tablet framing made it read as a distracting floating disc.
+Runtime evidence publishes
+`data-universe-surface-depth-cues="software-beacon"` on the software path and
+`"full"` on the real-GPU fallback.
+
 The retained fallback's heavy `terrain.update()` loop also reads the navigation
 coordinator's existing phase ref as a synchronous stop signal. This is
 read-only rendering glue, not another phase authority: the coordinator mutates
