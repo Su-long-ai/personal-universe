@@ -169,22 +169,39 @@ export function UniverseCanvas({
   const [systemScaleFrame, setSystemScaleFrame] =
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
+  const [worldPaintReady, setWorldPaintReady] = useState(false);
 
   useEffect(() => {
-    if (phase === "surface") setSurfaceFallbackPrimed(true);
+    if (phase === "atmosphere" || phase === "surface") {
+      setSurfaceFallbackPrimed(true);
+    }
   }, [phase]);
+
+  const worldPrewarmPlanet = selectedPlanet ?? systemScaleTargetPlanet;
+  const closeWorldPhase =
+    phase === "approach" ||
+    phase === "orbit" ||
+    phase === "atmosphere" ||
+    phase === "surface";
+
+  useEffect(() => {
+    // Paint readiness belongs to the concrete renderer capability, not only
+    // the planet identity. A quality switch can replace live ProceduralPlanets
+    // with a lightweight/software path (or the reverse) while the same planet
+    // remains selected; keep the System handoff frame until the new authority
+    // has painted as well.
+    setWorldPaintReady(false);
+    delete document.documentElement.dataset.universeWorldPaintReady;
+  }, [quality, worldPrewarmPlanet?.id]);
 
   useEffect(() => {
     if (phase === "system" && systemScaleTargetPlanet) return;
     setSystemScaleFrame(null);
   }, [phase, systemScaleTargetPlanet]);
 
-  const liveWorld =
-    Boolean(selectedPlanet) &&
-    (phase === "approach" ||
-      phase === "orbit" ||
-      phase === "atmosphere" ||
-      phase === "surface");
+  const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
+  const keepSystemForHandoff =
+    closeWorldPhase && Boolean(selectedSystem) && !worldPaintReady;
 
   return (
     <Canvas
@@ -246,7 +263,7 @@ export function UniverseCanvas({
         />
       )}
 
-      {phase === "system" && selectedSystem && (
+      {(phase === "system" || keepSystemForHandoff) && selectedSystem && (
         selectedSystem.id.startsWith("yeis-system:") ? (
           <Suspense
             fallback={
@@ -279,16 +296,27 @@ export function UniverseCanvas({
         )
       )}
 
-      <Suspense fallback={null}>
-        {phase !== "galaxy" &&
-          phase !== "system" &&
-          phase !== "returning" &&
-          selectedPlanet && (
+      <Suspense
+        fallback={
+          closeWorldPhase ? (
+            <group
+              onUpdate={() => {
+                document.documentElement.dataset.universeWorldSceneLifecycle =
+                  "loading";
+              }}
+            />
+          ) : null
+        }
+      >
+        {worldPrewarmPlanet &&
+          (phase === "system" || closeWorldPhase) && (
             <LazyPlanetScene
-              planet={selectedPlanet}
+              planet={worldPrewarmPlanet}
               quality={quality}
               phase={phase}
               worldScalePosition={worldScalePosition}
+              presentationActive={closeWorldPhase}
+              onPaintReady={() => setWorldPaintReady(true)}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}

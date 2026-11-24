@@ -41,6 +41,7 @@ import {
   applyWorldScaleWheel,
   continuousScaleDelta,
   continuousScaleDirection,
+  normalizeWheelDelta,
   galaxyScaleSegmentProgress,
   isWorldScalePhase,
   nextWorldScalePhase,
@@ -202,6 +203,43 @@ function cameraTargetLabel(
   return target.kind + ":" + target.index;
 }
 
+function scheduleScaleRendererHandoff({
+  label,
+  isCurrent,
+  commit,
+}: {
+  label: string;
+  isCurrent: () => boolean;
+  commit: () => void;
+}) {
+  let completed = false;
+  let firstFrame = 0;
+  let secondFrame = 0;
+  let deadline = 0;
+
+  const finish = (source: "paint" | "deadline") => {
+    if (completed) return;
+    completed = true;
+    if (firstFrame) window.cancelAnimationFrame(firstFrame);
+    if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    if (deadline) window.clearTimeout(deadline);
+
+    if (!isCurrent()) return;
+    document.documentElement.dataset.universeScaleHandoff =
+      label + ":" + source;
+    commit();
+  };
+
+  // Two rAF callbacks preserve one real endpoint paint on a healthy renderer.
+  // Hosted/software WebGL can stop delivering rAF while the browser still
+  // accepts wheel events, so do not let that presentation preference become
+  // an input lock. The matched endpoints are already composition-equivalent.
+  firstFrame = window.requestAnimationFrame(() => {
+    secondFrame = window.requestAnimationFrame(() => finish("paint"));
+  });
+  deadline = window.setTimeout(() => finish("deadline"), 64);
+}
+
 function scaleSystemDestinationForMarker(
   marker: GalaxyMarker,
 ): UniverseNavigationDestination {
@@ -308,11 +346,13 @@ export default function UniverseApp({
     direction: ContinuousScaleDirection | null;
     lastAt: number;
     samples: number;
+    gesture: number;
   }>({
     accumulated: 0,
     direction: null,
     lastAt: 0,
     samples: 0,
+    gesture: 0,
   });
 
   const cancelPendingContinuousScaleIntent = useCallback(
@@ -343,6 +383,7 @@ export default function UniverseApp({
       wheel.direction = null;
       wheel.lastAt = 0;
       wheel.samples = 0;
+      wheel.gesture += 1;
 
       delete document.documentElement.dataset.universeScaleQueued;
       delete document.documentElement.dataset.universeScaleDirection;
@@ -369,17 +410,22 @@ export default function UniverseApp({
     [contentEntries, galaxy.markers],
   );
   const defaultGalaxyScaleFocus = useMemo(() => {
+    // Opening soft focus is a product-tour fallback, not the centre-pick
+    // ranking. Prefer the one world that currently owns the complete
+    // Galaxy=0 -> Surface=5 path so a first-time visitor who simply scrolls
+    // can experience the whole scale journey. Real centre focus still keeps
+    // Personal Signals ahead of Hero, and Search/Places ranking is unchanged.
+    const hero = galaxy.markers.find((marker) => marker.source === "hero");
+    if (hero) {
+      return navigationDestinationForMarker(hero, contentPlacements);
+    }
+
     for (const placement of contentPlacements) {
       const destination = navigationDestinationForPlacement(
         placement,
         galaxy.markers,
       );
       if (destination) return destination;
-    }
-
-    const hero = galaxy.markers.find((marker) => marker.source === "hero");
-    if (hero) {
-      return navigationDestinationForMarker(hero, contentPlacements);
     }
 
     const nativeStar = galaxy.markers.find(
@@ -745,7 +791,7 @@ export default function UniverseApp({
         contentPlacements,
       );
       selectedSystemRef.current = system;
-    setSelectedSystem(system);
+      setSelectedSystem(system);
       setSelectedPlanet(null);
       setScrollDepth(0);
       setNavigationRequest(null);
@@ -849,7 +895,7 @@ export default function UniverseApp({
           if (cameraTarget) {
             navigationRequestSeq.current += 1;
             selectedSystemRef.current = null;
-      setSelectedSystem(null);
+            setSelectedSystem(null);
             setSelectedPlanet(null);
             setPhase("galaxy");
             deepLinkHandledRef.current = deepLinkNavigationKey(
@@ -897,7 +943,7 @@ export default function UniverseApp({
         document.documentElement.dataset.universeActiveDestination =
           destination.id;
         selectedSystemRef.current = system;
-    setSelectedSystem(system);
+        setSelectedSystem(system);
         setSelectedPlanet(planet);
         openedWorldDestinationRef.current = planet ? destination.id : null;
         setScrollDepth(0);
@@ -1879,7 +1925,7 @@ export default function UniverseApp({
       const systemDestination = scaleSystemDestinationForMarker(marker);
       preferredSystemScaleDestinationRef.current = focus;
       selectedSystemRef.current = system;
-    setSelectedSystem(system);
+      setSelectedSystem(system);
       setSelectedPlanet(null);
       setSystemScaleTargetPlanet(null);
       setScrollDepth(0);
@@ -1953,9 +1999,53 @@ export default function UniverseApp({
         return;
       }
 
-      const direction = continuousScaleDirection(event.deltaY);
+      const normalizedDelta = normalizeWheelDelta(
+        event.deltaY,
+        event.deltaMode,
+        window.innerHeight,
+      );
+      const direction = continuousScaleDirection(normalizedDelta);
       if (!direction) return;
       const settledPhase = cameraSettledPhaseRef.current;
+
+      const now = performance.now();
+      const wheel = scaleWheelRef.current;
+      const previousDirection = wheel.direction;
+      const directionChanged =
+        previousDirection !== null && previousDirection !== direction;
+      const resetWindow =
+        wheel.samples >= 2
+          ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
+          : CONTINUOUS_SCALE_RESET_MS;
+      const gestureExpired =
+        wheel.direction !== null && now - wheel.lastAt > resetWindow;
+      if (wheel.direction === null || directionChanged || gestureExpired) {
+        wheel.gesture += 1;
+        wheel.accumulated = 0;
+        wheel.samples = 0;
+        wheel.direction = direction;
+        if (directionChanged) {
+          continuousScaleIntentEpochRef.current += 1;
+          pendingWorldScaleStepsRef.current = 0;
+          delete document.documentElement.dataset.universeScaleQueued;
+          document.documentElement.dataset.universeScaleReversal = String(
+            wheel.gesture,
+          );
+        }
+      }
+      wheel.lastAt = now;
+      wheel.samples = Math.min(255, wheel.samples + 1);
+      document.documentElement.dataset.universeScaleGesture = String(
+        wheel.gesture,
+      );
+      document.documentElement.dataset.universeScaleInput =
+        event.deltaMode === 1
+          ? "line"
+          : event.deltaMode === 2
+            ? "page"
+            : "pixel";
+      document.documentElement.dataset.universeScaleDelta =
+        normalizedDelta.toFixed(3);
 
       // Manual scale intent owns navigation immediately, even before a small
       // trackpad delta crosses the currentPhase threshold. This stops Journey
@@ -2034,20 +2124,22 @@ export default function UniverseApp({
             document.documentElement.dataset.universeNavigationTarget =
               nativeStarId;
 
-            continuousScaleIntentEpochRef.current += 1;
-            const intentEpoch = continuousScaleIntentEpochRef.current;
             const nextPosition = applyGalaxyScaleWheel(
               currentPosition,
-              event.deltaY,
+              normalizedDelta,
             );
 
             if (
               Math.abs(nextPosition - currentPosition) <=
               WORLD_SCALE_EPSILON
             ) {
+              // Same-direction input at the matched endpoint must not
+              // invalidate the paint/deadline handoff already in flight.
               return;
             }
 
+            continuousScaleIntentEpochRef.current += 1;
+            const intentEpoch = continuousScaleIntentEpochRef.current;
             pendingScaleEnterSystemRef.current = null;
             pendingWorldScaleStepsRef.current = 0;
             setNavigationRequest(null);
@@ -2075,20 +2167,16 @@ export default function UniverseApp({
               nextPosition >=
                 SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
             ) {
-              // Keep the restored YEIS native-system endpoint on screen for
-              // one painted frame before product System assumes authority.
-              window.requestAnimationFrame(() => {
-                window.requestAnimationFrame(() => {
-                  if (
-                    continuousScaleIntentEpochRef.current !== intentEpoch ||
-                    phaseRef.current !== "galaxy" ||
-                    worldScalePositionRef.current <
-                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
-                  ) {
-                    return;
-                  }
+              scheduleScaleRendererHandoff({
+                label: "galaxy-system",
+                isCurrent: () =>
+                  continuousScaleIntentEpochRef.current === intentEpoch &&
+                  phaseRef.current === "galaxy" &&
+                  worldScalePositionRef.current >=
+                    SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
+                commit: () => {
                   void commitGalaxyScaleFocusedSystem(focus);
-                });
+                },
               });
             }
 
@@ -2105,13 +2193,12 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
-          // The Approach -> System renderer boundary must not consume a wheel
-          // sample without changing scale. Apply this exact delta to the
-          // existing System segment first, then hand renderer authority over
-          // at the resulting coordinate (for a -/+96 sample: 2 -> 1.5).
+          // Preserve the physical wheel sample across the Approach -> System
+          // renderer boundary. The boundary itself must not consume input:
+          // a normalized +96 sample moves 2 -> 1.5, then the next 1.5 -> 1.
           const nextPosition = applySystemScaleWheel(
             WORLD_SCALE_MIN,
-            event.deltaY,
+            normalizedDelta,
           );
           setSystemScaleTargetPlanet(selectedPlanet);
           worldScalePositionRef.current = nextPosition;
@@ -2141,7 +2228,7 @@ export default function UniverseApp({
 
         const nextPosition = applyWorldScaleWheel(
           currentPosition,
-          event.deltaY,
+          normalizedDelta,
           selectedPlanet.surfaceMode,
         );
 
@@ -2196,7 +2283,7 @@ export default function UniverseApp({
             continuousScaleIntentEpochRef.current += 1;
             const nextPosition = applyGalaxyScaleWheel(
               SYSTEM_SCALE_MIN,
-              event.deltaY,
+              normalizedDelta,
             );
             setSystemScaleTargetPlanet(null);
             worldScalePositionRef.current = nextPosition;
@@ -2276,17 +2363,19 @@ export default function UniverseApp({
           setSystemScaleTargetPlanet(targetPlanet);
         }
 
-        continuousScaleIntentEpochRef.current += 1;
-        const intentEpoch = continuousScaleIntentEpochRef.current;
         const nextPosition = applySystemScaleWheel(
           currentPosition,
-          event.deltaY,
+          normalizedDelta,
         );
 
         if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
+          // Preserve the already-scheduled System→Approach handoff while
+          // sustained input continues against the coordinate-2 endpoint.
           return;
         }
 
+        continuousScaleIntentEpochRef.current += 1;
+        const intentEpoch = continuousScaleIntentEpochRef.current;
         delete document.documentElement.dataset.universeScaleBlocked;
         delete document.documentElement.dataset.universeScaleQueued;
         worldScalePositionRef.current = nextPosition;
@@ -2315,17 +2404,17 @@ export default function UniverseApp({
           preferredSystemScaleDestinationRef.current = null;
           delete document.documentElement.dataset.universeScalePreferred;
 
-          // Leave one painted System frame at the matched endpoint before the
-          // renderer identity changes. Any newer scale/navigation intent
-          // invalidates this scheduled handoff.
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-              if (
-                continuousScaleIntentEpochRef.current !== intentEpoch ||
-                phaseRef.current !== "system"
-              ) {
-                return;
-              }
+          // Prefer one painted matched System endpoint, but never let a
+          // throttled/software rAF stall consume the visitor's next scale
+          // samples. Any newer scale/navigation intent invalidates the handoff.
+          scheduleScaleRendererHandoff({
+            label: "system-approach",
+            isCurrent: () =>
+              continuousScaleIntentEpochRef.current === intentEpoch &&
+              phaseRef.current === "system" &&
+              worldScalePositionRef.current >=
+                WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+            commit: () => {
               if (destination) {
                 void handleNavigateDestination(destination, {
                   preserveGalaxyScaleBridge: true,
@@ -2334,16 +2423,11 @@ export default function UniverseApp({
                 setSelectedPlanet(targetPlanet);
                 setWorldScalePhase("approach");
               }
-            });
+            },
           });
         }
         return;
       }
-
-      const now = performance.now();
-      const wheel = scaleWheelRef.current;
-      const directionChanged =
-        wheel.direction !== null && wheel.direction !== direction;
 
       const worldTransitionUnsettled =
         currentPhase !== "galaxy" &&
@@ -2358,30 +2442,12 @@ export default function UniverseApp({
       // threshold already limits each browser event to at most one boundary,
       // while unsettled phases serialize extra steps through the existing
       // queue.
-      const resetWindow =
-        wheel.samples >= 2
-          ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
-          : CONTINUOUS_SCALE_RESET_MS;
-      const newGesture = wheel.direction === null;
-      const gestureExpired =
-        !newGesture && now - wheel.lastAt > resetWindow;
-
-      if (newGesture || directionChanged || gestureExpired) {
-        wheel.accumulated = 0;
-        wheel.samples = 0;
-        wheel.direction = direction;
+      if (wheel.samples === 1) {
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
-        if (directionChanged) {
-          continuousScaleIntentEpochRef.current += 1;
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
-        }
       }
 
-      wheel.lastAt = now;
-      wheel.samples = Math.min(8, wheel.samples + 1);
-      wheel.accumulated += Math.abs(continuousScaleDelta(event.deltaY));
+      wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = String(
         Math.min(

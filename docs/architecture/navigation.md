@@ -327,10 +327,13 @@ at the viewport centre. Explicit centre focus wins, with eligible priority:
 
 The fresh opening view also has one **soft focus** fallback so a visitor can
 start diving with the wheel even when the auto-orbit composition has no object
-inside the centre-pick radius. That fallback prefers the first Personal Signal,
-then the Hero world, then a native catalogue star. It is consumed by the first
-scale-in gesture and is permanently disabled as soon as drag, touch, pinch,
-pan or keyboard camera input shows that the visitor has taken spatial control.
+inside the centre-pick radius. That fallback prefers the Hero world, then the
+first Personal Signal, then a native catalogue star. Hero is intentionally the
+opening fallback because it currently owns the complete Galaxy=0 → Surface=5
+product path; this does not change explicit centre-pick priority, where Personal
+Signals still win. The fallback is consumed by the first scale-in gesture and is
+permanently disabled as soon as drag, touch, pinch, pan or keyboard camera input
+shows that the visitor has taken spatial control.
 After takeover, an empty centre remains empty instead of snapping back to a
 product-selected target.
 
@@ -390,9 +393,14 @@ object is expected to be represented by the local mesh, so a focused star
 resolves from point into its native system as coordinate 0→1 advances. The
 native endpoint and product System overview share the same physical system
 span, viewport FOV and sphere-fit factor. At coordinate 1 the native
-`starId + position + quaternion` is retained; only after that matched endpoint
-has painted does the product System take authority at the same view direction
-and apparent system size.
+`starId + position + quaternion` is retained. Product System normally takes
+authority after the matched endpoint receives a real paint opportunity. That
+paint preference is bounded: if a throttled/software renderer does not deliver
+the required rAF pair within 64 ms, the already composition-matched System
+endpoint takes authority directly instead of turning renderer readiness into an
+input lock. Same-direction wheel samples pressed against coordinate 1 do not
+invalidate that in-flight handoff; only a real coordinate change or authority
+takeover advances the scale intent epoch.
 
 The bridge snapshot is retained across renderer ownership. System→Galaxy first
 re-enters the native scene at the matched coordinate-1 endpoint and evaluates
@@ -661,6 +669,31 @@ Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
 Each new protected implementation unit must create and commit its own task and
 approval metadata before its first implementation commit.
+
+### Continuous scale input dynamics
+
+Galaxy (0) through Surface (5) uses one real-valued coordinate and one wheel
+input authority in `UniverseApp`. Browser wheel samples are normalized to
+CSS-pixel-equivalent distance before they reach any scale segment: pixel input
+is retained, line input uses 16 pixels per line, page input uses the viewport
+height, and each delivered event is capped at 96 pixels. The cap bounds a
+coalesced delivery after a main-thread stall; it does not add an accumulator,
+animation, or inertia.
+
+The normalized physical sample is then interpreted by the active scale segment.
+A capped 96px sample advances 0.25 across Galaxy→System (span 384) and 0.5
+across System→Surface intervals (span 192). Small high-resolution trackpad
+deltas remain proportional and immediately visible on both sides of the
+renderer boundary.
+
+Gesture identity is diagnostic/cancellation state, not physics. A pause starts
+a new identity, a sign reversal immediately increments the intent epoch and
+invalidates pending handoff work, and Search/Places, Journey, deep links,
+manual camera takeover, return, or navigation failure clear the session through
+the shared cancellation path. Boundary samples clamp idempotently; no hidden
+delta is retained, so the first opposite sample moves away from the boundary
+immediately. Runtime acceptance exposes normalized input, signed delta, gesture
+identity, and reversal identity through `data-universe-*` attributes.
 
 ## Runtime acceptance checklist
 
