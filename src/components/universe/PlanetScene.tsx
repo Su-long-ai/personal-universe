@@ -13,6 +13,7 @@ import {
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
 import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
@@ -269,8 +270,8 @@ function LiveSurfaceAnchor({
     ? rankedLandmarks.slice(0, 6)
     : rankedLandmarks.slice(0, 2);
   const visibleContent = expanded
-    ? rankedContent.slice(0, 6)
-    : rankedContent.slice(0, 1);
+    ? rankedContent.slice(0, SURFACE_CONTENT_SIGNAL_BUDGET.stable)
+    : rankedContent.slice(0, SURFACE_CONTENT_SIGNAL_BUDGET.transition);
   const rankedClusters = useMemo(
     () =>
       rankSurfaceContentClusters(
