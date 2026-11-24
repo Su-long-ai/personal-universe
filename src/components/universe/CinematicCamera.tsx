@@ -218,6 +218,23 @@ export function CinematicCamera({
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
+  const scratchWorldUp = useRef(new Vector3(0, 1, 0));
+  const scratchSurfaceUp = useRef(new Vector3());
+  const scratchSystemTarget = useRef(new Vector3());
+  const scratchSystemPosition = useRef(new Vector3());
+  const scratchForward = useRef(new Vector3());
+  const scratchApproachTarget = useRef(new Vector3());
+  const scratchApproachPosition = useRef(new Vector3());
+  const scratchApproachDirection = useRef(new Vector3());
+  const scratchEndpointOffset = useRef(new Vector3());
+  const scratchEndpointTarget = useRef(new Vector3());
+  const scratchSystemDirection = useRef(new Vector3());
+  const scratchFrameCenter = useRef(new Vector3());
+  const scratchFromPosition = useRef(new Vector3());
+  const scratchFromTarget = useRef(new Vector3());
+  const scratchToPosition = useRef(new Vector3());
+  const scratchToTarget = useRef(new Vector3());
+  const scratchNativeQuaternion = useRef(new Quaternion());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
 
@@ -438,7 +455,7 @@ export function CinematicCamera({
     const nativeSystemEntryView =
       phase === "system" && galaxyViewState?.systemOverview === true;
     const nativeSystemEntryQuaternion = nativeSystemEntryView
-      ? new Quaternion().fromArray(galaxyViewState.quaternion)
+      ? scratchNativeQuaternion.current.fromArray(galaxyViewState.quaternion)
       : null;
     if (nativeSystemEntryView) {
       document.documentElement.dataset.universeSystemEntryView =
@@ -488,7 +505,7 @@ export function CinematicCamera({
       camera.up
         .set(0, 1, 0)
         .applyQuaternion(nativeSystemEntryQuaternion)
-        .lerp(new Vector3(0, 1, 0), upT)
+        .lerp(scratchWorldUp.current.set(0, 1, 0), upT)
         .normalize();
     } else if (nativeSystemEntryQuaternion) {
       camera.up
@@ -506,7 +523,9 @@ export function CinematicCamera({
       camera.up
         .set(0, 1, 0)
         .lerp(
-          new Vector3(...activeSurfaceCameraFrame.up).normalize(),
+          scratchSurfaceUp.current
+            .set(...activeSurfaceCameraFrame.up)
+            .normalize(),
           surfaceInfluence,
         )
         .normalize();
@@ -535,15 +554,20 @@ export function CinematicCamera({
       const approachShot = SHOTS.approach;
       if (!systemShot || !approachShot) return;
 
-      const systemTarget = new Vector3(...systemShot.target);
-      const systemPosition = new Vector3(...systemShot.position);
+      const systemTarget = scratchSystemTarget.current.set(
+        ...systemShot.target,
+      );
+      const systemPosition = scratchSystemPosition.current.set(
+        ...systemShot.position,
+      );
       if (systemShot.frameScale) {
         const distance =
           controls.getDistanceToFitSphere(
             systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
           ) * systemShot.frameScale;
         if (nativeSystemEntryQuaternion) {
-          const forward = new Vector3(0, 0, -1)
+          const forward = scratchForward.current
+            .set(0, 0, -1)
             .applyQuaternion(nativeSystemEntryQuaternion)
             .normalize();
           systemPosition
@@ -560,23 +584,30 @@ export function CinematicCamera({
 
       // Preserve the authored Approach composition at the renderer boundary:
       // the target offset is expressed as a fraction of planet radius, while
-      // the viewing direction comes from the existing Approach shot.
-      const approachTarget = new Vector3(...approachShot.target);
-      const approachPosition = new Vector3(...approachShot.position);
-      const approachDirection = approachPosition
+      // the viewing direction comes from the existing Approach shot. Reuse
+      // scratch vectors here because this path runs for every continuous frame.
+      const approachTarget = scratchApproachTarget.current.set(
+        ...approachShot.target,
+      );
+      const approachPosition = scratchApproachPosition.current.set(
+        ...approachShot.position,
+      );
+      const approachDirection = scratchApproachDirection.current
+        .copy(approachPosition)
         .sub(approachTarget)
         .normalize();
-      const endpointTargetOffset = new Vector3(...approachShot.target)
-        .sub(new Vector3(...WORLD))
+      const endpointTargetOffset = scratchEndpointOffset.current
+        .set(...approachShot.target)
+        .sub(scratchFrameCenter.current.set(...WORLD))
         .multiplyScalar(
           Math.max(systemScaleFrame.radius, 1e-8) / PLANET_RENDER_RADIUS,
         );
-      const endpointTarget = new Vector3(...systemScaleFrame.position).add(
-        endpointTargetOffset,
-      );
+      const endpointTarget = scratchEndpointTarget.current
+        .set(...systemScaleFrame.position)
+        .add(endpointTargetOffset);
 
-      const systemDirection = systemPosition
-        .clone()
+      const systemDirection = scratchSystemDirection.current
+        .copy(systemPosition)
         .sub(systemTarget)
         .normalize();
       const linearT = Math.min(
@@ -645,7 +676,7 @@ export function CinematicCamera({
       document.documentElement.dataset.universeSystemScaleDistance =
         distance.toExponential(4);
       publishScaleFrameDiagnostics(
-        new Vector3(...systemScaleFrame.position),
+        scratchFrameCenter.current.set(...systemScaleFrame.position),
         systemScaleFrame.radius,
       );
       if (worldScalePosition >= 2 - WORLD_SCALE_EPSILON) {
@@ -689,25 +720,35 @@ export function CinematicCamera({
         upperPhase === "surface" ? surfaceShot : SHOTS[upperPhase];
       if (!lowerShot || !upperShot) return;
 
-      const resolveShot = (shot: CameraShot) => {
-        const target = new Vector3(...shot.target);
-        const position = new Vector3(...shot.position);
-        if (shot.frameScale) {
-          const distance =
-            controls.getDistanceToFitSphere(
-              shot.fitRadius ?? PLANET_RENDER_RADIUS,
-            ) * shot.frameScale;
-          position
-            .sub(target)
-            .normalize()
-            .multiplyScalar(distance)
-            .add(target);
-        }
-        return { position, target };
-      };
+      const fromTarget = scratchFromTarget.current.set(...lowerShot.target);
+      const fromPosition = scratchFromPosition.current.set(
+        ...lowerShot.position,
+      );
+      if (lowerShot.frameScale) {
+        const distance =
+          controls.getDistanceToFitSphere(
+            lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          ) * lowerShot.frameScale;
+        fromPosition
+          .sub(fromTarget)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(fromTarget);
+      }
 
-      const from = resolveShot(lowerShot);
-      const to = resolveShot(upperShot);
+      const toTarget = scratchToTarget.current.set(...upperShot.target);
+      const toPosition = scratchToPosition.current.set(...upperShot.position);
+      if (upperShot.frameScale) {
+        const distance =
+          controls.getDistanceToFitSphere(
+            upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          ) * upperShot.frameScale;
+        toPosition
+          .sub(toTarget)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(toTarget);
+      }
       const linearT =
         lowerIndex === upperIndex
           ? 0
@@ -716,8 +757,8 @@ export function CinematicCamera({
       // reads as one descent rather than a sequence of eased cinematics.
       const t = continuousScaleResponse(linearT);
 
-      desiredPosition.current.lerpVectors(from.position, to.position, t);
-      desiredTarget.current.lerpVectors(from.target, to.target, t);
+      desiredPosition.current.lerpVectors(fromPosition, toPosition, t);
+      desiredTarget.current.lerpVectors(fromTarget, toTarget, t);
       desiredPositionTolerance.current = Math.min(
         lowerShot.positionTolerance,
         upperShot.positionTolerance,
