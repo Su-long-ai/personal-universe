@@ -419,23 +419,12 @@ function DeepSky() {
   );
 }
 
-function liveQuality(
-  quality: QualityMode,
-  softwareRenderer: boolean,
-) {
-  if (quality === "low") {
-    return {
-      cloudQuality: 32,
-      cloudResolution: 0.35,
-      chunkRes: 16,
-      maxDepth: 4,
-      splitFactor: 2.1,
-    } as const;
-  }
-
-  // HIGH remains a live ProceduralPlanets renderer under SwiftShader, but
-  // software rasterizers get a conservative terrain budget so hosted Linux
-  // can reach a stable landing frame without starving browser teardown.
+function liveQuality(softwareRenderer: boolean) {
+  // A live Planet is a retained world resource, not a per-quality disposable.
+  // Use one stable budget for its lifetime so AUTO <-> HIGH and temporary LOW
+  // fallback switches do not destroy terrain/material/LOD state. Software HIGH
+  // keeps the conservative hosted-runner profile; real GPUs retain the prior
+  // HIGH profile so an AUTO-first visit can later promote without rebuilding.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
@@ -446,21 +435,12 @@ function liveQuality(
     } as const;
   }
 
-  if (quality === "high") {
-    return {
-      cloudQuality: 72,
-      cloudResolution: 0.6,
-      chunkRes: 32,
-      maxDepth: 6,
-      splitFactor: 2.7,
-    } as const;
-  }
   return {
-    cloudQuality: 56,
-    cloudResolution: 0.5,
-    chunkRes: 24,
-    maxDepth: 5,
-    splitFactor: 2.4,
+    cloudQuality: 72,
+    cloudResolution: 0.6,
+    chunkRes: 32,
+    maxDepth: 6,
+    splitFactor: 2.7,
   } as const;
 }
 
@@ -508,9 +488,9 @@ export function PlanetScene({
         : null,
     [fallbackReason, planet.archetype, planet.seed],
   );
-  const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
+  const liveKey = `${planet.id}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
-  const liveEnabled = warmedKey === liveKey && !fallbackReason;
+  const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
   const paintReported = useRef(false);
   const onPaintReadyChangeRef = useRef(onPaintReadyChange);
@@ -528,7 +508,7 @@ export function PlanetScene({
   }, []);
 
   useEffect(() => {
-    if (fallbackReason) return;
+    if (fallbackReason || warmedKey === liveKey) return;
 
     // Hidden System prewarm is useful on a real GPU, where constructing the
     // live ProceduralPlanets world can happen without stalling the scale
@@ -585,19 +565,25 @@ export function PlanetScene({
     phase,
     presentationActive,
     softwareRenderer,
+    warmedKey,
   ]);
 
   const livePlanet = useMemo(() => {
-    if (!liveEnabled) return null;
-    return new Planet({
+    if (!liveProvisioned) return null;
+    const nextPlanet = new Planet({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      ...liveQuality(quality, softwareRenderer),
+      ...liveQuality(softwareRenderer),
     });
-  }, [liveEnabled, planet, quality, softwareRenderer, sunDirection]);
+    const html = document.documentElement;
+    html.dataset.universeWorldPlanetAllocations = String(
+      Number(html.dataset.universeWorldPlanetAllocations ?? "0") + 1,
+    );
+    return nextPlanet;
+  }, [liveProvisioned, planet, softwareRenderer, sunDirection]);
 
   useEffect(() => {
     return () => {
@@ -665,10 +651,10 @@ export function PlanetScene({
   ]);
 
   useEffect(() => {
-    const mode = livePlanet
-      ? "procedural-planets-live"
-      : fallbackReason
-        ? `procedural-planets-fallback-${fallbackReason}`
+    const mode = fallbackReason
+      ? `procedural-planets-fallback-${fallbackReason}`
+      : livePlanet
+        ? "procedural-planets-live"
         : "procedural-planets-warmup";
     document.documentElement.dataset.universeWorldRenderer = mode;
     if (fallbackSurfaceTexture) {
@@ -690,7 +676,7 @@ export function PlanetScene({
   useFrame((_, delta) => {
     // Once landed, keep the terrain under the visitor fixed. Orbit/approach
     // retain the subtle planetary rotation.
-    if (livePlanet && phase !== "surface") {
+    if (livePlanet && !fallbackReason && phase !== "surface") {
       livePlanet.rotation.y += delta * 0.014;
     }
 
@@ -762,12 +748,15 @@ export function PlanetScene({
         {livePlanet ? (
           <primitive
             object={livePlanet}
+            visible={!fallbackReason}
             scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
           />
         ) : null}
       </group>
 
-      {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
+      {(phase === "surface" || worldScalePosition > 4) &&
+      livePlanet &&
+      !fallbackReason ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
           onCameraFrame={onSurfaceCameraFrame}
