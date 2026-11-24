@@ -235,6 +235,10 @@ one boolean:
 Returning to System invalidates first-paint authority even though the same
 Planet/material resources remain warm. Re-entering Approach must therefore
 paint the retained renderer again before System presentation is released.
+Authority is versioned by an activation generation as well as planet/quality
+identity: presenting -> parked -> presenting and HIGH -> LOW -> HIGH each
+advance the generation. A previously earned `ready=true` state therefore
+cannot become valid again merely because a repeated identity string matches.
 Quality or planet identity changes invalidate the same token for the replacement
 renderer, preventing readiness from leaking across capabilities.
 
@@ -248,6 +252,7 @@ Runtime evidence:
 - `data-universe-world-scene-ready`
 - `data-universe-world-scene-lifecycle="prewarming|active|parked"`
 - `data-universe-world-paint-ready="true"`
+- `data-universe-world-paint-generation`
 - `data-universe-world-pipeline-lifecycle="parked|active"`
 - `data-universe-world-pipeline-allocations`
 
