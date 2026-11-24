@@ -335,6 +335,7 @@ export function UniverseCanvas({
             phaseRef={phaseRef}
             quality={quality}
             hasPlanet={Boolean(selectedPlanet)}
+            ready={surfaceFallbackReady}
             onReadyChange={setSurfaceFallbackReady}
           />
         </Suspense>
