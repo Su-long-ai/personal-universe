@@ -28,6 +28,7 @@ import type {
   UniverseNavigationCameraRequest,
   UniverseNavigationDestination,
 } from "../../lib/universe/yeis/navigation";
+import { WORLD_SCALE_EPSILON } from "../../lib/universe/continuousScale";
 import type {
   GalaxyMarker,
   PlanetDefinition,
@@ -179,12 +180,32 @@ export function UniverseCanvas({
     identity: string;
     ready: boolean;
   }>({ identity: "", ready: false });
+  const previousScalePositionRef = useRef(worldScalePosition);
+  const [reverseSystemPrewarm, setReverseSystemPrewarm] = useState(false);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
       setSurfaceFallbackPrimed(true);
     }
   }, [phase]);
+
+  useEffect(() => {
+    const previous = previousScalePositionRef.current;
+    const reversingInsideApproach =
+      phase === "approach" &&
+      worldScalePosition < previous - WORLD_SCALE_EPSILON;
+
+    if (phase !== "approach") {
+      setReverseSystemPrewarm(false);
+    } else if (reversingInsideApproach) {
+      // Latch for the rest of this Approach interval. The native System owner
+      // can now build/compile while the close world still presents, then stay
+      // mounted as phase crosses into System.
+      setReverseSystemPrewarm(true);
+    }
+
+    previousScalePositionRef.current = worldScalePosition;
+  }, [phase, worldScalePosition]);
 
   const worldPrewarmPlanet = selectedPlanet ?? systemScaleTargetPlanet;
   const closeWorldPhase =
@@ -289,6 +310,14 @@ export function UniverseCanvas({
     keepSystemForHandoff && worldPaintStarted
       ? worldPrewarmPlanet?.id ?? null
       : null;
+  const systemPresentationActive =
+    phase === "system" || keepSystemForHandoff;
+  const reverseNativeSystemPrewarm =
+    reverseSystemPrewarm &&
+    phase === "approach" &&
+    Boolean(selectedSystem?.id.startsWith("yeis-system:"));
+  const mountSystemRenderer =
+    systemPresentationActive || reverseNativeSystemPrewarm;
 
   useEffect(() => {
     const html = document.documentElement;
@@ -368,18 +397,20 @@ export function UniverseCanvas({
         />
       )}
 
-      {(phase === "system" || keepSystemForHandoff) && selectedSystem && (
+      {mountSystemRenderer && selectedSystem && (
         selectedSystem.id.startsWith("yeis-system:") ? (
           <Suspense
             fallback={
-              <SystemScene
-                system={selectedSystem}
-                onSelectPlanet={onSelectPlanet}
-                onScaleFocus={onScaleFocusPlanet}
-                scaleTargetPlanet={systemScaleTargetPlanet}
-                handoffTargetPlanetId={handoffTargetPlanetId}
-                onScaleFrame={setSystemScaleFrame}
-              />
+              systemPresentationActive ? (
+                <SystemScene
+                  system={selectedSystem}
+                  onSelectPlanet={onSelectPlanet}
+                  onScaleFocus={onScaleFocusPlanet}
+                  scaleTargetPlanet={systemScaleTargetPlanet}
+                  handoffTargetPlanetId={handoffTargetPlanetId}
+                  onScaleFrame={setSystemScaleFrame}
+                />
+              ) : null
             }
           >
             <LazyYeisSystemScene
@@ -390,6 +421,7 @@ export function UniverseCanvas({
               handoffTargetPlanetId={handoffTargetPlanetId}
               onScaleFrame={setSystemScaleFrame}
               quality={quality}
+              presentationActive={systemPresentationActive}
             />
           </Suspense>
         ) : (
