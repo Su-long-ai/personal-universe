@@ -24,6 +24,7 @@ import {
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import {
   buildSurfaceWorldProfile,
+  nextSurfaceClusterEntryId,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
 } from "../../lib/universe/surface";
@@ -408,20 +409,6 @@ export default function UniverseApp({
         a.title.localeCompare(b.title),
     );
   }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
-  const surfaceClusterLeadEntries = useMemo(() => {
-    const leads = new Map<number, string>();
-    if (!surfaceProfile) return leads;
-
-    for (const anchor of rankSurfaceContentAnchors(
-      surfaceProfile.contentAnchors,
-      surfaceFocusEntryId,
-    )) {
-      if (!leads.has(anchor.cluster)) {
-        leads.set(anchor.cluster, anchor.entryId);
-      }
-    }
-    return leads;
-  }, [surfaceFocusEntryId, surfaceProfile]);
   const handleSurfaceFocusEntry = useCallback(
     (entryId: string) => {
       if (phaseRef.current !== "surface") return;
@@ -433,6 +420,33 @@ export default function UniverseApp({
       );
     },
     [selectedPlanet],
+  );
+  const handleSurfaceFocusCluster = useCallback(
+    (clusterIndex: number) => {
+      if (phaseRef.current !== "surface" || !surfaceProfile) return;
+      const focusedEntry =
+        surfaceFocusedAnchor?.cluster === clusterIndex
+          ? surfaceFocusEntryId
+          : null;
+      const nextEntryId = nextSurfaceClusterEntryId(
+        surfaceProfile.contentAnchors,
+        clusterIndex,
+        focusedEntry,
+      );
+      if (!nextEntryId) return;
+      if (
+        !selectedPlanet?.content?.some((entry) => entry.id === nextEntryId)
+      ) {
+        return;
+      }
+      setSurfaceLocalFocusEntryId(nextEntryId);
+    },
+    [
+      selectedPlanet,
+      surfaceFocusEntryId,
+      surfaceFocusedAnchor?.cluster,
+      surfaceProfile,
+    ],
   );
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -3342,30 +3356,39 @@ export default function UniverseApp({
               {rankSurfaceContentClusters(
                 surfaceProfile.contentClusters,
                 surfaceFocusedAnchor?.cluster ?? null,
-              )
-                .slice(0, 3)
-                .map((cluster) => {
-                  const entryId = surfaceClusterLeadEntries.get(cluster.index);
-                  return (
-                    <button
-                      type="button"
-                      className="surface-cluster-chip"
-                      data-priority={cluster.priority}
-                      data-surface-cluster={cluster.index}
-                      data-surface-entry={entryId}
-                      aria-pressed={
-                        surfaceFocusedAnchor?.cluster === cluster.index
-                      }
-                      disabled={!entryId}
-                      key={cluster.id}
-                      onClick={() => {
-                        if (entryId) handleSurfaceFocusEntry(entryId);
-                      }}
-                    >
-                      {cluster.label} · {cluster.anchorIds.length}
-                    </button>
-                  );
-                })}
+              ).map((cluster) => {
+                const focusedEntry =
+                  surfaceFocusedAnchor?.cluster === cluster.index
+                    ? surfaceFocusEntryId
+                    : null;
+                const nextEntryId = nextSurfaceClusterEntryId(
+                  surfaceProfile.contentAnchors,
+                  cluster.index,
+                  focusedEntry,
+                );
+                return (
+                  <button
+                    type="button"
+                    className="surface-cluster-chip"
+                    data-priority={cluster.priority}
+                    data-surface-cluster={cluster.index}
+                    data-surface-entry={nextEntryId ?? undefined}
+                    aria-pressed={
+                      surfaceFocusedAnchor?.cluster === cluster.index
+                    }
+                    aria-label={
+                      locale === "zh"
+                        ? `${cluster.label}，${cluster.anchorIds.length} 个信号，点按切换`
+                        : `${cluster.label}, ${cluster.anchorIds.length} signals, tap to cycle`
+                    }
+                    disabled={!nextEntryId}
+                    key={cluster.id}
+                    onClick={() => handleSurfaceFocusCluster(cluster.index)}
+                  >
+                    {cluster.label} · {cluster.anchorIds.length}
+                  </button>
+                );
+              })}
             </div>
           )}
           <em className="surface-explore-hint">
