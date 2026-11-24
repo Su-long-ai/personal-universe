@@ -203,6 +203,29 @@ far below exact canonical-ID, exact title and exact alias relevance. Ranking
 therefore improves continuity without letting visit history override identity
 or query intent.
 
+### Scale-aware default density
+
+The default empty-query **All** Places view uses the existing continuous
+Galaxy=0 → Surface=5 coordinate as a presentation-density signal. It does not
+create a second scale state or alter Search/navigation. Per-section row budgets
+interpolate from a sparse Galaxy profile toward a more local System/world
+profile: Galaxy emphasizes high-priority personal signals, featured
+destinations and system-level astronomy, while System increases the
+Planets & Bodies budget substantially. At close-world scales generic remote
+catalog sections contract again so local/world content stays legible.
+
+The catch-all Personal Signals section is a spotlight in this default view:
+featured or importance >= 4 entries can occupy it first, while lower-priority
+authored entries remain eligible for their semantic Projects, Research,
+Experience, Artifacts or Notes sections. This prevents the catch-all group from
+consuming every authored destination during display de-duplication.
+
+The density budget applies **only** to empty-query All Places. Search, Personal,
+Important, Nearby and Recent operate on the full canonical candidate set. A
+canonical ID such as `star:c50000` is resolved directly before ordinary
+text ranking, so reducing default DOM rows never makes valid long-tail
+destinations unreachable.
+
 ## Product Open vs native travel
 
 Personal Universe intentionally combines its React product scenes with YEIS
