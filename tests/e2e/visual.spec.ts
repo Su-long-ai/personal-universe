@@ -19,6 +19,11 @@ const DESKTOP: Viewport = {
   width: 1440,
   height: 900,
 };
+const WQHD: Viewport = {
+  name: "wqhd-2560x1440",
+  width: 2560,
+  height: 1440,
+};
 const TABLET: Viewport = {
   name: "tablet-834x1194",
   width: 834,
@@ -194,6 +199,60 @@ async function expectCompactNarrowHud(page: Page) {
     box!.height,
     "narrow-screen HUD should stay compact enough to avoid covering the world",
   ).toBeLessThan(310);
+}
+
+async function expectViewportContainedLayout(page: Page, label: string) {
+  const layout = await page.evaluate(() => {
+    const hud = document.querySelector<HTMLElement>(".universe-hud");
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas");
+    const hudRect = hud?.getBoundingClientRect() ?? null;
+    const canvasRect = canvas?.getBoundingClientRect() ?? null;
+    return {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+      hud: hudRect
+        ? {
+            left: hudRect.left,
+            top: hudRect.top,
+            right: hudRect.right,
+            bottom: hudRect.bottom,
+          }
+        : null,
+      canvas: canvasRect
+        ? {
+            left: canvasRect.left,
+            top: canvasRect.top,
+            right: canvasRect.right,
+            bottom: canvasRect.bottom,
+            width: canvasRect.width,
+            height: canvasRect.height,
+          }
+        : null,
+    };
+  });
+
+  expect(layout.hud, `${label} HUD should be laid out`).not.toBeNull();
+  expect(layout.canvas, `${label} canvas should be laid out`).not.toBeNull();
+  expect(
+    layout.scrollWidth,
+    `${label} should not create horizontal viewport overflow`,
+  ).toBeLessThanOrEqual(layout.width + 2);
+  expect(layout.hud!.left, `${label} HUD should stay on-screen`).toBeGreaterThanOrEqual(-2);
+  expect(layout.hud!.top, `${label} HUD should stay on-screen`).toBeGreaterThanOrEqual(-2);
+  expect(layout.hud!.right, `${label} HUD should stay on-screen`).toBeLessThanOrEqual(
+    layout.width + 2,
+  );
+  expect(layout.hud!.bottom, `${label} HUD should stay on-screen`).toBeLessThanOrEqual(
+    layout.height + 2,
+  );
+  expect(layout.canvas!.width, `${label} canvas should cover the viewport`).toBeGreaterThanOrEqual(
+    layout.width - 2,
+  );
+  expect(layout.canvas!.height, `${label} canvas should cover the viewport`).toBeGreaterThanOrEqual(
+    layout.height - 2,
+  );
 }
 
 async function personalTarget(page: Page) {
@@ -390,6 +449,68 @@ test("visual: desktop Approach-Orbit midpoint", async ({ page }, testInfo) => {
     await expectReadableWorldFrame(page, "Approach-Orbit midpoint");
   });
 });
+
+for (const viewport of [DESKTOP, WQHD]) {
+  test(
+    `visual: ${viewport.name} Orbit-Atmosphere midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "orbit-atmosphere-midpoint",
+        async () => {
+          await page.goto(
+            "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          await waitForCameraSettled(page, "orbit");
+          const html = page.locator("html");
+
+          await dispatchVisualScaleWheel(page, -96);
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "3.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-camera-segment",
+            "orbit:atmosphere",
+            { timeout: 10_000 },
+          );
+          await expect
+            .poll(
+              async () =>
+                Number(await html.getAttribute("data-universe-projected-radius")),
+              { timeout: 10_000 },
+            )
+            .toBeGreaterThan(0);
+
+          const projectedRadius = Number(
+            await html.getAttribute("data-universe-projected-radius"),
+          );
+          const normalizedRadius = projectedRadius / viewport.height;
+          expect(
+            normalizedRadius,
+            `${viewport.name} Orbit-Atmosphere target should remain visibly framed`,
+          ).toBeGreaterThan(0.12);
+          expect(
+            normalizedRadius,
+            `${viewport.name} Orbit-Atmosphere target should not clip vertically`,
+          ).toBeLessThan(0.7);
+          expect(await page.locator("canvas").count()).toBe(1);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Orbit-Atmosphere midpoint`,
+          );
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} Orbit-Atmosphere midpoint`,
+          );
+        },
+      );
+    },
+  );
+}
 
 test("visual: desktop Atmosphere-Surface midpoint", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "atmosphere-surface-midpoint", async () => {
