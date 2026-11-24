@@ -28,17 +28,19 @@ function ArrivalBeacon({
   active,
   onToggle,
   height,
+  presenting,
   softwareLite = false,
 }: {
   active: boolean;
   onToggle: () => void;
   height: number;
+  presenting: boolean;
   softwareLite?: boolean;
 }) {
   const beacon = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
-    if (softwareLite || !beacon.current) return;
+    if (!presenting || softwareLite || !beacon.current) return;
     beacon.current.rotation.y += delta * 0.12;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.55) * 0.035;
     beacon.current.scale.setScalar(active ? pulse * 1.06 : pulse);
@@ -312,6 +314,7 @@ export function SurfaceScene({
         active={beaconActive}
         height={anchorHeight}
         onToggle={() => setBeaconActive((value) => !value)}
+        presenting={presentationActive}
         softwareLite={softwareRenderer}
       />
     </>
