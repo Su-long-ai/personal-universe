@@ -205,6 +205,24 @@ export function UniverseCanvas({
     phase === "orbit" ||
     phase === "atmosphere" ||
     phase === "surface";
+  const [retainedWorldRendererId, setRetainedWorldRendererId] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      worldPrewarmPlanet &&
+      (phase === "system" || closeWorldPhase)
+    ) {
+      setRetainedWorldRendererId(worldPrewarmPlanet.id);
+    }
+  }, [closeWorldPhase, phase, worldPrewarmPlanet?.id]);
+
+  const keepWorldRendererMounted = Boolean(
+    worldPrewarmPlanet &&
+      (phase === "system" ||
+        closeWorldPhase ||
+        retainedWorldRendererId === worldPrewarmPlanet.id),
+  );
 
   useEffect(() => {
     // Paint readiness belongs to the concrete renderer capability, not only
@@ -329,7 +347,7 @@ export function UniverseCanvas({
         }
       >
         {worldPrewarmPlanet &&
-          (phase === "system" || closeWorldPhase) && (
+          keepWorldRendererMounted && (
             <LazyPlanetScene
               planet={worldPrewarmPlanet}
               quality={quality}
