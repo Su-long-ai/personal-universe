@@ -449,19 +449,22 @@ fallback/quality switches; bloom is likewise retained and toggled rather than
 rebuilt. This keeps AUTO/software cheap before a live request while preventing
 quality changes from reallocating the complete post-processing chain. The live
 ProceduralPlanets world follows the same lifetime rule: its resource identity is
-planet + renderer class, not the current LOW/AUTO/HIGH selector. Real-GPU AUTO
-and HIGH keep their distinct performance profiles, but they are applied through
-the package's live `Planet.set()` API to the same retained Planet instead of
-reconstructing the world. The last applied profile is tracked per Planet, so a
-temporary LOW fallback followed by a return to the same live quality does not
-even repeat the parameter update. Software HIGH keeps the bounded hosted-runner
-profile. Switching temporarily to a fallback mode hides and parks that same live
-Planet instead of disposing terrain/material/LOD state, so returning to a live
-capability reuses the warmed world immediately. The same Planet identity
-therefore survives forward and reverse travel as well as quality fallback
-cycles, while AUTO does not silently inherit HIGH's cost. LOW/AUTO-software
-retain the same Surface terrain instance, with cancellable Atmosphere-time
-preparation before the final boundary.
+planet + renderer class, not the current LOW/AUTO/HIGH selector. The package
+marks `chunkRes` and `maxDepth` as structural rebuild keys, so real-GPU
+quality does not blindly toggle those through `Planet.set()`. A new live Planet
+starts with the AUTO 24/5 structure; the first real HIGH request promotes it once
+to 32/6, and that structural tier is never demoted for that Planet. Repeated
+LOW/AUTO/HIGH cycles therefore cannot repeatedly throw away its LOD world.
+Non-structural cloud quality, cloud resolution and split factor still follow
+AUTO/HIGH through the package's live `Planet.set()` API. The last applied
+dynamic profile is tracked per Planet, so a temporary LOW fallback followed by a
+return to the same live quality does not even repeat that update. Software HIGH
+keeps the bounded hosted-runner profile. Switching temporarily to a fallback
+mode hides and parks that same live Planet instead of disposing it, so returning
+to a live capability reuses the warmed world immediately. AUTO keeps its cheaper
+initial structure unless the visitor has explicitly requested HIGH. LOW/AUTO-
+software retain the same Surface terrain instance, with cancellable Atmosphere-
+time preparation before the final boundary.
 
 Runtime evidence:
 
@@ -469,7 +472,12 @@ Runtime evidence:
 - `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation;
 - `data-universe-world-planet-allocations` counts live Planet construction;
 - `data-universe-world-live-profile` reports the currently active retained
-  profile (`gpu-auto`, `gpu-high`, or `software-high`).
+  dynamic profile (`gpu-auto`, `gpu-high`, or `software-high`);
+- `data-universe-world-live-profile-updates` counts actual dynamic
+  `Planet.set()` profile applications;
+- `data-universe-world-live-structure` reports the retained structural tier;
+- `data-universe-world-structural-promotions` counts one-way AUTO -> HIGH LOD
+  promotions.
 
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
