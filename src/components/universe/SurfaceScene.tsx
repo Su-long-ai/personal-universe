@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import type { QualityMode, UniversePhase } from "../../lib/universe/types";
+import type { PlanetDefinition, QualityMode, UniversePhase } from "../../lib/universe/types";\nimport { buildSurfaceWorldProfile } from "../../lib/universe/surface";
 import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
@@ -28,11 +28,15 @@ function ArrivalBeacon({
   active,
   onToggle,
   height,
+  accent,
+  landing,
   softwareLite = false,
 }: {
   active: boolean;
   onToggle: () => void;
   height: number;
+  accent: string;
+  landing: [number, number];
   softwareLite?: boolean;
 }) {
   const beacon = useRef<THREE.Group>(null);
@@ -46,23 +50,23 @@ function ArrivalBeacon({
 
   if (softwareLite) {
     return (
-      <group position={[1.2, height + 0.2, -11]} onClick={onToggle}>
+      <group position={[landing[0] + 0.8, height + 0.2, landing[1] - 5.6]} onClick={onToggle}>
         <mesh position={[0, 0.82, 0]}>
           <cylinderGeometry args={[0.045, 0.09, 1.7, 6]} />
           <meshBasicMaterial
-            color={active ? "#ffd39a" : "#8bdcff"}
+            color={active ? "#ffd39a" : accent}
             transparent
             opacity={0.82}
           />
         </mesh>
         <mesh position={[0, 1.78, 0]}>
           <octahedronGeometry args={[0.17, 0]} />
-          <meshBasicMaterial color={active ? "#fff0cf" : "#e1f8ff"} />
+          <meshBasicMaterial color={active ? "#fff0cf" : accent} />
         </mesh>
         <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.22, 0.31, 12]} />
           <meshBasicMaterial
-            color={active ? "#ffb66f" : "#65d5ff"}
+            color={active ? "#ffb66f" : accent}
             transparent
             opacity={0.42}
             side={THREE.DoubleSide}
@@ -74,12 +78,12 @@ function ArrivalBeacon({
   }
 
   return (
-    <group ref={beacon} position={[0.4, height, -5.4]} onClick={onToggle}>
+    <group ref={beacon} position={[landing[0], height, landing[1]]} onClick={onToggle}>
       <mesh scale={[0.1, 1.45, 0.1]}>
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial
-          color={active ? "#ffd7a0" : "#b9e8ff"}
-          emissive={active ? "#ff9a45" : "#5ac8ff"}
+          color={active ? "#ffd7a0" : accent}
+          emissive={active ? "#ff9a45" : accent}
           emissiveIntensity={active ? 4.5 : 2.2}
           metalness={0.64}
           roughness={0.22}
@@ -88,7 +92,7 @@ function ArrivalBeacon({
       <mesh position={[0, 0.65, 0]} scale={active ? 0.42 : 0.3}>
         <sphereGeometry args={[0.24, 24, 24]} />
         <meshBasicMaterial
-          color={active ? "#ffd9a0" : "#7fd8ff"}
+          color={active ? "#ffd9a0" : accent}
           transparent
           opacity={0.22}
           depthWrite={false}
@@ -132,29 +136,33 @@ export function SurfaceScene({
   phase,
   phaseRef,
   quality,
-  hasPlanet,
+  planet,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
-  hasPlanet: boolean;
+  planet: PlanetDefinition | null;
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
+  const profile = useMemo(
+    () => (planet ? buildSurfaceWorldProfile(planet) : null),
+    [planet],
+  );
   const softwareHorizonBackground = useMemo(() => {
-    // 1x8 vertical gradient stored bottom -> top. It stays near-black at the
-    // zenith while lifting only the software horizon band.
-    const data = new Uint8Array([
-      0x59, 0x64, 0x5e, 0xff,
-      0x59, 0x64, 0x5e, 0xff,
-      0x59, 0x64, 0x5e, 0xff,
-      0x56, 0x60, 0x5b, 0xff,
-      0x50, 0x5a, 0x55, 0xff,
-      0x43, 0x50, 0x4c, 0xff,
-      0x1c, 0x28, 0x28, 0xff,
-      0x01, 0x02, 0x04, 0xff,
-    ]);
+    const horizon = new THREE.Color(profile?.atmosphere.horizon ?? "#59645e");
+    const zenith = new THREE.Color(profile?.atmosphere.zenith ?? "#010204");
+    const sample = new THREE.Color();
+    const data = new Uint8Array(8 * 4);
+    for (let index = 0; index < 8; index += 1) {
+      const t = Math.pow(index / 7, 1.45);
+      sample.lerpColors(horizon, zenith, t);
+      data[index * 4] = Math.round(sample.r * 255);
+      data[index * 4 + 1] = Math.round(sample.g * 255);
+      data[index * 4 + 2] = Math.round(sample.b * 255);
+      data[index * 4 + 3] = 255;
+    }
     const texture = new THREE.DataTexture(data, 1, 8, THREE.RGBAFormat);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
@@ -162,19 +170,19 @@ export function SurfaceScene({
     texture.generateMipmaps = false;
     texture.needsUpdate = true;
     return texture;
-  }, []);
+  }, [profile?.id]);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
   const active =
     anchored &&
-    hasPlanet &&
+    Boolean(profile) &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
   const prepare =
     anchored &&
-    hasPlanet &&
+    Boolean(profile) &&
     (phase === "atmosphere" || phase === "surface") &&
     Boolean(liveWorldFallbackReason(gl, quality));
 
@@ -258,39 +266,56 @@ export function SurfaceScene({
     <>
       {!softwareRenderer ? (
         <>
-          <hemisphereLight args={["#7da6c8", "#101617", 1.15]} />
+          <hemisphereLight
+            args={[
+              profile?.atmosphere.horizon ?? "#7da6c8",
+              profile?.atmosphere.fog ?? "#101617",
+              1.15,
+            ]}
+          />
           <directionalLight
             position={[-12, 9, 4]}
-            intensity={4.6}
-            color="#ffc27d"
+            intensity={(profile?.lighting.sunIntensity ?? 1.45) * 3.05}
+            color={
+              profile
+                ? new THREE.Color(...profile.lighting.sunColor)
+                : "#ffc27d"
+            }
             castShadow
           />
           <pointLight
             position={[0.4, anchorHeight + 1.0, -5.4]}
             intensity={beaconActive ? 7 : 2.8}
             distance={11}
-            color={beaconActive ? "#ffb46d" : "#74d8ff"}
+            color={beaconActive ? "#ffb46d" : (profile?.accent ?? "#74d8ff")}
           />
         </>
       ) : null}
 
       <Suspense fallback={null}>
         {terrainEnabled ? (
-          <SurfaceTerrain
-            active={active}
-            phaseRef={phaseRef}
-            onAnchorHeight={handleAnchorHeight}
-          />
+          profile ? (
+            <SurfaceTerrain
+              active={active}
+              phaseRef={phaseRef}
+              profile={profile}
+              onAnchorHeight={handleAnchorHeight}
+            />
+          ) : null
         ) : null}
       </Suspense>
 
       {!softwareRenderer ? <DistantMoon /> : null}
-      <ArrivalBeacon
-        active={beaconActive}
-        height={anchorHeight}
-        onToggle={() => setBeaconActive((value) => !value)}
-        softwareLite={softwareRenderer}
-      />
+      {profile ? (
+        <ArrivalBeacon
+          active={beaconActive}
+          height={anchorHeight}
+          accent={profile.accent}
+          landing={profile.landing}
+          onToggle={() => setBeaconActive((value) => !value)}
+          softwareLite={softwareRenderer}
+        />
+      ) : null}
     </>
   );
 
@@ -304,6 +329,14 @@ export function SurfaceScene({
     document.documentElement.dataset.universeSurfaceHorizon = softwareRenderer
       ? "generated-gradient"
       : "gpu-fog";
+    if (profile) {
+      document.documentElement.dataset.universeSurfaceProfile = profile.id;
+      document.documentElement.dataset.universeSurfaceBiome = profile.biome;
+      document.documentElement.dataset.universeSurfaceLandmarks =
+        String(profile.landmarks.length);
+      document.documentElement.dataset.universeSurfaceContentAnchors =
+        String(profile.contentAnchors.length);
+    }
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -313,8 +346,12 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceDepthCues;
       delete document.documentElement.dataset.universeSurfaceHorizon;
+      delete document.documentElement.dataset.universeSurfaceProfile;
+      delete document.documentElement.dataset.universeSurfaceBiome;
+      delete document.documentElement.dataset.universeSurfaceLandmarks;
+      delete document.documentElement.dataset.universeSurfaceContentAnchors;
     };
-  }, [active, softwareRenderer]);
+  }, [active, profile, softwareRenderer]);
 
   return (
     <>
@@ -326,10 +363,16 @@ export function SurfaceScene({
               object={softwareHorizonBackground}
             />
           ) : (
-            <color attach="background" args={["#030b12"]} />
+            <color
+              attach="background"
+              args={[profile?.atmosphere.zenith ?? "#030b12"]}
+            />
           )}
           {!softwareRenderer ? (
-            <fog attach="fog" args={["#07141d", 34, 118]} />
+            <fog
+              attach="fog"
+              args={[profile?.atmosphere.fog ?? "#07141d", 34, 118]}
+            />
           ) : null}
         </>
       ) : null}
