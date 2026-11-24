@@ -298,7 +298,7 @@ function allValidationFailures() {
       (entry) =>
         entry.placement === "pinned" &&
         Boolean(entry.starId) &&
-        (entry.starId === "h-aurora" || entry.starId!.startsWith("c")),
+        (entry.starId === "h-aurora" || entry.starId.startsWith("c")),
     );
     for (const issue of validateUniverseContentDestinations(
       nativePinnedEntries,
