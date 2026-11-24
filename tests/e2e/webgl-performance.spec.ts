@@ -77,6 +77,10 @@ async function driveGalaxySystemRoundTrip(page: Page) {
 async function driveFullScaleRoundTrip(page: Page) {
   const html = page.locator("html");
 
+  // This is a resource-lifetime acceptance, not a step-size test. The product
+  // intentionally retunes continuous wheel response by scale segment, so drive
+  // far enough to the clamped endpoints instead of baking one historical
+  // samples-per-phase ratio into the WebGL test.
   for (let sample = 0; sample < 4; sample += 1) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(20);
@@ -87,24 +91,14 @@ async function driveFullScaleRoundTrip(page: Page) {
     { timeout: 10_000 },
   );
 
-  for (let sample = 0; sample < 2; sample += 1) {
-    await dispatchScaleWheel(page, -96);
-    await page.waitForTimeout(20);
-  }
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "approach",
-    { timeout: 10_000 },
-  );
-
-  for (let sample = 0; sample < 6; sample += 1) {
+  for (let sample = 0; sample < 16; sample += 1) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(20);
   }
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
-    { timeout: 15_000 },
+    { timeout: 20_000 },
   );
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
@@ -113,33 +107,18 @@ async function driveFullScaleRoundTrip(page: Page) {
   await expect(html).toHaveAttribute(
     "data-universe-world-scene-ready",
     "true",
-    { timeout: 15_000 },
+    { timeout: 20_000 },
   );
 
-  for (let sample = 0; sample < 6; sample += 1) {
-    await dispatchScaleWheel(page, 96);
-    await page.waitForTimeout(20);
-  }
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "approach",
-    { timeout: 15_000 },
-  );
-
-  for (let sample = 0; sample < 3; sample += 1) {
+  for (let sample = 0; sample < 20; sample += 1) {
     await dispatchScaleWheel(page, 96);
     await page.waitForTimeout(20);
   }
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
-    { timeout: 10_000 },
+    { timeout: 20_000 },
   );
-
-  for (let sample = 0; sample < 3; sample += 1) {
-    await dispatchScaleWheel(page, 96);
-    await page.waitForTimeout(20);
-  }
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
     "0.000",
