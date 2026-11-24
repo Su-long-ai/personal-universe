@@ -247,6 +247,11 @@ test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
         "true",
         { timeout: 30_000 },
       );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-system-focus",
+        /.+/,
+        { timeout: 30_000 },
+      );
       await expect(page.locator(".content-signal-card")).toBeVisible();
     },
   );
@@ -407,6 +412,11 @@ for (const viewport of [TABLET, MOBILE]) {
           await expect(html).toHaveAttribute(
             "data-universe-system-ready",
             "true",
+            { timeout: 30_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-system-focus",
+            /.+/,
             { timeout: 30_000 },
           );
           await expect(page.locator(".content-signal-card")).toBeVisible();
