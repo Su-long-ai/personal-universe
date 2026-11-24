@@ -41,7 +41,12 @@ The product adapter instead builds a render-only similarity-transformed
   content authority.
 
 The outer native system is fitted to the existing product system shot rather
-than moving the product camera into astronomical kilometre ranges.
+than moving the product camera into astronomical kilometre ranges. The adapter
+fits planet/dwarf orbital extent to the overview radius and independently caps
+the star's *rendered* overview radius, then applies the smaller of those two
+limits as one global similarity scale. This keeps the physical hierarchy and
+shader units coherent while preventing intrinsically large stars from shrinking
+their entire orbit map into a tiny central cluster.
 
 Product-only interaction remains a thin overlay. Invisible hit targets use the
 same native body ids and call the existing `onSelectPlanet` contract.

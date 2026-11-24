@@ -23,6 +23,7 @@ import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import { SystemScene } from "./SystemScene";
 
 const TARGET_SYSTEM_RADIUS = 8.2;
+const MAX_OVERVIEW_STAR_RADIUS = 0.12;
 const HIT_RADIUS = 0.34;
 
 type NativeResources = {
@@ -50,12 +51,24 @@ function nativePlanetId(planet: PlanetDefinition) {
 function systemScale(system: StarSystem) {
   system.update(J2000_JD, 0);
   const star = system.star;
-  let span = star.radius * 120;
+  let orbitalSpan = 0;
   for (const body of system.bodies) {
     if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
-    span = Math.max(span, body.position.distanceTo(star.position));
+    orbitalSpan = Math.max(
+      orbitalSpan,
+      body.position.distanceTo(star.position),
+    );
   }
-  return TARGET_SYSTEM_RADIUS / Math.max(span, 1);
+
+  // Fit the orbit map first, then cap the rendered star size with the same
+  // global similarity scale. The previous star.radius * 120 proxy made hot,
+  // physically large stars such as Spica shrink every orbit into a tiny
+  // central cluster even when there was ample screen space.
+  const orbitScale =
+    TARGET_SYSTEM_RADIUS / Math.max(orbitalSpan, 1);
+  const starScale =
+    MAX_OVERVIEW_STAR_RADIUS / Math.max(star.radius, 1);
+  return Math.min(orbitScale, starScale);
 }
 
 function scaledOrbit(body: CelestialBody, scale: number): OrbitElements | undefined {
