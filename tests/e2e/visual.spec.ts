@@ -107,7 +107,15 @@ async function waitForCameraSettled(
   );
 }
 
-async function expectReadableWorldFrame(page: Page, label: string) {
+type ReadableWorldFrameOptions = {
+  subjectRoiOnly?: boolean;
+};
+
+async function expectReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
   // Stable endpoint screenshots deliberately wait for the renderer's
   // quiescent-pipeline signal.
   await expect(page.locator("html")).toHaveAttribute(
@@ -116,15 +124,32 @@ async function expectReadableWorldFrame(page: Page, label: string) {
     { timeout: 60_000 },
   );
 
-  await captureReadableWorldFrame(page, label);
+  await captureReadableWorldFrame(page, label, options);
 }
 
-async function captureReadableWorldFrame(page: Page, label: string) {
-  // Capture the final viewport once and let visualCase reuse the exact same
-  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
-  // seconds on one screenshot, so a second identical read would make the
-  // acceptance itself stall the renderer it is measuring.
-  const png = await page.screenshot();
+async function captureReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
+  // Capture once and let visualCase reuse the exact same framebuffer read for
+  // the artifact. HIGH transition acceptance only needs the same central ROI
+  // that this probe measures; asking SwiftShader to read the surrounding
+  // black-space/HUD pixels first can dominate the entire test budget without
+  // adding visual evidence.
+  const viewport = page.viewportSize();
+  const subjectClip =
+    options.subjectRoiOnly && viewport
+      ? {
+          x: Math.floor(viewport.width * 0.2),
+          y: Math.floor(viewport.height * 0.2),
+          width: Math.max(1, Math.floor(viewport.width * 0.6)),
+          height: Math.max(1, Math.floor(viewport.height * 0.6)),
+        }
+      : undefined;
+  const png = await page.screenshot(
+    subjectClip ? { clip: subjectClip } : undefined,
+  );
   pendingReadableWorldFrame.set(page, png);
   const image = sharp(png);
   const metadata = await image.metadata();
@@ -140,10 +165,10 @@ async function captureReadableWorldFrame(page: Page, label: string) {
   // Keep this probe off the browser main thread: decoding a PNG with
   // createImageBitmap can block hosted SwiftShader long enough to distort the
   // renderer acceptance that the probe is supposed to observe.
-  const left = Math.floor(width * 0.2);
-  const top = Math.floor(height * 0.2);
-  const roiWidth = Math.max(1, Math.floor(width * 0.6));
-  const roiHeight = Math.max(1, Math.floor(height * 0.6));
+  const left = subjectClip ? 0 : Math.floor(width * 0.2);
+  const top = subjectClip ? 0 : Math.floor(height * 0.2);
+  const roiWidth = subjectClip ? width : Math.max(1, Math.floor(width * 0.6));
+  const roiHeight = subjectClip ? height : Math.max(1, Math.floor(height * 0.6));
   const { data, info } = await image
     .extract({
       left,
@@ -784,7 +809,15 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
-      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+        { subjectRoiOnly: true },
+      );
     },
   );
 });
@@ -846,6 +879,7 @@ test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuit
       await expectReadableWorldFrame(
         page,
         "HIGH Surface/Atmosphere reverse midpoint",
+        { subjectRoiOnly: true },
       );
     },
   );
