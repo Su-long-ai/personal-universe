@@ -394,6 +394,48 @@ test("visual: desktop Galaxy-System midpoint", async ({ page }, testInfo) => {
   });
 });
 
+
+test("visual: desktop Galaxy-System reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "galaxy-system-reverse-midpoint",
+    async () => {
+      const html = await locateHeroScaleTarget(page);
+      for (let sample = 0; sample < 4; sample += 1) {
+        await dispatchVisualScaleWheel(page, -96);
+      }
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "system",
+        { timeout: 10_000 },
+      );
+      expect(await page.locator("canvas").count()).toBe(1);
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "0.750",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "galaxy",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-galaxy-scale-bridge",
+        "active",
+      );
+      expect(await page.locator("canvas").count()).toBe(1);
+    },
+  );
+});
+
 test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "system-approach-midpoint", async () => {
     const html = await locateHeroScaleTarget(page);
@@ -514,6 +556,52 @@ for (const viewport of [DESKTOP, WQHD]) {
     },
   );
 }
+
+
+test("visual: desktop Atmosphere-Orbit reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "atmosphere-orbit-reverse-midpoint",
+    async () => {
+      await page.goto(
+        "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "atmosphere");
+      const html = page.locator("html");
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "3.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "orbit",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "orbit:atmosphere",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      await expectViewportContainedLayout(
+        page,
+        "desktop Atmosphere-Orbit reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "desktop Atmosphere-Orbit reverse midpoint",
+      );
+    },
+  );
+});
 
 test("visual: desktop Atmosphere-Surface midpoint", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "atmosphere-surface-midpoint", async () => {
@@ -779,6 +867,47 @@ test("visual: desktop Hero world high-quality live renderer", async ({
   );
 });
 
+
+test("visual: desktop Hero world low-quality fallback renderer", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-world-low-fallback",
+    async () => {
+      await page.goto(
+        "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("low");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-fallback-low-quality",
+        { timeout: 30_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "fallback-low-quality",
+        { timeout: 30_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-fallback-surface",
+        "generated-texture",
+        { timeout: 30_000 },
+      );
+      await waitForCameraSettled(page, "orbit");
+      await expectViewportContainedLayout(
+        page,
+        "desktop LOW Hero orbit",
+      );
+      await expectReadableWorldFrame(page, "LOW Hero orbit");
+    },
+  );
+});
+
 test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy", async ({
   page,
 }, testInfo) => {
@@ -916,6 +1045,38 @@ for (const viewport of [TABLET, MOBILE]) {
     },
   );
 }
+
+
+test("visual: mobile portrait keeps HUD and canvas contained through close-world scale", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    MOBILE,
+    "layout-close-world-contained",
+    async () => {
+      await page.goto(
+        "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "orbit");
+      await expectCompactNarrowHud(page);
+      await expectViewportContainedLayout(page, "mobile Orbit layout");
+
+      await dispatchVisualScaleWheel(page, -96);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-scale-position",
+        "3.500",
+      );
+      await expectCompactNarrowHud(page);
+      await expectViewportContainedLayout(
+        page,
+        "mobile Orbit-Atmosphere midpoint layout",
+      );
+    },
+  );
+});
 
 for (const viewport of [TABLET, MOBILE]) {
   test(`visual: ${viewport.name} galaxy`, async ({ page }, testInfo) => {
