@@ -119,12 +119,14 @@ export function SystemScene({
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
   onScaleFrame,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -249,14 +251,16 @@ export function SystemScene({
           />
         </mesh>
 
-        {system.planets.map((planet, index) => (
-          <PlanetBody
-            key={planet.id}
-            planet={planet}
-            index={index}
-            onSelect={onSelectPlanet}
-          />
-        ))}
+        {system.planets.map((planet, index) =>
+          planet.id === handoffTargetPlanetId ? null : (
+            <PlanetBody
+              key={planet.id}
+              planet={planet}
+              index={index}
+              onSelect={onSelectPlanet}
+            />
+          ),
+        )}
       </group>
     </>
   );
