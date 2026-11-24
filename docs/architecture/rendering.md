@@ -34,21 +34,31 @@ calls `Universe.switchTo()` and `CameraController.shiftFrame()`, preserving
 the absolute camera position while local coordinates change. The current-system
 renderers are then retargeted to the new `StarSystem`; as apparent size grows,
 their existing culling and point/mesh rules determine which detail becomes
-visible. The product System renderer is not mounted during this native flight.
+visible. The product System renderer is not mounted during this native path.
 
 The native endpoint is not a magic distance. `nativeSystemSpan()` is shared
 with the product similarity adapter, and the Galaxy camera computes its arrival
 distance with the same perspective sphere-fit formula and
 `SYSTEM_OVERVIEW_FRAME_SCALE` used by camera-controls on the product side.
+Task `GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001` retains the pinned
+`CameraController.goToPoint()` interpolation but replaces elapsed-time
+progress with the normalized product coordinate: Galaxy=0 and System=1. Each
+wheel/trackpad sample therefore scrubs the existing logarithmic native camera
+trajectory directly. No second camera, tween loop, transition renderer or
+alternate LOD representation is introduced.
+
 The resulting `starId + position + quaternion + systemOverview` view state is
-persisted continuously and written again at arrival. When product System takes
+persisted continuously and written at coordinate 1. When product System takes
 authority, `CinematicCamera` reuses that quaternion and the normal
 viewport-aware System fit distance, so camera ownership changes without
-resetting the view direction.
+resetting the view direction. A persistent bridge snapshot keeps the original
+Galaxy endpoint, target star, approach direction and native arrival distance
+across the renderer handoff. Reverse System→Galaxy reconstructs the same
+pinned trajectory at coordinate 1 and scrubs it backward toward coordinate 0
+rather than reinterpreting target-system kilometres or playing a separate
+return animation.
 
-Reverse travel retains the same native reference-frame view state rather than
-reinterpreting target-system kilometres in the Solar frame. Exact body
-Search/Places/click travel remains unchanged; only wheel scale travel
+Exact body Search/Places/click travel remains unchanged; only wheel scale travel
 normalizes a body/content focus to its owning star before the System boundary.
 
 Runtime evidence includes:
@@ -346,10 +356,12 @@ Fallbacks are product behavior, not hidden test exceptions:
 
 ## Lifecycle and loading
 
-Large renderer paths are lazy-loaded. Native system resources are constructed
-only in the system phase and disposed on unmount. Live close-world
-ProceduralPlanets resources exist only in close-world phases, now including
-Surface. Crucially, the live `Planet` is not disposed and recreated at the
+Large renderer paths are lazy-loaded. The pinned native current-system LOD
+resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
+disposed with that scene; the product similarity-scaled native System renderer
+is still constructed only when product System owns coordinate 1→2. Live
+close-world ProceduralPlanets resources exist only in close-world phases, now
+including Surface. Crucially, the live `Planet` is not disposed and recreated at the
 Atmosphere → Surface boundary; React keeps the same close-world component and
 the same compositor path alive. The software/LOW Surface fallback is the one
 intentional exception: after its first use, one generic ProceduralTerrains
