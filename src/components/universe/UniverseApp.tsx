@@ -31,7 +31,6 @@ import {
 import {
   CONTINUOUS_SCALE_ACTIVE_RESET_MS,
   CONTINUOUS_SCALE_RESET_MS,
-  CONTINUOUS_SCALE_WHEEL_THRESHOLD,
   GALAXY_SCALE_MIN,
   SYSTEM_SCALE_MIN,
   WORLD_SCALE_EPSILON,
@@ -39,7 +38,6 @@ import {
   applyGalaxyScaleWheel,
   applySystemScaleWheel,
   applyWorldScaleWheel,
-  continuousScaleDelta,
   continuousScaleDirection,
   continuousScaleInputResponseDelta,
   continuousScaleResponseDistance,
@@ -342,13 +340,11 @@ export default function UniverseApp({
   const galaxySoftFocusAvailableRef = useRef(true);
   const continuousScaleIntentEpochRef = useRef(0);
   const scaleWheelRef = useRef<{
-    accumulated: number;
     direction: ContinuousScaleDirection | null;
     lastAt: number;
     samples: number;
     gesture: number;
   }>({
-    accumulated: 0,
     direction: null,
     lastAt: 0,
     samples: 0,
@@ -412,7 +408,6 @@ export default function UniverseApp({
       }
 
       const wheel = scaleWheelRef.current;
-      wheel.accumulated = 0;
       wheel.direction = null;
       wheel.lastAt = 0;
       wheel.samples = 0;
@@ -2004,7 +1999,6 @@ export default function UniverseApp({
         wheel.direction !== null && now - wheel.lastAt > resetWindow;
       if (wheel.direction === null || directionChanged || gestureExpired) {
         wheel.gesture += 1;
-        wheel.accumulated = 0;
         wheel.samples = 0;
         wheel.direction = direction;
         if (directionChanged) {
@@ -2433,27 +2427,16 @@ export default function UniverseApp({
         return;
       }
 
-      // The threshold path below is retained only for non-scale navigation
-      // outside the 0→5 coordinate (for example outward Galaxy return).
+      // Scale samples never enter a second threshold accumulator. The direct
+      // 0→5 coordinate consumed every executable scale sample above; the
+      // remaining cases are navigation outside that coordinate and act on the
+      // current delivered sample immediately.
       if (wheel.samples === 1) {
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
       }
 
-      wheel.lastAt = now;
-      wheel.samples = Math.min(8, wheel.samples + 1);
-      wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
       document.documentElement.dataset.universeScaleDirection = direction;
-      document.documentElement.dataset.universeScaleProgress = String(
-        Math.min(
-          1,
-          wheel.accumulated / CONTINUOUS_SCALE_WHEEL_THRESHOLD,
-        ).toFixed(3),
-      );
-
-      if (wheel.accumulated < CONTINUOUS_SCALE_WHEEL_THRESHOLD) return;
-
-      wheel.accumulated = 0;
       document.documentElement.dataset.universeScaleProgress = "0";
       document.documentElement.dataset.universeScaleIndex = String(
         scalePhaseIndex(currentPhase),
@@ -2541,9 +2524,10 @@ export default function UniverseApp({
               "no-planet-focus";
             return;
           }
-          // This legacy threshold branch is retained only as a defensive
-          // fallback. Normal System wheel input is consumed by the continuous
-          // 1→2 scale segment above before reaching this point.
+          // Normal System wheel input is consumed by the continuous 1→2
+          // segment above. Reaching this branch means System identity exists
+          // without its normal active-system authority; keep focus recovery
+          // immediate rather than accumulating another wheel gesture.
           lockedSystemScaleFocusRef.current = planet;
           setSystemScaleTargetPlanet(planet);
           return;
