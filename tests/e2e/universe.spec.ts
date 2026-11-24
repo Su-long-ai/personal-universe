@@ -151,6 +151,19 @@ async function dispatchScaleWheel(
   );
 }
 
+async function waitForUniverseRenderFrame(page: Page) {
+  // Wheel coordination updates scalePosition synchronously, while the native
+  // YEIS camera consumes that coordinate in R3F's next animation frame. Await
+  // that renderer-owned boundary rather than an arbitrary wall-clock timeout
+  // before asserting physical-path diagnostics.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      }),
+  );
+}
+
 test("public page publishes canonical and social preview metadata", async ({
   page,
 }, testInfo) => {
@@ -1623,6 +1636,7 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
     "hero:aurora-01",
   );
 
+  await waitForUniverseRenderFrame(page);
   const beforeSearch = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
@@ -2014,6 +2028,7 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
       "data-universe-galaxy-scale-target",
       target,
     );
+    await waitForUniverseRenderFrame(page);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
     );
@@ -2056,6 +2071,7 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
   await expect
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
     .toBeCloseTo(0.55, 2);
+  await waitForUniverseRenderFrame(page);
   const reverseRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
@@ -2101,6 +2117,7 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     await expect
       .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
       .toBeCloseTo(accumulated, 2);
+    await waitForUniverseRenderFrame(page);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
     );
@@ -2243,6 +2260,7 @@ test("Galaxy direct scale reverses cleanly at 0.4 0.8 near-one and immediately a
       "hero:aurora-01",
     );
     await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+    await waitForUniverseRenderFrame(page);
   };
 
   // 0 -> 0.4 -> 0.2.

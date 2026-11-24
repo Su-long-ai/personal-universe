@@ -998,6 +998,17 @@ export function CinematicCamera({
     return () => controls.removeEventListener("rest", handleRest);
   }, [publishIfReached]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const handleWorldFrameReady = () => publishIfReached();
+    html.addEventListener("universe-world-frame-ready", handleWorldFrameReady);
+    return () =>
+      html.removeEventListener(
+        "universe-world-frame-ready",
+        handleWorldFrameReady,
+      );
+  }, [publishIfReached]);
+
   useFrame(() => {
     const controls = controlsRef.current;
     const shot =

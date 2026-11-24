@@ -204,13 +204,25 @@ export function CinematicPipeline({
     }
 
     if (fallbackReason) {
-      const sceneReady = html.dataset.universeWorldSceneReady === "true";
-      if (sceneReady) {
+      // A mounted fallback scene is not yet a readable framebuffer. In hosted
+      // SwiftShader the first material/shader frame can trail the R3F scene
+      // callback, so camera settlement must be gated by frames that have
+      // actually passed through this composer. Reuse the existing stable-frame
+      // counter instead of adding another timer/readiness state machine.
+      const paintReady = html.dataset.universeWorldPaintReady === "true";
+      stableFrames.current = paintReady ? stableFrames.current + 1 : 0;
+      const frameReady = stableFrames.current >= 3;
+      const becameReady =
+        frameReady && html.dataset.universeWorldReady !== "true";
+      if (frameReady) {
         html.dataset.universeWorldReady = "true";
+        if (becameReady) {
+          html.dispatchEvent(new Event("universe-world-frame-ready"));
+        }
       } else {
         delete html.dataset.universeWorldReady;
       }
-      if (sceneReady && cameraReady) {
+      if (frameReady && cameraReady) {
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
@@ -230,7 +242,14 @@ export function CinematicPipeline({
     // can immediately enqueue another LOD generation pass. Require consecutive
     // settled frames before consumers are allowed to capture the canvas.
     if (stableFrames.current >= 3) {
+      const becameReady = html.dataset.universeWorldReady !== "true";
       html.dataset.universeWorldReady = "true";
+      if (becameReady) {
+        // The renderer owns the moment a usable frame exists. Notify camera
+        // settlement immediately instead of relying on a later R3F frame;
+        // hosted SwiftShader may otherwise stop between these two authorities.
+        html.dispatchEvent(new Event("universe-world-frame-ready"));
+      }
       if (cameraReady) {
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
