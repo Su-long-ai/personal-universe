@@ -202,7 +202,8 @@ export function SystemScene({
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current !== 0) return;
 
-    let best: { planet: PlanetDefinition; distance: number } | null = null;
+    let bestPlanet: PlanetDefinition | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (let index = 0; index < system.planets.length; index += 1) {
       const planet = system.planets[index];
       const orbit = compressedOrbit(planet, index);
@@ -226,15 +227,16 @@ export function SystemScene({
         projected.x * size.width * 0.5,
         projected.y * size.height * 0.5,
       );
-      if (distance <= 92 && (!best || distance < best.distance)) {
-        best = { planet, distance };
+      if (distance <= 92 && distance < bestDistance) {
+        bestPlanet = planet;
+        bestDistance = distance;
       }
     }
 
-    const nextId = best?.planet.id ?? null;
+    const nextId = bestPlanet?.id ?? null;
     if (focusedIdRef.current === nextId) return;
     focusedIdRef.current = nextId;
-    onScaleFocus(best?.planet ?? null);
+    onScaleFocus(bestPlanet);
   });
 
   useEffect(
