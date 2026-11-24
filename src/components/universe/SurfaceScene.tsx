@@ -185,6 +185,14 @@ export function SurfaceScene({
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
+
+  useEffect(() => {
+    // These are local presentation states for one world, not product
+    // navigation state. Never let a retained fallback carry them into another
+    // generated world while its new terrain is preparing.
+    setBeaconActive(false);
+    setAnchorHeight(4.8);
+  }, [profile?.id]);
   const landable = Boolean(profile && planet?.surfaceMode !== "none");
   const active =
     anchored &&
