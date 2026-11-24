@@ -22,7 +22,7 @@ import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import { SystemScene } from "./SystemScene";
 
-const TARGET_SYSTEM_RADIUS = 8.2;
+const TARGET_SYSTEM_RADIUS = 7.0;
 const HIT_RADIUS = 0.34;
 
 type NativeResources = {
@@ -339,6 +339,14 @@ export function YeisSystemScene({
 
   useFrame((state) => {
     if (!resources) return;
+
+    // Pinned YEIS renderers intentionally emit camera-relative coordinates
+    // because their native host keeps the camera at a floating origin. Our R3F
+    // product camera lives at its real shot position, so restore that origin
+    // offset once at the shared native sub-scene boundary. Child positions and
+    // shader uniforms remain camera-relative; the product camera is no longer
+    // applied a second time by the scene graph.
+    resources.scene.position.copy(camera.position);
 
     const native = resources.system;
     native.update(J2000_JD, state.clock.elapsedTime * 3600);
