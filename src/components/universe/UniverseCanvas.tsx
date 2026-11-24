@@ -232,14 +232,18 @@ export function UniverseCanvas({
 
   const worldPaintIdentity =
     `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
+  const worldPaintIdentityRef = useRef(worldPaintIdentity);
+  worldPaintIdentityRef.current = worldPaintIdentity;
   const worldPaintReady =
     worldPaintState.identity === worldPaintIdentity &&
     worldPaintState.ready;
   const handleWorldPaintReady = useCallback(
     (ready: boolean) => {
-      // Carry the concrete planet + quality identity with readiness. A late
-      // callback from the previous world can only write its old token; it can
-      // never authorize the newly selected world's System handoff.
+      // Carry the concrete planet + quality identity with readiness. If an
+      // old PlanetScene cleanup arrives after a new identity has already
+      // rendered, ignore it completely rather than letting a stale token
+      // temporarily revoke the new world's authority.
+      if (worldPaintIdentityRef.current !== worldPaintIdentity) return;
       setWorldPaintState({
         identity: worldPaintIdentity,
         ready,
