@@ -632,6 +632,25 @@ test("low-quality Surface retains the existing terrain fallback", async ({
     { timeout: 60_000 },
   );
 
+  const surfaceMeta = page.locator(".surface-world-meta");
+  await expect(surfaceMeta).toBeVisible();
+  await expect(surfaceMeta.locator("b")).toHaveCount(3);
+  await expect(page.locator(".surface-region-index span").first()).toBeVisible();
+
+  const cards = page.locator(".world-content-card");
+  const cardCount = await cards.count();
+  if (cardCount > 1) {
+    const first = await cards.nth(0).boundingBox();
+    const second = await cards.nth(1).boundingBox();
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(
+      second!.y >= first!.y + first!.height - 1 ||
+        first!.y >= second!.y + second!.height - 1,
+      "Surface content cards should occupy distinct readable rows",
+    ).toBe(true);
+  }
+
   await runtime.assertClean(testInfo);
 });
 
@@ -679,6 +698,8 @@ test("generated secondary terrestrial worlds receive deterministic Surface produ
     profile!,
     { timeout: 60_000 },
   );
+  await expect(page.locator(".surface-world-meta")).toBeVisible();
+  await expect(page.locator(".surface-region-index span").first()).toBeVisible();
 
   await runtime.assertClean(testInfo);
 });
