@@ -2264,6 +2264,15 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.500",
   );
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
+    .toBeCloseTo(0.5, 2);
   const inwardRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
@@ -2277,6 +2286,15 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.250",
   );
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
+    .toBeCloseTo(0.25, 2);
   await expect
     .poll(async () =>
       Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
@@ -2731,6 +2749,10 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
     "data-universe-galaxy-scale-target",
     "hero:aurora-01",
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.500",
+  );
 
   const beforeSearch = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
@@ -2767,6 +2789,76 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
       Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
     )
     .toBeLessThan(beforeSearch);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Search native travel keeps autopilot authority after partial Galaxy scale", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.500",
+  );
+
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  // The localized alias resolves into the live native body catalogue. Detail
+  // text is runtime-owned (for example "MOON · Sol"), so select the canonical
+  // native title and let the identity assertions below prove the exact body.
+  await search.fill("月球");
+  const moon = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ has: page.locator("strong", { hasText: /^Moon$/ }) })
+    .first();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/moon",
+  );
+  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/moon");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
+
+  await expect
+    .poll(async () => {
+      const traveling = await html.getAttribute("data-universe-traveling");
+      const complete = await html.getAttribute("data-universe-travel-complete");
+      return traveling === "c0/moon" || complete === "c0/moon";
+    })
+    .toBe(true);
+  await expect(html).toHaveAttribute(
+    "data-universe-travel-complete",
+    "c0/moon",
+    { timeout: 15_000 },
+  );
+  const travelDeltaPc = Number(
+    await html.getAttribute("data-universe-travel-delta-pc"),
+  );
+  expect(Number.isFinite(travelDeltaPc)).toBeTruthy();
+  expect(travelDeltaPc).toBeGreaterThan(1e-9);
 
   await runtime.assertClean(testInfo);
 });
@@ -2910,6 +3002,84 @@ test("manual pointer takeover freezes a partial Galaxy scale coordinate", async 
     "data-universe-navigation-phase",
     "galaxy",
   );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("touch drag takeover freezes a partial Galaxy scale coordinate", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+
+  await page.locator("canvas").evaluate((canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = rect.left + rect.width * 0.55;
+    const y = rect.top + rect.height * 0.5;
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 41,
+      pointerType: "touch",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX: x,
+      clientY: y,
+    };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", init));
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        ...init,
+        clientX: x + 72,
+        clientY: y + 20,
+      }),
+    );
+    window.dispatchEvent(
+      new PointerEvent("pointerup", {
+        ...init,
+        buttons: 0,
+        clientX: x + 72,
+        clientY: y + 20,
+      }),
+    );
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-superseded",
+    "manual-camera",
+  );
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
+
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
 
   await runtime.assertClean(testInfo);
 });
@@ -2972,10 +3142,23 @@ test("repeated Galaxy System round trips reuse one canvas and one scale target",
     { timeout: 20_000 },
   );
 
+  let retainedPathId: string | null = null;
   for (let cycle = 0; cycle < 3; cycle += 1) {
     for (let sample = 0; sample < 4; sample += 1) {
       await dispatchScaleWheel(page, -96);
       await page.waitForTimeout(60);
+      if (sample === 0) {
+        await expect(html).toHaveAttribute(
+          "data-universe-galaxy-scale-path-id",
+          /.+/,
+        );
+        const currentPathId = await html.getAttribute(
+          "data-universe-galaxy-scale-path-id",
+        );
+        expect(currentPathId).toBeTruthy();
+        if (retainedPathId === null) retainedPathId = currentPathId;
+        expect(currentPathId).toBe(retainedPathId);
+      }
     }
     await expect(html).toHaveAttribute(
       "data-universe-navigation-phase",
@@ -3004,6 +3187,10 @@ test("repeated Galaxy System round trips reuse one canvas and one scale target",
     await expect(html).toHaveAttribute(
       "data-universe-galaxy-scale-target",
       "hero:aurora-01",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-path-id",
+      retainedPathId!,
     );
     expect(await page.locator("canvas").count()).toBe(1);
   }
@@ -3131,6 +3318,15 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
       "data-universe-galaxy-scale-target",
       target,
     );
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
+      .toBeCloseTo(expected, 2);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
     );
@@ -3153,10 +3349,18 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
   // the wheel at coordinate 0.5 keeps the physical camera at the same point;
   // only another scale sample may move it.
   const ratioAtHalf = previousRatio;
+  const executorRevisionAtHalf = await html.getAttribute(
+    "data-universe-galaxy-scale-executor-revision",
+  );
+  expect(executorRevisionAtHalf).toBeTruthy();
   await page.waitForTimeout(300);
   expect(
     Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
   ).toBeCloseTo(ratioAtHalf, 4);
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor-revision",
+    executorRevisionAtHalf!,
+  );
 
   await driveTo(-96, 0.75);
   await driveTo(-19.2, 0.8);
@@ -3186,6 +3390,15 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
   await dispatchScaleWheel(page, 96);
   await expect
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
+    .toBeCloseTo(0.55, 2);
+  await expect
+    .poll(async () =>
+      Number(
+        await html.getAttribute(
+          "data-universe-galaxy-scale-applied-position",
+        ),
+      ),
+    )
     .toBeCloseTo(0.55, 2);
   const reverseRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
@@ -3231,6 +3444,15 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     await dispatchScaleWheel(page, deltaY);
     await expect
       .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
+      .toBeCloseTo(accumulated, 2);
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
       .toBeCloseTo(accumulated, 2);
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
@@ -3373,6 +3595,15 @@ test("Galaxy direct scale reverses cleanly at 0.4 0.8 near-one and immediately a
       "data-universe-galaxy-scale-target",
       "hero:aurora-01",
     );
+    await expect
+      .poll(async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-galaxy-scale-applied-position",
+          ),
+        ),
+      )
+      .toBeCloseTo(value, 2);
     await expect(html).not.toHaveAttribute("data-universe-scale-queued");
   };
 
@@ -3436,6 +3667,52 @@ test("Galaxy direct scale reverses cleanly at 0.4 0.8 near-one and immediately a
   await runtime.assertClean(testInfo);
 });
 
+
+test("Galaxy exact endpoint reversal beats pending System handoff", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    root.dispatchEvent(new WheelEvent("wheel", {
+      deltaY: -96,
+      bubbles: true,
+      cancelable: true,
+    }));
+    root.dispatchEvent(new WheelEvent("wheel", {
+      deltaY: 96,
+      bubbles: true,
+      cancelable: true,
+    }));
+  });
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.750",
+  );
+  await page.waitForTimeout(350);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-bridge", "active");
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
 
 test("Hero continuous scale traverses Galaxy to Surface and back without waiting for settlement", async ({
   page,
@@ -5138,6 +5415,65 @@ test("line-mode wheel input normalizes to the same reversible scale domain", asy
     "approach",
     { timeout: 10_000 },
   );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Galaxy high-frequency native scale stays off the React render hot path", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  const before = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 48; index += 1) {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        deltaY: -2,
+      }));
+    }
+  });
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.250");
+  await page.waitForTimeout(50);
+  const afterIn = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterIn - before).toBeLessThanOrEqual(1);
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 48; index += 1) {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        deltaY: 2,
+      }));
+    }
+  });
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await page.waitForTimeout(50);
+  const afterOut = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterOut - afterIn).toBeLessThanOrEqual(1);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
 
   await runtime.assertClean(testInfo);
 });
