@@ -72,8 +72,12 @@ function LiveSurfaceAnchor({
   }, [onCameraFrame]);
 
   useFrame(() => {
-    if (!group.current) return;
+    if (!group.current || cameraFramePublished.current) return;
 
+    // PlanetScene locks rotation for the whole final 4->5 interval. The
+    // terrain-derived landing frame is therefore stable and only needs to be
+    // resolved once per anchor activation; crossing back to <=4 unmounts this
+    // anchor and a later inward pass resolves a fresh frame.
     planet.updateWorldMatrix(true, false);
     planet.getWorldPosition(scratch.center);
     planet.getWorldQuaternion(scratch.worldQuaternion);
@@ -810,13 +814,18 @@ export function PlanetScene({
   }, [fallbackReason, fallbackSurfaceMap, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
+    // Freeze the live planet for the entire final Atmosphere->Surface
+    // interval, not only after the semantic Surface boundary. LiveSurfaceAnchor
+    // publishes one terrain-derived landing frame as soon as position > 4; if
+    // the body kept rotating after that publication, the rendered patch would
+    // drift away from the camera frame during the remainder of 4->5. Reversal
+    // below/equal 4 resumes rotation from the exact frozen orientation.
     if (
       worldPresentationActive &&
       livePlanet &&
       !fallbackReason &&
-      phase !== "surface"
+      phase !== "surface" &&
+      worldScalePosition <= 4
     ) {
       livePlanet.rotation.y += delta * 0.014;
     }
