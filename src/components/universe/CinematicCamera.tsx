@@ -25,6 +25,7 @@ import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
 } from "./CinematicPipeline";
+import type { SystemScaleFrame } from "./SystemScene";
 
 export type SurfaceCameraFrame = {
   position: [number, number, number];
@@ -41,6 +42,7 @@ type CinematicCameraProps = {
   reducedMotion: boolean;
   quality: QualityMode;
   surfaceCameraFrame: SurfaceCameraFrame | null;
+  systemScaleFrame: SystemScaleFrame | null;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -168,6 +170,7 @@ export function CinematicCamera({
   reducedMotion,
   quality,
   surfaceCameraFrame,
+  systemScaleFrame,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -181,6 +184,10 @@ export function CinematicCamera({
   );
   const surfaceFallback =
     phase === "surface" && surfaceFallbackAvailable;
+  const continuousSystemCamera =
+    phase === "system" &&
+    worldScaleContinuous &&
+    worldScalePosition > 1 + WORLD_SCALE_EPSILON;
   const activeSurfaceCameraFrame =
     phase === "surface" || worldScalePosition > 4
       ? surfaceCameraFrame
@@ -221,7 +228,9 @@ export function CinematicCamera({
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 1.28
       : phase === "system"
-        ? 5
+        ? continuousSystemCamera
+          ? 1e-8
+          : 5
         : phase === "surface"
           ? surfaceFallback
             ? 8
@@ -279,10 +288,13 @@ export function CinematicCamera({
         worldScaleContinuous &&
         isWorldScalePhase(phase) &&
         (!surfaceFallbackAvailable || worldScalePosition <= 4);
+      const continuousScaleCamera =
+        continuousSystemCamera || continuousWorldCamera;
       if (
-        continuousWorldCamera &&
-        Math.abs(worldScalePosition - scalePhaseIndex(phase)) >
-          WORLD_SCALE_EPSILON
+        continuousScaleCamera &&
+        (continuousSystemCamera ||
+          Math.abs(worldScalePosition - scalePhaseIndex(phase)) >
+            WORLD_SCALE_EPSILON)
       ) {
         return;
       }
@@ -307,6 +319,7 @@ export function CinematicCamera({
       phase,
       phaseRef,
       publishSettled,
+      continuousSystemCamera,
       surfaceFallbackAvailable,
       worldScaleContinuous,
       worldScalePosition,
@@ -365,6 +378,24 @@ export function CinematicCamera({
 
     controls.stop();
 
+    if (continuousSystemCamera && !systemScaleFrame) {
+      document.documentElement.dataset.universeCameraMode =
+        "scale-continuous";
+      document.documentElement.dataset.universeScaleCameraSegment =
+        "system:approach";
+      document.documentElement.dataset.universeSystemScaleFrame =
+        "awaiting";
+      return;
+    }
+    if (systemScaleFrame) {
+      document.documentElement.dataset.universeSystemScaleFrame = "ready";
+      document.documentElement.dataset.universeSystemScaleRadius =
+        systemScaleFrame.radius.toExponential(4);
+    } else {
+      delete document.documentElement.dataset.universeSystemScaleFrame;
+      delete document.documentElement.dataset.universeSystemScaleRadius;
+    }
+
     const continuousWorldCamera =
       worldScaleContinuous &&
       isWorldScalePhase(phase) &&
@@ -374,7 +405,15 @@ export function CinematicCamera({
       Boolean(activeSurfaceCameraFrame) &&
       (phase === "surface" ||
         (continuousWorldCamera && worldScalePosition > 4));
-    const desiredNear = nearLiveSurface ? 0.001 : 0.05;
+    const desiredNear =
+      continuousSystemCamera && systemScaleFrame
+        ? Math.max(
+            1e-8,
+            Math.min(0.05, Math.max(systemScaleFrame.radius, 1e-8) * 0.05),
+          )
+        : nearLiveSurface
+          ? 0.001
+          : 0.05;
     if (camera.near !== desiredNear) {
       camera.near = desiredNear;
       camera.updateProjectionMatrix();
@@ -416,6 +455,112 @@ export function CinematicCamera({
         0,
         !reducedMotion,
       );
+      return;
+    }
+
+    if (continuousSystemCamera && systemScaleFrame) {
+      const systemShot = SHOTS.system;
+      const approachShot = SHOTS.approach;
+      if (!systemShot || !approachShot) return;
+
+      const systemTarget = new Vector3(...systemShot.target);
+      const systemPosition = new Vector3(...systemShot.position);
+      if (systemShot.frameScale) {
+        const distance =
+          controls.getDistanceToFitSphere(
+            systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
+          ) * systemShot.frameScale;
+        systemPosition
+          .sub(systemTarget)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(systemTarget);
+      }
+
+      // Preserve the authored Approach composition at the renderer boundary:
+      // the target offset is expressed as a fraction of planet radius, while
+      // the viewing direction comes from the existing Approach shot.
+      const approachTarget = new Vector3(...approachShot.target);
+      const approachPosition = new Vector3(...approachShot.position);
+      const approachDirection = approachPosition
+        .sub(approachTarget)
+        .normalize();
+      const endpointTargetOffset = new Vector3(...approachShot.target)
+        .sub(new Vector3(...WORLD))
+        .multiplyScalar(
+          Math.max(systemScaleFrame.radius, 1e-8) / PLANET_RENDER_RADIUS,
+        );
+      const endpointTarget = new Vector3(...systemScaleFrame.position).add(
+        endpointTargetOffset,
+      );
+
+      const systemDirection = systemPosition
+        .clone()
+        .sub(systemTarget)
+        .normalize();
+      const linearT = Math.min(
+        1,
+        Math.max(0, worldScalePosition - 1),
+      );
+      const t = linearT * linearT * (3 - 2 * linearT);
+      const direction = systemDirection
+        .lerp(approachDirection, t)
+        .normalize();
+
+      const startDistance = Math.max(
+        1e-8,
+        systemPosition.distanceTo(systemTarget),
+      );
+      const endpointDistance = Math.max(
+        1e-8,
+        controls.getDistanceToFitSphere(
+          Math.max(systemScaleFrame.radius, 1e-8),
+        ) * (approachShot.frameScale ?? 1),
+      );
+      const distance = Math.exp(
+        Math.log(startDistance) * (1 - t) +
+          Math.log(endpointDistance) * t,
+      );
+
+      desiredTarget.current.lerpVectors(
+        systemTarget,
+        endpointTarget,
+        t,
+      );
+      desiredPosition.current
+        .copy(direction)
+        .multiplyScalar(distance)
+        .add(desiredTarget.current);
+      desiredPositionTolerance.current = Math.min(
+        systemShot.positionTolerance,
+        approachShot.positionTolerance,
+      );
+      desiredTargetTolerance.current = Math.min(
+        systemShot.targetTolerance,
+        approachShot.targetTolerance,
+      );
+      configuredPhase.current = phase;
+
+      controls.smoothTime = 0.05;
+      controls.maxSpeed = 1000;
+      controls.stop();
+      void controls.setLookAt(
+        desiredPosition.current.x,
+        desiredPosition.current.y,
+        desiredPosition.current.z,
+        desiredTarget.current.x,
+        desiredTarget.current.y,
+        desiredTarget.current.z,
+        false,
+      );
+      controls.update(0);
+
+      document.documentElement.dataset.universeCameraMode =
+        "scale-continuous";
+      document.documentElement.dataset.universeScaleCameraSegment =
+        "system:approach";
+      document.documentElement.dataset.universeSystemScaleDistance =
+        distance.toExponential(4);
       return;
     }
 
@@ -641,6 +786,8 @@ export function CinematicCamera({
     softwareRenderer,
     surfaceFallback,
     surfaceFallbackAvailable,
+    systemScaleFrame,
+    continuousSystemCamera,
     viewportHeight,
     viewportWidth,
     worldScaleContinuous,
@@ -689,6 +836,9 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;
       delete document.documentElement.dataset.universeScaleCameraSegment;
+      delete document.documentElement.dataset.universeSystemScaleFrame;
+      delete document.documentElement.dataset.universeSystemScaleRadius;
+      delete document.documentElement.dataset.universeSystemScaleDistance;
     },
     [],
   );

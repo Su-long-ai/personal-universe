@@ -14,9 +14,10 @@ export const CONTINUOUS_SCALE_WHEEL_THRESHOLD = 72;
 export const CONTINUOUS_SCALE_RESET_MS = 260;
 export const CONTINUOUS_SCALE_ACTIVE_RESET_MS = 2_000;
 
-// Close-world scale is a real coordinate rather than a phase counter.
-// Galaxy/System still use focus acquisition / native travel; once a planet is
-// open, wheel delta moves continuously from Approach (2) to Surface (5).
+// Product scale is a real coordinate rather than a phase counter.
+// Galaxy still uses native focus/travel. Once a stellar system is open, wheel
+// delta moves continuously from System (1) through Approach (2) to Surface (5).
+export const SYSTEM_SCALE_MIN = 1;
 export const WORLD_SCALE_MIN = 2;
 export const WORLD_SCALE_MAX = 5;
 export const WORLD_SCALE_WHEEL_SPAN = 192;
@@ -48,6 +49,31 @@ export function worldScalePositionForPhase(
   phase: UniversePhase,
 ): number | null {
   return isWorldScalePhase(phase) ? scalePhaseIndex(phase) : null;
+}
+
+export function scalePositionForPhase(
+  phase: UniversePhase,
+): number | null {
+  if (phase === "system") return SYSTEM_SCALE_MIN;
+  return worldScalePositionForPhase(phase);
+}
+
+export function applySystemScaleWheel(
+  position: number,
+  deltaY: number,
+): number {
+  const delta = -continuousScaleDelta(deltaY) / WORLD_SCALE_WHEEL_SPAN;
+  return Math.min(
+    WORLD_SCALE_MIN,
+    Math.max(SYSTEM_SCALE_MIN, position + delta),
+  );
+}
+
+export function systemScaleSegmentProgress(position: number): number {
+  return Math.min(
+    1,
+    Math.max(0, position - SYSTEM_SCALE_MIN),
+  );
 }
 
 export function worldScaleMax(surfaceMode: PlanetSurfaceMode): number {

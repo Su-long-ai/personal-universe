@@ -36,6 +36,16 @@ function compressedOrbit(planet: PlanetDefinition, index: number) {
   return 2.7 + Math.log1p(Math.max(0.05, planet.orbitAU)) * 2.1 + index * 0.72;
 }
 
+function planetRenderRadius(planet: PlanetDefinition) {
+  return Math.min(0.58, 0.15 + Math.log1p(planet.radiusEarth) * 0.12);
+}
+
+export type SystemScaleFrame = {
+  planetId: string;
+  position: [number, number, number];
+  radius: number;
+};
+
 function PlanetBody({
   planet,
   index,
@@ -48,7 +58,7 @@ function PlanetBody({
   const orbit = compressedOrbit(planet, index);
   const group = useRef<THREE.Group>(null);
   const phase = useMemo(() => (hashSeed(planet.seed) % 1000) / 1000 * Math.PI * 2, [planet.seed]);
-  const size = Math.min(0.58, 0.15 + Math.log1p(planet.radiusEarth) * 0.12);
+  const size = planetRenderRadius(planet);
 
   useFrame((state) => {
     if (!group.current) return;
@@ -108,10 +118,14 @@ export function SystemScene({
   system,
   onSelectPlanet,
   onScaleFocus,
+  scaleTargetPlanet,
+  onScaleFrame,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
+  scaleTargetPlanet?: PlanetDefinition | null;
+  onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
   const { camera, size } = useThree();
@@ -119,9 +133,52 @@ export function SystemScene({
   const focusedIdRef = useRef<string | null>(null);
   const focusPositionRef = useRef(new THREE.Vector3());
   const focusProjectionRef = useRef(new THREE.Vector3());
+  const scaleFramePositionRef = useRef(new THREE.Vector3());
+  const scaleFrameIdRef = useRef<string | null>(null);
+  const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
 
   useFrame((state) => {
+    scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
+    const scaleTargetChanged =
+      scaleFrameIdRef.current !== (scaleTargetPlanet?.id ?? null);
+    if (
+      scaleTargetPlanet &&
+      onScaleFrame &&
+      (scaleTargetChanged || scaleFrameTickRef.current === 0)
+    ) {
+      const index = system.planets.findIndex(
+        (planet) => planet.id === scaleTargetPlanet.id,
+      );
+      if (index >= 0) {
+        const orbit = compressedOrbit(scaleTargetPlanet, index);
+        const period = Math.max(0.45, scaleTargetPlanet.orbitalPeriodYears);
+        const phase =
+          ((hashSeed(scaleTargetPlanet.seed) % 1000) / 1000) * Math.PI * 2 +
+          state.clock.elapsedTime * (0.055 / Math.sqrt(period));
+        const position = scaleFramePositionRef.current
+          .set(
+            Math.cos(phase) * orbit,
+            0,
+            -Math.sin(phase) * orbit,
+          )
+          .applyEuler(systemTiltRef.current);
+        scaleFrameIdRef.current = scaleTargetPlanet.id;
+        onScaleFrame({
+          planetId: scaleTargetPlanet.id,
+          position: [position.x, position.y, position.z],
+          radius: planetRenderRadius(scaleTargetPlanet),
+        });
+      }
+    } else if (
+      !scaleTargetPlanet &&
+      onScaleFrame &&
+      scaleFrameIdRef.current !== null
+    ) {
+      scaleFrameIdRef.current = null;
+      onScaleFrame(null);
+    }
+
     if (!onScaleFocus) return;
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current !== 0) return;
@@ -164,8 +221,9 @@ export function SystemScene({
   useEffect(
     () => () => {
       if (focusedIdRef.current !== null) onScaleFocus?.(null);
+      if (scaleFrameIdRef.current !== null) onScaleFrame?.(null);
     },
-    [onScaleFocus],
+    [onScaleFocus, onScaleFrame],
   );
 
   return (

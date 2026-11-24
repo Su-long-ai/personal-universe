@@ -8,7 +8,10 @@ import {
 } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
-import { SystemScene } from "./SystemScene";
+import {
+  SystemScene,
+  type SystemScaleFrame,
+} from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
 import {
   CinematicCamera,
@@ -108,6 +111,7 @@ export function UniverseCanvas({
   onNavigationFailed,
   selectedSystem,
   selectedPlanet,
+  systemScaleTargetPlanet,
   onSelectSystem,
   onNavigateDestination,
   onSignalHover,
@@ -136,6 +140,7 @@ export function UniverseCanvas({
   ) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
+  systemScaleTargetPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
   onNavigateDestination: (
     destination: UniverseNavigationDestination,
@@ -156,11 +161,18 @@ export function UniverseCanvas({
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
   const [surfaceCameraFrame, setSurfaceCameraFrame] =
     useState<SurfaceCameraFrame | null>(null);
+  const [systemScaleFrame, setSystemScaleFrame] =
+    useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
 
   useEffect(() => {
     if (phase === "surface") setSurfaceFallbackPrimed(true);
   }, [phase]);
+
+  useEffect(() => {
+    if (phase === "system" && systemScaleTargetPlanet) return;
+    setSystemScaleFrame(null);
+  }, [phase, systemScaleTargetPlanet]);
 
   const liveWorld =
     Boolean(selectedPlanet) &&
@@ -190,6 +202,7 @@ export function UniverseCanvas({
           reducedMotion={reducedMotion}
           quality={quality}
           surfaceCameraFrame={surfaceCameraFrame}
+          systemScaleFrame={systemScaleFrame}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -232,6 +245,8 @@ export function UniverseCanvas({
                 system={selectedSystem}
                 onSelectPlanet={onSelectPlanet}
                 onScaleFocus={onScaleFocusPlanet}
+                scaleTargetPlanet={systemScaleTargetPlanet}
+                onScaleFrame={setSystemScaleFrame}
               />
             }
           >
@@ -239,6 +254,8 @@ export function UniverseCanvas({
               system={selectedSystem}
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}
+              scaleTargetPlanet={systemScaleTargetPlanet}
+              onScaleFrame={setSystemScaleFrame}
               quality={quality}
             />
           </Suspense>
@@ -247,6 +264,8 @@ export function UniverseCanvas({
             system={selectedSystem}
             onSelectPlanet={onSelectPlanet}
             onScaleFocus={onScaleFocusPlanet}
+            scaleTargetPlanet={systemScaleTargetPlanet}
+            onScaleFrame={setSystemScaleFrame}
           />
         )
       )}

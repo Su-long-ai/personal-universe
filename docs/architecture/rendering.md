@@ -72,12 +72,47 @@ Runtime evidence:
 - `data-universe-system-ready="true"`
 - `data-universe-system-focus="<product planet id>"`
 
+## System → world scale bridge
+
+Task `SYSTEM-WORLD-SCALE-CONTINUITY-001` removes the remaining product-camera
+jump between the System renderer and Approach without overlapping renderers.
+While System remains authoritative, the locked planet exposes only a narrow
+render-space frame: product planet id, exact current center and rendered/physical
+radius. Native YEIS supplies this directly from its current transformed body;
+the product fallback computes the same contract from its existing compressed
+orbit and mesh radius.
+
+The existing `camera-controls` instance remains the sole camera executor.
+Scale coordinate 1 is the viewport-aware System overview. From 1→2 the camera
+target interpolates toward the locked body's current center while camera
+distance interpolates logarithmically from the System overview distance to
+`getDistanceToFitSphere(bodyRadius) * Approach.frameScale`. The viewing
+direction and radius-relative target offset converge to the existing Approach
+composition, so coordinate 2 has matched apparent framing even though renderer
+coordinates change after the boundary.
+
+The renderer handoff is deliberately delayed until the matched System endpoint
+has had a paint opportunity. The reverse path mounts System at coordinate 2
+while retaining the selected planet as scale focus; if its body frame is not
+ready yet, the camera holds the last Approach frame rather than snapping to the
+System overview. No transition planet, fade, second camera or custom tween loop
+is introduced.
+
+Runtime evidence:
+
+- `data-universe-scale-position="1.xxx"`
+- `data-universe-scale-camera-segment="system:approach"`
+- `data-universe-system-scale-frame="awaiting|ready"`
+- `data-universe-system-scale-radius`
+- `data-universe-system-scale-distance`
+
 ## Close-world renderer
 
 Approach, Orbit and Atmosphere keep the existing R3F canvas and the same
 `camera-controls` camera authority. The product reuses ProceduralPlanets inside
-that host. Task `WORLD-CONTINUOUS-SCALE-COORDINATE-001` adds a normalized
-close-world scale coordinate (Approach=2, Orbit=3, Atmosphere=4, Surface=5).
+that host. Task `WORLD-CONTINUOUS-SCALE-COORDINATE-001` continues the
+normalized product scale coordinate (System=1, Approach=2, Orbit=3,
+Atmosphere=4, Surface=5).
 Wheel delta changes this coordinate directly. The camera resolves the existing
 viewport-aware shot anchors on either side and reuses
 `camera-controls.lerpLookAt()` with a reversible smoothstep interpolation;

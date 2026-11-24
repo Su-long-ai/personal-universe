@@ -21,7 +21,10 @@ import { starLightColor } from "../../vendor/yeis/astro/stellar";
 import { BodyRenderer } from "../../vendor/yeis/render/BodyRenderer";
 import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
-import { SystemScene } from "./SystemScene";
+import {
+  SystemScene,
+  type SystemScaleFrame,
+} from "./SystemScene";
 
 const HIT_RADIUS = 0.34;
 
@@ -251,11 +254,15 @@ export function YeisSystemScene({
   system,
   onSelectPlanet,
   onScaleFocus,
+  scaleTargetPlanet,
+  onScaleFrame,
   quality,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
+  scaleTargetPlanet?: PlanetDefinition | null;
+  onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
 }) {
   const { gl, camera, size } = useThree();
@@ -267,6 +274,8 @@ export function YeisSystemScene({
   const focusedNativeIdRef = useRef<string | null>(null);
   const focusFillRef = useRef(new Map<string, number>());
   const focusProjectionRef = useRef(new THREE.Vector3());
+  const scaleFrameIdRef = useRef<string | null>(null);
+  const scaleFrameTickRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -339,6 +348,8 @@ export function YeisSystemScene({
       focusedIdRef.current = null;
       focusedNativeIdRef.current = null;
       focusFillRef.current.clear();
+      if (scaleFrameIdRef.current !== null) onScaleFrame?.(null);
+      scaleFrameIdRef.current = null;
       if (created) disposeResources(created);
     };
   }, [gl, starId]);
@@ -356,6 +367,36 @@ export function YeisSystemScene({
 
     const native = resources.system;
     native.update(J2000_JD, state.clock.elapsedTime * 3600);
+
+    scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
+    const scaleTargetChanged =
+      scaleFrameIdRef.current !== (scaleTargetPlanet?.id ?? null);
+    if (
+      scaleTargetPlanet &&
+      onScaleFrame &&
+      (scaleTargetChanged || scaleFrameTickRef.current === 0)
+    ) {
+      const targetBody = native.get(nativePlanetId(scaleTargetPlanet));
+      if (targetBody) {
+        scaleFrameIdRef.current = scaleTargetPlanet.id;
+        onScaleFrame({
+          planetId: scaleTargetPlanet.id,
+          position: [
+            targetBody.position.x,
+            targetBody.position.y,
+            targetBody.position.z,
+          ],
+          radius: Math.max(targetBody.data.radius, 1e-8),
+        });
+      }
+    } else if (
+      !scaleTargetPlanet &&
+      onScaleFrame &&
+      scaleFrameIdRef.current !== null
+    ) {
+      scaleFrameIdRef.current = null;
+      onScaleFrame(null);
+    }
 
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current === 0) {
@@ -446,6 +487,8 @@ export function YeisSystemScene({
         system={system}
         onSelectPlanet={onSelectPlanet}
         onScaleFocus={onScaleFocus}
+        scaleTargetPlanet={scaleTargetPlanet}
+        onScaleFrame={onScaleFrame}
       />
     );
   }

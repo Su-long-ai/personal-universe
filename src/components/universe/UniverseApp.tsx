@@ -32,16 +32,20 @@ import {
   CONTINUOUS_SCALE_ACTIVE_RESET_MS,
   CONTINUOUS_SCALE_RESET_MS,
   CONTINUOUS_SCALE_WHEEL_THRESHOLD,
+  SYSTEM_SCALE_MIN,
   WORLD_SCALE_EPSILON,
+  WORLD_SCALE_MIN,
+  applySystemScaleWheel,
   applyWorldScaleWheel,
   continuousScaleDelta,
   continuousScaleDirection,
   isWorldScalePhase,
   nextWorldScalePhase,
   scalePhaseIndex,
+  scalePositionForPhase,
+  systemScaleSegmentProgress,
   worldScaleMax,
   worldScalePhaseForPosition,
-  worldScalePositionForPhase,
   worldScalePositionMatchesPhase,
   worldScaleSegmentProgress,
   type ContinuousScaleDirection,
@@ -264,6 +268,8 @@ export default function UniverseApp({
   worldScalePositionRef.current = worldScalePosition;
   const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
   const worldScalePlanetRef = useRef<string | null>(null);
+  const [systemScaleTargetPlanet, setSystemScaleTargetPlanet] =
+    useState<PlanetDefinition | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
   const openedWorldDestinationRef = useRef<string | null>(null);
@@ -398,11 +404,24 @@ export default function UniverseApp({
   }, [phase]);
 
   useEffect(() => {
-    const anchor = worldScalePositionForPhase(phase);
+    const anchor = scalePositionForPhase(phase);
     const planetId = selectedPlanet?.id ?? null;
     const planetChanged =
       isWorldScalePhase(phase) && worldScalePlanetRef.current !== planetId;
     worldScalePlanetRef.current = planetId;
+
+    if (phase === "system") {
+      const position = worldScalePositionRef.current;
+      const validSystemPosition =
+        position >= SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON &&
+        position <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON;
+      if (!validSystemPosition || (!systemScaleTargetPlanet && position > 1)) {
+        worldScalePositionRef.current = SYSTEM_SCALE_MIN;
+        setWorldScalePosition(SYSTEM_SCALE_MIN);
+        setWorldScaleContinuous(false);
+      }
+      return;
+    }
 
     if (anchor === null) {
       setWorldScaleContinuous(false);
@@ -417,7 +436,13 @@ export default function UniverseApp({
       setWorldScalePosition(anchor);
       setWorldScaleContinuous(false);
     }
-  }, [phase, selectedPlanet?.id]);
+  }, [phase, selectedPlanet?.id, systemScaleTargetPlanet]);
+
+  useEffect(() => {
+    if (phase !== "system" && systemScaleTargetPlanet) {
+      setSystemScaleTargetPlanet(null);
+    }
+  }, [phase, systemScaleTargetPlanet]);
 
   useEffect(() => {
     document.documentElement.dataset.universeScalePosition =
@@ -1531,13 +1556,15 @@ export default function UniverseApp({
       options: { preserveWorldScalePosition?: boolean } = {},
     ) => {
       phaseRef.current = nextPhase;
-      const nextWorldPosition = worldScalePositionForPhase(nextPhase);
-      if (nextWorldPosition === null) {
-        setWorldScaleContinuous(false);
-      } else if (!options.preserveWorldScalePosition) {
-        worldScalePositionRef.current = nextWorldPosition;
-        setWorldScalePosition(nextWorldPosition);
-        setWorldScaleContinuous(false);
+      const nextScalePosition = scalePositionForPhase(nextPhase);
+      if (!options.preserveWorldScalePosition) {
+        if (nextScalePosition === null) {
+          setWorldScaleContinuous(false);
+        } else {
+          worldScalePositionRef.current = nextScalePosition;
+          setWorldScalePosition(nextScalePosition);
+          setWorldScaleContinuous(false);
+        }
       }
       worldScaleBoundaryLockedRef.current = true;
       if (worldScaleBoundaryUnlockFrameRef.current !== null) {
@@ -1795,8 +1822,15 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= 2 + WORLD_SCALE_EPSILON
         ) {
-          setWorldScaleContinuous(false);
-          setWorldScalePhase("system");
+          setSystemScaleTargetPlanet(selectedPlanet);
+          worldScalePositionRef.current = WORLD_SCALE_MIN;
+          setWorldScalePosition(WORLD_SCALE_MIN);
+          setWorldScaleContinuous(true);
+          document.documentElement.dataset.universeScalePosition =
+            WORLD_SCALE_MIN.toFixed(3);
+          setWorldScalePhase("system", {
+            preserveWorldScalePosition: true,
+          });
           return;
         }
 
@@ -1846,6 +1880,126 @@ export default function UniverseApp({
         if (semanticPhase !== currentPhase) {
           setWorldScalePhase(semanticPhase, {
             preserveWorldScalePosition: true,
+          });
+        }
+        return;
+      }
+
+      if (currentPhase === "system" && selectedSystem) {
+        const currentPosition = Math.min(
+          WORLD_SCALE_MIN,
+          Math.max(SYSTEM_SCALE_MIN, worldScalePositionRef.current),
+        );
+
+        if (
+          direction === "out" &&
+          currentPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON
+        ) {
+          setSystemScaleTargetPlanet(null);
+          setWorldScaleContinuous(false);
+          handleReturn();
+          return;
+        }
+
+        let preferredPlanet: PlanetDefinition | null = null;
+        const preferred = preferredSystemScaleDestinationRef.current;
+        if (preferred?.target.kind === "body") {
+          preferredPlanet =
+            selectedSystem.planets.find(
+              (candidate) =>
+                candidate.id === preferred.target.bodyId ||
+                nativePlanetId(candidate) === preferred.target.bodyId,
+            ) ?? null;
+        } else if (preferred?.target.kind === "observed-body") {
+          preferredPlanet =
+            selectedSystem.planets.find(
+              (candidate) =>
+                candidate.id === preferred.target.bodyId ||
+                nativePlanetId(candidate) === preferred.target.bodyId,
+            ) ?? null;
+        } else if (preferred?.target.kind === "content") {
+          preferredPlanet =
+            selectedSystem.planets.find((candidate) =>
+              candidate.content?.some(
+                (entry) => entry.id === preferred.target.entryId,
+              ),
+            ) ?? null;
+        }
+
+        const targetPlanet =
+          systemScaleTargetPlanet ??
+          preferredPlanet ??
+          lockedSystemScaleFocusRef.current ??
+          systemScaleFocusRef.current;
+
+        if (!targetPlanet) {
+          document.documentElement.dataset.universeScaleBlocked =
+            "no-planet-focus";
+          return;
+        }
+
+        lockedSystemScaleFocusRef.current = targetPlanet;
+        if (systemScaleTargetPlanet?.id !== targetPlanet.id) {
+          setSystemScaleTargetPlanet(targetPlanet);
+        }
+
+        continuousScaleIntentEpochRef.current += 1;
+        const intentEpoch = continuousScaleIntentEpochRef.current;
+        const nextPosition = applySystemScaleWheel(
+          currentPosition,
+          event.deltaY,
+        );
+
+        if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
+          return;
+        }
+
+        delete document.documentElement.dataset.universeScaleBlocked;
+        delete document.documentElement.dataset.universeScaleQueued;
+        worldScalePositionRef.current = nextPosition;
+        setWorldScalePosition(nextPosition);
+        setWorldScaleContinuous(true);
+        document.documentElement.dataset.universeScalePosition =
+          nextPosition.toFixed(3);
+        document.documentElement.dataset.universeScaleDirection = direction;
+        document.documentElement.dataset.universeScaleProgress =
+          systemScaleSegmentProgress(nextPosition).toFixed(3);
+        cameraSettledPhaseRef.current = null;
+        setCameraSettledPhase(null);
+        delete document.documentElement.dataset.universeCameraSettled;
+        delete document.documentElement.dataset.universeScaleSettled;
+
+        if (
+          direction === "in" &&
+          nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON
+        ) {
+          const destination = navigationDestinationForPlanet(
+            selectedSystem,
+            targetPlanet,
+            galaxy.markers,
+            contentPlacements,
+          );
+          preferredSystemScaleDestinationRef.current = null;
+          delete document.documentElement.dataset.universeScalePreferred;
+
+          // Leave one painted System frame at the matched endpoint before the
+          // renderer identity changes. Any newer scale/navigation intent
+          // invalidates this scheduled handoff.
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              if (
+                continuousScaleIntentEpochRef.current !== intentEpoch ||
+                phaseRef.current !== "system"
+              ) {
+                return;
+              }
+              if (destination) {
+                void handleNavigateDestination(destination);
+              } else {
+                setSelectedPlanet(targetPlanet);
+                setWorldScalePhase("approach");
+              }
+            });
           });
         }
         return;
@@ -2011,21 +2165,11 @@ export default function UniverseApp({
               "no-planet-focus";
             return;
           }
+          // This legacy threshold branch is retained only as a defensive
+          // fallback. Normal System wheel input is consumed by the continuous
+          // 1→2 scale segment above before reaching this point.
           lockedSystemScaleFocusRef.current = planet;
-          const destination = navigationDestinationForPlanet(
-            selectedSystem,
-            planet,
-            galaxy.markers,
-            contentPlacements,
-          );
-          preferredSystemScaleDestinationRef.current = null;
-          delete document.documentElement.dataset.universeScalePreferred;
-          if (destination) {
-            void handleNavigateDestination(destination);
-          } else {
-            setSelectedPlanet(planet);
-            setWorldScalePhase("approach");
-          }
+          setSystemScaleTargetPlanet(planet);
           return;
         }
 
@@ -2101,6 +2245,7 @@ export default function UniverseApp({
       selectedPlanet,
       selectedSystem,
       setWorldScalePhase,
+      systemScaleTargetPlanet,
     ],
   );
 
@@ -2129,6 +2274,7 @@ export default function UniverseApp({
           onNavigationFailed={handleNavigationFailed}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
+          systemScaleTargetPlanet={systemScaleTargetPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
           onSignalHover={setSignalHover}
