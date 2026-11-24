@@ -469,12 +469,16 @@ export function PlanetScene({
   quality,
   phase,
   worldScalePosition,
+  presentationActive = true,
+  onPaintReady,
   onSurfaceCameraFrame,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
   phase: UniversePhase;
   worldScalePosition: number;
+  presentationActive?: boolean;
+  onPaintReady?: () => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const { gl } = useThree();
@@ -499,9 +503,22 @@ export function PlanetScene({
   const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
   const liveEnabled = warmedKey === liveKey && !fallbackReason;
+  const paintedFrames = useRef(0);
+  const paintReported = useRef(false);
 
   useEffect(() => {
     if (fallbackReason) return;
+
+    // Hidden System prewarm is useful on a real GPU, where constructing the
+    // live ProceduralPlanets world can happen without stalling the scale
+    // gesture. On software WebGL, doing that same heavy construction while
+    // the visitor is still inside System blocks input. Keep the lightweight
+    // scene/pipeline mounted there, then start the live world only once the
+    // close-world presentation becomes active; UniverseCanvas retains the
+    // matched System frame until this world has painted.
+    if (softwareRenderer && phase === "system" && !presentationActive) {
+      return;
+    }
 
     let cancelled = false;
     let firstFrame = 0;
@@ -527,7 +544,7 @@ export function PlanetScene({
           } else {
             fallbackTimer = window.setTimeout(enableLive, 120);
           }
-        }, 1800);
+        }, phase === "system" ? 0 : 240);
       });
     });
 
@@ -541,7 +558,13 @@ export function PlanetScene({
       }
       if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
     };
-  }, [fallbackReason, liveKey]);
+  }, [
+    fallbackReason,
+    liveKey,
+    phase,
+    presentationActive,
+    softwareRenderer,
+  ]);
 
   const livePlanet = useMemo(() => {
     if (!liveEnabled) return null;
@@ -570,10 +593,23 @@ export function PlanetScene({
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
+    document.documentElement.dataset.universeWorldSceneLifecycle =
+      presentationActive ? "active" : "prewarming";
     return () => {
       delete document.documentElement.dataset.universeWorldSceneReady;
+      delete document.documentElement.dataset.universeWorldSceneLifecycle;
     };
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeWorldSceneLifecycle =
+      presentationActive ? "active" : "prewarming";
+    if (!presentationActive) {
+      paintedFrames.current = 0;
+      paintReported.current = false;
+      delete document.documentElement.dataset.universeWorldPaintReady;
+    }
+  }, [presentationActive]);
 
   useEffect(() => {
     const mode = livePlanet
@@ -604,6 +640,19 @@ export function PlanetScene({
     if (livePlanet && phase !== "surface") {
       livePlanet.rotation.y += delta * 0.014;
     }
+
+    if (
+      presentationActive &&
+      !paintReported.current &&
+      (Boolean(fallbackReason) || Boolean(livePlanet))
+    ) {
+      paintedFrames.current += 1;
+      if (paintedFrames.current >= 2) {
+        paintReported.current = true;
+        document.documentElement.dataset.universeWorldPaintReady = "true";
+        onPaintReady?.();
+      }
+    }
   });
 
   if (phase === "surface" && fallbackReason) {
@@ -615,7 +664,10 @@ export function PlanetScene({
 
   return (
     <>
-      <color attach="background" args={["#000106"]} />
+      {presentationActive ? (
+        <color attach="background" args={["#000106"]} />
+      ) : null}
+      <group visible={presentationActive}>
       <DeepSky />
       <Stars
         radius={78}
@@ -677,6 +729,7 @@ export function PlanetScene({
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}
+      </group>
     </>
   );
 }
