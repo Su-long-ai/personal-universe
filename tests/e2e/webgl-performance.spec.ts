@@ -27,6 +27,49 @@ async function dispatchScaleWheel(page: Page, deltaY: number) {
   }, deltaY);
 }
 
+async function driveGalaxySystemRoundTrip(page: Page) {
+  const html = page.locator("html");
+
+  for (let sample = 0; sample < 4; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(20);
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-ready",
+    "true",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+
+  for (let sample = 0; sample < 3; sample += 1) {
+    await dispatchScaleWheel(page, 96);
+    await page.waitForTimeout(20);
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.000",
+  );
+}
+
 async function driveFullScaleRoundTrip(page: Page) {
   const html = page.locator("html");
 
@@ -249,6 +292,84 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
   expect(secondMetrics.software).toBe(firstMetrics.software);
 
   await second.close();
+});
+
+test("Galaxy System remounts retire WebGL geometry @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await driveGalaxySystemRoundTrip(page);
+  const first = (await settleWebglMetrics(page)).second;
+  await attachMetrics(testInfo, "webgl-system-cycle-1.json", first);
+
+  await driveGalaxySystemRoundTrip(page);
+  const second = (await settleWebglMetrics(page)).second;
+  await attachMetrics(testInfo, "webgl-system-cycle-2.json", second);
+
+  expect(second.renderer).toBe(first.renderer);
+  expect(second.geometries).toBeLessThanOrEqual(first.geometries + 1);
+  expect(second.textures).toBeLessThanOrEqual(first.textures + 1);
+  expect(second.programs).toBeLessThanOrEqual(first.programs + 1);
+});
+
+test("retained Surface fallback parks without resource growth @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeis(page);
+  await page.locator(".hud-actions select").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 60_000 },
+  );
+  const initial = (await settleWebglMetrics(page)).second;
+  await attachMetrics(testInfo, "webgl-surface-initial.json", initial);
+
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await dispatchScaleWheel(page, 96);
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "atmosphere",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "parked",
+      { timeout: 10_000 },
+    );
+
+    await dispatchScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "surface",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "active",
+      { timeout: 10_000 },
+    );
+  }
+
+  const restored = (await settleWebglMetrics(page)).second;
+  await attachMetrics(testInfo, "webgl-surface-restored.json", restored);
+  expect(restored.renderer).toBe(initial.renderer);
+  expect(restored.allocations).toBe(initial.allocations);
+  expect(restored.geometries).toBeLessThanOrEqual(initial.geometries + 1);
+  expect(restored.textures).toBeLessThanOrEqual(initial.textures + 1);
+  expect(restored.programs).toBeLessThanOrEqual(initial.programs + 1);
 });
 
 test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", async ({
