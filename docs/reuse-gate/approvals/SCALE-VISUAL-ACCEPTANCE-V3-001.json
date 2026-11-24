@@ -1,0 +1,28 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-VISUAL-ACCEPTANCE-V3-001",
+  "approved_at": "2026-11-24T16:28:00.000Z",
+  "baseline_commit": "c61195ea723ab5aeb68e209fd56b5e6027a4c427",
+  "record_path": "docs/reuse-gate/tasks/SCALE-VISUAL-ACCEPTANCE-V3-001.json",
+  "record_sha256": "b47d5f64da03c8067c873ad8ea698aa6c3f867bc9ab143d13820730cf41e0837",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Align the existing Playwright visual midpoint matrix with the approved continuous-scale response map across desktop, tablet, mobile and WebGL-heavy lanes without weakening renderer, handoff, readability, or single-Canvas assertions"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-playwright-visual-matrix"
+  ],
+  "candidate_scores": {
+    "existing-playwright-visual-matrix": 57,
+    "new-scale-screenshot-harness": null
+  }
+}
