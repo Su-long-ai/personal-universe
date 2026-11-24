@@ -1,4 +1,5 @@
 export {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
   buildSurfaceWorldProfile,
   nextSurfaceClusterEntryId,
   rankSurfaceContentAnchors,
