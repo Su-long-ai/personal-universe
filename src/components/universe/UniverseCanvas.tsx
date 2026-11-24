@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { GalaxyScene } from "./GalaxyScene";
 import { SystemScene } from "./SystemScene";
@@ -90,6 +97,7 @@ function RendererPageLifecycle() {
 
 export function UniverseCanvas({
   phase,
+  phaseRef,
   engineMode,
   markers,
   contentPlacements,
@@ -112,6 +120,7 @@ export function UniverseCanvas({
   onCinematicUserControlStart,
 }: {
   phase: UniversePhase;
+  phaseRef: MutableRefObject<UniversePhase>;
   engineMode: UniverseEngine;
   markers: GalaxyMarker[];
   contentPlacements: UniverseContentPlacement[];
@@ -254,6 +263,7 @@ export function UniverseCanvas({
           <LazySurfaceScene
             anchored
             phase={phase}
+            phaseRef={phaseRef}
             quality={quality}
             hasPlanet={Boolean(selectedPlanet)}
           />
