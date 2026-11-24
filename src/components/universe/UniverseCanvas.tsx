@@ -185,9 +185,14 @@ export function UniverseCanvas({
     phase === "surface";
 
   useEffect(() => {
+    // Paint readiness belongs to the concrete renderer capability, not only
+    // the planet identity. A quality switch can replace live ProceduralPlanets
+    // with a lightweight/software path (or the reverse) while the same planet
+    // remains selected; keep the System handoff frame until the new authority
+    // has painted as well.
     setWorldPaintReady(false);
     delete document.documentElement.dataset.universeWorldPaintReady;
-  }, [worldPrewarmPlanet?.id]);
+  }, [quality, worldPrewarmPlanet?.id]);
 
   useEffect(() => {
     if (phase === "system" && systemScaleTargetPlanet) return;
