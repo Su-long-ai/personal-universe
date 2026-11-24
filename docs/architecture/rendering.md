@@ -309,6 +309,18 @@ terrain anchor. Deterministic clusters group those anchors into reusable
 region-level presentation units. Both ProceduralPlanets and ProceduralTerrains
 consume the same ranked anchors and clusters.
 
+When the active YEIS destination is a Personal Signal, the existing
+`personal:<entryId>` destination remains the single focus authority.
+`UniverseApp` derives the matching Surface entry from the selected planet and
+publishes `data-universe-surface-focus-entry` throughout the close-world
+journey. Surface renderers translate that identity to the existing deterministic
+anchor and publish `data-universe-surface-focus-anchor`; they do not create a
+second navigation target. Focus temporarily outranks display importance so the
+requested signal and its cluster remain visible during 4→5, while the underlying
+anchor priority and coordinates stay unchanged. The world-content stack uses
+the same ordering from Approach onward, including narrow layouts that only keep
+the first two Surface cards.
+
 This shared hierarchy is scale-aware. During the live Atmosphere→Surface
 interval the tangent overlay exposes only the highest-ranked signal and cluster,
 then expands at Surface without changing their coordinates. The bounded
