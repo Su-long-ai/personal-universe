@@ -302,12 +302,15 @@ terrain subsystem, not a second terrain engine. The fallback publishes
 
 Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
 fallback begins real terrain construction and driver preparation during the
-inward Atmosphere interval at an idle/stable boundary instead of merely mounting
-a dormant component and deferring `createInfiniteTerrain().prepare()` until
-Surface. If navigation reverses before construction begins, the scheduled prime
-is cancelled. Once construction has begun, that same instance remains retained
-and may finish preparing while parked; it is not restarted on a later inward
-gesture.
+inward Atmosphere interval at the first idle/stable boundary instead of merely
+mounting a dormant component and deferring `createInfiniteTerrain().prepare()`
+until Surface. Once the instance exists, the hidden Atmosphere phase also uses
+the detached landing view for bounded destination-ring streaming, so coordinate
+5 does not have to start camera-centred chunk creation from zero. If navigation
+reverses before construction begins, the scheduled prime is cancelled; if it
+reverses after construction has begun, hidden streaming pauses immediately and
+the same instance remains retained/parked for the next inward journey rather
+than being restarted.
 
 At coordinate 5, fallback presentation has an explicit readiness handoff. The
 lightweight close-world globe remains the visible authority while the terrain is
