@@ -237,10 +237,13 @@ test("default YEIS boots with native galaxy and personal signals", async ({
   const runtime = await observeRuntime(page);
   const initialRequests = new Set<string>();
   const initialScripts = new Set<string>();
+  const expectedOrigin = new URL(
+    String(testInfo.project.use.baseURL ?? "http://127.0.0.1:4321"),
+  ).origin;
 
   page.on("request", (request) => {
     const url = request.url();
-    if (!url.startsWith("http://127.0.0.1:4321/")) return;
+    if (new URL(url).origin !== expectedOrigin) return;
     const type = request.resourceType();
     if (!["document", "script", "stylesheet", "fetch", "xhr"].includes(type)) return;
     const parsed = new URL(url);
@@ -402,12 +405,12 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await runtime.assertClean(testInfo);
 });
 
-test("HIGH close-world prewarms after focus lock and keeps one pipeline allocation @webgl-heavy", async ({
+test("HIGH close-world retains one pipeline, Planet and PlanetPass across quality fallback @webgl-heavy", async ({
   page,
 }, testInfo) => {
   test.slow(
     true,
-    "HIGH ProceduralPlanets prewarm is intentionally isolated from ordinary software-WebGL release shards",
+    "HIGH ProceduralPlanets lifetime acceptance is isolated from ordinary software-WebGL release shards",
   );
   const runtime = await observeRuntime(page);
   await page.goto("/?phase=system&star=h-aurora&freeze=1");
@@ -4859,11 +4862,14 @@ test("Earth body navigation preserves async search and shareable return flow", a
   await search.fill("Earth");
 
   // Query edits synchronously invalidate the prior Places rows instead of
-  // leaving them clickable during the async search debounce window.
+  // leaving them clickable during the async search debounce window. Do not
+  // require the transient aria-busy=true frame: a fast hosted run can finish
+  // the 90 ms debounce + async lookup before Playwright samples that state.
   expect(await featuredRows.count()).toBe(0);
-  expect(
-    await dialog.locator(".navigator-results").getAttribute("aria-busy"),
-  ).toBe("true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigator-mode",
+    "search",
+  );
 
   const earth = page
     .locator(".navigator-result-row")
@@ -4871,6 +4877,10 @@ test("Earth body navigation preserves async search and shareable return flow", a
     .filter({ hasText: "Earth" })
     .first();
   await expect(earth).toBeVisible();
+  await expect(dialog.locator(".navigator-results")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
   await expect(dialog).not.toContainText("Dünya");
   await earth.locator(".navigator-result-open").click();
   await expect(dialog).toBeHidden();
