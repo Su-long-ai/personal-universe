@@ -144,6 +144,7 @@ function observedPlanet(
     Math.max(0.12, Math.pow(Math.max(planet.radiusEarth ?? 1, 0.2), 3.1));
   const radiusEarth =
     planet.radiusEarth ?? Math.max(0.25, Math.pow(massEarth, 0.27));
+  const archetype = inferArchetype(equilibriumTempK, massEarth);
   const seed = `catalog:${system.hostname}:${planet.name}`;
 
   return {
