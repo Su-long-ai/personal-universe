@@ -28,6 +28,11 @@ const MOBILE: Viewport = {
   width: 390,
   height: 844,
 };
+const ULTRAWIDE: Viewport = {
+  name: "ultrawide-3440x1440",
+  width: 3440,
+  height: 1440,
+};
 
 test.describe.configure({ retries: 0 });
 
@@ -44,6 +49,22 @@ async function shot(
     path,
     contentType: "image/png",
   });
+}
+
+async function dispatchVisualWheel(page: Page, deltaY: number) {
+  await page.locator("main.universe-root").evaluate(
+    (root, value) => {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: value,
+        }),
+      );
+    },
+    deltaY,
+  );
 }
 
 async function waitForCameraSettled(
@@ -257,6 +278,139 @@ test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
   );
 });
 
+test("visual: desktop System to Approach midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "system-approach-midpoint",
+    async () => {
+      await page.goto("/?phase=system&star=h-aurora&freeze=1");
+      await waitForYeisEngine(page);
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-system-renderer",
+        "yeis-native",
+        { timeout: 30_000 },
+      );
+      await expect
+        .poll(
+          async () => html.getAttribute("data-universe-system-focus"),
+          { timeout: 30_000 },
+        )
+        .not.toBeNull();
+
+      await dispatchVisualWheel(page, -96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "1.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-segment",
+        "system:approach",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "system:approach",
+      );
+      await expect
+        .poll(
+          async () =>
+            Number(await html.getAttribute("data-universe-projected-radius")),
+          { timeout: 10_000 },
+        )
+        .toBeGreaterThan(0);
+    },
+  );
+});
+
+test("visual: desktop Hero approach", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "hero-approach", async () => {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "approach");
+    await expectReadableWorldFrame(page, "AUTO Hero approach");
+  });
+});
+
+test("visual: desktop Hero atmosphere", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "hero-atmosphere", async () => {
+    await page.goto(
+      "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "atmosphere");
+    await expectReadableWorldFrame(page, "AUTO Hero atmosphere");
+  });
+});
+
+test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "atmosphere-surface-midpoint-live",
+    async () => {
+      await page.goto(
+        "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "atmosphere");
+
+      await dispatchVisualWheel(page, -96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "4.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-segment",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-render-authority",
+        "world",
+      );
+      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+    },
+  );
+});
+
+test("visual: ultrawide close-world composition", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, ULTRAWIDE, "approach-orbit-midpoint", async () => {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "approach");
+    await dispatchVisualWheel(page, -96);
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-segment",
+      "approach:orbit",
+    );
+    await expectReadableWorldFrame(page, "ultrawide Approach/Orbit midpoint");
+  });
+});
+
 test("visual: desktop Personal Signal orbit", async ({ page }, testInfo) => {
   await visualCase(
     page,
@@ -434,6 +588,40 @@ for (const viewport of [TABLET, MOBILE]) {
             { timeout: 30_000 },
           );
           await expect(page.locator(".content-signal-card")).toBeVisible();
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
+
+  test(
+    `visual: ${viewport.name} Hero close-world midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "hero-approach-orbit-midpoint",
+        async () => {
+          await page.goto(
+            "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          await waitForCameraSettled(page, "approach");
+          await dispatchVisualWheel(page, -96);
+          const html = page.locator("html");
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "2.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-segment",
+            "approach:orbit",
+          );
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} Approach/Orbit midpoint`,
+          );
           await expectCompactNarrowHud(page);
         },
       );
