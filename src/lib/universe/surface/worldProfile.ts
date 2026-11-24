@@ -202,29 +202,28 @@ export function rankSurfaceWorldRegions(
   regions: readonly SurfaceWorldRegion[],
   focusedRegionId: string | null = null,
 ): SurfaceWorldRegion[] {
-  return [...regions].sort(
-    (a, b) =>
-      Number(b.id === focusedRegionId) -
-        Number(a.id === focusedRegionId) ||
-      b.radius - a.radius ||
-      a.name.localeCompare(b.name) ||
-      a.id.localeCompare(b.id),
-  );
+  if (!focusedRegionId) return [...regions];
+  const focused = regions.find((region) => region.id === focusedRegionId);
+  if (!focused) return [...regions];
+  return [
+    focused,
+    ...regions.filter((region) => region.id !== focusedRegionId),
+  ];
 }
 
 export function rankSurfaceWorldLandmarks(
   landmarks: readonly SurfaceWorldLandmark[],
   focusedLandmarkId: string | null = null,
 ): SurfaceWorldLandmark[] {
-  return [...landmarks].sort(
-    (a, b) =>
-      Number(b.id === focusedLandmarkId) -
-        Number(a.id === focusedLandmarkId) ||
-      b.prominence - a.prominence ||
-      b.scale - a.scale ||
-      a.name.localeCompare(b.name) ||
-      a.id.localeCompare(b.id),
+  if (!focusedLandmarkId) return [...landmarks];
+  const focused = landmarks.find(
+    (landmark) => landmark.id === focusedLandmarkId,
   );
+  if (!focused) return [...landmarks];
+  return [
+    focused,
+    ...landmarks.filter((landmark) => landmark.id !== focusedLandmarkId),
+  ];
 }
 
 function rgb(hex: string): SurfaceRgb {
