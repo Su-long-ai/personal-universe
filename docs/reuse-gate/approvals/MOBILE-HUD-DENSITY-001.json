@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "MOBILE-HUD-DENSITY-001",
+  "approved_at": "2026-11-24T06:34:00.000Z",
+  "baseline_commit": "ea2e0376d7d1e19da065862d4ecf2515fb62135e",
+  "record_path": "docs/reuse-gate/tasks/MOBILE-HUD-DENSITY-001.json",
+  "record_sha256": "566fc4cfad022a1b7b7a37aaa0c27abb65908db7bf246643210fa17c85ee6c36",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing UniverseHud structure and CSS media-query path to reduce vertical HUD density on narrow screens while preserving all controls and one product UI authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/universe.css",
+    "tests/e2e/visual.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-hud-responsive-density",
+    "playwright-existing-mobile-visuals"
+  ],
+  "candidate_scores": {
+    "existing-hud-responsive-density": 57,
+    "auto-collapsed-mobile-hud": 43.5,
+    "separate-mobile-hud": null,
+    "playwright-existing-mobile-visuals": 57
+  }
+}
