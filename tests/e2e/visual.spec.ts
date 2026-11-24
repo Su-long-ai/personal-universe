@@ -108,15 +108,45 @@ async function waitForCameraSettled(
 }
 
 async function expectReadableWorldFrame(page: Page, label: string) {
-  // Camera settlement means the concrete renderer has painted. Screenshot
-  // acceptance is deliberately stricter: wait for the existing pipeline
-  // signal that combines stable renderer work with the camera-ready state.
+  // Stable endpoint screenshots deliberately wait for the renderer's
+  // quiescent-pipeline signal.
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-world-screenshot-ready",
     "true",
     { timeout: 60_000 },
   );
 
+  await captureReadableWorldFrame(page, label);
+}
+
+async function expectReadableContinuousWorldFrame(page: Page, label: string) {
+  const html = page.locator("html");
+  // A scale midpoint is intentionally moving, so ProceduralPlanets may keep
+  // background LOD work pending indefinitely. Waiting for three consecutive
+  // pending=0 frames here turns valid motion into a false release failure.
+  // Require the concrete scene + live pass to have painted, then cross two
+  // animation frames so the capture is definitely after the wheel sample.
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+    { timeout: 20_000 },
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+
+  await captureReadableWorldFrame(page, label);
+}
+
+async function captureReadableWorldFrame(page: Page, label: string) {
   // Capture the final viewport once and let visualCase reuse the exact same
   // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
   // seconds on one screenshot, so a second identical read would make the
@@ -674,7 +704,10 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
-      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+      await expectReadableContinuousWorldFrame(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+      );
     },
   );
 });
