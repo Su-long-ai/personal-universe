@@ -3370,8 +3370,8 @@ export default function UniverseApp({
           )}
           <em className="surface-explore-hint">
             {locale === "zh"
-              ? "拖动探索 · 双指调整视角 · 滚轮离开地表"
-              : "DRAG TO EXPLORE · PINCH TO FRAME · WHEEL TO DEPART"}
+              ? "点按信号聚焦 · 拖动探索 · 双指调整视角 · 滚轮离开地表"
+              : "TAP SIGNALS TO FOCUS · DRAG TO EXPLORE · PINCH TO FRAME · WHEEL TO DEPART"}
           </em>
         </section>
       )}
