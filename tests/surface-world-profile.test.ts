@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
   surfaceModeForArchetype,
 } from "../src/lib/universe/surface/worldProfile.ts";
 import type {
@@ -11,7 +12,10 @@ import type {
 } from "../src/lib/universe/types.ts";
 import type { UniverseContentEntry } from "../src/lib/universe/content/types.ts";
 
-function content(id: string): UniverseContentEntry {
+function content(
+  id: string,
+  overrides: Partial<UniverseContentEntry> = {},
+): UniverseContentEntry {
   return {
     id,
     title: id.toUpperCase(),
@@ -23,6 +27,7 @@ function content(id: string): UniverseContentEntry {
     featured: false,
     placement: "auto",
     placementKey: `stable:${id}`,
+    ...overrides,
   };
 }
 
@@ -101,6 +106,59 @@ test("existing content anchors do not move when unrelated content is added", () 
     );
     assert.deepEqual(after, before);
   }
+});
+
+test("surface content ranking preserves product importance without moving anchors", () => {
+  const source = buildSurfaceWorldProfile(
+    planet("priority-world", "temperate", {
+      content: [
+        content("ambient", { importance: 1 }),
+        content("secondary", { importance: 3 }),
+        content("featured", { importance: 2, featured: true }),
+        content("important", { importance: 5 }),
+      ],
+    }),
+  );
+
+  const ranked = rankSurfaceContentAnchors(source.contentAnchors);
+  assert.deepEqual(
+    ranked.map((anchor) => anchor.priority),
+    ["primary", "primary", "secondary", "ambient"],
+  );
+  assert.deepEqual(
+    new Set(ranked.map((anchor) => anchor.id)),
+    new Set(source.contentAnchors.map((anchor) => anchor.id)),
+  );
+});
+
+test("content clusters cover every signal exactly once", () => {
+  const source = buildSurfaceWorldProfile(
+    planet("cluster-world", "desert", {
+      content: [
+        content("alpha"),
+        content("beta", { importance: 5 }),
+        content("gamma", { importance: 1 }),
+        content("delta"),
+        content("epsilon"),
+      ],
+    }),
+  );
+
+  const clustered = source.contentClusters.flatMap(
+    (cluster) => cluster.anchorIds,
+  );
+  assert.deepEqual(
+    [...clustered].sort(),
+    source.contentAnchors.map((anchor) => anchor.id).sort(),
+  );
+  assert.ok(
+    source.contentClusters.every(
+      (cluster) =>
+        cluster.anchorIds.length > 0 &&
+        Number.isFinite(cluster.center[0]) &&
+        Number.isFinite(cluster.center[1]),
+    ),
+  );
 });
 
 test("hero worlds use the same model but receive richer landmark density", () => {
