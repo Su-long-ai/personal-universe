@@ -23,6 +23,7 @@ import {
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
   buildSurfaceWorldProfile,
   nextSurfaceClusterEntryId,
   rankSurfaceContentAnchors,
@@ -409,6 +410,16 @@ export default function UniverseApp({
         a.title.localeCompare(b.title),
     );
   }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  const visibleWorldContentEntries = useMemo(
+    () =>
+      phase === "surface" && surfaceProfile
+        ? worldContentEntries.slice(
+            0,
+            SURFACE_CONTENT_SIGNAL_BUDGET.stable,
+          )
+        : worldContentEntries,
+    [phase, surfaceProfile, worldContentEntries],
+  );
   const handleSurfaceFocusEntry = useCallback(
     (entryId: string) => {
       if (phaseRef.current !== "surface") return;
@@ -3236,9 +3247,17 @@ export default function UniverseApp({
 
       {phase !== "galaxy" &&
         phase !== "system" &&
-        worldContentEntries.length ? (
-          <div className="world-content-stack" aria-label="World content">
-            {worldContentEntries.map((entry) => {
+        visibleWorldContentEntries.length ? (
+          <div
+            className="world-content-stack"
+            aria-label="World content"
+            data-surface-card-budget={
+              phase === "surface"
+                ? SURFACE_CONTENT_SIGNAL_BUDGET.stable
+                : undefined
+            }
+          >
+            {visibleWorldContentEntries.map((entry) => {
               const surfacePresentation =
                 phase === "surface"
                   ? surfaceContentPresentation.get(entry.id)
