@@ -575,8 +575,10 @@ Behavior:
   click in ordinary motion;
 - `prefers-reduced-motion` disables automatic advance and keeps Prev/Next
   manual controls;
-- a Journey never invents content: if the relevant Content Collection group is
-  empty, the corresponding journey is disabled.
+- a Journey never invents content: empty Content Collection routes are hidden,
+  and route cards with the exact same ordered destination sequence are
+  de-duplicated. A route appears automatically once real content makes it
+  non-empty and distinct.
 
 This closes a former semantic mismatch where the React phase could switch to
 `approach` or `system` before the camera had actually arrived, allowing the
