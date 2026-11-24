@@ -427,6 +427,11 @@ test("retained Surface fallback recovers and parks without resource growth @webg
 
   const html = page.locator("html");
   await expect(html).toHaveAttribute(
+    "data-universe-surface-prewarm",
+    /^(preparing|ready)$/,
+    { timeout: 5_000 },
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-webgl-lifecycle",
     "active",
     { timeout: 15_000 },
