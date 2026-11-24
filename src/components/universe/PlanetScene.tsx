@@ -15,6 +15,7 @@ import { hashSeed } from "../../lib/universe/generation";
 import {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
@@ -190,9 +191,13 @@ function LiveSurfaceAnchor({
   const visibleContent = expanded
     ? rankedContent.slice(0, 6)
     : rankedContent.slice(0, 1);
+  const rankedClusters = useMemo(
+    () => rankSurfaceContentClusters(profile.contentClusters),
+    [profile.id],
+  );
   const visibleClusters = expanded
-    ? profile.contentClusters.slice(0, 3)
-    : profile.contentClusters.slice(0, 1);
+    ? rankedClusters.slice(0, 3)
+    : rankedClusters.slice(0, 1);
 
   useEffect(() => {
     document.documentElement.dataset.universeSurfaceLayoutSignals =
