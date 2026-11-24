@@ -2235,10 +2235,12 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleQueued;
             delete document.documentElement.dataset.universeScaleBlocked;
 
-            publishWorldScalePosition(
-              nextPosition,
-              nextPosition >= SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
-            );
+            // Native YEIS consumes Galaxy 0→1 scale through the React
+            // scene boundary, so every physical wheel sample must publish
+            // immediately. System/world camera positions can still batch to
+            // one React commit per animation frame because camera-controls
+            // owns their imperative interpolation.
+            publishWorldScalePosition(nextPosition, true);
             setWorldScaleContinuous(true);
             document.documentElement.dataset.universeScaleDirection =
               direction;
