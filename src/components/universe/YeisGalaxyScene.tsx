@@ -1050,7 +1050,11 @@ export function YeisGalaxyScene({
     );
     let scaleBridgeActive = false;
 
-    if (scaleDestination && !manualScaleTakeover) {
+    if (
+      scaleDestination &&
+      !manualScaleTakeover &&
+      !scaleManualTakeoverReportedRef.current
+    ) {
       const targetStarId = scaleTargetNativeStarId(
         scaleDestination,
         markersRef.current,

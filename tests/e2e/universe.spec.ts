@@ -2054,6 +2054,12 @@ test("manual pointer takeover freezes a partial Galaxy scale coordinate", async 
     "data-universe-navigation-phase",
     "galaxy",
   );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+  );
 
   await runtime.assertClean(testInfo);
 });
