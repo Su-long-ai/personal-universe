@@ -481,13 +481,19 @@ export function PlanetScene({
     surfaceFallbackReady;
   const worldPresentationActive =
     presentationActive && !fallbackSurfaceOwnsPresentation;
-  const fallbackSurfaceTexture = useMemo(
-    () =>
-      fallbackReason === "software-renderer"
-        ? createFallbackSurfaceTexture(planet)
-        : null,
-    [fallbackReason, planet.archetype, planet.seed],
-  );
+  const fallbackSurfaceTexture = useMemo(() => {
+    if (!softwareRenderer) return null;
+    const texture = createFallbackSurfaceTexture(planet);
+    const html = document.documentElement;
+    html.dataset.universeWorldFallbackTextureAllocations = String(
+      Number(html.dataset.universeWorldFallbackTextureAllocations ?? "0") + 1,
+    );
+    return texture;
+  }, [softwareRenderer, planet.archetype, planet.seed]);
+  const fallbackSurfaceMap =
+    fallbackReason === "software-renderer"
+      ? fallbackSurfaceTexture
+      : null;
   const liveKey = `${planet.id}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
   const liveProvisioned = warmedKey === liveKey;
@@ -657,7 +663,7 @@ export function PlanetScene({
         ? "procedural-planets-live"
         : "procedural-planets-warmup";
     document.documentElement.dataset.universeWorldRenderer = mode;
-    if (fallbackSurfaceTexture) {
+    if (fallbackSurfaceMap) {
       document.documentElement.dataset.universeWorldFallbackSurface =
         "generated-texture";
     } else {
@@ -671,7 +677,7 @@ export function PlanetScene({
       }
       delete document.documentElement.dataset.universeWorldFallbackSurface;
     };
-  }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
+  }, [fallbackReason, fallbackSurfaceMap, livePlanet]);
 
   useFrame((_, delta) => {
     // Once landed, keep the terrain under the visitor fixed. Orbit/approach
@@ -736,11 +742,11 @@ export function PlanetScene({
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
             color={
-              fallbackSurfaceTexture
+              fallbackSurfaceMap
                 ? "#ffffff"
                 : fallbackColor(planet.archetype)
             }
-            map={fallbackSurfaceTexture}
+            map={fallbackSurfaceMap}
             roughness={0.82}
             metalness={0.02}
           />
