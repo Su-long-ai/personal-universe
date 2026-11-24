@@ -372,14 +372,51 @@ export async function loadUniversePlaces(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
   currentSystem: SystemDefinition | null = null,
+  recentDestinationIds: string[] = [],
 ): Promise<UniverseNavigationSection[]> {
   const { loadYeisCore } = await import("./index");
-  return buildPlaces(
+  const sections = buildPlaces(
     await loadYeisCore(),
     placements,
     markers,
     currentSystem,
   );
+  if (recentDestinationIds.length === 0) return sections;
+
+  const knownIds = new Set(
+    sections.flatMap((section) =>
+      section.destinations.map((destination) => destination.id),
+    ),
+  );
+  const resolved = await Promise.all(
+    recentDestinationIds.slice(0, 8).map((id) =>
+      resolveUniverseNavigationDestination(id, placements, markers),
+    ),
+  );
+
+  for (const destination of resolved) {
+    if (!destination || knownIds.has(destination.id)) continue;
+    knownIds.add(destination.id);
+
+    const existing = sections.find(
+      (section) => section.id === destination.group,
+    );
+    if (existing) {
+      existing.destinations.push(destination);
+      continue;
+    }
+
+    const nextSection = section(destination.group, [destination]);
+    const nextRank = SEARCH_GROUP_ORDER.indexOf(destination.group);
+    const insertAt = sections.findIndex(
+      (candidate) =>
+        SEARCH_GROUP_ORDER.indexOf(candidate.id) > nextRank,
+    );
+    if (insertAt >= 0) sections.splice(insertAt, 0, nextSection);
+    else sections.push(nextSection);
+  }
+
+  return sections;
 }
 
 export function navigationSectionsForResults(
@@ -716,7 +753,25 @@ export async function resolveUniverseNavigationDestination(
     const nativeId = key.slice("star:".length);
     if (!nativeId) return null;
     const marker = markers.find((candidate) => candidate.nativeId === nativeId);
-    if (marker) return navigationDestinationForMarker(marker, placements);
+    if (marker) {
+      return {
+        id: key,
+        kind: "star",
+        group: "stars",
+        title: marker.name,
+        detail: (marker.spectralType || "STAR") + " · CATALOG STAR",
+        target: { kind: "star", nativeId },
+        markerId: marker.id,
+        origin:
+          marker.source === "hero"
+            ? "hero"
+            : marker.source === "catalog"
+              ? "observed"
+              : "catalog",
+        aliases: markerKeywords(marker),
+        keywords: markerKeywords(marker),
+      };
+    }
     const { loadYeisCore } = await import("./index");
     const runtime = await loadYeisCore();
     return {
@@ -726,6 +781,7 @@ export async function resolveUniverseNavigationDestination(
       title: runtime.universe.starName(nativeId),
       detail: "STAR · CATALOG",
       target: { kind: "star", nativeId },
+      origin: "catalog",
     };
   }
 
