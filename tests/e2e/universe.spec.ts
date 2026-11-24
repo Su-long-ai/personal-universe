@@ -674,6 +674,140 @@ test("apparent target radius grows monotonically during System approach", async 
   await runtime.assertClean(testInfo);
 });
 
+test("rapid mid-segment reversal cancels stale scale settlement", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -80);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.417",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+  );
+
+  // Reverse before any semantic boundary. The signed coordinate must retrace
+  // the same path rather than queueing a completion from the prior direction.
+  await dispatchScaleWheel(page, 80);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(300);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-cancelled-queue",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("fallback Surface terrain parks and resumes across reverse scale @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 60_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 60_000 },
+  );
+  const terrainProfile = await html.getAttribute(
+    "data-universe-surface-terrain-profile",
+  );
+  expect(terrainProfile).toBeTruthy();
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-lifecycle",
+    "active",
+  );
+
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "parked",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-profile",
+    terrainProfile!,
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "5.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-profile",
+    terrainProfile!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-lifecycle",
+    "active",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("low-quality Surface retains the existing terrain fallback", async ({
   page,
 }, testInfo) => {
