@@ -479,6 +479,16 @@ Runtime evidence:
 - `data-universe-world-structural-promotions` counts one-way AUTO -> HIGH LOD
   promotions.
 
+Live first-paint authority is also renderer-derived rather than a component-age
+heuristic. The retained PlanetPass increments
+`data-universe-world-live-draw-frame` only after an actual PlanetRenderer frame
+reports at least one drawn planet and `pending=0`. PlanetScene snapshots that
+counter when capability/presentation authority changes and requires two
+consecutive new successful draw stamps before publishing
+`data-universe-world-paint-ready="true"`. System therefore cannot disappear
+just because the Planet object or pass exists; the matched world must have
+actually drawn.
+
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
 to live rendering must earn fresh `pending=0` frames before
