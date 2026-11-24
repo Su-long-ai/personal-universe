@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-DECORATIVE-GLTF-DEFER-001",
+  "approved_at": "2026-11-24T18:42:00.000Z",
+  "baseline_commit": "cbc6ba3b850728cb95f60dc3e38aeda42f2b4270",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-DECORATIVE-GLTF-DEFER-001.json",
+  "record_sha256": "3fdeba71a4cde5fa025686a67f4731933edd6599cbd87228165306425dfa65f8",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "react-three-drei": "89a72092c79070cf4a49c0cf5af09e50511812dd94fdf74b06961ffff0bda13e"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing R3F component boundary and Drei useGLTF cache so decorative boulder assets load only on hardware paths that actually render them, while software Surface fallback avoids unused GLTF download, parse, materials and geometry"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "selected_ids": [
+    "r3f-hardware-child-boundary",
+    "drei-usegltf-hardware-load"
+  ],
+  "candidate_scores": {
+    "r3f-hardware-child-boundary": 53,
+    "drei-usegltf-hardware-load": 57
+  }
+}
