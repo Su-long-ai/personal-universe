@@ -191,6 +191,7 @@ jobs:
           const base = `${process.env.PAGE_URL.replace(/\/$/, "")}/`;
           const origin = new URL(base).origin;
           const pageErrors = [];
+          const consoleErrors = [];
           const criticalFailures = [];
 
           const browser = await chromium.launch({
@@ -209,6 +210,11 @@ jobs:
 
             page.on("pageerror", (error) => {
               pageErrors.push(error.message);
+            });
+            page.on("console", (message) => {
+              if (message.type() === "error") {
+                consoleErrors.push(message.text());
+              }
             });
             page.on("requestfailed", (request) => {
               const url = new URL(request.url());
@@ -234,7 +240,9 @@ jobs:
             });
 
             await page.waitForFunction(
-              () => document.documentElement.dataset.universeEngine === "yeis",
+              () =>
+                document.documentElement.dataset.universeEngine === "yeis" &&
+                document.documentElement.dataset.yeisNativeGalaxy === "ready",
               undefined,
               { timeout: 30_000 },
             );
@@ -286,6 +294,11 @@ jobs:
               );
             }
 
+            // Preserve the frame that actually proves direct live scale motion.
+            // The reversed Galaxy endpoint is already covered by state + Canvas
+            // assertions below, so avoid a second redundant SwiftShader read.
+            await page.screenshot({ path: "pages-live-smoke.png" });
+
             await page.mouse.wheel(0, 120);
             await page.waitForFunction(
               () => {
@@ -310,11 +323,14 @@ jobs:
                 `Expected one canvas after live scale reversal, found ${finalCanvasCount}`,
               );
             }
-            await page.screenshot({ path: "pages-live-smoke.png" });
-
             if (pageErrors.length) {
               throw new Error(
                 `Live browser page errors: ${pageErrors.join(" | ")}`,
+              );
+            }
+            if (consoleErrors.length) {
+              throw new Error(
+                `Live browser console errors: ${consoleErrors.join(" | ")}`,
               );
             }
             if (criticalFailures.length) {
@@ -328,10 +344,11 @@ jobs:
           NODE
 
           {
-            echo "- Live Chromium YEIS boot: PASS"
+            echo "- Live Chromium YEIS native Galaxy ready: PASS"
             echo "- Live single-Canvas probe: PASS"
             echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
-            echo "- Live critical asset/browser error probe: PASS"
+            echo "- Live midpoint screenshot evidence: PASS"
+            echo "- Live critical asset/browser/console error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload live Pages browser evidence
