@@ -17,6 +17,7 @@ import {
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
   rankSurfaceWorldLandmarks,
+  rankSurfaceWorldPaths,
   rankSurfaceWorldRegions,
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
@@ -210,9 +211,6 @@ function LiveSurfaceAnchor({
     0,
     (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
   ];
-  const visiblePaths = expanded
-    ? profile.paths.slice(0, 4)
-    : profile.paths.slice(0, 1);
   const rankedContent = useMemo(
     () =>
       rankSurfaceContentAnchors(
@@ -243,6 +241,17 @@ function LiveSurfaceAnchor({
       focusedAnchor?.landmarkId ?? null,
     );
   }, [expanded, focusedAnchor?.landmarkId, profile.landmarks]);
+  const rankedPaths = useMemo(
+    () =>
+      rankSurfaceWorldPaths(
+        profile.paths,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.paths],
+  );
+  const visiblePaths = expanded
+    ? rankedPaths.slice(0, 4)
+    : rankedPaths.slice(0, 1);
   const visibleRegions = expanded ? rankedRegions.slice(0, 4) : [];
   const visibleLandmarks = expanded
     ? rankedLandmarks.slice(0, 6)
@@ -296,6 +305,7 @@ function LiveSurfaceAnchor({
           const dx = to[0] - from[0];
           const dz = to[2] - from[2];
           const length = Math.hypot(dx, dz);
+          const focused = path.landmarkId === focusedAnchor?.landmarkId;
           return (
             <mesh
               key={path.id}
@@ -304,15 +314,20 @@ function LiveSurfaceAnchor({
             >
               <boxGeometry
                 args={[
-                  Math.max(0.0013, path.width * LIVE_SURFACE_LAYOUT_SCALE),
+                  Math.max(
+                    0.0013,
+                    path.width *
+                      LIVE_SURFACE_LAYOUT_SCALE *
+                      (focused ? 1.35 : 1),
+                  ),
                   0.0011,
                   length,
                 ]}
               />
               <meshBasicMaterial
-                color={profile.accent}
+                color={focused ? "#fff0cf" : profile.accent}
                 transparent
-                opacity={0.2}
+                opacity={focused ? 0.46 : 0.2}
                 depthWrite={false}
               />
             </mesh>
