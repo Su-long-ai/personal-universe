@@ -11,7 +11,7 @@ import {
   type PlanetDefinition,
   type QualityMode,
 } from "../../lib/universe/types";
-import { hashSeed } from "../../lib/universe/generation";
+import { hashSeed } from "../../lib/universe/generation";\nimport { buildSurfaceWorldProfile, type SurfaceWorldProfile } from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
@@ -28,13 +28,15 @@ const SURFACE_WORLD_NORMAL = new THREE.Vector3(
   0.350456,
   -0.931211,
 ).normalize();
-const SURFACE_UP = new THREE.Vector3(0, 1, 0);
+const SURFACE_UP = new THREE.Vector3(0, 1, 0);\nconst LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
 
 function LiveSurfaceAnchor({
   planet,
+  profile,
   onCameraFrame,
 }: {
   planet: Planet;
+  profile: SurfaceWorldProfile;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -58,6 +60,12 @@ function LiveSurfaceAnchor({
   useEffect(() => {
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-planets-live-surface";
+    document.documentElement.dataset.universeSurfaceProfile = profile.id;
+    document.documentElement.dataset.universeSurfaceBiome = profile.biome;
+    document.documentElement.dataset.universeSurfaceLandmarks =
+      String(profile.landmarks.length);
+    document.documentElement.dataset.universeSurfaceContentAnchors =
+      String(profile.contentAnchors.length);
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -67,9 +75,13 @@ function LiveSurfaceAnchor({
       }
       delete document.documentElement.dataset.universeSurfaceAnchorReady;
       delete document.documentElement.dataset.universeSurfaceCameraFrame;
+      delete document.documentElement.dataset.universeSurfaceProfile;
+      delete document.documentElement.dataset.universeSurfaceBiome;
+      delete document.documentElement.dataset.universeSurfaceLandmarks;
+      delete document.documentElement.dataset.universeSurfaceContentAnchors;
       onCameraFrame(null);
     };
-  }, [onCameraFrame]);
+  }, [onCameraFrame, profile]);
 
   useFrame(() => {
     if (!group.current) return;
@@ -129,17 +141,122 @@ function LiveSurfaceAnchor({
     document.documentElement.dataset.universeSurfaceAnchorReady = "true";
   });
 
+  const tangentPoint = (point: [number, number]): [number, number, number] => [
+    (point[0] - profile.landing[0]) * LIVE_SURFACE_LAYOUT_SCALE,
+    0,
+    (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
+  ];
+
   return (
     <group ref={group} name="live-surface-anchor">
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
-        <ringGeometry args={[0.035, 0.065, 28]} />
-        <meshBasicMaterial
-          color="#76e6ff"
-          transparent
-          opacity={0.24}
-          depthWrite={false}
-        />
-      </mesh>
+      <group position={[0, -0.024, 0]} name="live-surface-product-layout">
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+          <ringGeometry args={[0.035, 0.065, 28]} />
+          <meshBasicMaterial
+            color={profile.accent}
+            transparent
+            opacity={0.32}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {profile.paths.map((path) => {
+          const from = tangentPoint(path.from);
+          const to = tangentPoint(path.to);
+          const dx = to[0] - from[0];
+          const dz = to[2] - from[2];
+          const length = Math.hypot(dx, dz);
+          return (
+            <mesh
+              key={path.id}
+              position={[(from[0] + to[0]) * 0.5, 0.004, (from[2] + to[2]) * 0.5]}
+              rotation={[0, Math.atan2(dx, dz), 0]}
+            >
+              <boxGeometry
+                args={[
+                  Math.max(0.0013, path.width * LIVE_SURFACE_LAYOUT_SCALE),
+                  0.0011,
+                  length,
+                ]}
+              />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={0.2}
+                depthWrite={false}
+              />
+            </mesh>
+          );
+        })}
+
+        {profile.regions.map((region) => {
+          const point = tangentPoint(region.center);
+          const radius = Math.max(
+            0.009,
+            region.radius * LIVE_SURFACE_LAYOUT_SCALE * 0.16,
+          );
+          return (
+            <mesh
+              key={region.id}
+              position={[point[0], 0.0045, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius * 0.68, radius, 20]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={0.14}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          );
+        })}
+
+        {profile.landmarks.map((landmark) => {
+          const point = tangentPoint(landmark.position);
+          const scale = 0.006 + landmark.scale * 0.0045;
+          return (
+            <mesh
+              key={landmark.id}
+              position={[point[0], 0.006 + scale * 0.7, point[2]]}
+              scale={[scale, scale * 1.9, scale]}
+            >
+              {landmark.kind === "crater" || landmark.kind === "basin" ? (
+                <torusGeometry args={[0.7, 0.14, 5, 12]} />
+              ) : landmark.kind === "ridge" ? (
+                <boxGeometry args={[1.15, 0.4, 0.38]} />
+              ) : (
+                <coneGeometry args={[0.55, 1.4, 6]} />
+              )}
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={0.36 + landmark.prominence * 0.28}
+              />
+            </mesh>
+          );
+        })}
+
+        {profile.contentAnchors.map((anchor) => {
+          const point = tangentPoint(anchor.position);
+          return (
+            <group
+              key={anchor.id}
+              position={[point[0], 0.009, point[2]]}
+            >
+              <mesh scale={[0.003, 0.011, 0.003]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshBasicMaterial color={profile.accent} />
+              </mesh>
+              <mesh position={[0, 0.014, 0]}>
+                <octahedronGeometry args={[0.0038, 0]} />
+                <meshBasicMaterial color="#ffffff" />
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
     </group>
   );
 }
@@ -492,6 +609,10 @@ export function PlanetScene({
     [],
   );
   const softwareRenderer = isSoftwareRenderer(gl);
+  const surfaceProfile = useMemo(
+    () => buildSurfaceWorldProfile(planet),
+    [planet],
+  );
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const fallbackSurfaceTexture = useMemo(
     () =>
@@ -726,6 +847,7 @@ export function PlanetScene({
       {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
+          profile={surfaceProfile}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}
