@@ -12,6 +12,7 @@ import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
 import {
   rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
 import { isSoftwareRenderer } from "./CinematicPipeline";
@@ -353,9 +354,13 @@ export function SurfaceTerrain({
   const visibleContent = softwareRenderer
     ? rankedContent.slice(0, 3)
     : rankedContent;
+  const rankedClusters = useMemo(
+    () => rankSurfaceContentClusters(profile.contentClusters),
+    [profile.id],
+  );
   const visibleClusters = softwareRenderer
-    ? profile.contentClusters.slice(0, 2)
-    : profile.contentClusters;
+    ? rankedClusters.slice(0, 2)
+    : rankedClusters;
 
   useEffect(() => {
     return () => {
