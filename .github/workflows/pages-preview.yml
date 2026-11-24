@@ -257,11 +257,39 @@ jobs:
             await page.waitForFunction(
               () => {
                 const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
                 return (
-                  data.universeScaleDirection === "in" ||
-                  Boolean(data.universePendingDestination) ||
-                  Boolean(data.universeTraveling) ||
-                  data.universeNavigationPhase === "system"
+                  data.universeNavigationPhase === "galaxy" &&
+                  data.universeScaleDirection === "in" &&
+                  Number.isFinite(position) &&
+                  position > 0 &&
+                  position < 1 &&
+                  Boolean(data.universeGalaxyScaleTarget)
+                );
+              },
+              undefined,
+              { timeout: 10_000 },
+            );
+
+            const inwardPosition = await page.evaluate(() =>
+              Number(document.documentElement.dataset.universeScalePosition),
+            );
+            if (!(inwardPosition > 0 && inwardPosition < 1)) {
+              throw new Error(
+                `Expected one live wheel sample to hold an intermediate Galaxy scale position, got ${inwardPosition}`,
+              );
+            }
+
+            await page.mouse.wheel(0, 120);
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
+                return (
+                  data.universeNavigationPhase === "galaxy" &&
+                  data.universeScaleDirection === "out" &&
+                  Number.isFinite(position) &&
+                  Math.abs(position) < 0.001
                 );
               },
               undefined,
@@ -288,6 +316,6 @@ jobs:
           {
             echo "- Live Chromium YEIS boot: PASS"
             echo "- Live single-Canvas probe: PASS"
-            echo "- Live wheel ownership probe: PASS"
+            echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
             echo "- Live critical asset/browser error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
