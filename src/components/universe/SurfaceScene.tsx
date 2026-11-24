@@ -149,6 +149,7 @@ export function SurfaceScene({
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
   const softwareHorizonBackground = useMemo(() => {
+    if (!softwareRenderer) return null;
     // 1x8 vertical gradient stored bottom -> top. It stays near-black at the
     // zenith while lifting only the software horizon band.
     const data = new Uint8Array([
@@ -168,7 +169,7 @@ export function SurfaceScene({
     texture.generateMipmaps = false;
     texture.needsUpdate = true;
     return texture;
-  }, []);
+  }, [softwareRenderer]);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
@@ -187,7 +188,7 @@ export function SurfaceScene({
 
   useEffect(
     () => () => {
-      softwareHorizonBackground.dispose();
+      softwareHorizonBackground?.dispose();
     },
     [softwareHorizonBackground],
   );
@@ -349,7 +350,7 @@ export function SurfaceScene({
           {softwareRenderer ? (
             <primitive
               attach="background"
-              object={softwareHorizonBackground}
+              object={softwareHorizonBackground!}
             />
           ) : (
             <color attach="background" args={["#030b12"]} />
