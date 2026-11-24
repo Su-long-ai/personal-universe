@@ -130,6 +130,14 @@ export function SurfaceTerrain({
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
+    if (softwareRenderer) return;
+    // Start the shared drei cache fetch while the real-GPU terrain itself is
+    // preparing, so decorations are usually ready before Surface owns the
+    // frame. Software fallback never touches this hardware-only asset.
+    useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");
+  }, [softwareRenderer]);
+
+  useEffect(() => {
     if (prepare || active) setActivated(true);
   }, [active, prepare]);
 
