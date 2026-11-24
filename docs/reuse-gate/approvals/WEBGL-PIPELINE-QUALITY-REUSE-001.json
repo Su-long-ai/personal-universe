@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-PIPELINE-QUALITY-REUSE-001",
+  "approved_at": "2026-11-24T17:24:00.000Z",
+  "baseline_commit": "f8f452e8fb0f321aa7f947875fb60439b902745f",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-PIPELINE-QUALITY-REUSE-001.json",
+  "record_sha256": "7d055c4305b67a8489115f697b324215ba4273c71437ffa279fe39816cd6b67c",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Remove avoidable EffectComposer and PlanetPass reconstruction during ordinary quality changes while preserving HIGH visuals and software fallback behavior"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/CinematicPipeline.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "selected_ids": [
+    "stable-r3f-composer-lifecycle",
+    "retained-procedural-planets-pass"
+  ],
+  "candidate_scores": {
+    "stable-r3f-composer-lifecycle": 57,
+    "retained-procedural-planets-pass": 48,
+    "custom-postprocess-pool": 33
+  }
+}
