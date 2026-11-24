@@ -2174,14 +2174,24 @@ export default function UniverseApp({
 
         if (
           direction === "out" &&
-          currentPosition <= 2 + WORLD_SCALE_EPSILON
+          currentPosition <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
+          // Preserve the physical wheel sample across the Approach -> System
+          // renderer boundary. The boundary itself must not consume input:
+          // a normalized +96 sample moves 2 -> 1.5, then the next 1.5 -> 1.
+          const nextPosition = applySystemScaleWheel(
+            WORLD_SCALE_MIN,
+            normalizedDelta,
+          );
           setSystemScaleTargetPlanet(selectedPlanet);
-          worldScalePositionRef.current = WORLD_SCALE_MIN;
-          setWorldScalePosition(WORLD_SCALE_MIN);
+          worldScalePositionRef.current = nextPosition;
+          setWorldScalePosition(nextPosition);
           setWorldScaleContinuous(true);
           document.documentElement.dataset.universeScalePosition =
-            WORLD_SCALE_MIN.toFixed(3);
+            nextPosition.toFixed(3);
+          document.documentElement.dataset.universeScaleDirection = direction;
+          document.documentElement.dataset.universeScaleProgress =
+            systemScaleSegmentProgress(nextPosition).toFixed(3);
           setWorldScalePhase("system", {
             preserveWorldScalePosition: true,
           });
