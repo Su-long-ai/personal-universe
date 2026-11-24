@@ -3032,6 +3032,7 @@ export default function UniverseApp({
         markers={galaxy.markers}
         placements={contentPlacements}
         currentSystem={selectedSystem}
+        scalePosition={worldScalePosition}
         activeDestinationId={activeDestinationId}
         recentDestinationIds={recentDestinationIds}
         pendingDestinationId={pendingDestinationId}
