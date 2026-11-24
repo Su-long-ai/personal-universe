@@ -61,19 +61,18 @@ async function shot(
 }
 
 async function dispatchVisualWheel(page: Page, deltaY: number) {
-  await page.locator("main.universe-root").evaluate(
-    (root, value) => {
-      root.dispatchEvent(
-        new WheelEvent("wheel", {
-          bubbles: true,
-          cancelable: true,
-          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
-          deltaY: value,
-        }),
-      );
-    },
-    deltaY,
+  // Use Chromium's native input path for visual acceptance. Executing a
+  // synthetic WheelEvent through page.evaluate() competes with the WebGL main
+  // thread and can itself stall for many seconds under hosted SwiftShader,
+  // which measures the injector rather than the interaction. The viewport
+  // centre is always inside the full-screen universe root/canvas.
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("visual wheel requires a viewport");
+  await page.mouse.move(
+    Math.floor(viewport.width / 2),
+    Math.floor(viewport.height / 2),
   );
+  await page.mouse.wheel(0, deltaY);
 }
 
 const dispatchVisualScaleWheel = dispatchVisualWheel;
