@@ -1,0 +1,29 @@
+{
+  "schema": 3,
+  "task_id": "PERSONAL-CONTENT-BROWSER-ACCEPTANCE-V1-001",
+  "approved_at": "2026-11-24T19:03:00.000Z",
+  "baseline_commit": "838aab7a32ef66b4f9c54b5db1277962bf5aa0c8",
+  "record_path": "docs/reuse-gate/tasks/PERSONAL-CONTENT-BROWSER-ACCEPTANCE-V1-001.json",
+  "record_sha256": "cc0c5dcd38e61e10e3245d0643e656adae4f3dbe27adfc8879bdd10c5bb3b50c",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "web-url-history-api": "77f33a919f6f3efedd54f6b619b7dda4be7823975a54147bf7f4a55c6d9fd9d8"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Playwright acceptance for bilingual authored discovery, Places navigation, and canonical Personal deep links"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-playwright-product-acceptance",
+    "existing-browser-deeplink-contract"
+  ],
+  "candidate_scores": {
+    "existing-playwright-product-acceptance": 56.5,
+    "existing-browser-deeplink-contract": 52.5
+  }
+}
