@@ -327,10 +327,13 @@ at the viewport centre. Explicit centre focus wins, with eligible priority:
 
 The fresh opening view also has one **soft focus** fallback so a visitor can
 start diving with the wheel even when the auto-orbit composition has no object
-inside the centre-pick radius. That fallback prefers the first Personal Signal,
-then the Hero world, then a native catalogue star. It is consumed by the first
-scale-in gesture and is permanently disabled as soon as drag, touch, pinch,
-pan or keyboard camera input shows that the visitor has taken spatial control.
+inside the centre-pick radius. That fallback prefers the Hero world, then the
+first Personal Signal, then a native catalogue star. Hero is intentionally the
+opening fallback because it currently owns the complete Galaxy=0 → Surface=5
+product path; this does not change explicit centre-pick priority, where Personal
+Signals still win. The fallback is consumed by the first scale-in gesture and is
+permanently disabled as soon as drag, touch, pinch, pan or keyboard camera input
+shows that the visitor has taken spatial control.
 After takeover, an empty centre remains empty instead of snapping back to a
 product-selected target.
 
