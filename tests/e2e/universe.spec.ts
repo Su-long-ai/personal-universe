@@ -738,6 +738,42 @@ test("default YEIS secondary terrestrial world reaches the shared Surface produc
   await runtime.assertClean(testInfo);
 });
 
+test("YEIS giant worlds stop at Orbit and never invent a Surface @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=orbit&star=c0&body=yeis-planet%3Ajupiter&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 30_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-blocked",
+    "no-surface",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-surface-profile");
+  await expect(html).not.toHaveAttribute("data-universe-surface-renderer");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("LOW fallback prewarm cancels on immediate reverse and resumes before Surface", async ({
   page,
 }, testInfo) => {
