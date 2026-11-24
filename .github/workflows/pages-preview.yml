@@ -64,6 +64,26 @@ jobs:
       - name: Bundle guard
         run: node tests/ci/bundle-guard.mjs
 
+      - name: Verify repository-subpath runtime asset URLs
+        shell: bash
+        run: |
+          base="${PUBLIC_BASE_PATH%/}/"
+          broken="${PUBLIC_BASE_PATH%/}"
+          if grep -R -I -E "${broken}(vendor|textures|audio|nebulae)/" dist; then
+            echo "Found runtime asset URL concatenated without the project-site slash" >&2
+            exit 1
+          fi
+          for asset in \
+            "vendor/yeis/" \
+            "textures/stars_milky_way.jpg" \
+            "audio/deep-space.ogg" \
+            "nebulae/"; do
+            if ! grep -R -I -F -q "${base}${asset}" dist; then
+              echo "Expected built runtime asset prefix ${base}${asset} was not found" >&2
+              exit 1
+            fi
+          done
+
       - name: Preserve deployable Pages build
         uses: actions/upload-artifact@v4
         with:
