@@ -45,11 +45,13 @@ export function SurfaceTerrain({
   active,
   phaseRef,
   profile,
+  focusedEntryId,
   onAnchorHeight,
 }: {
   active: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   profile: SurfaceWorldProfile;
+  focusedEntryId: string | null;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
@@ -353,15 +355,21 @@ export function SurfaceTerrain({
     ? profile.regions.slice(0, 2)
     : profile.regions;
   const rankedContent = useMemo(
-    () => rankSurfaceContentAnchors(profile.contentAnchors),
-    [profile.contentAnchors],
+    () => rankSurfaceContentAnchors(profile.contentAnchors, focusedEntryId),
+    [focusedEntryId, profile.contentAnchors],
   );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === focusedEntryId) ?? null;
   const visibleContent = softwareRenderer
     ? rankedContent.slice(0, 3)
     : rankedContent;
   const rankedClusters = useMemo(
-    () => rankSurfaceContentClusters(profile.contentClusters),
-    [profile.contentClusters],
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
   );
   const visibleClusters = softwareRenderer
     ? rankedClusters.slice(0, 2)
@@ -403,12 +411,13 @@ export function SurfaceTerrain({
       {visibleClusters.map((cluster) => {
         const height =
           (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) + 0.08;
+        const focused = focusedAnchor?.cluster === cluster.index;
         const radius =
-          cluster.priority === "primary"
+          (cluster.priority === "primary"
             ? 0.52
             : cluster.priority === "secondary"
               ? 0.4
-              : 0.3;
+              : 0.3) * (focused ? 1.18 : 1);
         return (
           <mesh
             key={cluster.id}
@@ -422,11 +431,13 @@ export function SurfaceTerrain({
               color={profile.accent}
               transparent
               opacity={
-                cluster.priority === "primary"
-                  ? 0.34
-                  : cluster.priority === "secondary"
-                    ? 0.22
-                    : 0.14
+                focused
+                  ? 0.46
+                  : cluster.priority === "primary"
+                    ? 0.34
+                    : cluster.priority === "secondary"
+                      ? 0.22
+                      : 0.14
               }
               side={THREE.DoubleSide}
               depthWrite={false}
@@ -486,8 +497,10 @@ export function SurfaceTerrain({
         );
       })}
       {visibleContent.map((anchor) => {
-        const priorityScale =
-          anchor.priority === "primary"
+        const focused = anchor.entryId === focusedEntryId;
+        const priorityScale = focused
+          ? 1.38
+          : anchor.priority === "primary"
             ? 1.25
             : anchor.priority === "secondary"
               ? 1
@@ -506,13 +519,19 @@ export function SurfaceTerrain({
               <meshBasicMaterial
                 color={profile.accent}
                 transparent
-                opacity={anchor.priority === "primary" ? 0.96 : 0.76}
+                opacity={
+                  focused || anchor.priority === "primary" ? 0.98 : 0.76
+                }
               />
             </mesh>
             <mesh position={[0, 0.48, 0]}>
               <octahedronGeometry args={[0.12, 0]} />
               <meshBasicMaterial
-                color={anchor.priority === "primary" ? "#fff0cf" : "#ffffff"}
+                color={
+                  focused || anchor.priority === "primary"
+                    ? "#fff0cf"
+                    : "#ffffff"
+                }
               />
             </mesh>
           </group>
