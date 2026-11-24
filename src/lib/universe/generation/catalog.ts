@@ -5,7 +5,8 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
-import { surfaceModeForArchetype } from "../surface";\nimport { hashSeed } from "./seededRng";
+import { surfaceModeForArchetype } from "../surface";
+import { hashSeed } from "./seededRng";
 
 type CatalogPlanet = {
   name: string;
