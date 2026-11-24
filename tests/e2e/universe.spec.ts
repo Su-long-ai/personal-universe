@@ -3348,7 +3348,9 @@ test("Places filters derive Personal and Important views from canonical graph", 
   const importantRows = dialog.locator(".navigator-result-row");
   await expect(importantRows.first()).toBeVisible();
   await expect(
-    importantRows.locator('[data-destination-featured="true"]').first(),
+    dialog.locator(
+      '.navigator-result-row[data-destination-featured="true"]',
+    ).first(),
   ).toBeVisible();
 
   const nearby = dialog.getByRole("button", { name: "NEARBY" });
