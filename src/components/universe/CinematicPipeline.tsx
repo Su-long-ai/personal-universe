@@ -308,6 +308,11 @@ export function CinematicPipeline({
       "universeWebglPixelRatio",
       String(pixelRatioCap),
     );
+    publishDatasetMetric(
+      document.documentElement,
+      "universeWorldRenderPath",
+      renderWithComposer ? "composer" : "direct",
+    );
     // A parked SwiftShader composer otherwise retains a full-size pair of
     // render targets even though AUTO/LOW fallback and Galaxy/System render
     // directly. Collapse those targets while parked; restoring live HIGH
@@ -326,6 +331,7 @@ export function CinematicPipeline({
     gl,
     parkComposerTargets,
     pixelRatioCap,
+    renderWithComposer,
     setDpr,
     size.height,
     size.width,
@@ -374,12 +380,6 @@ export function CinematicPipeline({
       // of paying an offscreen RenderPass + OutputPass round trip.
       gl.render(scene, camera);
     }
-    publishDatasetMetric(
-      html,
-      "universeWorldRenderPath",
-      renderWithComposer ? "composer" : "direct",
-    );
-
     // PlanetPass creates PlanetRenderer lazily during its first live draw.
     // If that happened this frame, align the final profile now but do not
     // count the just-drawn frame as readiness evidence; the next frame will
