@@ -102,7 +102,7 @@ export function UniverseHud({
                 : "切换语言为英文"
             }
           >
-            {locale === "en" ? "中文" : "EN"}
+            {locale === "en" ? "ZH" : "EN"}
           </button>
           <button
             className="hud-collapse"

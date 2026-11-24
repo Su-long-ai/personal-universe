@@ -871,7 +871,11 @@ test("Chinese and English switch in place and persist", async ({
     if (frame === page.mainFrame()) mainFrameNavigations += 1;
   });
 
-  await page.getByRole("button", { name: "Switch language to Chinese" }).click();
+  const languageButton = page.getByRole("button", {
+    name: "Switch language to Chinese",
+  });
+  await expect(languageButton).toHaveText("ZH");
+  await languageButton.click();
 
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-locale",
@@ -904,7 +908,11 @@ test("Chinese and English switch in place and persist", async ({
     "zh",
   );
 
-  await page.getByRole("button", { name: "切换语言为英文" }).click();
+  const englishButton = page.getByRole("button", {
+    name: "切换语言为英文",
+  });
+  await expect(englishButton).toHaveText("EN");
+  await englishButton.click();
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-locale",
     "en",
