@@ -231,10 +231,18 @@ travel.
 Product-world framing reuses the already-installed `camera-controls` camera
 authority rather than maintaining separate desktop/tablet/mobile shot tables.
 `PLANET_RENDER_RADIUS` is shared by the fallback and baked planet
-representations. For Approach and Orbit, the existing cinematic shot direction
-and transition timing are retained, while the final camera distance comes from
+representations. For Approach and Orbit, the cinematic transition remains owned by the same
+`camera-controls` instance, while the final camera distance comes from
 `CameraControls.getDistanceToFitSphere(PLANET_RENDER_RADIUS)` multiplied by a
 small phase-specific breathing-room factor.
+
+Task `WORLD-ARRIVAL-CINEMATIC-CONTINUITY-001` also keeps Orbit and Atmosphere
+on the same illuminated hemisphere as the canonical live Surface anchor. Only
+the existing shot azimuth/elevation changes: the ProceduralPlanets sun model,
+fit distance, phase semantics, settlement generation guards and terrain-derived
+Surface frame stay unchanged. This removes the near-black high-quality Orbit
+composition and avoids the previous large camera reversal immediately before
+landing.
 
 Because `getDistanceToFitSphere()` uses the active camera's effective FOV and
 aspect ratio, portrait viewports automatically move farther away when the

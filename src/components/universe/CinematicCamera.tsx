@@ -108,8 +108,11 @@ const SHOTS: Partial<
     frameScale: 1.5,
   },
   orbit: {
-    position: [8.65, 1.28, 6.25],
-    target: [WORLD[0] - 0.22, WORLD[1] + 0.02, WORLD[2]],
+    // Stay on the same illuminated hemisphere as the canonical Surface
+    // anchor. The previous +Z shot looked across the night side and then
+    // forced Atmosphere/Surface to reverse around the globe before landing.
+    position: [10.45, 1.38, -5.2],
+    target: [WORLD[0] - 0.22, WORLD[1] + 0.06, WORLD[2] - 0.15],
     smoothTime: 0.92,
     maxSpeed: 18,
     positionTolerance: 0.12,
@@ -117,8 +120,11 @@ const SHOTS: Partial<
     frameScale: 1.28,
   },
   atmosphere: {
-    position: [7.3, 1.2, 4.8],
-    target: [6.75, 0.45, 1.2],
+    // Continue descending toward the lit landing patch rather than crossing
+    // back over the terminator. Surface still replaces this with its terrain-
+    // derived frame once the live anchor is ready.
+    position: [7.7, 1.78, -4.35],
+    target: [6.25, 1.2, -3.0],
     smoothTime: 0.68,
     maxSpeed: 12,
     positionTolerance: 0.08,
