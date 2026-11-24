@@ -237,7 +237,14 @@ export function SurfaceScene({
         document.documentElement.dataset.universeSurfacePrewarm = "preparing";
         setTerrainEnabled(true);
       };
-      if (idleWindow.requestIdleCallback) {
+      if (phase === "surface") {
+        // A visible Surface is no longer speculative work. Hosted SwiftShader
+        // can stay continuously busy enough that requestIdleCallback becomes a
+        // starvation point even with a timeout. Start the already-bounded
+        // ProceduralTerrains prepare on the next task; reserve idle scheduling
+        // for Atmosphere prewarm where the terrain is still off-screen.
+        enable();
+      } else if (idleWindow.requestIdleCallback) {
         idleHandle = idleWindow.requestIdleCallback(enable, { timeout: 650 });
       } else {
         enable();
