@@ -46,12 +46,14 @@ export function SurfaceTerrain({
   phaseRef,
   profile,
   focusedEntryId,
+  onFocusEntry,
   onAnchorHeight,
 }: {
   active: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   profile: SurfaceWorldProfile;
   focusedEntryId: string | null;
+  onFocusEntry: (entryId: string) => void;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
@@ -363,6 +365,16 @@ export function SurfaceTerrain({
   const visibleContent = softwareRenderer
     ? rankedContent.slice(0, 3)
     : rankedContent;
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      active ? visibleContent.length : 0,
+    );
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
+    };
+  }, [active, profile.id, visibleContent.length]);
+
   const rankedClusters = useMemo(
     () =>
       rankSurfaceContentClusters(
@@ -511,8 +523,18 @@ export function SurfaceTerrain({
         return (
           <group
             key={anchor.id}
+            name={`surface-signal-${anchor.id}`}
+            userData={{ surfaceEntryId: anchor.entryId }}
             position={[anchor.position[0], height, anchor.position[1]]}
             scale={priorityScale}
+            onClick={
+              active
+                ? (event) => {
+                    event.stopPropagation();
+                    onFocusEntry(anchor.entryId);
+                  }
+                : undefined
+            }
           >
             <mesh>
               <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
