@@ -29,8 +29,41 @@ async function wheelScale(
     box!.x + box!.width * 0.5,
     box!.y + box!.height * 0.5,
   );
+  const html = page.locator("html");
+  const startingPhase = await html.getAttribute(
+    "data-universe-navigation-phase",
+  );
+  const closeWorld = [
+    "approach",
+    "orbit",
+    "atmosphere",
+    "surface",
+  ].includes(startingPhase ?? "");
   const deltaY = direction === "in" ? -120 : 120;
+
+  // Close-world input is now a real coordinate. A normal wheel sample moves
+  // half a semantic interval so the camera visibly travels before the phase
+  // boundary changes. Semantic transition tests use two samples to reach the
+  // next authored anchor; galaxy/system retain their native one-sample entry.
   await page.mouse.wheel(0, deltaY);
+  if (closeWorld) {
+    await page.waitForTimeout(80);
+    const phaseAfterFirst = await html.getAttribute(
+      "data-universe-navigation-phase",
+    );
+    if (
+      ["approach", "orbit", "atmosphere", "surface"].includes(
+        phaseAfterFirst ?? "",
+      )
+    ) {
+      const position = Number(
+        await html.getAttribute("data-universe-scale-position"),
+      );
+      if (Number.isFinite(position) && Math.abs(position - Math.round(position)) > 0.01) {
+        await page.mouse.wheel(0, deltaY);
+      }
+    }
+  }
   await page.waitForTimeout(320);
 }
 
@@ -239,7 +272,7 @@ test("wheel scale advances and reverses world layers without auto chaining", asy
     "data-universe-camera-settled",
     "atmosphere",
   );
-  await dispatchScaleWheel(page, -120);
+  await wheelScale(page, "in");
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
@@ -274,6 +307,62 @@ test("wheel scale advances and reverses world layers without auto chaining", asy
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("close-world wheel moves the live camera before a semantic phase boundary", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -72);
+
+  // Three eighths of the Approach -> Orbit interval: semantic identity has
+  // not changed, but the one camera authority is already at the interpolated
+  // position. This is the contract that the old threshold/phase ladder lacked.
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.375",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "scale-continuous",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-camera-segment",
+    "approach:orbit",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+  );
+
+  await dispatchScaleWheel(page, 72);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
   );
 
   await runtime.assertClean(testInfo);
@@ -391,7 +480,7 @@ test("manual galaxy takeover disables the opening soft focus", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("continuous wheel intent carries across unsettled world transitions", async ({
+test("continuous wheel coordinate crosses close-world boundaries without waiting for settlement", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -415,15 +504,13 @@ test("continuous wheel intent carries across unsettled world transitions", async
     box!.y + box!.height * 0.5,
   );
 
-  // Keep scrolling while the previous camera transition is still running.
-  // Continued input is committed scale intent: unsettled camera work must
-  // queue it, while a quickly settled software fallback must not discard a
-  // distinct event just because the events are close together in wall time.
-  await page.mouse.wheel(0, -120);
-  await page.waitForTimeout(60);
-  await page.mouse.wheel(0, -120);
-  await page.waitForTimeout(60);
-  await page.mouse.wheel(0, -120);
+  // Keep scrolling without waiting for authored shot settlement. Six
+  // half-interval wheel samples traverse the continuous coordinate from
+  // Approach (2) to Surface (5); there is no world-step queue anymore.
+  for (let index = 0; index < 6; index += 1) {
+    await page.mouse.wheel(0, -120);
+    await page.waitForTimeout(60);
+  }
 
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -467,16 +554,26 @@ test("rapid reverse during transition supersedes stale camera completion", async
   await page.mouse.wheel(0, -120);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
-    "orbit",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.500",
   );
 
-  // Reverse while Orbit is still moving. The prior completion must not win.
+  // Reverse the continuous coordinate before crossing the Orbit anchor.
+  // The camera must return to the exact Approach anchor with no stale
+  // intermediate completion winning afterward.
   await page.waitForTimeout(40);
   await page.mouse.wheel(0, 120);
 
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
   );
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
@@ -486,7 +583,7 @@ test("rapid reverse during transition supersedes stale camera completion", async
   await expect(html).toHaveAttribute("data-universe-scale-index", "2");
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
-  // Give a stale Orbit rest/completion ample opportunity to arrive.
+  // Give any stale intermediate rest/completion ample opportunity to arrive.
   await page.waitForTimeout(800);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -500,7 +597,7 @@ test("rapid reverse during transition supersedes stale camera completion", async
   await runtime.assertClean(testInfo);
 });
 
-test("trackpad-like small deltas accumulate into exactly one scale step", async ({
+test("trackpad-like small deltas move the close-world coordinate continuously", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -524,30 +621,29 @@ test("trackpad-like small deltas accumulate into exactly one scale step", async 
     box!.y + box!.height * 0.5,
   );
 
-  // A lone tiny sample still expires quickly as noise. This test pins the
-  // accumulator itself with DOM WheelEvents because hosted Chromium may
-  // coalesce tiny automation-level mouse.wheel samples. Real mouse-wheel
-  // delivery remains covered by the end-to-end scale/navigation cases.
-  await dispatchScaleWheel(page, -16);
-  await page.waitForTimeout(320);
+  // A tiny trackpad sample now produces visible scale motion immediately;
+  // it is not held behind a discrete threshold accumulator.
   await dispatchScaleWheel(page, -16);
   await expect(html).toHaveAttribute(
-    "data-universe-scale-progress",
-    "0.222",
+    "data-universe-scale-position",
+    "2.083",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
   );
 
-  // Once repeated same-direction samples establish a gesture, partial intent
-  // survives a scheduler/render stall longer than the single-sample reset.
-  for (let index = 0; index < 3; index += 1) {
+  // The coordinate itself survives an input pause. Continue the gesture until
+  // the exact Orbit anchor (3.0) is reached.
+  await page.waitForTimeout(600);
+  for (let index = 0; index < 11; index += 1) {
     await dispatchScaleWheel(page, -16);
   }
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-progress",
-    "0.889",
-  );
-  await page.waitForTimeout(600);
-  await dispatchScaleWheel(page, -16);
 
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "3.000",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
@@ -598,7 +694,7 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
   );
 
   for (const phase of ["atmosphere", "orbit", "approach"] as const) {
-    await dispatchScaleWheel(page, 120);
+    await wheelScale(page, "out");
     await expect(html).toHaveAttribute(
       "data-universe-navigation-phase",
       phase,
@@ -618,12 +714,12 @@ test("surface boundary stays settled and outward wheel returns all the way to ga
     );
   }
 
-  await dispatchScaleWheel(page, 120);
+  await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
   );
-  await dispatchScaleWheel(page, 120);
+  await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
@@ -676,7 +772,7 @@ test("reduced motion keeps continuous scale reversible and settled", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Search takeover cancels queued world scale intent", async ({
+test("Search takeover freezes an in-flight continuous world scale coordinate", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -700,22 +796,18 @@ test("Search takeover cancels queued world scale intent", async ({
     box!.y + box!.height * 0.5,
   );
 
-  // Keep the whole takeover in one browser task. The coordinator permits
-  // only one world boundary per tick, so the second wheel sample is queued;
-  // opening Search in that same turn must cancel it before the next frame can
-  // consume it. This mirrors a user invoking a higher-priority authority while
-  // a continuous gesture still carries pending scale intent.
+  // Move halfway toward Orbit and open Search in the same browser task.
+  // Search is a higher-priority authority: it freezes the coordinate where
+  // the user left it instead of allowing hidden queued phase motion.
   await page.locator("main.universe-root").evaluate((root) => {
-    for (const deltaY of [-120, -120]) {
-      root.dispatchEvent(
-        new WheelEvent("wheel", {
-          bubbles: true,
-          cancelable: true,
-          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
-          deltaY,
-        }),
-      );
-    }
+    root.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        deltaY: -120,
+      }),
+    );
     const searchButton = Array.from(document.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("SEARCH / PLACES"),
     );
@@ -726,30 +818,29 @@ test("Search takeover cancels queued world scale intent", async ({
   });
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
-    "orbit",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.500",
   );
 
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
   await expect(html).toHaveAttribute(
-    "data-universe-scale-cancelled-queue",
-    "world:+1",
-  );
-  await expect(html).toHaveAttribute(
     "data-universe-scale-superseded",
     "navigator-open",
   );
 
-  await expect(html).toHaveAttribute(
-    "data-universe-camera-settled",
-    "orbit",
-    { timeout: 10_000 },
-  );
   await page.waitForTimeout(500);
   await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.500",
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
-    "orbit",
+    "approach",
   );
 
   await page.keyboard.press("Escape");
@@ -757,11 +848,11 @@ test("Search takeover cancels queued world scale intent", async ({
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
-    "atmosphere",
+    "orbit",
   );
   await expect(html).toHaveAttribute(
     "data-universe-camera-settled",
-    "atmosphere",
+    "orbit",
     { timeout: 10_000 },
   );
 
@@ -1566,7 +1657,7 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
   // Chromium can coalesce tiny automation-level mouse.wheel samples; use the
   // same DOM WheelEvent accumulator probe as the dedicated trackpad contract.
   // The first page.mouse.wheel above still validates real pointer takeover.
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < 11; index += 1) {
     await dispatchScaleWheel(page, -16);
     await page.waitForTimeout(20);
   }

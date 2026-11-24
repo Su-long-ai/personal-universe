@@ -374,35 +374,42 @@ enter-system intent is queued and consumed only after the existing destination
 becomes current; a competing camera request is not created.
 
 Inside the system, an inward gesture opens the current/preferred planet at
-`approach`. Product-world scale then advances over the same phase ladder, but
-wheel input is not discarded while a cinematic shot is moving. Additional
-same-direction threshold crossings are queued as scale intent and consumed as
-soon as each camera boundary settles, so a sustained wheel gesture can flow
-through Orbit and Atmosphere without requiring stop-scroll-stop repetition.
-Changing direction clears the queued intent and retargets one phase in the
-opposite direction immediately.
+`approach`. From that point the product no longer treats Approach, Orbit,
+Atmosphere and Surface as four wheel-triggered camera jumps. Task
+`WORLD-CONTINUOUS-SCALE-COORDINATE-001` introduces one close-world coordinate
+from 2 (Approach) through 5 (Surface). Every wheel/trackpad delta moves that
+coordinate immediately; `camera-controls.lerpLookAt()` evaluates the adjacent
+authored shots at the same coordinate, so the camera moves before a semantic
+phase boundary is crossed. The phase remains useful for copy, loading, renderer
+lifetime and deep-link identity, but it is no longer the source of close-world
+camera motion.
 
-Wheel-out performs the exact reverse ladder. At System it returns to the
-retained YEIS galaxy view; farther out it can travel back toward the Milky Way
-overview.
+The coordinate is exactly reversible. Reversing the wheel evaluates the same
+path in the opposite direction rather than cancelling one cinematic animation
+and starting another. Search, Journey takeover or another higher-priority
+navigation authority freezes the coordinate where the visitor left it; there
+is no hidden close-world phase-step queue to drain afterward.
 
-### Wheel ownership and hysteresis
+Wheel-out performs the exact reverse scale path. At the Approach minimum, the
+next outward intent returns to System; at System it returns to the retained
+YEIS galaxy view.
+
+### Wheel ownership and scale domains
 
 Exactly one layer owns mouse-wheel scale input:
 
 - YEIS `Input.wheel` is zeroed before the native CameraController update;
 - camera-controls has its wheel ACTION disabled;
-- the product coordinator accumulates small trackpad deltas and applies
-  two-stage direction hysteresis: a lone tiny sample expires quickly, while an
-  established same-direction gesture keeps its partial progress through short
-  renderer/main-thread stalls.
+- the product coordinator is the only wheel owner.
 
-Traditional mouse-wheel notches therefore feel immediate while fine trackpad
-noise must accumulate before a scale boundary is crossed. A phase transition
-itself serializes committed steps: extra input is queued while the camera is
-unsettled, but distinct wheel events are never discarded solely because they
-arrived inside a wall-clock cooldown. Changing direction clears queued intent
-and resets the gesture lock.
+Galaxy/System acquisition still uses the established focus threshold and
+scheduler-safe hysteresis because native YEIS travel is an asynchronous spatial
+operation rather than a product-camera interpolation. Once a world is open,
+that threshold is deliberately bypassed: even a small trackpad sample changes
+the close-world scale coordinate immediately. Mouse-wheel notches and trackpad
+samples therefore differ only in distance travelled, not in whether motion is
+visible. Semantic phase changes occur only when the continuous coordinate
+crosses their boundaries.
 
 Opening-galaxy auto-orbit yields on the first wheel scale gesture, and the same
 gesture is still processed as scale intent. Manual spatial takeover disables

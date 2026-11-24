@@ -32,10 +32,18 @@ import {
   CONTINUOUS_SCALE_ACTIVE_RESET_MS,
   CONTINUOUS_SCALE_RESET_MS,
   CONTINUOUS_SCALE_WHEEL_THRESHOLD,
+  WORLD_SCALE_EPSILON,
+  applyWorldScaleWheel,
   continuousScaleDelta,
   continuousScaleDirection,
+  isWorldScalePhase,
   nextWorldScalePhase,
   scalePhaseIndex,
+  worldScaleMax,
+  worldScalePhaseForPosition,
+  worldScalePositionForPhase,
+  worldScalePositionMatchesPhase,
+  worldScaleSegmentProgress,
   type ContinuousScaleDirection,
 } from "../../lib/universe/continuousScale";
 import {
@@ -251,6 +259,11 @@ export default function UniverseApp({
     useState<UniversePhase | null>(null);
   const cameraSettledPhaseRef = useRef<UniversePhase | null>(null);
   cameraSettledPhaseRef.current = cameraSettledPhase;
+  const [worldScalePosition, setWorldScalePosition] = useState(2);
+  const worldScalePositionRef = useRef(2);
+  worldScalePositionRef.current = worldScalePosition;
+  const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
+  const worldScalePlanetRef = useRef<string | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
   const openedWorldDestinationRef = useRef<string | null>(null);
@@ -383,6 +396,36 @@ export default function UniverseApp({
       delete document.documentElement.dataset.universeScaleIndex;
     };
   }, [phase]);
+
+  useEffect(() => {
+    const anchor = worldScalePositionForPhase(phase);
+    const planetId = selectedPlanet?.id ?? null;
+    const planetChanged =
+      isWorldScalePhase(phase) && worldScalePlanetRef.current !== planetId;
+    worldScalePlanetRef.current = planetId;
+
+    if (anchor === null) {
+      setWorldScaleContinuous(false);
+      return;
+    }
+
+    if (
+      planetChanged ||
+      !worldScalePositionMatchesPhase(worldScalePositionRef.current, phase)
+    ) {
+      worldScalePositionRef.current = anchor;
+      setWorldScalePosition(anchor);
+      setWorldScaleContinuous(false);
+    }
+  }, [phase, selectedPlanet?.id]);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeScalePosition =
+      worldScalePosition.toFixed(3);
+    return () => {
+      delete document.documentElement.dataset.universeScalePosition;
+    };
+  }, [worldScalePosition]);
 
   useEffect(() => {
     if (!navigatorOpen) return;
@@ -1483,8 +1526,19 @@ export default function UniverseApp({
   }, [phase, selectedSystem]);
 
   const setWorldScalePhase = useCallback(
-    (nextPhase: UniversePhase) => {
+    (
+      nextPhase: UniversePhase,
+      options: { preserveWorldScalePosition?: boolean } = {},
+    ) => {
       phaseRef.current = nextPhase;
+      const nextWorldPosition = worldScalePositionForPhase(nextPhase);
+      if (nextWorldPosition === null) {
+        setWorldScaleContinuous(false);
+      } else if (!options.preserveWorldScalePosition) {
+        worldScalePositionRef.current = nextWorldPosition;
+        setWorldScalePosition(nextWorldPosition);
+        setWorldScaleContinuous(false);
+      }
       worldScaleBoundaryLockedRef.current = true;
       if (worldScaleBoundaryUnlockFrameRef.current !== null) {
         window.cancelAnimationFrame(worldScaleBoundaryUnlockFrameRef.current);
@@ -1732,6 +1786,70 @@ export default function UniverseApp({
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
       delete document.documentElement.dataset.universeScaleCancelledQueue;
+
+      if (isWorldScalePhase(currentPhase) && selectedPlanet) {
+        const currentPosition = worldScalePositionRef.current;
+        const maxPosition = worldScaleMax(selectedPlanet.surfaceMode);
+
+        if (
+          direction === "out" &&
+          currentPosition <= 2 + WORLD_SCALE_EPSILON
+        ) {
+          setWorldScaleContinuous(false);
+          setWorldScalePhase("system");
+          return;
+        }
+
+        if (
+          direction === "in" &&
+          currentPosition >= maxPosition - WORLD_SCALE_EPSILON
+        ) {
+          document.documentElement.dataset.universeScaleBlocked =
+            selectedPlanet.surfaceMode === "none"
+              ? "no-surface"
+              : "surface-limit";
+          return;
+        }
+
+        const nextPosition = applyWorldScaleWheel(
+          currentPosition,
+          event.deltaY,
+          selectedPlanet.surfaceMode,
+        );
+
+        if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
+          return;
+        }
+
+        pendingWorldScaleStepsRef.current = 0;
+        delete document.documentElement.dataset.universeScaleQueued;
+        delete document.documentElement.dataset.universeScaleBlocked;
+
+        worldScalePositionRef.current = nextPosition;
+        setWorldScalePosition(nextPosition);
+        setWorldScaleContinuous(true);
+        document.documentElement.dataset.universeScalePosition =
+          nextPosition.toFixed(3);
+        document.documentElement.dataset.universeScaleDirection = direction;
+        document.documentElement.dataset.universeScaleProgress =
+          worldScaleSegmentProgress(nextPosition).toFixed(3);
+
+        cameraSettledPhaseRef.current = null;
+        setCameraSettledPhase(null);
+        delete document.documentElement.dataset.universeCameraSettled;
+        delete document.documentElement.dataset.universeScaleSettled;
+
+        const semanticPhase = worldScalePhaseForPosition(
+          nextPosition,
+          selectedPlanet.surfaceMode,
+        );
+        if (semanticPhase !== currentPhase) {
+          setWorldScalePhase(semanticPhase, {
+            preserveWorldScalePosition: true,
+          });
+        }
+        return;
+      }
 
       const now = performance.now();
       const wheel = scaleWheelRef.current;
@@ -2001,6 +2119,8 @@ export default function UniverseApp({
         <UniverseCanvas
           phase={phase}
           phaseRef={phaseRef}
+          worldScalePosition={worldScalePosition}
+          worldScaleContinuous={worldScaleContinuous}
           engineMode={activeEngine}
           markers={galaxy.markers}
           contentPlacements={contentPlacements}

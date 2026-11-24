@@ -17,6 +17,11 @@ import {
   type UniversePhase,
 } from "../../lib/universe/types";
 import {
+  WORLD_SCALE_EPSILON,
+  isWorldScalePhase,
+  scalePhaseIndex,
+} from "../../lib/universe/continuousScale";
+import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
 } from "./CinematicPipeline";
@@ -30,6 +35,8 @@ export type SurfaceCameraFrame = {
 type CinematicCameraProps = {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
+  worldScalePosition: number;
+  worldScaleContinuous: boolean;
   scrollDepth: number;
   reducedMotion: boolean;
   quality: QualityMode;
@@ -66,7 +73,19 @@ const MANUAL_TOUCH = {
   three: CameraControlsImpl.ACTION.NONE,
 } as const;
 
-const FALLBACK_SURFACE_SHOT = {
+type CameraShot = {
+  position: [number, number, number];
+  target: [number, number, number];
+  smoothTime: number;
+  maxSpeed: number;
+  positionTolerance: number;
+  targetTolerance: number;
+  fitRadius?: number;
+  frameScale?: number;
+  transition?: boolean;
+};
+
+const FALLBACK_SURFACE_SHOT: CameraShot = {
   position: [0.5, 22.0, 18.0] as [number, number, number],
   target: [0, 8.0, -16.0] as [number, number, number],
   smoothTime: 0.38,
@@ -76,22 +95,7 @@ const FALLBACK_SURFACE_SHOT = {
   transition: false,
 };
 
-const SHOTS: Partial<
-  Record<
-    UniversePhase,
-    {
-      position: [number, number, number];
-      target: [number, number, number];
-      smoothTime: number;
-      maxSpeed: number;
-      positionTolerance: number;
-      targetTolerance: number;
-      fitRadius?: number;
-      frameScale?: number;
-      transition?: boolean;
-    }
-  >
-> = {
+const SHOTS: Partial<Record<UniversePhase, CameraShot>> = {
   system: {
     position: [0, 8.6, 18.5],
     target: [0, 0, 0],
@@ -158,6 +162,8 @@ const SHOTS: Partial<
 export function CinematicCamera({
   phase,
   phaseRef,
+  worldScalePosition,
+  worldScaleContinuous,
   scrollDepth,
   reducedMotion,
   quality,
@@ -170,10 +176,15 @@ export function CinematicCamera({
   const viewportWidth = useThree((state) => state.size.width);
   const viewportHeight = useThree((state) => state.size.height);
   const softwareRenderer = isSoftwareRenderer(gl);
+  const surfaceFallbackAvailable = Boolean(
+    liveWorldFallbackReason(gl, quality),
+  );
   const surfaceFallback =
-    phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
+    phase === "surface" && surfaceFallbackAvailable;
   const activeSurfaceCameraFrame =
-    phase === "surface" ? surfaceCameraFrame : null;
+    phase === "surface" || worldScalePosition > 4
+      ? surfaceCameraFrame
+      : null;
   const liveSurfaceShot =
     activeSurfaceCameraFrame && SHOTS.surface
       ? {
@@ -264,6 +275,18 @@ export function CinematicCamera({
         return;
       }
 
+      const continuousWorldCamera =
+        worldScaleContinuous &&
+        isWorldScalePhase(phase) &&
+        (!surfaceFallbackAvailable || worldScalePosition <= 4);
+      if (
+        continuousWorldCamera &&
+        Math.abs(worldScalePosition - scalePhaseIndex(phase)) >
+          WORLD_SCALE_EPSILON
+      ) {
+        return;
+      }
+
       const controls = controlsRef.current;
       if (!controls) return;
 
@@ -280,7 +303,14 @@ export function CinematicCamera({
         publishSettled(expectedGeneration);
       }
     },
-    [phase, phaseRef, publishSettled],
+    [
+      phase,
+      phaseRef,
+      publishSettled,
+      surfaceFallbackAvailable,
+      worldScaleContinuous,
+      worldScalePosition,
+    ],
   );
 
   const handleUserControlStart = useCallback(() => {
@@ -335,10 +365,16 @@ export function CinematicCamera({
 
     controls.stop();
 
-    const desiredNear =
-      phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame
-        ? 0.001
-        : 0.05;
+    const continuousWorldCamera =
+      worldScaleContinuous &&
+      isWorldScalePhase(phase) &&
+      (!surfaceFallbackAvailable || worldScalePosition <= 4);
+    const nearLiveSurface =
+      !surfaceFallbackAvailable &&
+      Boolean(activeSurfaceCameraFrame) &&
+      (phase === "surface" ||
+        (continuousWorldCamera && worldScalePosition > 4));
+    const desiredNear = nearLiveSurface ? 0.001 : 0.05;
     if (camera.near !== desiredNear) {
       camera.near = desiredNear;
       camera.updateProjectionMatrix();
@@ -350,6 +386,19 @@ export function CinematicCamera({
       activeSurfaceCameraFrame
     ) {
       camera.up.set(...activeSurfaceCameraFrame.up).normalize();
+    } else if (
+      continuousWorldCamera &&
+      activeSurfaceCameraFrame &&
+      worldScalePosition > 4
+    ) {
+      const surfaceInfluence = Math.min(1, worldScalePosition - 4);
+      camera.up
+        .set(0, 1, 0)
+        .lerp(
+          new Vector3(...activeSurfaceCameraFrame.up).normalize(),
+          surfaceInfluence,
+        )
+        .normalize();
     } else {
       camera.up.set(0, 1, 0);
     }
@@ -369,6 +418,109 @@ export function CinematicCamera({
       );
       return;
     }
+
+    if (continuousWorldCamera) {
+      const clampedPosition = Math.max(
+        2,
+        Math.min(5, worldScalePosition),
+      );
+      const lowerIndex = Math.min(5, Math.floor(clampedPosition));
+      const upperIndex = Math.min(5, lowerIndex + 1);
+      const phaseForIndex = (index: number): UniversePhase =>
+        index >= 5
+          ? "surface"
+          : index >= 4
+            ? "atmosphere"
+            : index >= 3
+              ? "orbit"
+              : "approach";
+      const lowerPhase = phaseForIndex(lowerIndex);
+      const upperPhase = phaseForIndex(upperIndex);
+      const surfaceShot =
+        activeSurfaceCameraFrame && liveSurfaceShot
+          ? liveSurfaceShot
+          : SHOTS.surface;
+      const lowerShot =
+        lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
+      const upperShot =
+        upperPhase === "surface" ? surfaceShot : SHOTS[upperPhase];
+      if (!lowerShot || !upperShot) return;
+
+      const resolveShot = (shot: CameraShot) => {
+        const target = new Vector3(...shot.target);
+        const position = new Vector3(...shot.position);
+        if (shot.frameScale) {
+          const distance =
+            controls.getDistanceToFitSphere(
+              shot.fitRadius ?? PLANET_RENDER_RADIUS,
+            ) * shot.frameScale;
+          position
+            .sub(target)
+            .normalize()
+            .multiplyScalar(distance)
+            .add(target);
+        }
+        return { position, target };
+      };
+
+      const from = resolveShot(lowerShot);
+      const to = resolveShot(upperShot);
+      const linearT =
+        lowerIndex === upperIndex
+          ? 0
+          : clampedPosition - lowerIndex;
+      // Smoothstep keeps velocity continuous at the authored shot anchors
+      // while remaining exactly reversible for the same scale coordinate.
+      const t = linearT * linearT * (3 - 2 * linearT);
+
+      desiredPosition.current.lerpVectors(from.position, to.position, t);
+      desiredTarget.current.lerpVectors(from.target, to.target, t);
+      desiredPositionTolerance.current = Math.min(
+        lowerShot.positionTolerance,
+        upperShot.positionTolerance,
+      );
+      desiredTargetTolerance.current = Math.min(
+        lowerShot.targetTolerance,
+        upperShot.targetTolerance,
+      );
+      configuredPhase.current = phase;
+
+      controls.smoothTime = 0.05;
+      controls.maxSpeed = 1000;
+      controls.stop();
+      void controls.lerpLookAt(
+        from.position.x,
+        from.position.y,
+        from.position.z,
+        from.target.x,
+        from.target.y,
+        from.target.z,
+        to.position.x,
+        to.position.y,
+        to.position.z,
+        to.target.x,
+        to.target.y,
+        to.target.z,
+        t,
+        false,
+      );
+      controls.update(0);
+
+      document.documentElement.dataset.universeCameraMode =
+        "scale-continuous";
+      document.documentElement.dataset.universeScaleCameraSegment =
+        lowerPhase + ":" + upperPhase;
+
+      if (
+        Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
+        WORLD_SCALE_EPSILON
+      ) {
+        publishIfReached(generation);
+      }
+      return;
+    }
+
+    delete document.documentElement.dataset.universeScaleCameraSegment;
 
     const shot =
       phase === "surface"
@@ -488,8 +640,11 @@ export function CinematicCamera({
     scrollDepth,
     softwareRenderer,
     surfaceFallback,
+    surfaceFallbackAvailable,
     viewportHeight,
     viewportWidth,
+    worldScaleContinuous,
+    worldScalePosition,
     publishIfReached,
   ]);
 
@@ -533,6 +688,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraGeneration;
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;
+      delete document.documentElement.dataset.universeScaleCameraSegment;
     },
     [],
   );
