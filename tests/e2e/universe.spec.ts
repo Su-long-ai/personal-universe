@@ -87,19 +87,23 @@ async function wheelScale(
   await page.waitForTimeout(320);
 }
 
-async function dispatchScaleWheel(page: Page, deltaY: number) {
+async function dispatchScaleWheel(
+  page: Page,
+  deltaY: number,
+  deltaMode = 0,
+) {
   await page.locator("main.universe-root").evaluate(
-    (root, value) => {
+    (root, input) => {
       root.dispatchEvent(
         new WheelEvent("wheel", {
           bubbles: true,
           cancelable: true,
-          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
-          deltaY: value,
+          deltaMode: input.deltaMode,
+          deltaY: input.deltaY,
         }),
       );
     },
-    deltaY,
+    { deltaY, deltaMode },
   );
 }
 
@@ -462,6 +466,210 @@ test("close-world wheel moves the live camera before a semantic phase boundary",
     "approach",
     { timeout: 10_000 },
   );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("precision-trackpad deltas move the close-world camera immediately", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.005",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "scale-continuous",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("line-mode wheel input normalizes to the same reversible scale domain", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -3, 1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-segment",
+    "approach:orbit",
+  );
+
+  await dispatchScaleWheel(page, 3, 1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("high-frequency wheel bursts publish at most one scale render per frame", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+  const before = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 24; index += 1) {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -2,
+        }),
+      );
+    }
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.250",
+  );
+  await page.waitForTimeout(50);
+  const afterIn = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterIn - before).toBeLessThanOrEqual(2);
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 24; index += 1) {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: 2,
+        }),
+      );
+    }
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await page.waitForTimeout(50);
+  const afterOut = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterOut - afterIn).toBeLessThanOrEqual(2);
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("apparent target radius grows monotonically during System approach", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.250",
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-projected-radius")),
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  const firstRadius = Number(
+    await html.getAttribute("data-universe-projected-radius"),
+  );
+  const firstDistance = Number(
+    await html.getAttribute("data-universe-camera-distance"),
+  );
+
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.500",
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-projected-radius")),
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(firstRadius);
+  const secondDistance = Number(
+    await html.getAttribute("data-universe-camera-distance"),
+  );
+  expect(secondDistance).toBeLessThan(firstDistance);
 
   await runtime.assertClean(testInfo);
 });
