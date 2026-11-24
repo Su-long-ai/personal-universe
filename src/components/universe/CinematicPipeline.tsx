@@ -47,6 +47,7 @@ export function CinematicPipeline({
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
+  const highQuality = quality === "high";
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const useLiveWorld = liveWorld && !fallbackReason;
@@ -98,7 +99,7 @@ export function CinematicPipeline({
         // Use one stable live-renderer budget for the lifetime of this WebGL
         // host. HIGH keeps its detailed GPU profile; software HIGH retains the
         // conservative hosted-runner impostor threshold.
-        impostorPixels: softwareRenderer ? 180 : high ? 90 : 120,
+        impostorPixels: softwareRenderer ? 180 : highQuality ? 90 : 120,
       });
       composer.composer.insertPass(nextPass, 1);
       planetPassRef.current = nextPass;
@@ -118,7 +119,7 @@ export function CinematicPipeline({
     camera,
     composer,
     fallbackReason,
-    high,
+    highQuality,
     scene,
     softwareRenderer,
     useLiveWorld,
@@ -207,7 +208,7 @@ export function CinematicPipeline({
   }, [composer]);
 
   useFrame((_, delta) => {
-    const desiredImpostorPixels = softwareRenderer ? 180 : high ? 90 : 120;
+    const desiredImpostorPixels = softwareRenderer ? 180 : highQuality ? 90 : 120;
     const rendererBeforeDraw = planetPass?.planetRenderer;
     if (
       rendererBeforeDraw &&
