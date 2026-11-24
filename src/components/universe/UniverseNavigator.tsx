@@ -569,6 +569,9 @@ export function UniverseNavigator({
                     }
                     data-destination-id={result.id}
                     data-destination-origin={result.origin ?? "catalog"}
+                    data-destination-system={
+                      universeDestinationSystemId(result) ?? undefined
+                    }
                     data-destination-featured={
                       result.featured ? "true" : undefined
                     }
