@@ -818,6 +818,11 @@ export function PlanetScene({
       livePlanet.rotation.y += delta * 0.014;
     }
 
+    // Retained worlds stay mounted through System/Galaxy so their resources
+    // survive reversal, but a parked renderer has no paint authority. Avoid
+    // polling pipeline/profile DOM state on every hidden frame.
+    if (!worldPresentationActive) return;
+
     const expectedLiveProfile = softwareRenderer
       ? "software-high"
       : quality === "high"
