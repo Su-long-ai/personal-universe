@@ -231,6 +231,32 @@ async function expectReadableNarrowSurfaceLayout(
       "data-surface-priority",
       /primary|secondary|ambient/,
     );
+
+    const focusAction = cards.first().locator(".world-content-focus-action");
+    await expect(focusAction).toBeVisible();
+    const focusBox = await focusAction.boundingBox();
+    expect(
+      focusBox,
+      "Surface focus control should have a measurable layout box",
+    ).not.toBeNull();
+    expect(focusBox!.x).toBeGreaterThanOrEqual(stackBox!.x - 1);
+    expect(focusBox!.x + focusBox!.width).toBeLessThanOrEqual(
+      stackBox!.x + stackBox!.width + 1,
+    );
+  }
+
+  const clusterChips = surfaceCopy.locator(".surface-cluster-chip");
+  if ((await clusterChips.count()) > 0) {
+    await expect(clusterChips.first()).toBeVisible();
+    const clusterBox = await clusterChips.first().boundingBox();
+    expect(
+      clusterBox,
+      "Surface cluster control should have a measurable layout box",
+    ).not.toBeNull();
+    expect(clusterBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+    expect(clusterBox!.x + clusterBox!.width).toBeLessThanOrEqual(
+      surfaceBox!.x + surfaceBox!.width + 1,
+    );
   }
 
   if (viewport.width <= 800) {
