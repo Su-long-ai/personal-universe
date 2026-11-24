@@ -345,6 +345,7 @@ export function YeisSystemScene({
       delete document.documentElement.dataset.universeSystemReady;
       delete document.documentElement.dataset.universeSystemFocus;
       delete document.documentElement.dataset.universeSystemTargetSuppressed;
+      delete document.documentElement.dataset.universeSystemTargetSpriteSuppressed;
       focusedIdRef.current = null;
       focusedNativeIdRef.current = null;
       focusFillRef.current.clear();
@@ -475,11 +476,26 @@ export function YeisSystemScene({
     }
 
     resources.points.setPixelRatio(gl.getPixelRatio());
+    const handoffApparentRadiusPx = handoffView?.apparentRadiusPx ?? null;
+    if (handoffView) {
+      // BodyPoints fades each sprite from BodyView.apparentRadiusPx. Present
+      // only the handoff target as fully resolved for this points update so its
+      // independent sprite is zeroed, then restore the real radius before
+      // orbit/focus consumers read it.
+      handoffView.apparentRadiusPx = Number.POSITIVE_INFINITY;
+    }
     resources.points.update(
       star.position,
       camera.position,
       resources.luminosity,
     );
+    if (handoffView && handoffApparentRadiusPx !== null) {
+      handoffView.apparentRadiusPx = handoffApparentRadiusPx;
+      document.documentElement.dataset.universeSystemTargetSpriteSuppressed =
+        handoffTargetPlanetId ?? handoffNativeId ?? "";
+    } else {
+      delete document.documentElement.dataset.universeSystemTargetSpriteSuppressed;
+    }
     resources.orbits.update(
       camera.position,
       true,
@@ -516,7 +532,7 @@ export function YeisSystemScene({
       <Stars
         radius={90}
         depth={45}
-        count={quality === "low" ? 900 : 1800}
+        count={1800}
         factor={1.7}
         saturation={0.22}
         fade
