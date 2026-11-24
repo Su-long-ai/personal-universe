@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-SOFTWARE-VISUAL-PROFILE-001",
+  "approved_at": "2026-11-24T09:16:17.355Z",
+  "baseline_commit": "22bd0d4a333b86f4b197694912d0ff98c34758f9",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-SOFTWARE-VISUAL-PROFILE-001.json",
+  "record_sha256": "c0002f7c7d048ed24f48a8ba54ccb2ff6b7c1e6719efb5714f8a462bf8ae5da3",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Improve the AUTO/software Surface fallback's visible relief, tonal separation and distance depth using only the installed ProceduralTerrains terrain configuration and existing hosted visual acceptance, without adding clouds, water, a second renderer, extra scene passes or another camera authority"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "procedural-terrains-software-visual-profile",
+    "existing-narrow-surface-playwright-acceptance"
+  ],
+  "candidate_scores": {
+    "procedural-terrains-software-visual-profile": 54,
+    "existing-narrow-surface-playwright-acceptance": 56.5,
+    "procedural-terrains-water-cloud-stack": 38,
+    "host-scene-fog-light-overlay": null
+  }
+}
