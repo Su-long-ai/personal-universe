@@ -3192,11 +3192,14 @@ test("Earth body navigation preserves async search and shareable return flow", a
   await search.fill("Earth");
 
   // Query edits synchronously invalidate the prior Places rows instead of
-  // leaving them clickable during the async search debounce window.
+  // leaving them clickable during the async search debounce window. Do not
+  // require the transient aria-busy=true frame: a fast hosted run can finish
+  // the 90 ms debounce + async lookup before Playwright samples that state.
   expect(await featuredRows.count()).toBe(0);
-  expect(
-    await dialog.locator(".navigator-results").getAttribute("aria-busy"),
-  ).toBe("true");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-navigator-mode",
+    "search",
+  );
 
   const earth = page
     .locator(".navigator-result-row")
@@ -3204,6 +3207,10 @@ test("Earth body navigation preserves async search and shareable return flow", a
     .filter({ hasText: "Earth" })
     .first();
   await expect(earth).toBeVisible();
+  await expect(dialog.locator(".navigator-results")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
   await expect(dialog).not.toContainText("Dünya");
   await earth.locator(".navigator-result-open").click();
   await expect(dialog).toBeHidden();
