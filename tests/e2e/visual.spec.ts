@@ -102,6 +102,15 @@ async function expectReadableWorldFrame(page: Page, label: string) {
   ).toBeGreaterThan(8);
 }
 
+async function expectCompactNarrowHud(page: Page) {
+  const box = await page.locator(".universe-hud").boundingBox();
+  expect(box, "narrow-screen HUD should have a measurable layout box").not.toBeNull();
+  expect(
+    box!.height,
+    "narrow-screen HUD should stay compact enough to avoid covering the world",
+  ).toBeLessThan(310);
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -392,6 +401,7 @@ for (const viewport of [TABLET, MOBILE]) {
           await expect(page.getByText(/ORBIT \/\//)).toBeVisible();
           await waitForCameraSettled(page, "orbit");
           await expect(page.locator(".world-content-card")).toBeVisible();
+          await expectCompactNarrowHud(page);
         },
       );
     },
