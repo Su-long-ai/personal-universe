@@ -1,5 +1,6 @@
 export {
   buildSurfaceWorldProfile,
+  nextSurfaceClusterEntryId,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
   rankSurfaceWorldLandmarks,
