@@ -466,7 +466,15 @@ mode hides and parks that same live Planet instead of disposing it, so returning
 to a live capability reuses the warmed world immediately. AUTO keeps its cheaper
 initial structure unless the visitor has explicitly requested HIGH. LOW/AUTO-
 software retain the same Surface terrain instance, with cancellable Atmosphere-
-time preparation before the final boundary.
+time preparation before the final boundary. Once a destination has actually
+entered System/close-world ownership, UniverseCanvas also keeps that
+PlanetScene mounted and parked through the reverse Galaxy endpoint while the
+same Galaxy destination remains captured. The target's destination id is the
+retention key: changing/clearing the Galaxy target unmounts the old world and
+releases its GPU resources, so this is one bounded retained world rather than a
+growing cache. Software WebGL never begins construction of a missing live
+Planet while that retained scene is hidden; it only reuses an already-warmed
+instance there.
 
 Runtime evidence:
 
@@ -479,7 +487,11 @@ Runtime evidence:
   `Planet.set()` profile applications;
 - `data-universe-world-live-structure` reports the retained structural tier;
 - `data-universe-world-structural-promotions` counts one-way AUTO -> HIGH LOD
-  promotions.
+  promotions;
+- `data-universe-world-impostor-pixels` reports the retained PlanetRenderer's
+  active impostor threshold. PlanetRenderer is lazy inside PlanetPass, so the
+  pipeline applies the current threshold as soon as the renderer appears and
+  does not credit that creation frame as first-paint evidence.
 
 Live first-paint authority is also renderer-derived rather than a component-age
 heuristic. The retained PlanetPass increments
@@ -490,9 +502,11 @@ consecutive new successful draw stamps before publishing
 `data-universe-world-paint-ready="true"`. System therefore cannot disappear
 just because the Planet object or pass exists; the matched world must have
 actually drawn. UniverseCanvas also keys the consumed first-paint state by
-`planet id + quality` rather than storing an unqualified boolean. A late
-callback from a previous planet/capability may update its own stale token, but
-cannot authorize the newly selected world's System handoff.
+`planet id + quality` rather than storing an unqualified boolean. The current
+identity is mirrored in a ref, so a callback whose captured identity is already
+stale is discarded before it can mutate parent readiness at all. Old cleanup
+work therefore cannot either authorize a new world or revoke a new world's
+already-earned authority.
 
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
