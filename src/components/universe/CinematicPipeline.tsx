@@ -184,10 +184,19 @@ export function CinematicPipeline({
     const retainedPass = planetPassRef.current;
     if (retainedPass) retainedPass.enabled = useLiveWorld;
     if (composer.bloomPass) {
-      composer.bloomPass.strength = high ? 0.48 : 0.28;
-      composer.bloomPass.radius = high ? 0.48 : 0.36;
+      // LOW is explicitly the bounded/readable mode. Disable the expensive
+      // bloom pass instead of rendering it at a weaker strength; AUTO/HIGH on
+      // real GPUs reuse the same pass object and simply re-enable it.
+      composer.bloomPass.enabled = high;
+      composer.bloomPass.strength = 0.48;
+      composer.bloomPass.radius = 0.48;
       composer.bloomPass.threshold = 1.08;
     }
+    publishDatasetMetric(
+      document.documentElement,
+      "universeWorldBloom",
+      composer.bloomPass?.enabled ? "on" : "off",
+    );
     document.documentElement.dataset.universeWorldPipelineLifecycle =
       useLiveWorld ? "active" : "parked";
   }, [
@@ -301,6 +310,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWebglPixelRatio;
       delete document.documentElement.dataset.universeWorldRenderPath;
       delete document.documentElement.dataset.universeWorldComposerTargets;
+      delete document.documentElement.dataset.universeWorldBloom;
       appliedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
