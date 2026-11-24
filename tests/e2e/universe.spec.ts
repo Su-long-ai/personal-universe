@@ -459,6 +459,18 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
     { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-software",
+    /true|false/,
+    { timeout: 15_000 },
+  );
+  const softwareRenderer =
+    (await html.getAttribute("data-universe-webgl-software")) === "true";
+  await expect(html).toHaveAttribute(
     "data-universe-world-live-draw-frame",
     /\d+/,
   );
@@ -475,11 +487,11 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-impostor-pixels",
-    "180",
+    softwareRenderer ? "180" : "90",
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-live-structure",
-    "software",
+    softwareRenderer ? "software" : "high",
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-planet-allocations",
@@ -499,7 +511,7 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
   expect(planetPassAllocations).toBeGreaterThan(0);
   await expect(html).toHaveAttribute(
     "data-universe-world-live-profile",
-    "software-high",
+    softwareRenderer ? "software-high" : "gpu-high",
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-live-profile-updates",
@@ -509,6 +521,18 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
     await html.getAttribute("data-universe-world-live-profile-updates"),
   );
   expect(liveProfileUpdates).toBeGreaterThan(0);
+  const structuralPromotions = Number(
+    (await html.getAttribute("data-universe-world-structural-promotions")) ??
+      "0",
+  );
+  // This case selects HIGH before the live world is provisioned, so it should
+  // build the final structure directly rather than AUTO then rebuild.
+  expect(structuralPromotions).toBe(0);
+  const fallbackTextureAllocations = Number(
+    (await html.getAttribute(
+      "data-universe-world-fallback-texture-allocations",
+    )) ?? "0",
+  );
   const firstHighPaintGeneration = Number(
     await html.getAttribute("data-universe-world-paint-generation"),
   );
@@ -588,8 +612,17 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
     { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-world-live-profile",
-    "software-high",
+    softwareRenderer ? "software-high" : "gpu-high",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    softwareRenderer ? "180" : "90",
   );
   expect(
     Number(await html.getAttribute("data-universe-world-live-profile-updates")),
@@ -605,6 +638,21 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
       await html.getAttribute("data-universe-world-planet-pass-allocations"),
     ),
   ).toBe(planetPassAllocations);
+  expect(
+    Number(
+      (await html.getAttribute("data-universe-world-structural-promotions")) ??
+        "0",
+    ),
+  ).toBe(structuralPromotions);
+  if (fallbackTextureAllocations > 0) {
+    expect(
+      Number(
+        await html.getAttribute(
+          "data-universe-world-fallback-texture-allocations",
+        ),
+      ),
+    ).toBe(fallbackTextureAllocations);
+  }
 
   await runtime.assertClean(testInfo);
 });
