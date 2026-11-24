@@ -303,6 +303,10 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
     "data-universe-webgl-lifecycle",
     "active",
   );
+  await expect(firstHtml).toHaveAttribute(
+    "data-universe-webgl-context-generation",
+    "0",
+  );
   const firstMetrics = await readWebglMetrics(firstPage);
   await attachMetrics(testInfo, "webgl-first-context.json", firstMetrics);
 
@@ -363,9 +367,14 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
   const secondPage = await second.newPage();
   await secondPage.goto("/?freeze=1");
   await waitForYeis(secondPage);
-  await expect(secondPage.locator("html")).toHaveAttribute(
+  const secondHtml = secondPage.locator("html");
+  await expect(secondHtml).toHaveAttribute(
     "data-universe-webgl-lifecycle",
     "active",
+  );
+  await expect(secondHtml).toHaveAttribute(
+    "data-universe-webgl-context-generation",
+    "0",
   );
   const secondMetrics = await readWebglMetrics(secondPage);
   await attachMetrics(testInfo, "webgl-fresh-context.json", secondMetrics);
