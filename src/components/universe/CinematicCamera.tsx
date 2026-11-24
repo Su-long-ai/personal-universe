@@ -797,7 +797,7 @@ export function CinematicCamera({
       document.documentElement.dataset.universeScaleSegment =
         lowerPhase + ":" + upperPhase;
       publishScaleFrameDiagnostics(
-        new Vector3(...WORLD),
+        scratchFrameCenter.current.set(...WORLD),
         PLANET_RENDER_RADIUS,
       );
 
@@ -889,7 +889,7 @@ export function CinematicCamera({
       controls.update(0);
       if (matchedSystemApproachHandoff) {
         publishScaleFrameDiagnostics(
-          new Vector3(...WORLD),
+          scratchFrameCenter.current.set(...WORLD),
           PLANET_RENDER_RADIUS,
         );
         const html = document.documentElement;
