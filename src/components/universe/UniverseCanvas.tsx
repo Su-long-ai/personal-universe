@@ -332,7 +332,7 @@ export function UniverseCanvas({
             phase={phase}
             phaseRef={phaseRef}
             quality={quality}
-            hasPlanet={Boolean(selectedPlanet)}
+            planet={selectedPlanet}
           />
         </Suspense>
       ) : null}
