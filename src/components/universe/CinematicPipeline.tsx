@@ -48,9 +48,7 @@ export function CinematicPipeline({
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
   const softwareRenderer = isSoftwareRenderer(gl);
-  const fallbackReason = liveWorld
-    ? liveWorldFallbackReason(gl, quality)
-    : null;
+  const fallbackReason = liveWorldFallbackReason(gl, quality);
   const useLiveWorld = liveWorld && !fallbackReason;
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
@@ -63,7 +61,7 @@ export function CinematicPipeline({
 
     const next = new EffectComposer(gl);
     next.addPass(new RenderPass(scene, camera));
-    const planetPass = useLiveWorld
+    const planetPass = !fallbackReason
       ? new PlanetPass(scene, camera, {
           background: "transparent",
           output: "linear",
@@ -92,8 +90,18 @@ export function CinematicPipeline({
       );
     }
     next.addPass(new OutputPass());
-    return { composer: next, planetPass };
-  }, [camera, gl, high, quality, scene, softwareRenderer, useLiveWorld]);
+    const html = document.documentElement;
+    const allocations =
+      Number(html.dataset.universeWorldPipelineAllocations ?? 0) + 1;
+    html.dataset.universeWorldPipelineAllocations = String(allocations);
+    return { composer: next, planetPass, allocation: allocations };
+  }, [camera, fallbackReason, gl, high, quality, scene, softwareRenderer]);
+
+  useEffect(() => {
+    if (composer.planetPass) composer.planetPass.enabled = useLiveWorld;
+    document.documentElement.dataset.universeWorldPipelineLifecycle =
+      useLiveWorld ? "active" : "parked";
+  }, [composer, useLiveWorld]);
 
   useEffect(() => {
     if (!liveWorld) {
@@ -134,7 +142,7 @@ export function CinematicPipeline({
       }
       delete document.documentElement.dataset.universeWorldReady;
     };
-  }, [composer, fallbackReason, liveWorld]);
+  }, [composer.planetPass, fallbackReason, liveWorld]);
 
   useEffect(() => {
     // R3F owns the renderer DPR. On software WebGL, cap the actual canvas
@@ -162,6 +170,7 @@ export function CinematicPipeline({
       stableFrames.current = 0;
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
+      delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       composer.planetPass?.dispose();
       composer.composer.dispose();
     };
