@@ -1,0 +1,166 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-INPUT-PRODUCT-FEEL-V3-001",
+  "title": "Continuous scale input response mapping and product feel",
+  "scope": {
+    "level": "implementation",
+    "subject": "Tune the existing Galaxy=0 to Surface=5 continuous coordinate with a stateless reversible response map, cross-segment device feel diagnostics, immediate reversal, and global forward/reverse acceptance without adding inertia, queues, or a second wheel authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The product already owns wheel input in UniverseApp, normalizes WheelEvent units, disables camera-controls wheel ownership, and exposes one real-valued 0..5 scale coordinate. The remaining product-feel gap is response mapping: Galaxy currently requires 384 normalized pixels per scale unit while System/world use 192, creating a large gain discontinuity at the native renderer boundary. Reuse the existing coordinator and pure continuousScale helpers. Express the wheel response as a monotonic stateless mapping over the same coordinate so per-segment gain can be tuned without hidden momentum, phase thresholds, post-tail motion, or reverse asymmetry.",
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://www.w3.org/TR/uievents/#events-wheelevents",
+      "finding": "WheelEvent reports delivered signed deltas and deltaMode but does not define product zoom physics; the existing coordinator should remain the sole semantic scale authority."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/WheelEvent",
+      "finding": "Wheel samples may vary by device and browser, so perceived response should be mapped after unit normalization rather than by assuming raw notch magnitude."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "camera-controls remains the camera executor with wheel actions disabled while Personal Universe owns semantic scale input; reuse its immediate programmatic camera updates rather than adding project inertia."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the Galaxy/native scale renderer and bridge authority; product input mapping must feed the existing native progress instead of creating a parallel camera controller."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Retain the current YEIS-backed Personal Universe scale product and tune its existing coordinator."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Retain the existing R3F scene boundary and React input owner; no new animation loop is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        3
+      ],
+      "conclusion": "Reuse the existing normalized wheel sample and one 0..5 coordinate; add only a pure response transform and diagnostics."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep camera-controls as the camera executor with wheel disabled; do not enable its independent wheel damping."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-continuous-coordinate-response-map",
+      "name": "Stateless monotonic response map on the existing continuous coordinate",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseApp and continuousScale module",
+      "license": "project orchestration over existing MIT stack",
+      "decision": "reuse",
+      "reason": "Removes cross-segment gain discontinuities while preserving immediate delivery, exact direction changes, one input authority, and no post-input motion.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "camera-controls-wheel-damping",
+      "name": "Re-enable camera-controls wheel dolly/damping",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Installed dependency",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Creates a second wheel authority and post-delivery motion that cannot preserve semantic renderer handoffs."
+    },
+    {
+      "id": "phase-threshold-or-inertia-queue",
+      "name": "Threshold phase stepping or project-owned inertia queue",
+      "level": "component_asset",
+      "source": "Legacy interaction pattern",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Reintroduces staged motion, stale reversal work, and hidden state explicitly forbidden by the product contract."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Galaxy through System/Approach has no abrupt response gain jump",
+      "importance": "high",
+      "coverage": {
+        "existing-continuous-coordinate-response-map": "full",
+        "camera-controls-wheel-damping": "partial",
+        "phase-threshold-or-inertia-queue": "none"
+      },
+      "decision": "Use one monotonic response-distance coordinate with explicit per-segment pixel budgets and invert it back to the existing 0..5 coordinate."
+    },
+    {
+      "capability": "Forward and reverse samples are symmetric and immediate",
+      "importance": "high",
+      "coverage": {
+        "existing-continuous-coordinate-response-map": "full",
+        "camera-controls-wheel-damping": "none",
+        "phase-threshold-or-inertia-queue": "none"
+      },
+      "decision": "Make the response transform stateless and invertible; sign changes apply to the very next delivered sample."
+    },
+    {
+      "capability": "Approach/Orbit/Atmosphere/Surface tune perceived speed without overshoot or post-tail motion",
+      "importance": "high",
+      "coverage": {
+        "existing-continuous-coordinate-response-map": "full",
+        "camera-controls-wheel-damping": "partial",
+        "phase-threshold-or-inertia-queue": "none"
+      },
+      "decision": "Tune segment budgets in the pure response map, keep sample caps and existing camera executor, and expose response diagnostics for hosted acceptance."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-continuous-coordinate-response-map"
+    ],
+    "rationale": "Extend the existing pure scale helpers and UniverseApp diagnostics only. The response map changes how much of the same 0..5 coordinate a delivered normalized sample consumes; it owns no time, queue, animation, or camera state.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If hosted evidence shows a local segment still feels too fast or slow, tune only the explicit segment pixel budgets and rerun full forward/reverse acceptance; do not add inertia, thresholds, hidden accumulation, or a second input authority."
+  }
+}
