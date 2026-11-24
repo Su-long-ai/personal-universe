@@ -1,0 +1,38 @@
+{
+  "schema": 3,
+  "task_id": "PERSONAL-CONTENT-AUTHORING-PIPELINE-V1-001",
+  "approved_at": "2026-11-24T18:30:00.000Z",
+  "baseline_commit": "34ddd42275350685c89f4dd8fd7e8a1027bf2204",
+  "record_path": "docs/reuse-gate/tasks/PERSONAL-CONTENT-AUTHORING-PIPELINE-V1-001.json",
+  "record_sha256": "3adf6012303f20f68e9edb36e37df433dfce98c586e98f03c76659610d5042dd",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d",
+    "keystatic": "4c36359f8117f0de64e6f5cbb2b213f0253afbc07733a8f154f246b28dab9e2c"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Astro Content Collections authoring pipeline for stable personal content identity, localization, mapping metadata, migration, validation, and deterministic import"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "package.json",
+    "src/content.config.ts",
+    "src/content/portfolio/personal-universe.md",
+    "src/content/portfolio/personal-universe.json",
+    "src/lib/universe/content/types.ts",
+    "src/lib/universe/content/authoring.ts",
+    "src/lib/universe/content/index.ts",
+    "src/pages/index.astro",
+    "scripts/content-author.mjs",
+    "tests/content-authoring.test.ts",
+    "docs/architecture/content-layer.md"
+  ],
+  "selected_ids": [
+    "astro-content-collections-authoring"
+  ],
+  "candidate_scores": {
+    "astro-content-collections-authoring": 56,
+    "keystatic-editor-now": 46.5
+  }
+}
