@@ -317,14 +317,20 @@ function allValidationFailures() {
 
   failures.push(...mediaFailures(entries, sources));
 
-  const nonJson = files.filter((path) =>
-    [".md", ".mdx"].includes(extname(path).toLowerCase()),
+  const unsupportedSources = files.filter(
+    (path) => extname(path).toLowerCase() !== ".json",
   );
+  for (const path of unsupportedSources) {
+    failures.push(
+      path +
+        ": canonical portfolio records must be JSON; import or migrate this source into one deterministic JSON record.",
+    );
+  }
+
   return {
     entries,
     failures,
     warnings: mediaWarnings(entries),
-    nonJson,
   };
 }
 
@@ -477,7 +483,7 @@ function commandMigrate(args) {
 }
 
 function commandValidate() {
-  const { entries, failures, warnings, nonJson } = allValidationFailures();
+  const { entries, failures, warnings } = allValidationFailures();
   if (failures.length > 0) {
     fail(
       "Personal content validation failed:\n" +
@@ -488,15 +494,7 @@ function commandValidate() {
     process.stderr.write("[CONTENT] warning: " + warning + "\n");
   }
   process.stdout.write(
-    "[CONTENT] valid " +
-      entries.length +
-      " JSON item(s)" +
-      (nonJson.length
-        ? "; " +
-          nonJson.length +
-          " Markdown/MDX item(s) remain covered by Astro collection/build validation"
-        : "") +
-      ".\n",
+    "[CONTENT] valid " + entries.length + " canonical JSON item(s).\n",
   );
 }
 

@@ -187,10 +187,12 @@ Personal content now has an explicit canonical identity and a small repository
 workflow instead of relying on Astro's source filename as product identity.
 
 The canonical source is still the existing Astro `portfolio` Content
-Collection. The normal source format is JSON because it is easy for the
-deterministic CLI to scaffold, batch-normalize, migrate, and lint while Astro
-continues to load and validate the same collection. Markdown/MDX remain valid
-collection inputs for long-form cases; they are not a second content store.
+Collection. Canonical records are JSON. Raw Markdown/MDX, YAML, CSV, exports,
+or manually curated batches may be future/import inputs, but the durable
+collection output is one deterministic JSON record per content identity. This
+keeps Astro schema validation and the authoring CLI looking at the exact same
+record set, so no source format can bypass cross-record ID, relation, media,
+destination, migration, or alias integrity checks.
 
 ### Stable identity and compatibility
 
@@ -284,8 +286,9 @@ bad authored content before production while keeping the mandatory checks
 local, deterministic, and fast. The 5,000-item validation fixture guards
 against accidental quadratic catalog checks as authored content grows.
 
-The original `personal-universe` source was mechanically moved from Markdown
-frontmatter to JSON while retaining canonical ID `personal-universe`,
+The original `personal-universe` source was mechanically normalized from
+Markdown frontmatter into the canonical JSON format while retaining canonical
+ID `personal-universe`,
 placement key `personal-universe`, and native YEIS star `c59669`. Its
 Chinese metadata and semantic Surface hints now exercise the richer contract
 without changing the established product destination.

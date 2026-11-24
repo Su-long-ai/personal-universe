@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   rmSync,
+  readFileSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -430,6 +431,13 @@ test("normalized records become runtime entries with stable ids", () => {
   assert.equal(runtime.id, "runtime-entry");
   assert.equal(runtime.provenance?.kind, "authored");
   assert.equal(runtime.signalVisible, true);
+});
+
+test("canonical portfolio source is JSON-only so CLI and Astro validate the same records", () => {
+  const configPath = resolve(REPO_ROOT, "src/content.config.ts");
+  const config = readFileSync(configPath, "utf8");
+  assert.match(config, /pattern: "\*\*\/\*\.json"/);
+  assert.doesNotMatch(config, /mdx?/);
 });
 
 test("authoring CLI dry-run, migrate, preview, and index workflows execute", () => {
