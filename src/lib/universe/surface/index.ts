@@ -3,6 +3,7 @@ export {
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
   rankSurfaceWorldLandmarks,
+  rankSurfaceWorldPaths,
   rankSurfaceWorldRegions,
   surfaceModeForArchetype,
   supportsSurfaceArchetype,
