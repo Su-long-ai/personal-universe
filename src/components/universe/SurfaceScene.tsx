@@ -1,4 +1,11 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { QualityMode, UniversePhase } from "../../lib/universe/types";
@@ -80,11 +87,13 @@ function DistantMoon() {
 export function SurfaceScene({
   anchored = false,
   phase,
+  phaseRef,
   quality,
   hasPlanet,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
+  phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
   hasPlanet: boolean;
 }) {
@@ -160,6 +169,7 @@ export function SurfaceScene({
         {terrainEnabled ? (
           <SurfaceTerrain
             active={active}
+            phaseRef={phaseRef}
             onAnchorHeight={handleAnchorHeight}
           />
         ) : null}
