@@ -17,6 +17,7 @@ import {
   loadUniverseNavigation,
   loadUniversePlaces,
   navigationSectionsForResults,
+  universeDestinationSystemId,
   type UniverseNavigationDestination,
   type UniverseNavigationSection,
 } from "../../lib/universe/yeis/navigation";
@@ -27,6 +28,7 @@ export function UniverseNavigator({
   placements,
   currentSystem,
   activeDestinationId,
+  recentDestinationIds = [],
   pendingDestinationId,
   pendingDestinationMode,
   onClose,
@@ -40,6 +42,7 @@ export function UniverseNavigator({
   placements: UniverseContentPlacement[];
   currentSystem?: SystemDefinition | null;
   activeDestinationId?: string | null;
+  recentDestinationIds?: string[];
   pendingDestinationId?: string | null;
   pendingDestinationMode?: "locating" | "traveling" | null;
   onClose: () => void;
@@ -60,6 +63,9 @@ export function UniverseNavigator({
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [placesFilter, setPlacesFilter] = useState<
+    "all" | "personal" | "important" | "nearby" | "recent"
+  >("all");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [pendingAction, setPendingAction] = useState<{
     destinationId: string;
@@ -67,17 +73,52 @@ export function UniverseNavigator({
   } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const recentDestinationSet = useMemo(
+    () => new Set(recentDestinationIds),
+    [recentDestinationIds],
+  );
+  const currentSystemId =
+    currentSystem?.id.startsWith("yeis-system:")
+      ? currentSystem.id.slice("yeis-system:".length)
+      : null;
+
   const displaySections = useMemo(() => {
     const seenDestinations = new Set<string>();
+    const searchMode = Boolean(query.trim());
+
     return sections.flatMap((section) => {
       const destinations = section.destinations.filter((destination) => {
+        if (!searchMode) {
+          const matchesFilter =
+            placesFilter === "all" ||
+            (placesFilter === "personal" &&
+              destination.origin === "personal") ||
+            (placesFilter === "important" &&
+              (destination.featured ||
+                (destination.importance ?? 0) >= 4 ||
+                destination.origin === "hero")) ||
+            (placesFilter === "nearby" &&
+              Boolean(currentSystemId) &&
+              universeDestinationSystemId(destination) === currentSystemId) ||
+            (placesFilter === "recent" &&
+              recentDestinationSet.has(destination.id));
+
+          if (!matchesFilter) return false;
+        }
+
         if (seenDestinations.has(destination.id)) return false;
         seenDestinations.add(destination.id);
         return true;
       });
       return destinations.length ? [{ ...section, destinations }] : [];
     });
-  }, [sections]);
+  }, [
+    currentSystemId,
+    placesFilter,
+    query,
+    recentDestinationSet,
+    sections,
+  ]);
 
   const results = useMemo(
     () => displaySections.flatMap((section) => section.destinations),
@@ -144,6 +185,7 @@ export function UniverseNavigator({
     }
 
     document.documentElement.dataset.universeNavigator = "open";
+    document.documentElement.dataset.universeNavigatorFilter = placesFilter;
     const debugQuery = new URLSearchParams(window.location.search).get("navq");
     if (debugQuery) {
       setQuery(debugQuery);
@@ -153,6 +195,7 @@ export function UniverseNavigator({
       delete document.documentElement.dataset.universeNavigator;
       delete document.documentElement.dataset.universeNavigatorResults;
       delete document.documentElement.dataset.universeNavigatorMode;
+      delete document.documentElement.dataset.universeNavigatorFilter;
     };
   }, [open]);
 
@@ -176,6 +219,7 @@ export function UniverseNavigator({
             placements,
             markers,
             currentSystem ?? null,
+            recentDestinationIds,
           ).then(navigationSectionsForResults)
         : loadUniversePlaces(
             placements,
@@ -215,7 +259,20 @@ export function UniverseNavigator({
       cancelled = true;
       if (debounceTimer) window.clearTimeout(debounceTimer);
     };
-  }, [currentSystem, markers, open, placements, query]);
+  }, [
+    currentSystem,
+    markers,
+    open,
+    placements,
+    query,
+    recentDestinationIds,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
+    document.documentElement.dataset.universeNavigatorFilter = placesFilter;
+    setActiveIndex(0);
+  }, [open, placesFilter]);
 
   useEffect(() => {
     if (!results[activeIndex]) return;
@@ -368,6 +425,38 @@ export function UniverseNavigator({
           </small>
         </div>
 
+        {!query.trim() && (
+          <div
+            className="navigator-filters"
+            aria-label={text(locale, "discoveryFilters")}
+          >
+            {(
+              [
+                ["all", "filterAll"],
+                ["personal", "filterPersonal"],
+                ["important", "filterImportant"],
+                ["nearby", "filterNearby"],
+                ["recent", "filterRecent"],
+              ] as const
+            ).map(([id, label]) => {
+              const disabled =
+                (id === "nearby" && !currentSystemId) ||
+                (id === "recent" && recentDestinationIds.length === 0);
+              return (
+                <button
+                  type="button"
+                  key={id}
+                  aria-pressed={placesFilter === id}
+                  disabled={disabled}
+                  onClick={() => setPlacesFilter(id)}
+                >
+                  {text(locale, label)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {!query.trim() && onStartJourney && journeyOptions.length > 0 && (
           <div
             className="navigator-journeys"
@@ -424,7 +513,11 @@ export function UniverseNavigator({
             status !== "loading" &&
             results.length === 0 && (
               <div className="navigator-empty">
-                {text(locale, "noDestination")}
+                {!query.trim() && placesFilter === "recent"
+                  ? text(locale, "noRecentDestinations")
+                  : !query.trim() && placesFilter !== "all"
+                    ? text(locale, "noFilteredDestinations")
+                    : text(locale, "noDestination")}
               </div>
             )}
 
