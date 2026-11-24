@@ -64,11 +64,38 @@ async function wheelScale(
       );
       if (!Number.isFinite(position)) break;
 
-      const atAnchor =
-        Math.abs(position - Math.round(position)) <= 0.01;
+      // Integer scale anchors are not all semantic boundaries in both
+      // directions. For example Atmosphere spans [4, 5), so outward 4.5 -> 4.0
+      // is still Atmosphere and needs another physical sample to reach Orbit.
+      // Stop only at true domain endpoints or at asynchronous renderer
+      // handoffs that need paint time rather than more input.
       if (
-        atAnchor &&
-        (startingPhase !== "galaxy" || direction === "out")
+        startingPhase === "galaxy" &&
+        direction === "out" &&
+        position <= 0.001
+      ) {
+        break;
+      }
+      if (
+        startingPhase === "galaxy" &&
+        direction === "in" &&
+        position >= 0.999
+      ) {
+        await page.waitForTimeout(160);
+        break;
+      }
+      if (
+        startingPhase === "system" &&
+        direction === "in" &&
+        position >= 1.999
+      ) {
+        await page.waitForTimeout(160);
+        break;
+      }
+      if (
+        startingPhase === "surface" &&
+        direction === "in" &&
+        position >= 4.999
       ) {
         break;
       }
