@@ -131,10 +131,14 @@ landing frame.
 The product reuses ProceduralPlanets inside that host:
 
 - a lightweight product sphere appears immediately;
-- live `Planet` construction is delayed until the initial navigation frame is
-  stable;
-- `PlanetPass` is inserted into the existing EffectComposer only for the live
-  path;
+- the selected close-world module and `Planet` begin warming while the System
+  renderer still owns presentation;
+- the System renderer remains mounted across the semantic boundary until the
+  close world has participated in two real composer frames, so a lazy import or
+  shader warmup cannot expose an empty Canvas;
+- one `PlanetPass` is inserted when the stable EffectComposer is allocated and
+  is enabled or parked as presentation changes; phase changes do not dispose
+  and recreate the composer or pass;
 - LOW quality always uses the lightweight fallback;
 - AUTO quality falls back on software renderers such as SwiftShader/llvmpipe;
 - HIGH quality explicitly requests the live renderer and is used by the
@@ -146,6 +150,10 @@ Runtime evidence:
 - `data-universe-world-pipeline`
 - `data-universe-world-ready`
 - `data-universe-world-scene-ready`
+- `data-universe-world-scene-lifecycle="prewarming|active"`
+- `data-universe-world-paint-ready="true"`
+- `data-universe-world-pipeline-lifecycle="parked|active"`
+- `data-universe-world-pipeline-allocations`
 
 A live HIGH world is accepted only when the renderer reports
 `procedural-planets-live`, the pipeline reports
@@ -207,7 +215,10 @@ terrain subsystem, not a second terrain engine. The fallback publishes
 `"infinite-hardware"`.
 
 Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
-first fallback Surface visit creates one retained Infinite World instance;
+fallback begins preparing during the inward Atmosphere interval at an
+idle/stable boundary instead of waiting for the Surface boundary. If navigation
+reverses before construction begins, the scheduled prime is cancelled. Once
+created, one retained Infinite World instance is reused;
 leaving Surface hides the same scene and pauses its `terrain.update` call, but
 does not synchronously dispose streamed GPU/chunk resources on the wheel
 transition path. The retained instance is disposed only when its R3F Canvas host
@@ -219,6 +230,7 @@ Runtime evidence:
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
 - `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget.
+- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` exposes the cancellable prime lifecycle.
 
 Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
 fallback could gain useful visual depth from ProceduralTerrains' existing
@@ -303,6 +315,14 @@ Fallbacks are product behavior, not hidden test exceptions:
 5. No fallback may create a second navigation/destination authority.
 
 ## Lifecycle and loading
+
+Task `SCALE-RENDERER-CONTINUITY-001` moves the ownership boundary outward:
+the selected close-world module prewarms during late System, the System scene
+stays present until a close-world frame is actually painted, and the composer
+plus PlanetPass are parked rather than rebuilt when live-world presentation is
+inactive. The same Planet/material/LOD identity therefore survives forward and
+reverse travel. LOW/AUTO-software use the same rule for their retained terrain,
+with cancellable Atmosphere-time preparation before the final boundary.
 
 Large renderer paths are lazy-loaded. Native system resources are constructed
 only in the system phase and disposed on unmount. Live close-world

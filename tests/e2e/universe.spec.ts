@@ -328,6 +328,85 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await runtime.assertClean(testInfo);
 });
 
+test("HIGH close-world prewarms after focus lock and keeps one pipeline allocation", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("high");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-lifecycle",
+    "parked",
+  );
+  const allocations = Number(
+    await html.getAttribute("data-universe-world-pipeline-allocations"),
+  );
+  expect(allocations).toBeGreaterThan(0);
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  // System has no close-world identity before the visitor commits a scale
+  // target. The first partial delta locks the centred/preferred planet while
+  // staying inside System, giving the existing world renderer time to prewarm
+  // before the semantic handoff at coordinate 2.
+  await dispatchScaleWheel(page, -72);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.375",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-scene-lifecycle",
+    "prewarming",
+    { timeout: 15_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-lifecycle",
+    "active",
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(allocations);
+
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(allocations);
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel scale advances and reverses world layers without auto chaining", async ({
   page,
 }, testInfo) => {
@@ -492,6 +571,66 @@ test("low-quality Surface retains the existing terrain fallback", async ({
     { timeout: 15_000 },
   );
 
+  await runtime.assertClean(testInfo);
+});
+
+test("LOW fallback prewarm cancels on immediate reverse and resumes before Surface", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+
+  // Enter Atmosphere with two direct half-interval samples and reverse before
+  // the 320 ms idle prewarm delay can create terrain. This proves cancellation
+  // rather than accidentally observing a fallback that was already ready.
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-prewarm",
+    "scheduled",
+  );
+
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-prewarm",
+    "cancelled",
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-surface-prewarm"),
+      { timeout: 15_000 },
+    )
+    .toMatch(/preparing|ready/);
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "surface");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "parked",
+  );
   await runtime.assertClean(testInfo);
 });
 
