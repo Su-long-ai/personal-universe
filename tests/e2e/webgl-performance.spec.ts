@@ -34,6 +34,71 @@ async function dispatchScaleWheel(page: Page, deltaY: number) {
   }, deltaY);
 }
 
+async function forceWebglLossAndRestore(page: Page) {
+  return page.evaluate(async () => {
+    const canvas = document.querySelector("canvas");
+    if (!canvas) return { supported: false, lost: false, restored: false };
+    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    if (!gl) return { supported: false, lost: false, restored: false };
+    const extension = gl.getExtension("WEBGL_lose_context");
+    if (!extension) {
+      return { supported: false, lost: false, restored: false };
+    }
+
+    const html = document.documentElement;
+    const generationBefore = Number(
+      html.dataset.universeWebglContextGeneration ?? "0",
+    );
+    const waitFor = (name: "webglcontextlost" | "webglcontextrestored") =>
+      new Promise<boolean>((resolve) => {
+        const timer = window.setTimeout(() => resolve(false), 5_000);
+        canvas.addEventListener(
+          name,
+          (event) => {
+            if (name === "webglcontextlost") event.preventDefault();
+            window.clearTimeout(timer);
+            resolve(true);
+          },
+          { once: true },
+        );
+      });
+
+    canvas.addEventListener(
+      "webglcontextlost",
+      (event) => event.preventDefault(),
+      { once: true },
+    );
+    const lostPromise = waitFor("webglcontextlost");
+    extension.loseContext();
+    const lost = await lostPromise;
+    if (!lost) return { supported: true, lost: false, restored: false };
+
+    const duringLoss = {
+      lifecycle: html.dataset.universeWebglLifecycle ?? null,
+      recovery: html.dataset.universeWorldRecovery ?? null,
+      worldReady: html.dataset.universeWorldReady ?? null,
+      screenshotReady: html.dataset.universeWorldScreenshotReady ?? null,
+    };
+
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    const restoredPromise = waitFor("webglcontextrestored");
+    extension.restoreContext();
+    const restored = await restoredPromise;
+
+    return {
+      supported: true,
+      lost,
+      restored,
+      duringLoss,
+      lifecycleAfterRestore: html.dataset.universeWebglLifecycle ?? null,
+      generationBefore,
+      generationAfter: Number(
+        html.dataset.universeWebglContextGeneration ?? "0",
+      ),
+    };
+  });
+}
+
 async function driveGalaxySystemRoundTrip(page: Page) {
   const html = page.locator("html");
 
@@ -316,7 +381,7 @@ test("Galaxy System remounts retire WebGL geometry @webgl-heavy", async ({
   expect(second.programs).toBeLessThanOrEqual(first.programs + 1);
 });
 
-test("retained Surface fallback parks without resource growth @webgl-heavy", async ({
+test("retained Surface fallback recovers and parks without resource growth @webgl-heavy", async ({
   page,
 }, testInfo) => {
   await page.goto(
@@ -336,8 +401,34 @@ test("retained Surface fallback parks without resource growth @webgl-heavy", asy
     "active",
     { timeout: 60_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 15_000 },
+  );
   const initial = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-surface-initial.json", initial);
+
+  const recovery = await forceWebglLossAndRestore(page);
+  expect(recovery.supported).toBe(true);
+  expect(recovery.lost).toBe(true);
+  expect(recovery.restored).toBe(true);
+  expect(recovery.duringLoss?.lifecycle).toBe("lost");
+  expect(recovery.duringLoss?.recovery).toBe("lost");
+  expect(recovery.duringLoss?.worldReady).toBeNull();
+  expect(recovery.duringLoss?.screenshotReady).toBeNull();
+  expect(recovery.lifecycleAfterRestore).toBe("active");
+  expect(recovery.generationAfter).toBe(recovery.generationBefore + 1);
+  await expect(html).toHaveAttribute(
+    "data-universe-world-recovery",
+    "ready",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-ready",
+    "true",
+    { timeout: 15_000 },
+  );
 
   for (let cycle = 0; cycle < 3; cycle += 1) {
     await dispatchScaleWheel(page, 96);
