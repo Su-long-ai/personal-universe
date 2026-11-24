@@ -3271,12 +3271,26 @@ test("Recent destination survives reload and filters canonical Places", async ({
     )
     .toBe("body:c0/earth");
 
+  // Seed one valid long-tail catalogue destination to prove Recent is not
+  // limited to the curated Places inventory. Session history stores identity
+  // only; the existing canonical resolver reconstructs its display metadata.
+  await page.evaluate(() => {
+    window.sessionStorage.setItem(
+      "personal-universe.recent-destinations.v1",
+      JSON.stringify(["star:c50000", "body:c0/earth"]),
+    );
+  });
+
   const reloadUrl = page.url();
   await page.goto(reloadUrl);
   await waitForYeisEngine(page);
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
     "body:c0/earth",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-recent-destinations",
+    /(^|\|)star:c50000(\||$)/,
   );
   await expect(html).toHaveAttribute(
     "data-universe-recent-destinations",
@@ -3297,6 +3311,11 @@ test("Recent destination survives reload and filters canonical Places", async ({
   await expect(
     dialog.locator(
       '.navigator-result-row[data-destination-id="body:c0/earth"]',
+    ),
+  ).toBeVisible();
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="star:c50000"]',
     ),
   ).toBeVisible();
   expect(
