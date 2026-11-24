@@ -473,6 +473,7 @@ export function PlanetScene({
   worldScalePosition,
   presentationActive = true,
   surfaceFallbackReady = false,
+  onPaintStartedChange,
   onPaintReadyChange,
   onSurfaceCameraFrame,
 }: {
@@ -482,6 +483,7 @@ export function PlanetScene({
   worldScalePosition: number;
   presentationActive?: boolean;
   surfaceFallbackReady?: boolean;
+  onPaintStartedChange?: (started: boolean) => void;
   onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
@@ -523,6 +525,7 @@ export function PlanetScene({
   );
   const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
+  const paintStartedReported = useRef(false);
   const paintReported = useRef(false);
   const lastLiveDrawFrame = useRef(0);
   const appliedLiveProfile = useRef<{
@@ -533,8 +536,21 @@ export function PlanetScene({
     planet: Planet;
     tier: "auto" | "high" | "software";
   } | null>(null);
+  const onPaintStartedChangeRef = useRef(onPaintStartedChange);
+  onPaintStartedChangeRef.current = onPaintStartedChange;
   const onPaintReadyChangeRef = useRef(onPaintReadyChange);
   onPaintReadyChangeRef.current = onPaintReadyChange;
+
+  const publishPaintStarted = useCallback((started: boolean) => {
+    if (paintStartedReported.current === started) return;
+    paintStartedReported.current = started;
+    if (started) {
+      document.documentElement.dataset.universeWorldPaintStarted = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldPaintStarted;
+    }
+    onPaintStartedChangeRef.current?.(started);
+  }, []);
 
   const publishPaintReady = useCallback((ready: boolean) => {
     if (paintReported.current === ready) return;
@@ -718,12 +734,13 @@ export function PlanetScene({
           ? "prewarming"
           : "parked";
     return () => {
+      publishPaintStarted(false);
       publishPaintReady(false);
       delete document.documentElement.dataset.universeWorldSceneReady;
       delete document.documentElement.dataset.universeWorldSceneLifecycle;
       delete document.documentElement.dataset.universeWorldCapability;
     };
-  }, [publishPaintReady]);
+  }, [publishPaintReady, publishPaintStarted]);
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneLifecycle =
@@ -748,6 +765,7 @@ export function PlanetScene({
     lastLiveDrawFrame.current = Number(
       document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
     );
+    publishPaintStarted(false);
     publishPaintReady(false);
 
     return () => {
@@ -762,6 +780,7 @@ export function PlanetScene({
     liveKey,
     worldPresentationActive,
     publishPaintReady,
+    publishPaintStarted,
   ]);
 
   useEffect(() => {
@@ -839,6 +858,9 @@ export function PlanetScene({
         }
       }
 
+      if (paintedFrames.current >= 1) {
+        publishPaintStarted(true);
+      }
       if (paintedFrames.current >= 2) {
         publishPaintReady(true);
       }
