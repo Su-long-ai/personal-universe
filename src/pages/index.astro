@@ -1,23 +1,47 @@
 ---
 import { getCollection } from "astro:content";
 import UniverseApp from "../components/universe/UniverseApp";
-import type { UniverseContentEntry } from "../lib/universe/content";
+import {
+  assertUniverseContentCatalog,
+  type UniverseContentEntry,
+} from "../lib/universe/content";
+import { buildGalaxyIndex } from "../lib/universe/generation";
 
 const portfolio = await getCollection("portfolio", ({ data }) => !data.draft);
-const contentEntries: UniverseContentEntry[] = portfolio.map(({ id, data }) => ({
-  id,
+const contentEntries: UniverseContentEntry[] = portfolio.map(({ data }) => ({
+  id: data.contentId,
+  schemaVersion: data.schemaVersion,
   title: data.title,
   summary: data.summary,
+  ...(data.body ? { body: data.body } : {}),
+  i18n: data.i18n,
+  aliases: data.aliases,
   kind: data.kind,
   status: data.status,
+  ...(data.dateStart ? { dateStart: data.dateStart } : {}),
+  ...(data.dateEnd ? { dateEnd: data.dateEnd } : {}),
   importance: data.importance,
   tags: data.tags,
   featured: data.featured,
+  signalVisible: data.signalVisible,
   placement: data.placement,
   ...(data.placementKey ? { placementKey: data.placementKey } : {}),
   ...(data.starId ? { starId: data.starId } : {}),
   ...(data.href ? { href: data.href } : {}),
+  links: data.links,
+  media: data.media,
+  ...(data.surface ? { surface: data.surface } : {}),
+  provenance: data.provenance,
+  relations: data.relations,
+  journeys: data.journeys,
+  legacyIds: data.legacyIds,
 }));
+
+const canonicalGalaxy = buildGalaxyIndex("personal-universe-v2");
+assertUniverseContentCatalog(contentEntries, canonicalGalaxy.markers);
+const visibleContentEntries = contentEntries.filter(
+  (entry) => entry.signalVisible !== false,
+);
 
 const pageTitle = "Personal Universe";
 const pageDescription =
@@ -63,6 +87,6 @@ const socialPreviewUrl = new URL(
     <title>{pageTitle}</title>
   </head>
   <body>
-    <UniverseApp client:load contentEntries={contentEntries} />
+    <UniverseApp client:load contentEntries={visibleContentEntries} />
   </body>
 </html>

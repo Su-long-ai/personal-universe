@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "contentId": "personal-universe",
+  "title": "Personal Universe",
+  "summary": "An explorable personal homepage that turns projects and experiences into sparse signals inside a reusable astronomical universe.",
+  "body": "The site itself is the first content signal used to prove the content-to-world pipeline.",
+  "i18n": {
+    "zh": {
+      "title": "个人宇宙",
+      "summary": "一个可探索的个人主页，把项目与经历映射为可复用天文宇宙中的稀疏信号。"
+    }
+  },
+  "aliases": {
+    "en": [
+      "Personal Universe"
+    ],
+    "zh": [
+      "个人宇宙"
+    ]
+  },
+  "kind": "project",
+  "status": "active",
+  "importance": 5,
+  "tags": [
+    "Astro",
+    "React",
+    "Three.js",
+    "procedural-universe"
+  ],
+  "featured": true,
+  "signalVisible": true,
+  "placement": "pinned",
+  "placementKey": "personal-universe",
+  "starId": "c59669",
+  "links": [],
+  "media": [],
+  "surface": {
+    "preferredRegion": "landing",
+    "anchorCategory": "project",
+    "cluster": "core",
+    "order": 0,
+    "featured": true
+  },
+  "provenance": {
+    "kind": "authored"
+  },
+  "relations": [],
+  "journeys": [
+    "featured",
+    "projects"
+  ],
+  "legacyIds": [],
+  "draft": false
+}
