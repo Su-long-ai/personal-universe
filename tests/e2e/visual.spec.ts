@@ -225,6 +225,15 @@ async function expectReadableNarrowSurfaceLayout(
   expect(stackBox!.y + stackBox!.height).toBeLessThanOrEqual(viewport.height + 1);
 
   const cards = stack.locator(".world-content-card");
+  const surfaceCardBudget = Number(
+    (await stack.getAttribute("data-surface-card-budget")) ?? "0",
+  );
+  if (surfaceCardBudget > 0) {
+    expect(
+      await cards.count(),
+      "Surface DOM card count should stay within the shared stable signal budget",
+    ).toBeLessThanOrEqual(surfaceCardBudget);
+  }
   if ((await cards.count()) > 0) {
     await expect(cards.first()).toBeVisible();
     await expect(cards.first()).toHaveAttribute(
