@@ -101,6 +101,7 @@ export type YeisGalaxyViewState = {
 };
 
 export type YeisGalaxyScaleBridgeState = {
+  pathId: string;
   targetId: string;
   starId: string;
   sourceFrameId: string;
@@ -280,7 +281,7 @@ export function YeisGalaxyScene({
   onScaleManualTakeover,
   quality,
   reducedMotion,
-  scalePosition,
+  scalePositionRef,
   scaleTarget,
   scaleBridgeRef,
   viewStateRef,
@@ -301,7 +302,7 @@ export function YeisGalaxyScene({
   onScaleManualTakeover?: () => void;
   quality: QualityMode;
   reducedMotion: boolean;
-  scalePosition: number;
+  scalePositionRef: MutableRefObject<number>;
   scaleTarget: UniverseNavigationDestination | null;
   scaleBridgeRef: MutableRefObject<YeisGalaxyScaleBridgeState | null>;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
@@ -337,11 +338,10 @@ export function YeisGalaxyScene({
   const scaleFocusIdRef = useRef<string | null>(null);
   const scaleFocusFrameRef = useRef(0);
   const scaleBridgeControllerKeyRef = useRef<string | null>(null);
-  const scalePositionRef = useRef(scalePosition);
+  const scaleBridgeAutopilotRevisionRef = useRef<number | null>(null);
   const scaleTargetRef =
     useRef<UniverseNavigationDestination | null>(scaleTarget);
 
-  scalePositionRef.current = scalePosition;
   scaleTargetRef.current = scaleTarget;
 
   useEffect(() => {
@@ -1038,7 +1038,8 @@ export function YeisGalaxyScene({
       // the time-driven YEIS autopilot finish one more frame. Freeze exactly
       // where the continuous coordinate left the camera before manual input is
       // applied, then let native free/orbit controls take over from there.
-      state.controller.autopilot = null;
+      state.controller.cancelAutopilot();
+      scaleBridgeAutopilotRevisionRef.current = null;
       state.controller.autoOrbit = 0;
       state.controller.velocity.set(0, 0, 0);
       if (!scaleManualTakeoverReportedRef.current) {
@@ -1053,7 +1054,11 @@ export function YeisGalaxyScene({
     );
     let scaleBridgeActive = false;
 
-    if (scaleDestination && !manualScaleTakeover) {
+    if (
+      scaleDestination &&
+      !manualScaleTakeover &&
+      !scaleManualTakeoverReportedRef.current
+    ) {
       const targetStarId = scaleTargetNativeStarId(
         scaleDestination,
         markersRef.current,
@@ -1079,6 +1084,13 @@ export function YeisGalaxyScene({
               number,
               number,
             ];
+          const pathId = [
+            scaleDestination.id,
+            targetStarId,
+            sourceFrameId,
+            startAbsolutePositionKm.map((value) => value.toExponential(9)).join(","),
+            startQuaternion.map((value) => value.toFixed(9)).join(","),
+          ].join("|");
           const frameSwitchJumpKm = switchScaleReferenceFrame(
             state,
             targetStarId,
@@ -1104,6 +1116,7 @@ export function YeisGalaxyScene({
           scaleBridgeDirection.normalize();
 
           bridge = {
+            pathId,
             targetId: scaleDestination.id,
             starId: targetStarId,
             sourceFrameId,
@@ -1136,6 +1149,8 @@ export function YeisGalaxyScene({
           scaleBridgeRef.current = bridge;
           document.documentElement.dataset.universeGalaxyScalePath =
             `${sourceFrameId}->${targetStarId}`;
+          document.documentElement.dataset.universeGalaxyScalePathId =
+            pathId;
           document.documentElement.dataset.universeGalaxyScaleStartDistanceKm =
             startDistanceKm.toExponential(6);
           document.documentElement.dataset.universeGalaxyScaleEndpointDistanceKm =
@@ -1152,12 +1167,18 @@ export function YeisGalaxyScene({
         // elapsed time is not an authority for Galaxy -> System motion.
         const bridgeControllerKey =
           bridge.targetId + ":" + bridge.starId;
+        const bridgeAutopilotRevision =
+          scaleBridgeAutopilotRevisionRef.current;
         if (
           scaleBridgeControllerKeyRef.current !== bridgeControllerKey ||
-          !state.controller.autopilot
+          !state.controller.autopilot ||
+          bridgeAutopilotRevision === null ||
+          state.controller.autopilotRevision !== bridgeAutopilotRevision
         ) {
           pendingNavigationRef.current = null;
-          state.controller.autopilot = null;
+          if (bridgeAutopilotRevision !== null) {
+            state.controller.cancelAutopilot(bridgeAutopilotRevision);
+          }
           state.controller.position.fromArray(bridge.startPositionKm);
           state.controller.quaternion.fromArray(bridge.startQuaternion);
           state.controller.goToPoint(
@@ -1174,7 +1195,10 @@ export function YeisGalaxyScene({
 
         const visualScalePosition =
           galaxyScaleVisualResponse(scalePosition);
-        state.controller.setAutopilotProgress(visualScalePosition);
+        state.controller.setAutopilotProgress(
+          visualScalePosition,
+          scaleBridgeAutopilotRevisionRef.current ?? undefined,
+        );
         document.documentElement.dataset.universeGalaxyScaleExecutor =
           "native-progress";
         document.documentElement.dataset.universeGalaxyScaleVisualProgress =
@@ -1210,13 +1234,20 @@ export function YeisGalaxyScene({
       // scale executor immediately. Merely reaching Galaxy coordinate zero
       // does not: the target is still present in that case and reverse/forward
       // scrubbing must keep the same path identity.
+      const ownedAutopilotRevision =
+        scaleBridgeAutopilotRevisionRef.current;
       scaleBridgeRef.current = null;
       scaleBridgeControllerKeyRef.current = null;
-      state.controller.autopilot = null;
+      scaleBridgeAutopilotRevisionRef.current = null;
+      if (ownedAutopilotRevision !== null) {
+        state.controller.cancelAutopilot(ownedAutopilotRevision);
+      }
       state.controller.speed = 0;
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.universeGalaxyScaleExecutor;
+      delete document.documentElement.dataset.universeGalaxyScalePathId;
+      delete document.documentElement.dataset.universeGalaxyScaleAppliedPosition;
       delete document.documentElement.dataset.universeGalaxyScaleVisualProgress;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
@@ -1232,6 +1263,8 @@ export function YeisGalaxyScene({
 
     if (scaleBridgeActive && scaleBridgeRef.current) {
       const bridge = scaleBridgeRef.current;
+      document.documentElement.dataset.universeGalaxyScaleAppliedPosition =
+        scalePosition.toFixed(3);
       document.documentElement.dataset.universeTravelArrivalRatio =
         (
           state.controller.position.distanceTo(

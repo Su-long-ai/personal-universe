@@ -40,6 +40,8 @@ interface Autopilot {
 
 const _v = new Vector3();
 const _v2 = new Vector3();
+const _v3 = new Vector3();
+const _origin = new Vector3();
 const _q = new Quaternion();
 const _q2 = new Quaternion();
 const _m = new Matrix4();
@@ -74,6 +76,7 @@ export class CameraController {
   altitude = 0;
   nearest: CelestialBody | null = null;
   autopilot: Autopilot | null = null;
+  private autopilotRevisionValue = 0;
   /**
    * Slow automatic rotation around the orbit pivot (rad/s) — the opening view and guided tours
    * while dwelling. Any new flight or re-targeting clears it.
@@ -92,6 +95,32 @@ export class CameraController {
 
   constructor(private readonly universe: Universe) {}
 
+  private replaceAutopilot(next: Autopilot | null): void {
+    this.autopilot = next;
+    this.autopilotRevisionValue += 1;
+  }
+
+  get autopilotRevision(): number {
+    return this.autopilotRevisionValue;
+  }
+
+  /**
+   * Cancel only the trajectory the caller still owns. Passing a revision makes
+   * authority handoff race-safe: a newer Search/Places/native flight cannot be
+   * cleared by stale continuous-scale cleanup.
+   */
+  cancelAutopilot(expectedRevision?: number): boolean {
+    if (
+      expectedRevision !== undefined &&
+      expectedRevision !== this.autopilotRevisionValue
+    ) {
+      return false;
+    }
+    if (!this.autopilot) return false;
+    this.replaceAutopilot(null);
+    return true;
+  }
+
   setReference(b: CelestialBody | null): void {
     this.reference = b;
     if (b) this.refLastPos.copy(b.position);
@@ -105,7 +134,7 @@ export class CameraController {
     this.target = body;
     this.anchor = null;
     this.mode = 'orbit';
-    this.autopilot = null;
+    this.replaceAutopilot(null);
   }
 
   /** Orbit a fixed point of the current frame (galaxy centre, nebula…) without moving first. */
@@ -113,7 +142,7 @@ export class CameraController {
     this.anchor = { position: point.clone(), radius, name };
     this.target = null;
     this.setReference(null);
-    this.autopilot = null;
+    this.replaceAutopilot(null);
     this.autoOrbit = 0;
     this.mode = 'orbit';
     this.lookAt(point);
@@ -184,10 +213,10 @@ export class CameraController {
     }
     const ratio = Math.max(r0.length(), 1) / dist1;
     const duration = durationS ?? 2.2 + Math.min(4.5, Math.max(0, Math.log10(ratio)) * 0.9);
-    this.autopilot = {
+    this.replaceAutopilot({
       kind: 'goto', target: body, point: null, t: 0, duration,
       r0: r0.clone(), dir1, dist1, q0: this.quaternion.clone(),
-    };
+    });
     this.autoOrbit = 0;
     this.setReference(body);
     this.target = body;
@@ -204,11 +233,11 @@ export class CameraController {
     const r0 = _v.copy(this.position).sub(body.position);
     const ratio = Math.max(r0.length(), 1) / dist1;
     const duration = durationS ?? 2.2 + Math.min(4.5, Math.abs(Math.log10(ratio)) * 0.9);
-    this.autopilot = {
+    this.replaceAutopilot({
       kind: 'goto', target: body, point: null, t: 0, duration,
       r0: r0.clone(), dir1: dir1.clone().normalize(), dist1, q0: this.quaternion.clone(),
       up1: up1?.clone().normalize(),
-    };
+    });
     this.autoOrbit = 0;
     this.setReference(body);
     this.target = body;
@@ -245,10 +274,10 @@ export class CameraController {
     const dir1 = approachDir ? approachDir.clone().normalize() : (r0.lengthSq() > 0 ? r0.clone().normalize() : new Vector3(0, 0.3, 1).normalize());
     const ratio = Math.max(r0.length(), 1) / arriveDist;
     const duration = 3 + Math.min(6, Math.abs(Math.log10(ratio)) * 1.1);
-    this.autopilot = {
+    this.replaceAutopilot({
       kind: 'gotoPoint', target: null, point: point.clone(), anchor, t: 0, duration,
       r0: r0.clone(), dir1, dist1: arriveDist, q0: this.quaternion.clone(),
-    };
+    });
     this.autoOrbit = 0;
     this.target = null;
     this.anchor = null;
@@ -257,20 +286,20 @@ export class CameraController {
 
   /** Rotate to look at a body without moving. */
   centerOn(body: CelestialBody): void {
-    this.autopilot = {
+    this.replaceAutopilot({
       kind: 'center', target: body, point: null, t: 0, duration: 0.9,
       r0: new Vector3(), dir1: new Vector3(), dist1: 0, q0: this.quaternion.clone(),
-    };
+    });
     this.autoOrbit = 0;
     this.target = body;
   }
 
   /** Rotate to look along a fixed direction (e.g. toward a distant star) without moving. */
   centerOnDirection(dir: Vector3): void {
-    this.autopilot = {
+    this.replaceAutopilot({
       kind: 'centerDir', target: null, point: null, t: 0, duration: 0.9,
       r0: new Vector3(), dir1: dir.clone().normalize(), dist1: 0, q0: this.quaternion.clone(),
-    };
+    });
     this.autoOrbit = 0;
   }
 
@@ -280,7 +309,7 @@ export class CameraController {
    */
   shiftFrame(delta: Vector3, newReference: CelestialBody): void {
     this.position.add(delta);
-    this.autopilot = null;
+    this.replaceAutopilot(null);
     this.autoOrbit = 0;
     this.mode = 'free';
     this.target = null;
@@ -314,7 +343,16 @@ export class CameraController {
    * the motion authority. Pass null to return the trajectory to normal timed
    * execution.
    */
-  setAutopilotProgress(progress: number | null): boolean {
+  setAutopilotProgress(
+    progress: number | null,
+    expectedRevision?: number,
+  ): boolean {
+    if (
+      expectedRevision !== undefined &&
+      expectedRevision !== this.autopilotRevisionValue
+    ) {
+      return false;
+    }
     const ap = this.autopilot;
     if (!ap) return false;
     if (progress === null || !Number.isFinite(progress)) {
@@ -347,7 +385,7 @@ export class CameraController {
       const tgt = ap.target;
       const tgtPos = tgt ? tgt.position : ap.point;
       if (ap.kind === 'centerDir' || !tgtPos) {
-        _m.lookAt(new Vector3(), ap.dir1, _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, ap.dir1, _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, s);
       } else if (ap.kind === 'goto' || ap.kind === 'gotoPoint') {
@@ -365,11 +403,11 @@ export class CameraController {
         }
         this.position.copy(tgtPos).addScaledVector(dir, dist);
         // orientation: blend toward looking at target
-        _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, smoothstep(Math.min(1, s * 1.6)));
       } else {
-        _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, s);
       }
@@ -386,7 +424,7 @@ export class CameraController {
           this.mode = 'orbit';
           this.lookAt(ap.point);
         }
-        this.autopilot = null;
+        this.replaceAutopilot(null);
       }
       this.velocity.set(0, 0, 0);
     }
@@ -404,7 +442,7 @@ export class CameraController {
         if (dx !== 0 || dy !== 0) {
           const up = _v2.set(0, 1, 0).applyQuaternion(this.quaternion);
           _q.setFromAxisAngle(up, -dx * this.mouseSensitivity);
-          const right = new Vector3(1, 0, 0).applyQuaternion(this.quaternion);
+          const right = _v3.copy(X).applyQuaternion(this.quaternion);
           _q2.setFromAxisAngle(right, -dy * this.mouseSensitivity * ySign);
           _q.multiply(_q2);
           offset.applyQuaternion(_q);
@@ -425,7 +463,7 @@ export class CameraController {
         // Roll with Q/E in orbit mode
         const roll = (input.down('KeyQ') ? 1 : 0) - (input.down('KeyE') ? 1 : 0);
         if (roll !== 0) {
-          _q.setFromAxisAngle(Z.clone().applyQuaternion(this.quaternion), roll * dt * 1.2);
+          _q.setFromAxisAngle(_v3.copy(Z).applyQuaternion(this.quaternion), roll * dt * 1.2);
           this.quaternion.premultiply(_q);
         }
         this.position.copy(tgt.position).add(offset);
@@ -440,8 +478,8 @@ export class CameraController {
         const strafe = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
         const climb = (input.down('KeyR') ? 1 : 0) - (input.down('KeyF') ? 1 : 0);
         if (strafe !== 0 || climb !== 0) {
-          const up = new Vector3(0, 1, 0).applyQuaternion(this.quaternion);
-          const right = new Vector3(1, 0, 0).applyQuaternion(this.quaternion);
+          const up = _v2.copy(Y).applyQuaternion(this.quaternion);
+          const right = _v3.copy(X).applyQuaternion(this.quaternion);
           _q.setFromAxisAngle(up, -strafe * dt * 1.2);
           _q2.setFromAxisAngle(right, climb * dt * 1.2);
           _q.multiply(_q2);
