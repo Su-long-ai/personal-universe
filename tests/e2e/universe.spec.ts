@@ -705,6 +705,18 @@ test("low-quality Surface retains the existing terrain fallback", async ({
   if (signalCount > 0) {
     expect(clusterCount).toBeGreaterThan(0);
     await expect(page.locator(".surface-cluster-index span").first()).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          Number(
+            await html.getAttribute(
+              "data-universe-surface-interactive-signals",
+            ),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0);
+    await expect(page.locator(".world-content-focus-action").first()).toBeVisible();
   } else {
     expect(clusterCount).toBe(0);
   }
@@ -3560,6 +3572,40 @@ test("Personal Signal deep link keeps its Surface focus through product landing 
   await expect(page.locator(".world-content-card").first()).toHaveAttribute(
     "data-surface-focus",
     "true",
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(
+          await html.getAttribute(
+            "data-universe-surface-interactive-signals",
+          ),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0);
+
+  const focusAction = focusedCard.locator(".world-content-focus-action");
+  await expect(focusAction).toBeVisible();
+  await expect(focusAction).toHaveAttribute("aria-pressed", "true");
+  await focusAction.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-source",
+    "surface-selection",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-entry",
+    "personal-universe",
+  );
+
+  await focusAction.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-source",
+    "navigation",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-entry",
+    "personal-universe",
   );
 
   await runtime.assertClean(testInfo);
