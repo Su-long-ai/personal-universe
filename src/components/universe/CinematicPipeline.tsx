@@ -41,9 +41,11 @@ export function liveWorldFallbackReason(
 export function CinematicPipeline({
   quality,
   liveWorld,
+  prewarmLiveWorld = false,
 }: {
   quality: QualityMode;
   liveWorld: boolean;
+  prewarmLiveWorld?: boolean;
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
@@ -51,6 +53,12 @@ export function CinematicPipeline({
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const useLiveWorld = liveWorld && !fallbackReason;
+  // Real-GPU System prewarm may allocate the same retained PlanetPass before
+  // presentation begins. Software WebGL keeps the existing lazy policy so a
+  // hidden target cannot create expensive live-renderer resources.
+  const provisionLiveWorld =
+    useLiveWorld ||
+    (prewarmLiveWorld && !softwareRenderer && !fallbackReason);
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
   const appliedImpostorPixels = useRef<number | null>(null);
@@ -91,7 +99,7 @@ export function CinematicPipeline({
   const [planetPass, setPlanetPass] = useState<PlanetPass | null>(null);
 
   useEffect(() => {
-    if (useLiveWorld && !planetPassRef.current) {
+    if (provisionLiveWorld && !planetPassRef.current) {
       const nextPass = new PlanetPass(scene, camera, {
         background: "transparent",
         output: "linear",
@@ -122,6 +130,7 @@ export function CinematicPipeline({
     highQuality,
     scene,
     softwareRenderer,
+    provisionLiveWorld,
     useLiveWorld,
   ]);
 
