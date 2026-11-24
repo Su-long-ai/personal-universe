@@ -133,12 +133,14 @@ export function SurfaceScene({
   phaseRef,
   quality,
   hasPlanet,
+  onReadyChange,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
   hasPlanet: boolean;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
@@ -167,11 +169,13 @@ export function SurfaceScene({
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
-  const active =
+  const [terrainReady, setTerrainReady] = useState(false);
+  const surfaceRequested =
     anchored &&
     hasPlanet &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
+  const presentationActive = surfaceRequested && terrainReady;
   const prepare =
     anchored &&
     hasPlanet &&
@@ -187,8 +191,18 @@ export function SurfaceScene({
 
   const handleAnchorHeight = useCallback((height: number) => {
     setAnchorHeight(height);
+    setTerrainReady(true);
     document.documentElement.dataset.universeSurfaceTerrainState = "ready";
-  }, []);
+    document.documentElement.dataset.universeSurfacePrewarm = "ready";
+    onReadyChange?.(true);
+  }, [onReadyChange]);
+
+  useEffect(
+    () => () => {
+      onReadyChange?.(false);
+    },
+    [onReadyChange],
+  );
 
   useFrame(() => {
     const group = surfaceGroupRef.current;
@@ -200,7 +214,8 @@ export function SurfaceScene({
     // Surface group before the next render as soon as that intent leaves
     // Surface. This is presentation-only gating; React phase remains the
     // navigation authority and will reconcile the same visibility normally.
-    group.visible = active && phaseRef.current === "surface";
+    group.visible =
+      presentationActive && phaseRef.current === "surface";
   }, -100);
 
   useEffect(() => {
@@ -210,16 +225,20 @@ export function SurfaceScene({
       // lifecycle="parked". Its active/phaseRef guards pause all update work;
       // actual disposal remains owned by Canvas teardown.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
-      if (!terrainEnabled) {
-        document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
-      }
+      document.documentElement.dataset.universeSurfacePrewarm = terrainReady
+        ? "ready"
+        : "cancelled";
       return;
     }
 
-    // A previously prepared terrain is the retained fallback. Re-entering
-    // Surface must resume it rather than scheduling a second FiniteTerrain.
+    // A previously enabled terrain may still be compiling/streaming its first
+    // usable view. Do not call that "ready" until SurfaceTerrain has reported
+    // its actual anchor/full-coverage frame.
     if (terrainEnabled) {
-      document.documentElement.dataset.universeSurfacePrewarm = "ready";
+      document.documentElement.dataset.universeSurfaceTerrainState =
+        terrainReady ? "ready" : "preparing";
+      document.documentElement.dataset.universeSurfacePrewarm =
+        terrainReady ? "ready" : "preparing";
       return;
     }
 
@@ -252,7 +271,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [phase, prepare, terrainEnabled]);
+  }, [phase, prepare, terrainEnabled, terrainReady]);
 
   const content = (
     <>
@@ -277,7 +296,8 @@ export function SurfaceScene({
       <Suspense fallback={null}>
         {terrainEnabled ? (
           <SurfaceTerrain
-            active={active}
+            prepare={prepare}
+            active={surfaceRequested}
             phaseRef={phaseRef}
             onAnchorHeight={handleAnchorHeight}
           />
@@ -295,7 +315,7 @@ export function SurfaceScene({
   );
 
   useEffect(() => {
-    if (!active) return;
+    if (!presentationActive) return;
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-terrains-fallback";
     document.documentElement.dataset.universeSurfaceDepthCues = softwareRenderer
@@ -314,11 +334,11 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceDepthCues;
       delete document.documentElement.dataset.universeSurfaceHorizon;
     };
-  }, [active, softwareRenderer]);
+  }, [presentationActive, softwareRenderer]);
 
   return (
     <>
-      {active ? (
+      {presentationActive ? (
         <>
           {softwareRenderer ? (
             <primitive
@@ -333,7 +353,7 @@ export function SurfaceScene({
           ) : null}
         </>
       ) : null}
-      <group ref={surfaceGroupRef} visible={active}>{content}</group>
+      <group ref={surfaceGroupRef} visible={presentationActive}>{content}</group>
     </>
   );
 }
