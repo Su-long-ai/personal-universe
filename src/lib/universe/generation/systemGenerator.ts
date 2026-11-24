@@ -5,7 +5,8 @@ import type {
   StarDefinition,
   SystemDefinition,
 } from "../types";
-import { surfaceModeForArchetype } from "../surface";\nimport { hashSeed, SeededRng } from "./seededRng";
+import { surfaceModeForArchetype } from "../surface";
+import { hashSeed, SeededRng } from "./seededRng";
 
 type SpectralTemplate = {
   type: string;
