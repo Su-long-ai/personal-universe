@@ -263,7 +263,7 @@ export function SurfaceScene({
       } else {
         enable();
       }
-    }, phase === "atmosphere" ? 320 : 0);
+    }, 0);
 
     return () => {
       cancelled = true;
