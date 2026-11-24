@@ -1,0 +1,147 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-RENDERER-CONTINUITY-001",
+  "title": "Paint-ready close-world handoff and stable renderer resources",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Reuse the existing R3F Canvas, ProceduralPlanets Planet/PlanetPass and ProceduralTerrains fallback to prewarm close-world resources before System handoff, retain compositor/world identity across scale phases, and prepare fallback terrain before Surface"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The current product already has the correct renderer stack, but mounts PlanetScene only after System, builds Planet/PlanetPass behind delayed effects, rebuilds the EffectComposer when live-world eligibility changes, and primes the software/LOW terrain only at Surface. The missing capability is host lifecycle orchestration, not another renderer. Keep one R3F Canvas and camera authority; mount the selected close world while System still owns presentation, publish explicit scene/pass/paint readiness, switch presentation only after a rendered matching frame, keep one composer and PlanetPass allocation stable while toggling pass enablement, and prewarm the existing retained ProceduralTerrains fallback during Atmosphere or earlier idle time with cancellation when direction reverses.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber useFrame subscriptions share the Canvas render loop and support ordered frame work, allowing readiness to be published only after a mounted scene has participated in a real frame without adding another renderer loop."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "ProceduralPlanets is designed to embed Planet and PlanetPass in an existing Three scene/composer; the host owns the stable renderer, camera and composer lifecycle."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/main/packages/procedural-terrains/README.md",
+      "finding": "ProceduralTerrains exposes a caller-owned runtime with explicit update and dispose, so the existing retained terrain can be prepared while hidden and activated later without constructing another terrain authority."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT YEIS snapshot remains the System/navigation authority; close-world prewarming must remain invisible until the existing focus-relative System endpoint is ready to hand off."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": ["your-eyes-in-space-mit-e520568"],
+      "source_refs": [3],
+      "conclusion": "Retain Personal Universe's pinned YEIS-to-world product stack; the gap is resource handoff timing, not a missing universe solution."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": ["react-three-fiber"],
+      "source_refs": [0, 1],
+      "conclusion": "Use the existing single R3F Canvas, Three scene and frame loop as the lifetime boundary and readiness clock."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": ["procedural-planets", "procedural-terrains"],
+      "source_refs": [1, 2],
+      "conclusion": "Keep the installed live planet/pass and fallback terrain instances; prewarm and park them rather than replacing or duplicating them."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": ["react-core-hooks"],
+      "source_refs": [0],
+      "conclusion": "React refs/state plus ordered useFrame callbacks are sufficient for cancellable readiness and stable resource ownership."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-stack-stable-lifecycle",
+      "name": "Existing YEIS + R3F + ProceduralPlanets/ProceduralTerrains stable lifecycle",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current Personal Universe renderer stack",
+      "license": "MIT pinned YEIS and MIT installed renderer dependencies",
+      "decision": "reuse",
+      "reason": "It already owns every visual tier and camera; adding readiness and prewarm state closes the discontinuities with no competing authority.",
+      "evaluation": {"coverage": 5, "integration_cost": 2, "license_fit": 5, "maintenance_health": 5, "performance_fit": 5, "customization_fit": 5, "maturity": 5}
+    },
+    {
+      "id": "stable-planet-pass-composer",
+      "name": "Stable Three EffectComposer with toggled ProceduralPlanets PlanetPass",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Installed procedural-planets@0.5.1 and Three postprocessing",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Allocate the existing pass once per renderer/camera/quality identity and toggle it across phases, avoiding disposal on semantic liveWorld changes.",
+      "evaluation": {"coverage": 5, "integration_cost": 2, "license_fit": 5, "maintenance_health": 4, "performance_fit": 5, "customization_fit": 5, "maturity": 4}
+    },
+    {
+      "id": "retained-terrain-prewarm",
+      "name": "Existing retained ProceduralTerrains runtime prepared while hidden",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Current SurfaceScene/SurfaceTerrain integration",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Moves existing construction off the final boundary and preserves the already-approved single retained terrain lifecycle.",
+      "evaluation": {"coverage": 5, "integration_cost": 2, "license_fit": 5, "maintenance_health": 4, "performance_fit": 5, "customization_fit": 5, "maturity": 4}
+    },
+    {
+      "id": "second-transition-renderer",
+      "name": "Dedicated transition globe/canvas",
+      "level": "subsystem",
+      "source": "New custom implementation",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "It duplicates renderer, camera and planet identity and would create the exact authority and lifecycle discontinuity the task must remove.",
+      "evaluation": {"coverage": 3, "integration_cost": 5, "license_fit": 5, "maintenance_health": 2, "performance_fit": 1, "customization_fit": 5, "maturity": 1}
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "System retains visible authority until a matching close-world frame is painted",
+      "importance": "high",
+      "coverage": {"existing-stack-stable-lifecycle": "full", "stable-planet-pass-composer": "partial", "retained-terrain-prewarm": "none", "second-transition-renderer": "partial"},
+      "decision": "Pre-mount selected PlanetScene during System, publish frame readiness, and gate presentation handoff on readiness."
+    },
+    {
+      "capability": "Planet and compositor resources survive Approach through Surface and reverse travel",
+      "importance": "high",
+      "coverage": {"existing-stack-stable-lifecycle": "full", "stable-planet-pass-composer": "full", "retained-terrain-prewarm": "partial", "second-transition-renderer": "none"},
+      "decision": "Keep one close-world scene and stable composer/pass resources; semantic phases only toggle visibility/pass activity."
+    },
+    {
+      "capability": "AUTO/software and LOW Surface are ready before the final boundary",
+      "importance": "high",
+      "coverage": {"existing-stack-stable-lifecycle": "full", "stable-planet-pass-composer": "none", "retained-terrain-prewarm": "full", "second-transition-renderer": "none"},
+      "decision": "Prime the existing retained fallback during inward Atmosphere intent and cancel scheduled work on reversal before construction."
+    },
+    {
+      "capability": "Runtime evidence detects blank frames and resource recreation",
+      "importance": "high",
+      "coverage": {"existing-stack-stable-lifecycle": "full", "stable-planet-pass-composer": "full", "retained-terrain-prewarm": "full", "second-transition-renderer": "partial"},
+      "decision": "Publish readiness, painted-frame and allocation counters and assert them in HIGH and software/LOW Playwright paths."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": ["existing-stack-stable-lifecycle", "stable-planet-pass-composer", "retained-terrain-prewarm"],
+    "rationale": "Change only renderer ownership and readiness orchestration inside the current shared Canvas. The selected planet is prewarmed invisibly, presentation waits for a real rendered frame, the composer/PlanetPass allocation remains stable across semantic phases, and the already-retained fallback terrain prepares before Surface. No second renderer, camera, navigation authority, world model, fade or masking layer is introduced.",
+    "higher_level_tradeoffs": ["Prewarming keeps one selected close-world resource set resident during late System and keeps one fallback terrain resident after preparation, trading bounded memory for reversible, blank-free scale travel."],
+    "score_overrides": [],
+    "fallback": "If hidden prewarm exceeds the device budget, defer only expensive bake/detail work to an idle stable boundary while preserving the mounted scene identity and readiness gate; never replace the shared renderer or mask an unready handoff."
+  }
+}
