@@ -1662,6 +1662,72 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("manual pointer takeover freezes a partial Galaxy scale coordinate", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width * 0.55;
+  const y = box!.y + box!.height * 0.5;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 80, y + 24, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-superseded",
+    "manual-camera",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  // A stale direct-scale completion must not fire after pointer authority wins.
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("partial Galaxy scale tolerates repeated direction changes without hidden travel", async ({
   page,
 }, testInfo) => {
