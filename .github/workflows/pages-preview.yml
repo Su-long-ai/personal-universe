@@ -24,6 +24,7 @@ concurrency:
 env:
   PUBLIC_SITE_URL: https://su-long-ai.github.io
   PUBLIC_BASE_PATH: /personal-universe
+  PLAYWRIGHT_VERSION: 1.65.1
   DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
 jobs:
@@ -137,4 +138,156 @@ jobs:
             echo "- Production URL: ${base}"
             echo "- Live homepage probe: PASS"
             echo "- Live YEIS stars.bin probe: PASS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout deployed ref for browser smoke
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+          persist-credentials: false
+
+      - name: Setup Node for live browser smoke
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install repository dependencies for live browser smoke
+        run: npm ci
+
+      - name: Install pinned Playwright test runner
+        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
+
+      - name: Install Playwright Chromium and host dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify cached Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
+
+      - name: Verify browser tooling did not mutate lockfiles
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Verify live YEIS boot, Canvas, assets, and wheel ownership
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "@playwright/test";
+
+          const base = `${process.env.PAGE_URL.replace(/\/$/, "")}/`;
+          const origin = new URL(base).origin;
+          const pageErrors = [];
+          const criticalFailures = [];
+
+          const browser = await chromium.launch({
+            headless: true,
+            args: [
+              "--disable-dev-shm-usage",
+              "--use-gl=angle",
+              "--use-angle=swiftshader",
+            ],
+          });
+
+          try {
+            const page = await browser.newPage({
+              viewport: { width: 1440, height: 900 },
+            });
+
+            page.on("pageerror", (error) => {
+              pageErrors.push(error.message);
+            });
+            page.on("requestfailed", (request) => {
+              const url = new URL(request.url());
+              if (url.origin !== origin) return;
+              const path = url.pathname;
+              if (
+                path.includes("/_astro/") ||
+                path.includes("/vendor/yeis/") ||
+                path.endsWith("/stars.bin")
+              ) {
+                criticalFailures.push(
+                  `${path}: ${request.failure()?.errorText ?? "failed"}`,
+                );
+              }
+            });
+
+            await page.goto(`${base}?freeze=1`, {
+              waitUntil: "domcontentloaded",
+              timeout: 60_000,
+            });
+
+            await page.waitForFunction(
+              () => document.documentElement.dataset.universeEngine === "yeis",
+              undefined,
+              { timeout: 30_000 },
+            );
+            await page.locator("canvas").waitFor({
+              state: "visible",
+              timeout: 30_000,
+            });
+
+            const canvasCount = await page.locator("canvas").count();
+            if (canvasCount !== 1) {
+              throw new Error(
+                `Expected one live universe canvas, found ${canvasCount}`,
+              );
+            }
+
+            const canvas = page.locator("canvas");
+            const box = await canvas.boundingBox();
+            if (!box) throw new Error("Live universe canvas has no layout box");
+
+            await page.mouse.move(
+              box.x + box.width * 0.5,
+              box.y + box.height * 0.5,
+            );
+            await page.mouse.wheel(0, -120);
+
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                return (
+                  data.universeScaleDirection === "in" ||
+                  Boolean(data.universePendingDestination) ||
+                  Boolean(data.universeTraveling) ||
+                  data.universeNavigationPhase === "system"
+                );
+              },
+              undefined,
+              { timeout: 10_000 },
+            );
+
+            await page.waitForTimeout(500);
+
+            if (pageErrors.length) {
+              throw new Error(
+                `Live browser page errors: ${pageErrors.join(" | ")}`,
+              );
+            }
+            if (criticalFailures.length) {
+              throw new Error(
+                `Live critical request failures: ${criticalFailures.join(" | ")}`,
+              );
+            }
+          } finally {
+            await browser.close();
+          }
+          NODE
+
+          {
+            echo "- Live Chromium YEIS boot: PASS"
+            echo "- Live single-Canvas probe: PASS"
+            echo "- Live wheel ownership probe: PASS"
+            echo "- Live critical asset/browser error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
