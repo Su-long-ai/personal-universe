@@ -225,27 +225,30 @@ export function UniverseCanvas({
     worldPrewarmPlanet,
   ]);
 
-  const retainedWorldMatchesGalaxyTarget =
-    phase === "galaxy" &&
-    Boolean(
-      retainedWorldRenderer &&
-        galaxyScaleTarget?.id &&
-        retainedWorldRenderer.destinationId === galaxyScaleTarget.id,
-    );
+  // Keep exactly one previously entered world allocated while Galaxy is
+  // presented. Galaxy owns the visible renderer there; this retained world is
+  // parked and does no presentation work. Ordinary Surface -> Galaxy reversal
+  // may clear the active scale target, which must not destroy reusable world
+  // resources.
+  const retainedWorldParkedInGalaxy =
+    phase === "galaxy" && Boolean(retainedWorldRenderer);
   const worldRendererPlanet =
     worldPrewarmPlanet ??
-    (retainedWorldMatchesGalaxyTarget
+    (retainedWorldParkedInGalaxy
       ? retainedWorldRenderer?.planet ?? null
       : null);
   const keepWorldRendererMounted = Boolean(
     worldRendererPlanet &&
       (phase === "system" ||
         closeWorldPhase ||
-        retainedWorldMatchesGalaxyTarget),
+        retainedWorldParkedInGalaxy),
   );
 
+  // Readiness follows the concrete retained renderer identity. Activation
+  // generation below still invalidates authority whenever presentation parks
+  // or re-enters, so retaining identity does not retain paint permission.
   const worldPaintIdentity =
-    `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
+    `${worldRendererPlanet?.id ?? "none"}:${quality}`;
   const worldPaintAuthorityKey =
     `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}`;
   const worldPaintAuthorityRef = useRef({
@@ -393,7 +396,10 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPaintReady}
+          // Camera settlement can retry from the first concrete draw.
+          // System ownership handoff remains stricter and still waits for
+          // worldPaintReady (two matched presented frames).
+          worldFrameReady={worldPaintStarted}
           surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
