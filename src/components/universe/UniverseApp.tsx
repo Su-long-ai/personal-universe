@@ -203,6 +203,43 @@ function cameraTargetLabel(
   return target.kind + ":" + target.index;
 }
 
+function scheduleScaleRendererHandoff({
+  label,
+  isCurrent,
+  commit,
+}: {
+  label: string;
+  isCurrent: () => boolean;
+  commit: () => void;
+}) {
+  let completed = false;
+  let firstFrame = 0;
+  let secondFrame = 0;
+  let deadline = 0;
+
+  const finish = (source: "paint" | "deadline") => {
+    if (completed) return;
+    completed = true;
+    if (firstFrame) window.cancelAnimationFrame(firstFrame);
+    if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    if (deadline) window.clearTimeout(deadline);
+
+    if (!isCurrent()) return;
+    document.documentElement.dataset.universeScaleHandoff =
+      label + ":" + source;
+    commit();
+  };
+
+  // Two rAF callbacks preserve one real endpoint paint on a healthy renderer.
+  // Hosted/software WebGL can stop delivering rAF while the browser still
+  // accepts wheel events, so do not let that presentation preference become
+  // an input lock. The matched endpoints are already composition-equivalent.
+  firstFrame = window.requestAnimationFrame(() => {
+    secondFrame = window.requestAnimationFrame(() => finish("paint"));
+  });
+  deadline = window.setTimeout(() => finish("deadline"), 64);
+}
+
 function scaleSystemDestinationForMarker(
   marker: GalaxyMarker,
 ): UniverseNavigationDestination {
@@ -2095,20 +2132,16 @@ export default function UniverseApp({
               nextPosition >=
                 SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
             ) {
-              // Keep the restored YEIS native-system endpoint on screen for
-              // one painted frame before product System assumes authority.
-              window.requestAnimationFrame(() => {
-                window.requestAnimationFrame(() => {
-                  if (
-                    continuousScaleIntentEpochRef.current !== intentEpoch ||
-                    phaseRef.current !== "galaxy" ||
-                    worldScalePositionRef.current <
-                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
-                  ) {
-                    return;
-                  }
+              scheduleScaleRendererHandoff({
+                label: "galaxy-system",
+                isCurrent: () =>
+                  continuousScaleIntentEpochRef.current === intentEpoch &&
+                  phaseRef.current === "galaxy" &&
+                  worldScalePositionRef.current >=
+                    SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
+                commit: () => {
                   void commitGalaxyScaleFocusedSystem(focus);
-                });
+                },
               });
             }
 
@@ -2322,17 +2355,17 @@ export default function UniverseApp({
           preferredSystemScaleDestinationRef.current = null;
           delete document.documentElement.dataset.universeScalePreferred;
 
-          // Leave one painted System frame at the matched endpoint before the
-          // renderer identity changes. Any newer scale/navigation intent
-          // invalidates this scheduled handoff.
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-              if (
-                continuousScaleIntentEpochRef.current !== intentEpoch ||
-                phaseRef.current !== "system"
-              ) {
-                return;
-              }
+          // Prefer one painted matched System endpoint, but never let a
+          // throttled/software rAF stall consume the visitor's next scale
+          // samples. Any newer scale/navigation intent invalidates the handoff.
+          scheduleScaleRendererHandoff({
+            label: "system-approach",
+            isCurrent: () =>
+              continuousScaleIntentEpochRef.current === intentEpoch &&
+              phaseRef.current === "system" &&
+              worldScalePositionRef.current >=
+                WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+            commit: () => {
               if (destination) {
                 void handleNavigateDestination(destination, {
                   preserveGalaxyScaleBridge: true,
@@ -2341,7 +2374,7 @@ export default function UniverseApp({
                 setSelectedPlanet(targetPlanet);
                 setWorldScalePhase("approach");
               }
-            });
+            },
           });
         }
         return;
