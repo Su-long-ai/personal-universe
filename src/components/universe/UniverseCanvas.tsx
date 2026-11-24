@@ -225,27 +225,29 @@ export function UniverseCanvas({
     worldPrewarmPlanet,
   ]);
 
-  const retainedWorldMatchesGalaxyTarget =
-    phase === "galaxy" &&
-    Boolean(
-      retainedWorldRenderer &&
-        galaxyScaleTarget?.id &&
-        retainedWorldRenderer.destinationId === galaxyScaleTarget.id,
-    );
+  // Keep exactly one previously entered world allocated while Galaxy is
+  // presented. The Galaxy renderer remains the only visible authority; the
+  // retained world is parked so ordinary Surface -> Galaxy reversal can reuse
+  // the same Planet/PlanetRenderer resources even after scaleTarget is cleared.
+  const retainedWorldParkedInGalaxy =
+    phase === "galaxy" && Boolean(retainedWorldRenderer);
   const worldRendererPlanet =
     worldPrewarmPlanet ??
-    (retainedWorldMatchesGalaxyTarget
+    (retainedWorldParkedInGalaxy
       ? retainedWorldRenderer?.planet ?? null
       : null);
   const keepWorldRendererMounted = Boolean(
     worldRendererPlanet &&
       (phase === "system" ||
         closeWorldPhase ||
-        retainedWorldMatchesGalaxyTarget),
+        retainedWorldParkedInGalaxy),
   );
 
+  // Paint authority follows the retained concrete world. The presenting/parked
+  // suffix below still advances the activation generation, so re-entry must
+  // earn a fresh first paint without reallocating the world itself.
   const worldPaintIdentity =
-    `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
+    `${worldRendererPlanet?.id ?? "none"}:${quality}`;
   const worldPaintAuthorityKey =
     `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}`;
   const worldPaintAuthorityRef = useRef({
@@ -393,7 +395,9 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPaintReady}
+          // Camera settlement requires the first concrete world frame.
+          // Full handoff and screenshot readiness remain stricter.
+          worldFrameReady={worldPaintStarted}
           surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
