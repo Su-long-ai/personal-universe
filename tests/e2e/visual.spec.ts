@@ -894,9 +894,13 @@ test("visual: desktop Hero world low-quality fallback renderer", async ({
         { timeout: 30_000 },
       );
       await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 30_000 },
+      );
+      await expect(html).not.toHaveAttribute(
         "data-universe-world-fallback-surface",
         "generated-texture",
-        { timeout: 30_000 },
       );
       await waitForCameraSettled(page, "orbit");
       await expectViewportContainedLayout(
