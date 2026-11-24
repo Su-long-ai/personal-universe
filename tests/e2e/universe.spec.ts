@@ -719,6 +719,109 @@ test("entered HIGH world parks through Galaxy and reuses live allocations @webgl
   await runtime.assertClean(testInfo);
 });
 
+test("replacing a retained live world releases its renderer-owned cache @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Live renderer cache ownership is exercised under HIGH on hosted software WebGL",
+  );
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  await page.getByLabel("QUALITY").selectOption("high");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-planet-pass-allocations",
+    /\d+/,
+  );
+
+  const releasesBefore = Number(
+    (await html.getAttribute("data-universe-world-planet-releases")) ?? "0",
+  );
+
+  // Park the same live world all the way back at Galaxy. It remains retained
+  // because the captured destination is still Aurora, so no release is
+  // allowed merely for scale reversal.
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+    { timeout: 15_000 },
+  );
+  expect(
+    Number(
+      (await html.getAttribute("data-universe-world-planet-releases")) ?? "0",
+    ),
+  ).toBe(releasesBefore);
+
+  // Replacing the captured destination must unmount the old retained world.
+  // The sole CinematicPipeline owns PlanetRenderer, so it releases the old
+  // body's renderer-side impostor/cache entry before PlanetScene disposes the
+  // caller-owned Planet.
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("月球");
+  const moon = page
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-body") })
+    .filter({ has: page.locator("strong", { hasText: /^Moon$/ }) })
+    .first();
+  await expect(moon).toBeVisible();
+  await moon.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/moon",
+    { timeout: 20_000 },
+  );
+
+  await expect
+    .poll(
+      async () =>
+        Number(
+          (await html.getAttribute(
+            "data-universe-world-planet-releases",
+          )) ?? "0",
+        ),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(releasesBefore);
+  expect(await page.locator("canvas").count()).toBe(1);
+
+  await runtime.assertClean(testInfo);
+});
+
 test("System handoff waits for a fresh close-world paint on every entry", async ({
   page,
 }, testInfo) => {
