@@ -464,6 +464,14 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     "active",
   );
   await expect(html).toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    "180",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-live-structure",
+    "software",
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-world-planet-allocations",
     /\d+/,
   );
