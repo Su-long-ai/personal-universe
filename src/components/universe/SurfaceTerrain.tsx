@@ -349,14 +349,14 @@ export function SurfaceTerrain({
     : profile.regions;
   const rankedContent = useMemo(
     () => rankSurfaceContentAnchors(profile.contentAnchors),
-    [profile.id],
+    [profile.contentAnchors],
   );
   const visibleContent = softwareRenderer
     ? rankedContent.slice(0, 3)
     : rankedContent;
   const rankedClusters = useMemo(
     () => rankSurfaceContentClusters(profile.contentClusters),
-    [profile.id],
+    [profile.contentClusters],
   );
   const visibleClusters = softwareRenderer
     ? rankedClusters.slice(0, 2)
