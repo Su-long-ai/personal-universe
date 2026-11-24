@@ -11,7 +11,8 @@ import {
   type PlanetDefinition,
   type QualityMode,
 } from "../../lib/universe/types";
-import { hashSeed } from "../../lib/universe/generation";\nimport { buildSurfaceWorldProfile, type SurfaceWorldProfile } from "../../lib/universe/surface";
+import { hashSeed } from "../../lib/universe/generation";
+import { buildSurfaceWorldProfile, type SurfaceWorldProfile } from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
@@ -28,7 +29,8 @@ const SURFACE_WORLD_NORMAL = new THREE.Vector3(
   0.350456,
   -0.931211,
 ).normalize();
-const SURFACE_UP = new THREE.Vector3(0, 1, 0);\nconst LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
+const SURFACE_UP = new THREE.Vector3(0, 1, 0);
+const LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
 
 function LiveSurfaceAnchor({
   planet,
