@@ -3177,6 +3177,11 @@ export default function UniverseApp({
                   <span>
                     {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
                   </span>
+                  {surfaceFocusEntryId === entry.id && (
+                    <em className="world-content-focus-label">
+                      {locale === "zh" ? "当前目标" : "CURRENT TARGET"}
+                    </em>
+                  )}
                   <strong>{entry.title}</strong>
                   <small>{entry.summary}</small>
                   {surfacePresentation && (
