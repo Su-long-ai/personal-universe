@@ -594,6 +594,123 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
   await runtime.assertClean(testInfo);
 });
 
+test("entered HIGH world parks through Galaxy and reuses live allocations @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Repeated HIGH live-world entry is intentionally isolated from ordinary software-WebGL shards",
+  );
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  await page.getByLabel("QUALITY").selectOption("high");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+
+  const planetAllocations = Number(
+    await html.getAttribute("data-universe-world-planet-allocations"),
+  );
+  const passAllocations = Number(
+    await html.getAttribute("data-universe-world-planet-pass-allocations"),
+  );
+  const pipelineAllocations = Number(
+    await html.getAttribute("data-universe-world-pipeline-allocations"),
+  );
+  expect(planetAllocations).toBeGreaterThan(0);
+  expect(passAllocations).toBeGreaterThan(0);
+  expect(pipelineAllocations).toBeGreaterThan(0);
+
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-scene-lifecycle",
+    "parked",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-lifecycle",
+    "parked",
+  );
+  expect(await page.locator("canvas").count()).toBe(1);
+  expect(
+    Number(await html.getAttribute("data-universe-world-planet-allocations")),
+  ).toBe(planetAllocations);
+
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+
+  expect(
+    Number(await html.getAttribute("data-universe-world-planet-allocations")),
+  ).toBe(planetAllocations);
+  expect(
+    Number(
+      await html.getAttribute("data-universe-world-planet-pass-allocations"),
+    ),
+  ).toBe(passAllocations);
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(pipelineAllocations);
+  expect(await page.locator("canvas").count()).toBe(1);
+
+  await runtime.assertClean(testInfo);
+});
+
 test("System handoff waits for a fresh close-world paint on every entry", async ({
   page,
 }, testInfo) => {
