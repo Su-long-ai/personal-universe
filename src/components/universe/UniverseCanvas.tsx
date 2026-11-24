@@ -169,8 +169,8 @@ export function UniverseCanvas({
   const [systemScaleFrame, setSystemScaleFrame] =
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
+  const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
   const [worldPaintReady, setWorldPaintReady] = useState(false);
-  const [worldPipelineReady, setWorldPipelineReady] = useState(false);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -192,7 +192,6 @@ export function UniverseCanvas({
     // remains selected; keep the System handoff frame until the new authority
     // has painted as well.
     setWorldPaintReady(false);
-    setWorldPipelineReady(false);
     delete document.documentElement.dataset.universeWorldPaintReady;
   }, [quality, worldPrewarmPlanet?.id]);
 
@@ -228,7 +227,8 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPaintReady || worldPipelineReady}
+          worldFrameReady={worldPaintReady}
+          surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -319,7 +319,8 @@ export function UniverseCanvas({
               phase={phase}
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
-              onPaintReady={() => setWorldPaintReady(true)}
+              surfaceFallbackReady={surfaceFallbackReady}
+              onPaintReadyChange={setWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}
@@ -333,6 +334,7 @@ export function UniverseCanvas({
             phaseRef={phaseRef}
             quality={quality}
             hasPlanet={Boolean(selectedPlanet)}
+            onReadyChange={setSurfaceFallbackReady}
           />
         </Suspense>
       ) : null}
@@ -340,7 +342,6 @@ export function UniverseCanvas({
       <CinematicPipeline
         quality={quality}
         liveWorld={liveWorld}
-        onReadyChange={setWorldPipelineReady}
       />
     </Canvas>
   );
