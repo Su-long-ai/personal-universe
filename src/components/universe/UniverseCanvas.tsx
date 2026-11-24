@@ -188,23 +188,46 @@ export function UniverseCanvas({
     phase === "orbit" ||
     phase === "atmosphere" ||
     phase === "surface";
-  const [retainedWorldRendererId, setRetainedWorldRendererId] =
-    useState<string | null>(null);
+  const [retainedWorldRenderer, setRetainedWorldRenderer] = useState<{
+    planet: PlanetDefinition;
+    destinationId: string | null;
+  } | null>(null);
 
   useEffect(() => {
-    if (
-      worldPrewarmPlanet &&
-      (phase === "system" || closeWorldPhase)
-    ) {
-      setRetainedWorldRendererId(worldPrewarmPlanet.id);
+    if (!worldPrewarmPlanet || (phase !== "system" && !closeWorldPhase)) {
+      return;
     }
-  }, [closeWorldPhase, phase, worldPrewarmPlanet?.id]);
+    const destinationId = galaxyScaleTarget?.id ?? null;
+    setRetainedWorldRenderer((current) =>
+      current?.planet.id === worldPrewarmPlanet.id &&
+      current.destinationId === destinationId
+        ? current
+        : { planet: worldPrewarmPlanet, destinationId },
+    );
+  }, [
+    closeWorldPhase,
+    galaxyScaleTarget?.id,
+    phase,
+    worldPrewarmPlanet,
+  ]);
 
+  const retainedWorldMatchesGalaxyTarget =
+    phase === "galaxy" &&
+    Boolean(
+      retainedWorldRenderer &&
+        galaxyScaleTarget?.id &&
+        retainedWorldRenderer.destinationId === galaxyScaleTarget.id,
+    );
+  const worldRendererPlanet =
+    worldPrewarmPlanet ??
+    (retainedWorldMatchesGalaxyTarget
+      ? retainedWorldRenderer?.planet ?? null
+      : null);
   const keepWorldRendererMounted = Boolean(
-    worldPrewarmPlanet &&
+    worldRendererPlanet &&
       (phase === "system" ||
         closeWorldPhase ||
-        retainedWorldRendererId === worldPrewarmPlanet.id),
+        retainedWorldMatchesGalaxyTarget),
   );
 
   const worldPaintIdentity =
@@ -348,10 +371,10 @@ export function UniverseCanvas({
           ) : null
         }
       >
-        {worldPrewarmPlanet &&
+        {worldRendererPlanet &&
           keepWorldRendererMounted && (
             <LazyPlanetScene
-              planet={worldPrewarmPlanet}
+              planet={worldRendererPlanet}
               quality={quality}
               phase={phase}
               worldScalePosition={worldScalePosition}
