@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
   surfaceModeForArchetype,
 } from "../src/lib/universe/surface/worldProfile.ts";
 import type {
@@ -201,6 +203,42 @@ test("active content focus outranks display importance without moving its anchor
   assert.equal(ranked[0]?.entryId, "ambient-focus");
   assert.deepEqual(ranked[0]?.position, before.position);
   assert.equal(ranked[0]?.priority, "ambient");
+});
+
+test("focused Surface context remains visible ahead of generic prominence", () => {
+  const regions = [
+    { id: "wide", name: "Wide", center: [0, 0] as [number, number], radius: 8, elevationBias: 0 },
+    { id: "focus", name: "Focus", center: [1, 1] as [number, number], radius: 2, elevationBias: 0 },
+  ];
+  const landmarks = [
+    {
+      id: "prominent",
+      kind: "spire" as const,
+      name: "Prominent",
+      position: [0, 0] as [number, number],
+      scale: 2,
+      prominence: 0.95,
+    },
+    {
+      id: "focus",
+      kind: "archive" as const,
+      name: "Focus",
+      position: [1, 1] as [number, number],
+      scale: 1,
+      prominence: 0.2,
+    },
+  ];
+
+  assert.equal(rankSurfaceWorldRegions(regions, "focus")[0]?.id, "focus");
+  assert.equal(
+    rankSurfaceWorldLandmarks(landmarks, "focus")[0]?.id,
+    "focus",
+  );
+  assert.equal(rankSurfaceWorldRegions(regions)[0]?.id, "wide");
+  assert.equal(
+    rankSurfaceWorldLandmarks(landmarks)[0]?.id,
+    "prominent",
+  );
 });
 
 test("content clusters cover every signal exactly once", () => {
