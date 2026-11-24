@@ -795,19 +795,22 @@ export function CinematicCamera({
         surfaceManualView.current?.renderer === surfaceRendererMode
           ? surfaceManualView.current
           : null;
-      const surfaceBaseShot = surfaceFallbackAvailable
-        ? FALLBACK_SURFACE_SHOT
-        : activeSurfaceCameraFrame && liveSurfaceShot
+      const defaultSurfaceShot =
+        activeSurfaceCameraFrame && liveSurfaceShot
           ? liveSurfaceShot
           : SHOTS.surface;
+      const rememberedSurfaceBaseShot =
+        rememberedSurfaceView?.renderer === "fallback"
+          ? FALLBACK_SURFACE_SHOT
+          : defaultSurfaceShot;
       const surfaceShot =
-        rememberedSurfaceView && surfaceBaseShot
+        rememberedSurfaceView && rememberedSurfaceBaseShot
           ? {
-              ...surfaceBaseShot,
+              ...rememberedSurfaceBaseShot,
               position: rememberedSurfaceView.position,
               target: rememberedSurfaceView.target,
             }
-          : surfaceBaseShot;
+          : defaultSurfaceShot;
       const lowerShot =
         lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
       const upperShot =
@@ -938,6 +941,10 @@ export function CinematicCamera({
           ? surfaceBaseShot
           : SHOTS[phase];
     if (!shot) return;
+
+    if (phase === "surface" && rememberedSurfaceView) {
+      document.documentElement.dataset.universeSurfaceManualView = "restored";
+    }
 
     if (phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame) {
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
