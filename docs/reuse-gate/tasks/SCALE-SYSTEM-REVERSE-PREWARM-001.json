@@ -1,0 +1,147 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-SYSTEM-REVERSE-PREWARM-001",
+  "title": "Reuse YEIS native System lifecycle for reverse Approach prewarm",
+  "scope": {
+    "level": "implementation",
+    "subject": "Prewarm the existing pinned YEIS System resources only during reverse Approach and carry the same mounted System component across the Approach to System boundary without adding a renderer, camera authority, or persistent Surface-time System allocation"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Reverse close-world travel currently reaches Approach with the System renderer unmounted; crossing into System then remounts YeisSystemScene, reloads/recreates the native BodyRenderer, BodyPoints and OrbitLines, and only afterward presents System. Reuse the existing YeisSystemScene resource constructor in a hidden reverse-Approach lifecycle instead. Detect a decreasing continuous world-scale sample while phase=approach, latch a reverse-prewarm flag only for that Approach interval, mount the existing native System component with presentation disabled, and keep that same component mounted when phase becomes system. Forward System->Approach remains unchanged: System is retained only through the existing first-paint handoff then unmounted. Orbit/Atmosphere/Surface do not carry System resources.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The pinned MIT YEIS renderer is already the System authority. Its existing BodyRenderer, BodyPoints and OrbitLines resource graph should be warmed and retained rather than duplicated or replaced."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "R3F component lifecycle and useFrame allow a mounted resource owner to keep preparing state while its scene output is not attached, preserving the single Canvas and camera authority."
+    },
+    {
+      "url": "https://react.dev/reference/react/useRef",
+      "finding": "Refs plus a small latched state can detect reverse scale direction without introducing another navigation state machine; the latch can be scoped to the current Approach interval."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain/reuse the accepted YEIS System renderer itself; no alternate System renderer or transition scene is needed."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use the existing R3F component lifetime to warm the same native System resources while hidden and carry them across the reverse boundary."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing YeisSystemScene already owns BodyRenderer, BodyPoints and OrbitLines creation/disposal, so prewarm should extend that owner lifetime rather than create another resource manager."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Use current scale position plus refs/state to latch reverse Approach prewarm; no new transition/state dependency is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-hidden-reverse-approach-reuse",
+      "name": "Existing YEIS System resource owner with hidden reverse-Approach lifetime",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YeisSystemScene resource construction and disposal path",
+      "license": "MIT pinned snapshot",
+      "decision": "reuse",
+      "reason": "It preserves the accepted renderer and all native body/orbit identities while moving construction off the final System boundary.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "r3f-latched-reverse-lifecycle",
+      "name": "Existing R3F/React lifecycle with reverse Approach latch",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "UniverseCanvas phase + continuous worldScalePosition",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It detects the only window where prewarm is useful and avoids keeping System resources alive through Orbit, Atmosphere or Surface.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "persistent-system-cache",
+      "name": "Always-retained System renderer cache",
+      "level": "subsystem",
+      "source": "New product cache",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "It would keep large System GPU resources resident through the entire close-world journey and violate the large-resources-only-when-needed constraint.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 4,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-hidden-reverse-approach-reuse",
+      "r3f-latched-reverse-lifecycle"
+    ],
+    "rationale": "Mount the existing native System owner only after reverse motion is detected inside Approach, keep its output hidden while resources prepare, then reuse the same mounted component when System becomes visible. Do not keep it alive deeper than Approach and do not create a second System resource cache.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If native YEIS resources are not ready by the System boundary, retain the existing prototype Suspense fallback for presentation while the same native owner finishes loading; never block reverse navigation or add a second WebGL renderer."
+  }
+}
