@@ -59,6 +59,7 @@ export function CinematicPipeline({
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
+  const highQuality = quality === "high";
   const rendererIdentity = useMemo(
     () => rendererLabel(gl).slice(0, 240) || "unknown",
     [gl],
@@ -89,7 +90,15 @@ export function CinematicPipeline({
     reportedReady.current = ready;
     onReadyChangeRef.current?.(ready);
   };
-  const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
+  // SwiftShader is fill-rate bound. Keep HIGH visually live but render its
+  // backing store at 75% CSS resolution; AUTO/LOW software paths can go a bit
+  // lower because they already use the lightweight fallback renderer.
+  const softwarePixelRatio = highQuality ? 0.75 : 0.7;
+  const pixelRatioCap = softwareRenderer
+    ? softwarePixelRatio
+    : high
+      ? 1.75
+      : 1;
 
   useEffect(() => {
     const html = document.documentElement;
@@ -233,11 +242,21 @@ export function CinematicPipeline({
     // R3F owns the renderer DPR. On software WebGL, cap the actual canvas
     // backing store as well as the EffectComposer targets; otherwise a
     // 1440x900 screenshot can become a multi-million-pixel SwiftShader render.
-    if (softwareRenderer && gl.getPixelRatio() > 1) {
-      setDpr(1);
+    if (
+      softwareRenderer &&
+      Math.abs(gl.getPixelRatio() - softwarePixelRatio) > 0.01
+    ) {
+      setDpr(softwarePixelRatio);
     }
     composer.composer.setPixelRatio(
-      Math.min(gl.getPixelRatio(), pixelRatioCap),
+      softwareRenderer
+        ? softwarePixelRatio
+        : Math.min(gl.getPixelRatio(), pixelRatioCap),
+    );
+    publishDatasetMetric(
+      document.documentElement,
+      "universeWebglPixelRatio",
+      String(pixelRatioCap),
     );
     composer.composer.setSize(size.width, size.height);
   }, [
@@ -247,6 +266,7 @@ export function CinematicPipeline({
     setDpr,
     size.height,
     size.width,
+    softwarePixelRatio,
     softwareRenderer,
   ]);
 
@@ -259,6 +279,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       delete document.documentElement.dataset.universeWorldImpostorPixels;
       delete document.documentElement.dataset.universeWorldLiveDrawFrame;
+      delete document.documentElement.dataset.universeWebglPixelRatio;
       appliedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
