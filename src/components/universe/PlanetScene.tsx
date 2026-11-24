@@ -419,41 +419,51 @@ function DeepSky() {
   );
 }
 
-function liveQuality(
-  quality: Exclude<QualityMode, "low">,
+type LiveQualityMode = Exclude<QualityMode, "low">;
+
+function liveStructuralQuality(
+  quality: LiveQualityMode,
   softwareRenderer: boolean,
 ) {
-  // Planet.set() is the package's supported live parameter path. Keep one
-  // Planet identity while allowing the real-GPU AUTO profile to stay cheaper
-  // than HIGH. Software rendering only exposes a live world in HIGH and keeps
-  // the conservative hosted-runner budget.
+  if (softwareRenderer) {
+    return {
+      chunkRes: 16,
+      maxDepth: 5,
+    } as const;
+  }
+
+  return quality === "high"
+    ? ({ chunkRes: 32, maxDepth: 6 } as const)
+    : ({ chunkRes: 24, maxDepth: 5 } as const);
+}
+
+function liveDynamicQuality(
+  quality: LiveQualityMode,
+  softwareRenderer: boolean,
+) {
+  // chunkRes/maxDepth are deliberately excluded: ProceduralPlanets marks them
+  // as REBUILD_KEYS and Planet.set() would rebuild every LOD chunk. Structural
+  // quality is monotonic (AUTO -> HIGH at most once) while these non-structural
+  // knobs may follow the active live profile without replacing the Planet.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
-      chunkRes: 16,
-      maxDepth: 5,
       splitFactor: 2.3,
     } as const;
   }
 
-  if (quality === "high") {
-    return {
-      cloudQuality: 72,
-      cloudResolution: 0.6,
-      chunkRes: 32,
-      maxDepth: 6,
-      splitFactor: 2.7,
-    } as const;
-  }
-
-  return {
-    cloudQuality: 56,
-    cloudResolution: 0.5,
-    chunkRes: 24,
-    maxDepth: 5,
-    splitFactor: 2.4,
-  } as const;
+  return quality === "high"
+    ? ({
+        cloudQuality: 72,
+        cloudResolution: 0.6,
+        splitFactor: 2.7,
+      } as const)
+    : ({
+        cloudQuality: 56,
+        cloudResolution: 0.5,
+        splitFactor: 2.4,
+      } as const);
 }
 
 export function PlanetScene({
@@ -514,6 +524,10 @@ export function PlanetScene({
   const appliedLiveProfile = useRef<{
     planet: Planet;
     key: "gpu-auto" | "gpu-high" | "software-high";
+  } | null>(null);
+  const liveStructure = useRef<{
+    planet: Planet;
+    tier: "auto" | "high" | "software";
   } | null>(null);
   const onPaintReadyChangeRef = useRef(onPaintReadyChange);
   onPaintReadyChangeRef.current = onPaintReadyChange;
@@ -601,7 +615,8 @@ export function PlanetScene({
       // Start from the ordinary AUTO budget on a real GPU. If the visitor
       // entered directly in HIGH, the live set() effect below promotes this
       // same instance before it earns first-paint authority.
-      ...liveQuality("auto", softwareRenderer),
+      ...liveStructuralQuality("auto", softwareRenderer),
+      ...liveDynamicQuality("auto", softwareRenderer),
     });
     const html = document.documentElement;
     html.dataset.universeWorldPlanetAllocations = String(
@@ -619,6 +634,7 @@ export function PlanetScene({
   useEffect(() => {
     if (!livePlanet || fallbackReason) {
       delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
       return;
     }
 
@@ -628,8 +644,32 @@ export function PlanetScene({
       : (`gpu-${liveMode}` as "gpu-auto" | "gpu-high");
     const applied = appliedLiveProfile.current;
 
+    const currentStructure = liveStructure.current;
+    if (currentStructure?.planet !== livePlanet) {
+      liveStructure.current = {
+        planet: livePlanet,
+        tier: softwareRenderer ? "software" : "auto",
+      };
+    }
+
+    if (
+      !softwareRenderer &&
+      liveMode === "high" &&
+      liveStructure.current?.tier !== "high"
+    ) {
+      // The package marks chunkRes/maxDepth as structural rebuild keys. Promote
+      // once, then never demote this Planet, so repeated quality toggles cannot
+      // keep throwing away and recreating the LOD world.
+      livePlanet.set(liveStructuralQuality("high", false));
+      liveStructure.current = { planet: livePlanet, tier: "high" };
+      const html = document.documentElement;
+      html.dataset.universeWorldStructuralPromotions = String(
+        Number(html.dataset.universeWorldStructuralPromotions ?? "0") + 1,
+      );
+    }
+
     if (applied?.planet !== livePlanet || applied.key !== profileKey) {
-      livePlanet.set(liveQuality(liveMode, softwareRenderer));
+      livePlanet.set(liveDynamicQuality(liveMode, softwareRenderer));
       appliedLiveProfile.current = {
         planet: livePlanet,
         key: profileKey,
@@ -640,9 +680,12 @@ export function PlanetScene({
       );
     }
     document.documentElement.dataset.universeWorldLiveProfile = profileKey;
+    document.documentElement.dataset.universeWorldLiveStructure =
+      liveStructure.current?.tier ?? "auto";
 
     return () => {
       delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
     };
   }, [fallbackReason, livePlanet, quality, softwareRenderer]);
 
