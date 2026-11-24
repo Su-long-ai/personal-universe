@@ -430,11 +430,21 @@ Fallbacks are product behavior, not hidden test exceptions:
 Task `SCALE-RENDERER-CONTINUITY-001` moves the ownership boundary outward
 without adding another renderer: once a planet focus is locked, the existing
 close-world scene may prewarm while System still presents. The System scene
-remains visible until the close world reports real painted frames, and the
-EffectComposer plus PlanetPass are parked rather than rebuilt when presentation
-is inactive. The same Planet/material/LOD identity therefore survives forward
-and reverse travel. LOW/AUTO-software retain the same Surface terrain instance,
-with cancellable Atmosphere-time preparation before the final boundary.
+remains visible until the close world reports real painted frames. The
+EffectComposer is now allocated once for the shared Canvas lifetime instead of
+being keyed to LOW/AUTO/HIGH capability. PlanetPass is provisioned lazily only
+when a live world is first requested, then retained and parked across later
+fallback/quality switches; bloom is likewise retained and toggled rather than
+rebuilt. This keeps AUTO/software cheap before a live request while preventing
+quality changes from reallocating the complete post-processing chain. The same
+Planet/material/LOD identity therefore survives forward and reverse travel.
+LOW/AUTO-software retain the same Surface terrain instance, with cancellable
+Atmosphere-time preparation before the final boundary.
+
+Runtime evidence:
+
+- `data-universe-world-pipeline-allocations` counts shared composer allocation;
+- `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation.
 
 Large renderer paths are lazy-loaded. The pinned native current-system LOD
 resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
