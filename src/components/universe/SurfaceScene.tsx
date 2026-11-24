@@ -133,6 +133,7 @@ export function SurfaceScene({
   phaseRef,
   quality,
   hasPlanet,
+  ready,
   onReadyChange,
 }: {
   anchored?: boolean;
@@ -140,6 +141,7 @@ export function SurfaceScene({
   phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
   hasPlanet: boolean;
+  ready: boolean;
   onReadyChange?: (ready: boolean) => void;
 }) {
   const { gl } = useThree();
@@ -169,13 +171,12 @@ export function SurfaceScene({
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
-  const [terrainReady, setTerrainReady] = useState(false);
   const surfaceRequested =
     anchored &&
     hasPlanet &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
-  const presentationActive = surfaceRequested && terrainReady;
+  const presentationActive = surfaceRequested && ready;
   const prepare =
     anchored &&
     hasPlanet &&
@@ -191,7 +192,6 @@ export function SurfaceScene({
 
   const handleAnchorHeight = useCallback((height: number) => {
     setAnchorHeight(height);
-    setTerrainReady(true);
     document.documentElement.dataset.universeSurfaceTerrainState = "ready";
     document.documentElement.dataset.universeSurfacePrewarm = "ready";
     onReadyChange?.(true);
@@ -225,7 +225,7 @@ export function SurfaceScene({
       // lifecycle="parked". Its active/phaseRef guards pause all update work;
       // actual disposal remains owned by Canvas teardown.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
-      document.documentElement.dataset.universeSurfacePrewarm = terrainReady
+      document.documentElement.dataset.universeSurfacePrewarm = ready
         ? "ready"
         : "cancelled";
       return;
@@ -236,9 +236,9 @@ export function SurfaceScene({
     // its actual anchor/full-coverage frame.
     if (terrainEnabled) {
       document.documentElement.dataset.universeSurfaceTerrainState =
-        terrainReady ? "ready" : "preparing";
+        ready ? "ready" : "preparing";
       document.documentElement.dataset.universeSurfacePrewarm =
-        terrainReady ? "ready" : "preparing";
+        ready ? "ready" : "preparing";
       return;
     }
 
@@ -271,7 +271,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [phase, prepare, terrainEnabled, terrainReady]);
+  }, [phase, prepare, ready, terrainEnabled]);
 
   const content = (
     <>
