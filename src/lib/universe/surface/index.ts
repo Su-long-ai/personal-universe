@@ -2,6 +2,8 @@ export {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
   surfaceModeForArchetype,
   supportsSurfaceArchetype,
 } from "./worldProfile";
