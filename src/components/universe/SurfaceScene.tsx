@@ -30,6 +30,7 @@ type IdleWindow = Window & {
 
 function ArrivalBeacon({
   active,
+  running,
   onToggle,
   height,
   accent,
@@ -37,6 +38,7 @@ function ArrivalBeacon({
   softwareLite = false,
 }: {
   active: boolean;
+  running: boolean;
   onToggle: () => void;
   height: number;
   accent: string;
@@ -46,7 +48,7 @@ function ArrivalBeacon({
   const beacon = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
-    if (softwareLite || !beacon.current) return;
+    if (softwareLite || !running || !beacon.current) return;
     beacon.current.rotation.y += delta * 0.12;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.55) * 0.035;
     beacon.current.scale.setScalar(active ? pulse * 1.06 : pulse);
@@ -320,6 +322,7 @@ export function SurfaceScene({
       {profile ? (
         <ArrivalBeacon
           active={beaconActive}
+          running={active}
           height={anchorHeight}
           accent={profile.accent}
           landing={profile.landing}
