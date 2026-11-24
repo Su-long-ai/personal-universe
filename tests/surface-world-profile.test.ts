@@ -179,6 +179,30 @@ test("surface content ranking preserves product importance without moving anchor
   );
 });
 
+test("active content focus outranks display importance without moving its anchor", () => {
+  const source = buildSurfaceWorldProfile(
+    planet("focused-content-world", "temperate", {
+      content: [
+        content("ambient-focus", { importance: 1 }),
+        content("featured-other", { importance: 5, featured: true }),
+        content("secondary-other", { importance: 3 }),
+      ],
+    }),
+  );
+  const before = source.contentAnchors.find(
+    (anchor) => anchor.entryId === "ambient-focus",
+  );
+  assert.ok(before);
+
+  const ranked = rankSurfaceContentAnchors(
+    source.contentAnchors,
+    "ambient-focus",
+  );
+  assert.equal(ranked[0]?.entryId, "ambient-focus");
+  assert.deepEqual(ranked[0]?.position, before.position);
+  assert.equal(ranked[0]?.priority, "ambient");
+});
+
 test("content clusters cover every signal exactly once", () => {
   const source = buildSurfaceWorldProfile(
     planet("cluster-world", "desert", {
