@@ -303,6 +303,13 @@ and fallback rendering invalidates the remembered frame, preventing coordinates
 from one terrain frame from leaking into another. The saved view is not
 navigation state, is not written to the URL, and does not own wheel input.
 
+For the live ProceduralPlanets 4↔5 interval, camera-controls keeps the live
+Surface near-distance bound until the continuous coordinate reaches the
+Atmosphere endpoint. This prevents an explored close view from being clamped
+outward merely because semantic phase changes from Surface to Atmosphere while
+the same 5→4 camera segment is still active. Fallback terrain retains its own
+wider Surface bound and does not inherit live-world coordinates.
+
 Runtime evidence uses
 `data-universe-surface-manual-view="captured|scale-endpoint|restored"`.
 
