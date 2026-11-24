@@ -43,10 +43,12 @@ function seededClone(source: THREE.Object3D, index: number) {
 }
 
 export function SurfaceTerrain({
+  prepare,
   active,
   phaseRef,
   onAnchorHeight,
 }: {
+  prepare: boolean;
   active: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   onAnchorHeight?: (height: number) => void;
@@ -54,7 +56,7 @@ export function SurfaceTerrain({
   const { gl, camera } = useThree();
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
-  const [activated, setActivated] = useState(active);
+  const [activated, setActivated] = useState(prepare || active);
   const softwareRenderer = isSoftwareRenderer(gl);
   const terrainViewInitialized = useRef(false);
   const terrainReadyPublished = useRef(false);
@@ -67,8 +69,8 @@ export function SurfaceTerrain({
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
-    if (active) setActivated(true);
-  }, [active]);
+    if (prepare || active) setActivated(true);
+  }, [active, prepare]);
 
   useEffect(() => {
     if (!activated) return;
