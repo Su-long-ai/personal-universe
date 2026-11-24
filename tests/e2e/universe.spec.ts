@@ -484,8 +484,32 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
       "data-universe-world-fallback-texture-allocations",
     )) ?? "0",
   );
+  const structuralPromotions = Number(
+    (await html.getAttribute(
+      "data-universe-world-structural-promotions",
+    )) ?? "0",
+  );
+  const liveProfileUpdates = Number(
+    (await html.getAttribute(
+      "data-universe-world-live-profile-updates",
+    )) ?? "0",
+  );
+  const softwareRenderer =
+    (await html.getAttribute("data-universe-webgl-software")) === "true";
   expect(planetAllocations).toBeGreaterThan(0);
   expect(planetPassAllocations).toBeGreaterThan(0);
+  expect(liveProfileUpdates).toBeGreaterThan(0);
+  // This case enters HIGH before the live world is provisioned, so HIGH must
+  // be the initial structure rather than an AUTO allocation plus promotion.
+  expect(structuralPromotions).toBe(0);
+  await expect(html).toHaveAttribute(
+    "data-universe-world-live-profile",
+    softwareRenderer ? "software-high" : "gpu-high",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    softwareRenderer ? "180" : "90",
+  );
 
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
@@ -564,6 +588,24 @@ test("HIGH close-world retains one pipeline, Planet and PlanetPass across qualit
       ),
     ).toBe(fallbackTextureAllocations);
   }
+  expect(
+    Number(
+      (await html.getAttribute(
+        "data-universe-world-structural-promotions",
+      )) ?? "0",
+    ),
+  ).toBe(structuralPromotions);
+  expect(
+    Number(
+      await html.getAttribute(
+        "data-universe-world-live-profile-updates",
+      ),
+    ),
+  ).toBe(liveProfileUpdates);
+  await expect(html).toHaveAttribute(
+    "data-universe-world-impostor-pixels",
+    softwareRenderer ? "180" : "90",
+  );
 
   await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
