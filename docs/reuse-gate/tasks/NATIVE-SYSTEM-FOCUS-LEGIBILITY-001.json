@@ -1,0 +1,134 @@
+{
+  "schema": 2,
+  "task_id": "NATIVE-SYSTEM-FOCUS-LEGIBILITY-001",
+  "title": "Make the native YEIS system layer visually communicate the wheel-selected planet without adding another renderer",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse pinned YEIS selected-orbit emphasis and body fill semantics so the current center/wheel focus is visually legible in the native System scene, while preserving one renderer, one focus authority and the existing camera framing"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "Hosted desktop, tablet and mobile visual artifacts are now geometrically correct after the floating-origin and viewport-fit fixes, but the System layer still reads as a sparse transition because the planet that already owns center/wheel focus is not reflected in the native YEIS renderer. The pinned MIT renderer already exposes exactly the missing semantics: OrbitLines accepts a selected body id and increases that orbit's native emphasis, while BodyRenderer accepts a per-body fill map for a bounded work-light lift. Reuse those existing renderer controls and the existing focus scan instead of adding product-drawn orbit geometry, labels, shaders or a second selection model. Keep Playwright's existing System visual cases as release evidence.",
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT YEIS renderer already owns native body/orbit rendering and exposes selected-body orbit emphasis plus bounded per-body fill lighting; these are the correct primitives for System focus feedback."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-snapshots",
+      "finding": "The existing Playwright visual pipeline can retain desktop, tablet and mobile System screenshots as acceptance evidence without introducing another visual-testing framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain the pinned MIT YEIS renderer as the full System visual authority; replacing it to solve focus legibility would duplicate the renderer and break the frozen license/authority boundary."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing YEIS BodyRenderer and OrbitLines engine controls already expose the selected-orbit and work-light behavior needed here, so no additional Three.js interaction or annotation framework is justified."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568",
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse YEIS native focus rendering for the product's already-computed center target and reuse the current Playwright System visual cases for hosted acceptance."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "A new label, glow, orbit or HUD component would sit on top of primitives the retained native renderer already owns, adding duplicate visual state with no capability gain."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-native-selected-focus",
+      "name": "Pinned YEIS selected orbit plus per-body fill",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned MIT BodyRenderer RenderSettings.fill and OrbitLines selectedId semantics",
+      "license": "MIT at e52056897364e060fbd6d00951628f163b57d7a1",
+      "decision": "reuse",
+      "reason": "Directly reuses renderer-owned emphasis for the same body that already owns center/wheel focus, with no duplicate orbit geometry, camera authority or selection state.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "product-owned-system-focus-overlay",
+      "name": "New R3F product focus ring and planet labels",
+      "level": "component_asset",
+      "source": "New project-owned overlay geometry and label state",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would duplicate orbit/body emphasis already available inside the retained native renderer and create another visual selection surface that must track the same focus state."
+    },
+    {
+      "id": "playwright-existing-system-visuals",
+      "name": "Existing Playwright desktop/tablet/mobile System visual cases",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current tests/e2e/visual.spec.ts release cases",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Already captures the exact native System states and viewports whose focus legibility needs to improve, inside the protected hosted release suite.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-native-selected-focus",
+      "playwright-existing-system-visuals"
+    ],
+    "rationale": "Keep YEIS as the only System visual authority and feed its native selected-orbit/fill controls from the center focus the product already computes for wheel navigation. This adds visual feedback to existing state instead of creating labels, custom orbit geometry or a second selection model. Preserve the current camera fit and validate the result through the existing hosted System screenshots.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If native selected-orbit emphasis is still too subtle in hosted screenshots, tune only the bounded existing YEIS selection/fill values or the already-approved camera fit path; do not add a parallel product orbit renderer."
+  }
+}

@@ -64,10 +64,13 @@ same native body ids and call the existing `onSelectPlanet` contract.
 Personal Signal planets receive a cyan product halo without changing YEIS body
 identity or orbital data. Non-YEIS systems retain `SystemScene` as fallback.
 
+The product's existing center/wheel focus is also fed back into the retained YEIS renderer instead of being redrawn by React. The focused native body id is passed to `OrbitLines.update(..., selectedId)`, which uses YEIS's own selected-orbit emphasis, and the same body receives a bounded `BodyRenderer` fill value so a resolvable disc remains readable. This is visual feedback for the existing focus authority; it does not create a second selection model, orbit layer or label system.
+
 Runtime evidence:
 
 - `data-universe-system-renderer="yeis-native"`
 - `data-universe-system-ready="true"`
+- `data-universe-system-focus="<product planet id>"`
 
 ## Close-world renderer
 

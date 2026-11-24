@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "NATIVE-SYSTEM-FOCUS-LEGIBILITY-001",
+  "approved_at": "2026-11-24T07:36:30.000Z",
+  "baseline_commit": "709ff4b2ee59702a921925d3acd5e13284bc4e1d",
+  "record_path": "docs/reuse-gate/tasks/NATIVE-SYSTEM-FOCUS-LEGIBILITY-001.json",
+  "record_sha256": "d9f30e312d45da302e49d2e8082ee5d6bf2da74a5271fc37e4225a1c951b0396",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse pinned YEIS selected-orbit emphasis and body fill semantics so the current center/wheel focus is visually legible in the native System scene, while preserving one renderer, one focus authority and the existing camera framing"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "yeis-native-selected-focus",
+    "playwright-existing-system-visuals"
+  ],
+  "candidate_scores": {
+    "yeis-native-selected-focus": 54.5,
+    "product-owned-system-focus-overlay": null,
+    "playwright-existing-system-visuals": 57
+  }
+}
