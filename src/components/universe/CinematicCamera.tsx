@@ -283,6 +283,16 @@ export function CinematicCamera({
         return;
       }
 
+      const html = document.documentElement;
+      if (
+        isWorldScalePhase(phase) &&
+        html.dataset.universeWorldReady !== "true"
+      ) {
+        html.dataset.universeCameraAwaitingWorldFrame = phase;
+        return;
+      }
+      delete html.dataset.universeCameraAwaitingWorldFrame;
+
       completedPhase.current = phase;
       if (transitionWatchdog.current !== null) {
         window.clearTimeout(transitionWatchdog.current);
@@ -422,6 +432,7 @@ export function CinematicCamera({
     }
     delete document.documentElement.dataset.universeCameraSettled;
     delete document.documentElement.dataset.universeCameraWatchdog;
+    delete document.documentElement.dataset.universeCameraAwaitingWorldFrame;
     document.documentElement.dataset.universeCameraMode = "cinematic";
     document.documentElement.dataset.universeCameraGeneration =
       String(generation);
@@ -1019,6 +1030,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraGeneration;
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;
+      delete document.documentElement.dataset.universeCameraAwaitingWorldFrame;
       delete document.documentElement.dataset.universeScaleCameraSegment;
       delete document.documentElement.dataset.universeScaleSegment;
       delete document.documentElement.dataset.universeCameraDistance;
