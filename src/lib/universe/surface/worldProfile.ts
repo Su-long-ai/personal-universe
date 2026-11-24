@@ -170,9 +170,12 @@ function surfaceContentPriority(entry: {
 
 export function rankSurfaceContentAnchors(
   anchors: readonly SurfaceContentAnchor[],
+  focusedEntryId: string | null = null,
 ): SurfaceContentAnchor[] {
   return [...anchors].sort(
     (a, b) =>
+      Number(b.entryId === focusedEntryId) -
+        Number(a.entryId === focusedEntryId) ||
       SURFACE_CONTENT_PRIORITY_WEIGHT[b.priority] -
         SURFACE_CONTENT_PRIORITY_WEIGHT[a.priority] ||
       a.title.localeCompare(b.title) ||
@@ -182,9 +185,12 @@ export function rankSurfaceContentAnchors(
 
 export function rankSurfaceContentClusters(
   clusters: readonly SurfaceContentCluster[],
+  focusedClusterIndex: number | null = null,
 ): SurfaceContentCluster[] {
   return [...clusters].sort(
     (a, b) =>
+      Number(b.index === focusedClusterIndex) -
+        Number(a.index === focusedClusterIndex) ||
       SURFACE_CONTENT_PRIORITY_WEIGHT[b.priority] -
         SURFACE_CONTENT_PRIORITY_WEIGHT[a.priority] ||
       a.label.localeCompare(b.label) ||
