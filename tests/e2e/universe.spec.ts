@@ -3649,7 +3649,9 @@ test("Places filters derive Personal and Important views from canonical graph", 
     ).first(),
   ).toBeVisible();
 
-  const nearby = dialog.getByRole("button", { name: "NEARBY" });
+  const nearby = dialog
+    .locator(".navigator-filters")
+    .getByRole("button", { name: "NEARBY", exact: true });
   await expect(nearby).toBeDisabled();
 
   await runtime.assertClean(testInfo);
@@ -3664,7 +3666,9 @@ test("Nearby Places only exposes destinations owned by current native system", a
 
   const dialog = await openNavigator(page);
   const html = page.locator("html");
-  const nearby = dialog.getByRole("button", { name: "NEARBY" });
+  const nearby = dialog
+    .locator(".navigator-filters")
+    .getByRole("button", { name: "NEARBY", exact: true });
   await expect(nearby).toBeEnabled();
   await nearby.click();
 
@@ -3683,7 +3687,9 @@ test("Nearby Places only exposes destinations owned by current native system", a
     ),
   ).toBe(true);
   await expect(
-    rows.locator('[data-destination-id="body:c0/earth"]'),
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="body:c0/earth"]',
+    ),
   ).toBeVisible();
 
   await runtime.assertClean(testInfo);
@@ -3931,11 +3937,13 @@ test("Guided Journey share URL reloads the same canonical route and Stop clears 
     })
     .toBe("featured:0");
 
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("destination"))
+    .toMatch(/^personal:/);
   const sharedUrl = page.url();
   const sharedDestination = new URL(sharedUrl).searchParams.get(
     "destination",
   );
-  expect(sharedDestination).toMatch(/^personal:/);
 
   await page.goto(sharedUrl);
   await waitForYeisEngine(page);
