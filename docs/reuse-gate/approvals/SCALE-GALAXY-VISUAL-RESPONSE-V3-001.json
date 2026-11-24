@@ -1,0 +1,29 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-GALAXY-VISUAL-RESPONSE-V3-001",
+  "approved_at": "2026-11-24T16:20:00.000Z",
+  "baseline_commit": "c57d0e3fef5803ef9e238f1929afc735c9ea064b",
+  "record_path": "docs/reuse-gate/tasks/SCALE-GALAXY-VISUAL-RESPONSE-V3-001.json",
+  "record_sha256": "26a5f9c3bf7b9542d680197ba4dec3256d0cbf605897858f1ae6f5e4022691de",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Tune the existing pinned MIT YEIS Galaxy scale bridge so the product coordinate directly scrubs a modest stateless visual response curve with earlier perceptible target growth, exact endpoints, immediate reversal, and no time-driven continuation"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx"
+  ],
+  "selected_ids": [
+    "native-yeis-progress-response"
+  ],
+  "candidate_scores": {
+    "native-yeis-progress-response": 57,
+    "new-galaxy-camera-tween": null
+  }
+}
