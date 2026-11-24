@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -37,6 +37,13 @@ type NativeResources = {
   orbits: OrbitLines;
   luminosity: number;
   sunColor: THREE.Vector3;
+};
+
+type ProductTargetResources = {
+  hitGeometry: THREE.SphereGeometry;
+  haloGeometry: THREE.SphereGeometry;
+  hitMaterial: THREE.MeshBasicMaterial;
+  haloMaterial: THREE.MeshBasicMaterial;
 };
 
 function nativeStarId(system: SystemDefinition) {
@@ -146,39 +153,22 @@ function createRenderSystem(source: StarSystem) {
 }
 
 function disposeResources(resources: NativeResources) {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-
-  resources.scene.traverse((object) => {
-    const mesh = object as THREE.Mesh;
-    if (mesh.geometry) geometries.add(mesh.geometry);
-    const material = (object as THREE.Mesh).material;
-    if (Array.isArray(material)) {
-      for (const entry of material) materials.add(entry);
-    } else if (material) {
-      materials.add(material);
-    }
-  });
-
-  for (const view of resources.bodies.views) {
-    view.dispose(resources.scene);
-  }
-  for (const line of resources.orbits.lines) {
-    resources.scene.remove(line.line);
-  }
-  resources.scene.remove(resources.points.points);
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
+  resources.bodies.dispose();
+  resources.points.dispose();
+  resources.orbits.dispose();
   resources.scene.clear();
+
 }
 
 function ProductPlanetTarget({
   planet,
   resources,
+  targetResources,
   onSelect,
 }: {
   planet: PlanetDefinition;
   resources: NativeResources;
+  targetResources: ProductTargetResources;
   onSelect: (planet: PlanetDefinition) => void;
 }) {
   const hit = useRef<THREE.Mesh>(null);
@@ -213,28 +203,17 @@ function ProductPlanetTarget({
           document.body.classList.add("planet-hover");
         }}
         onPointerOut={() => document.body.classList.remove("planet-hover")}
-      >
-        <sphereGeometry args={[HIT_RADIUS, 12, 12]} />
-        <meshBasicMaterial
-          transparent
-          opacity={0.001}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
+        geometry={targetResources.hitGeometry}
+        material={targetResources.hitMaterial}
+      />
 
       {hasContent ? (
-        <mesh ref={halo} position={body.position}>
-          <sphereGeometry args={[HIT_RADIUS * 0.78, 18, 18]} />
-          <meshBasicMaterial
-            color="#73f4ff"
-            transparent
-            opacity={0.38}
-            wireframe
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
+        <mesh
+          ref={halo}
+          position={body.position}
+          geometry={targetResources.haloGeometry}
+          material={targetResources.haloMaterial}
+        />
       ) : null}
     </>
   );
@@ -400,7 +379,8 @@ export function YeisSystemScene({
 
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current === 0) {
-      let best: { planet: PlanetDefinition; distance: number } | null = null;
+      let bestPlanet: PlanetDefinition | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
       for (const planet of system.planets) {
         const body = native.get(nativePlanetId(planet));
         if (!body) continue;
@@ -412,13 +392,14 @@ export function YeisSystemScene({
           projected.x * size.width * 0.5,
           projected.y * size.height * 0.5,
         );
-        if (distance <= 92 && (!best || distance < best.distance)) {
-          best = { planet, distance };
+        if (distance <= 92 && distance < bestDistance) {
+          bestPlanet = planet;
+          bestDistance = distance;
         }
       }
 
-      const nextId = best?.planet.id ?? null;
-      const nextNativeId = best ? nativePlanetId(best.planet) : null;
+      const nextId = bestPlanet?.id ?? null;
+      const nextNativeId = bestPlanet ? nativePlanetId(bestPlanet) : null;
       if (focusedIdRef.current !== nextId) {
         focusedIdRef.current = nextId;
         focusedNativeIdRef.current = nextNativeId;
@@ -429,7 +410,7 @@ export function YeisSystemScene({
         } else {
           delete document.documentElement.dataset.universeSystemFocus;
         }
-        onScaleFocus?.(best?.planet ?? null);
+        onScaleFocus?.(bestPlanet);
       }
     }
 
@@ -485,7 +466,7 @@ export function YeisSystemScene({
       true,
       quality !== "low",
       pxPerRad,
-      (id) => resources.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+      apparentRadiusForBody,
       focusedNativeIdRef.current,
     );
   });
