@@ -246,12 +246,15 @@ async function expectReadableNarrowSurfaceLayout(
   }
 
   const clusterChips = surfaceCopy.locator(".surface-cluster-chip");
-  const publishedClusterCount = Number(
-    await page
-      .locator("html")
-      .getAttribute("data-universe-surface-content-clusters"),
-  );
-  if (Number.isFinite(publishedClusterCount)) {
+  const publishedClusterValue = await page
+    .locator("html")
+    .getAttribute("data-universe-surface-content-clusters");
+  if (publishedClusterValue !== null) {
+    const publishedClusterCount = Number(publishedClusterValue);
+    expect(
+      Number.isInteger(publishedClusterCount) && publishedClusterCount >= 0,
+      "Surface cluster diagnostic should publish a valid count",
+    ).toBe(true);
     expect(
       await clusterChips.count(),
       "Surface UI should retain every generated content cluster",
