@@ -310,6 +310,24 @@ async function visualCase(
       (await html.getAttribute("data-universe-webgl-triangles")) ?? "0",
     ),
   };
+  const continuity = {
+    phase: await html.getAttribute("data-universe-navigation-phase"),
+    position: Number(
+      (await html.getAttribute("data-universe-scale-position")) ?? "NaN",
+    ),
+    segment: await html.getAttribute("data-universe-scale-camera-segment"),
+    direction: await html.getAttribute("data-universe-scale-direction"),
+    authority: await html.getAttribute("data-universe-render-authority"),
+    handoff: await html.getAttribute("data-universe-handoff-state"),
+    queued: await html.getAttribute("data-universe-scale-queued"),
+    projectedRadius: Number(
+      (await html.getAttribute("data-universe-projected-radius")) ?? "NaN",
+    ),
+    worldRenderer: await html.getAttribute("data-universe-world-renderer"),
+    worldPipeline: await html.getAttribute("data-universe-world-pipeline"),
+    worldReady: await html.getAttribute("data-universe-world-ready"),
+    canvasCount: await page.locator("canvas").count(),
+  };
 
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
@@ -318,6 +336,7 @@ async function visualCase(
           viewport: viewport.name,
           case: name,
           elapsedMs: Date.now() - startedAt,
+          continuity,
           webgl,
         },
         null,
