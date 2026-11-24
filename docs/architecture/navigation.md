@@ -696,7 +696,8 @@ independent immutable task approvals, including
 `JOURNEY-SETTLED-ORCHESTRATION-001`,
 `NATIVE-BODY-ACCEPTANCE-001`,
 `NAVIGATION-ENTRY-COVERAGE-001`, and
-`WORLD-CAMERA-MANUAL-OVERRIDE-001`.
+`WORLD-CAMERA-MANUAL-OVERRIDE-001`, and
+`SCALE-INPUT-PRODUCT-FEEL-V3-001`.
 
 Do not edit an approved record after implementation merely to make it describe
 new code: the gate intentionally hashes the research record at approval time.
@@ -713,11 +714,24 @@ height, and each delivered event is capped at 96 pixels. The cap bounds a
 coalesced delivery after a main-thread stall; it does not add an accumulator,
 animation, or inertia.
 
-The normalized physical sample is then interpreted by the active scale segment.
-A capped 96px sample advances 0.25 across Galaxy→System (span 384) and 0.5
-across System→Surface intervals (span 192). Small high-resolution trackpad
-deltas remain proportional and immediately visible on both sides of the
-renderer boundary.
+The normalized physical sample is then interpreted through one stateless,
+monotonic response-distance map over the same 0→5 product coordinate. The
+semantic interval budgets are 384px (Galaxy→System), 288px
+(System→Approach), 192px (Approach→Orbit), 192px (Orbit→Atmosphere), and
+240px (Atmosphere→Surface). This removes the old 384px→192px input-gain cliff
+at the native System handoff and slows the final landing interval without
+creating time-based smoothing. The mapping is inverted for every delivered
+sample, so forward and reverse consume exactly the same response distance and
+small high-resolution trackpad deltas remain immediately visible.
+
+Native Galaxy rendering keeps the 384px coordinate budget, but the retained
+YEIS trajectory is scrubbed through a small stateless visual response curve so
+early input produces visible target growth without changing endpoint identity
+or adding autonomous motion. Close-world camera interpolation likewise keeps a
+substantial linear component through authored anchors instead of easing to a
+per-phase stop. The runtime publishes the delivered response delta and current
+response distance as `data-universe-scale-response` and
+`data-universe-scale-response-distance`; these are diagnostics only.
 
 Gesture identity is diagnostic/cancellation state, not physics. A pause starts
 a new identity, a sign reversal immediately increments the intent epoch and
