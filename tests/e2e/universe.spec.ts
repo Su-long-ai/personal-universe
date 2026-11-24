@@ -325,11 +325,12 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await dispatchScaleWheel(page, -72);
 
   // The System renderer is still authoritative, but the same camera has
-  // already moved 37.5% toward the focused planet. Renderer identity only
-  // changes after the continuous coordinate reaches the Approach endpoint.
+  // already moved 25% toward the focused planet. This gentler bridge removes
+  // the old 384px -> 192px input-gain cliff at System without introducing any
+  // delayed motion. Renderer identity still changes only at Approach.
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.375",
+    "1.250",
   );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -411,7 +412,7 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
   );
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.375",
+    "1.250",
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-scene-lifecycle",
@@ -1023,7 +1024,7 @@ test("surface reversal starts a new gesture and moves outward immediately", asyn
   );
 
   await page.mouse.wheel(0, 120);
-  await expect(html).toHaveAttribute("data-universe-scale-position", "4.500");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "4.600");
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "atmosphere",
@@ -1702,7 +1703,7 @@ test("144Hz-like close-world burst reverses without phase or camera backlog", as
 
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "4.500",
+    "4.600",
   );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -2121,11 +2122,13 @@ test("outward wheel preserves proportional delta across Approach System Galaxy b
     "1.000",
   );
 
-  // System 1 -> Approach 2. The endpoint handoff may be paint/deadline gated,
-  // but no additional wheel sample should be required once coordinate 2 lands.
-  await dispatchScaleWheel(page, -96);
-  await page.waitForTimeout(60);
-  await dispatchScaleWheel(page, -96);
+  // System 1 -> Approach 2 deliberately uses a 288px response budget so the
+  // transition does not double in apparent input gain at the renderer bridge.
+  // Three delivered 96px samples reach the exact endpoint with no queue.
+  for (let sample = 0; sample < 3; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(60);
+  }
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "approach",
@@ -2136,8 +2139,9 @@ test("outward wheel preserves proportional delta across Approach System Galaxy b
     "2.000",
   );
 
-  // The renderer boundary must not consume the outward sample. With the shared
-  // 192px System interval, +96 is exactly half an interval: 2 -> 1.5.
+  // The renderer boundary must not consume the outward sample. The same 288px
+  // System response budget applies in reverse, so +96 retraces exactly one
+  // third of the interval instead of accelerating at the handoff.
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -2146,11 +2150,16 @@ test("outward wheel preserves proportional delta across Approach System Galaxy b
   );
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.500",
+    "1.667",
   );
 
   // Continue proportionally through the matched System endpoint and straight
   // back onto the retained native Galaxy path.
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.333",
+  );
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
@@ -2544,11 +2553,12 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
     { timeout: 10_000 },
   );
 
-  // System 1 -> Approach 2. The second sample reaches the exact boundary and
-  // schedules renderer handoff. Keep input cadence independent of settlement.
-  await dispatchScaleWheel(page, -96);
-  await page.waitForTimeout(20);
-  await dispatchScaleWheel(page, -96);
+  // System 1 -> Approach 2 uses the gentler 288px bridge. The third sample
+  // reaches the exact boundary; cadence stays independent of settlement.
+  for (let sample = 0; sample < 3; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(20);
+  }
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "approach",
@@ -2558,12 +2568,15 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
     .toBeGreaterThanOrEqual(2);
 
-  // Continue six half-interval samples to Surface=5. No phase settlement wait
-  // is allowed between samples; each delta is authoritative immediately.
+  // Approach -> Atmosphere keeps the established 192px cadence, while the
+  // final Atmosphere -> Surface interval uses 240px to reduce landing overshoot.
+  // Six 96px samples plus one 48px sample therefore reach Surface exactly.
   for (let sample = 0; sample < 6; sample += 1) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(20);
   }
+  await dispatchScaleWheel(page, -48);
+  await page.waitForTimeout(20);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "surface",
@@ -2575,11 +2588,14 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
   );
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
-  // Surface 5 -> Approach 2 at the same continuous cadence.
+  // Reverse retraces the exact same response distance: six 96px samples and
+  // one 48px sample return to Approach=2 with no asymmetric tail.
   for (let sample = 0; sample < 6; sample += 1) {
     await dispatchScaleWheel(page, 96);
     await page.waitForTimeout(20);
   }
+  await dispatchScaleWheel(page, 48);
+  await page.waitForTimeout(20);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "approach",
@@ -2590,9 +2606,9 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
     "2.000",
   );
 
-  // The same outward sample that crosses Approach -> System must also move
-  // scale: 2 -> 1.5. A second reaches System=1, and the next one immediately
-  // enters the retained YEIS native bridge at 0.75.
+  // The outward sample crossing Approach -> System is preserved and follows
+  // the same 288px bridge in reverse: 2 -> 1.667 -> 1.333 -> 1.000. The next
+  // sample immediately enters the retained YEIS native bridge at 0.75.
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -2601,7 +2617,12 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
   );
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.500",
+    "1.667",
+  );
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.333",
   );
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
@@ -3780,7 +3801,12 @@ test("System to Approach handoff preserves apparent size and orientation", async
   await dispatchScaleWheel(page, -96);
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.500",
+    "1.333",
+  );
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.667",
   );
   await dispatchScaleWheel(page, -96);
 
@@ -3874,6 +3900,119 @@ test("precision-trackpad deltas move the close-world camera immediately", async 
     "data-universe-camera-mode",
     "scale-continuous",
   );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("micro wheel samples remain immediate, reversible, and stop with delivered input", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  const inward = [-4, -8, -16, -32];
+  const trace: number[] = [];
+  for (const deltaY of inward) {
+    await dispatchScaleWheel(page, deltaY);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    trace.push(position);
+    expect(
+      Number(await html.getAttribute("data-universe-scale-response")),
+    ).toBeGreaterThan(0);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-delta",
+      deltaY.toFixed(3),
+    );
+  }
+
+  for (let index = 1; index < trace.length; index += 1) {
+    expect(trace[index]).toBeGreaterThan(trace[index - 1]);
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.313",
+  );
+  const stoppedAt = await html.getAttribute("data-universe-scale-position");
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    stoppedAt!,
+  );
+
+  const inwardGesture = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  );
+  for (const deltaY of [32, 16, 8, 4]) {
+    await dispatchScaleWheel(page, deltaY);
+    expect(
+      Number(await html.getAttribute("data-universe-scale-response")),
+    ).toBeLessThan(0);
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-scale-gesture")),
+    )
+    .toBeGreaterThan(inwardGesture);
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("reduced-motion narrow viewport preserves direct reversible scale control", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -32);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.167",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "scale-continuous",
+  );
+
+  await dispatchScaleWheel(page, 32);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
   await runtime.assertClean(testInfo);
 });
@@ -4013,7 +4152,7 @@ test("apparent target radius grows monotonically during System approach", async 
   await dispatchScaleWheel(page, -48);
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.250",
+    "1.167",
   );
   await expect
     .poll(
@@ -4032,7 +4171,7 @@ test("apparent target radius grows monotonically during System approach", async 
   await dispatchScaleWheel(page, -48);
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "1.500",
+    "1.333",
   );
   await expect
     .poll(
@@ -4141,7 +4280,7 @@ test("fallback Surface terrain parks and resumes across reverse scale @webgl-hea
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
     "data-universe-scale-position",
-    "4.500",
+    "4.600",
   );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
