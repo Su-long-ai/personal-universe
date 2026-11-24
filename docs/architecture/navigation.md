@@ -699,14 +699,26 @@ surface pins, comparison/pulse effects and simulation-time restoration are
 specific to the upstream educational-tour product and are intentionally not
 copied into Personal Universe.
 
-The Places surface derives:
+The Places surface derives stable route identities from the same canonical
+destination sections:
 
-- Featured Journey
-- Projects Journey
-- Research Journey
+- `featured` → Featured Journey
+- `projects` → Projects Journey
+- `research` → Research Journey
 
-from the same destination sections. Each step calls the same destination
+The derivation now lives in the shared navigation module, so Navigator display
+and deep-link restore cannot silently disagree about route membership or
+ordered destination identity. Each step still calls the same destination
 executor used by Search/Places/canvas/deep links.
+
+A running route publishes only two additional shareable URL parameters:
+`journey=<id>` and `journeyStep=<index>`. The ordinary canonical
+`destination`/phase parameters remain in the URL. On reload, Journey restore
+rebuilds the route from current canonical Places sections, clamps the requested
+step, and owns the initial destination execution; the normal destination
+deep-link effect yields while `journey` is present so two navigation paths do
+not race. Stop or any manual competing navigation removes only the Journey
+parameters and leaves the canonical destination URL intact.
 
 Behavior:
 
