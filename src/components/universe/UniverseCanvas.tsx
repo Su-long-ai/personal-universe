@@ -166,6 +166,14 @@ export function UniverseCanvas({
   onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
+  const [yeisViewStateSnapshot, setYeisViewStateSnapshot] =
+    useState<YeisGalaxyViewState | null>(null);
+  const handleYeisViewStateCommit = useCallback(
+    (viewState: YeisGalaxyViewState) => {
+      setYeisViewStateSnapshot(viewState);
+    },
+    [],
+  );
   const yeisGalaxyScaleBridgeRef =
     useRef<YeisGalaxyScaleBridgeState | null>(null);
   const [surfaceCameraFrame, setSurfaceCameraFrame] =
@@ -394,7 +402,9 @@ export function UniverseCanvas({
           quality={quality}
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
-          galaxyViewState={yeisViewStateRef.current}
+          galaxyViewState={
+            yeisViewStateSnapshot ?? yeisViewStateRef.current
+          }
           // Camera settlement requires the first concrete world frame.
           // Full handoff and screenshot readiness remain stricter.
           worldFrameReady={worldPaintStarted}
@@ -422,6 +432,7 @@ export function UniverseCanvas({
             scaleTarget={galaxyScaleTarget}
             scaleBridgeRef={yeisGalaxyScaleBridgeRef}
             viewStateRef={yeisViewStateRef}
+            onViewStateCommit={handleYeisViewStateCommit}
           />
         </Suspense>
       )}
