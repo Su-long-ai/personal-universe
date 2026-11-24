@@ -3728,7 +3728,7 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     box!.y + box!.height * 0.5,
   );
 
-  // Even a sub-threshold trackpad intent is manual navigation and must stop
+  // Even one small trackpad sample is manual navigation and must stop
   // Journey auto-advance immediately without changing destination identity.
   await page.mouse.wheel(0, -16);
   await expect(controls).toHaveCount(0);
@@ -3744,12 +3744,12 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     destinationBefore,
   );
 
-  // The identity assertions above may exceed the single-sample gesture
-  // reset. Start a fresh trackpad-like gesture and cross the threshold inside
-  // one reset window; Journey must stay stopped while manual scale resumes.
-  // Chromium can coalesce tiny automation-level mouse.wheel samples; use the
-  // same DOM WheelEvent accumulator probe as the dedicated trackpad contract.
-  // The first page.mouse.wheel above still validates real pointer takeover.
+  // The identity assertions above may exceed the diagnostic gesture reset.
+  // Start a fresh trackpad-like burst; every delivered sample must move the
+  // live coordinate directly while Journey remains stopped. Chromium can
+  // coalesce tiny automation-level mouse.wheel samples, so use DOM WheelEvents
+  // for the burst. The first page.mouse.wheel above still validates real
+  // pointer takeover.
   for (let index = 0; index < 11; index += 1) {
     await dispatchScaleWheel(page, -16);
     await page.waitForTimeout(20);
