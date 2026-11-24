@@ -172,6 +172,11 @@ export function SurfaceScene({
     hasPlanet &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
+  const prepare =
+    anchored &&
+    hasPlanet &&
+    (phase === "atmosphere" || phase === "surface") &&
+    Boolean(liveWorldFallbackReason(gl, quality));
 
   useEffect(
     () => () => {
@@ -199,29 +204,37 @@ export function SurfaceScene({
   }, -100);
 
   useEffect(() => {
-    if (!active) {
+    if (!prepare) {
       // Once the fallback terrain has been created, keep that same instance
       // mounted under the shared Canvas and let SurfaceTerrain publish
       // lifecycle="parked". Its active/phaseRef guards pause all update work;
       // actual disposal remains owned by Canvas teardown.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
+      if (!terrainEnabled) {
+        document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
+      }
       return;
     }
 
     // A previously prepared terrain is the retained fallback. Re-entering
     // Surface must resume it rather than scheduling a second FiniteTerrain.
-    if (terrainEnabled) return;
+    if (terrainEnabled) {
+      document.documentElement.dataset.universeSurfacePrewarm = "ready";
+      return;
+    }
 
     const idleWindow = window as IdleWindow;
     let cancelled = false;
     let idleHandle: number | null = null;
     document.documentElement.dataset.universeSurfaceTerrainState = "deferred";
+    document.documentElement.dataset.universeSurfacePrewarm = "scheduled";
 
     const timer = window.setTimeout(() => {
       if (cancelled) return;
       const enable = () => {
         if (cancelled) return;
         document.documentElement.dataset.universeSurfaceTerrainState = "preparing";
+        document.documentElement.dataset.universeSurfacePrewarm = "preparing";
         setTerrainEnabled(true);
       };
       if (idleWindow.requestIdleCallback) {
@@ -229,7 +242,7 @@ export function SurfaceScene({
       } else {
         enable();
       }
-    }, 480);
+    }, phase === "atmosphere" ? 320 : 0);
 
     return () => {
       cancelled = true;
@@ -239,7 +252,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [active, terrainEnabled]);
+  }, [phase, prepare, terrainEnabled]);
 
   const content = (
     <>
