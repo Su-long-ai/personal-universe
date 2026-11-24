@@ -1286,7 +1286,7 @@ test("surface reversal starts a new gesture and moves outward immediately", asyn
   await runtime.assertClean(testInfo);
 });
 
-test("manual Surface exploration survives one wheel departure and return", async ({
+test("Surface taps stay selection-safe while drag exploration survives departure and return", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -1313,6 +1313,50 @@ test("manual Surface exploration survives one wheel departure and return", async
   expect(box).not.toBeNull();
   const x = box!.x + box!.width * 0.52;
   const y = box!.y + box!.height * 0.52;
+
+  // A click or touch tap is selection intent, not a camera takeover. This is
+  // required for clickable 3D Surface signals to coexist with manual explore.
+  await page.mouse.click(x, y);
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "settled",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-manual-view",
+  );
+
+  await canvas.evaluate((element, point) => {
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 73,
+      pointerType: "touch",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX: point.x,
+      clientY: point.y,
+    };
+    element.dispatchEvent(new PointerEvent("pointerdown", init));
+    window.dispatchEvent(
+      new PointerEvent("pointerup", {
+        ...init,
+        buttons: 0,
+      }),
+    );
+  }, { x, y });
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "settled",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-manual-view",
+  );
+
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 54, y + 18, { steps: 6 });
