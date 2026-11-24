@@ -18,6 +18,7 @@ import {
 } from "../../lib/universe/types";
 import {
   WORLD_SCALE_EPSILON,
+  WORLD_SCALE_MAX,
   continuousScaleResponse,
   isWorldScalePhase,
   scalePhaseIndex,
@@ -325,7 +326,10 @@ export function CinematicCamera({
       const continuousWorldCamera =
         worldScaleContinuous &&
         isWorldScalePhase(phase) &&
-        (!surfaceFallbackAvailable || worldScalePosition <= 4);
+        (
+          !surfaceFallbackAvailable ||
+          worldScalePosition < WORLD_SCALE_MAX - WORLD_SCALE_EPSILON
+        );
       const continuousScaleCamera =
         continuousSystemCamera || continuousWorldCamera;
       if (
@@ -493,7 +497,10 @@ export function CinematicCamera({
     const continuousWorldCamera =
       worldScaleContinuous &&
       isWorldScalePhase(phase) &&
-      (!surfaceFallbackAvailable || worldScalePosition <= 4);
+      (
+        !surfaceFallbackAvailable ||
+        worldScalePosition < WORLD_SCALE_MAX - WORLD_SCALE_EPSILON
+      );
     const nearLiveSurface =
       !surfaceFallbackAvailable &&
       Boolean(activeSurfaceCameraFrame) &&
