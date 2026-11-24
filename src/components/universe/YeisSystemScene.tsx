@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -267,6 +267,23 @@ export function YeisSystemScene({
     [],
   );
 
+  const bodyRenderOptions = useMemo(
+    () => ({
+      atmospheres: quality !== "low",
+      clouds: quality !== "low",
+      rings: true,
+      ringParticles: false,
+      shadows: quality !== "low",
+      imagery: false,
+      fill: focusFillRef.current,
+    }),
+    [quality],
+  );
+  const apparentRadiusForBody = useCallback(
+    (id: string) => resources?.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+    [resources],
+  );
+
   useEffect(
     () => () => {
       targetResources.hitGeometry.dispose();
@@ -400,7 +417,8 @@ export function YeisSystemScene({
 
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current === 0) {
-      let best: { planet: PlanetDefinition; distance: number } | null = null;
+      let bestPlanet: PlanetDefinition | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
       for (const planet of system.planets) {
         const body = native.get(nativePlanetId(planet));
         if (!body) continue;
@@ -412,13 +430,14 @@ export function YeisSystemScene({
           projected.x * size.width * 0.5,
           projected.y * size.height * 0.5,
         );
-        if (distance <= 92 && (!best || distance < best.distance)) {
-          best = { planet, distance };
+        if (distance <= 92 && distance < bestDistance) {
+          bestPlanet = planet;
+          bestDistance = distance;
         }
       }
 
-      const nextId = best?.planet.id ?? null;
-      const nextNativeId = best ? nativePlanetId(best.planet) : null;
+      const nextId = bestPlanet?.id ?? null;
+      const nextNativeId = bestPlanet ? nativePlanetId(bestPlanet) : null;
       if (focusedIdRef.current !== nextId) {
         focusedIdRef.current = nextId;
         focusedNativeIdRef.current = nextNativeId;
@@ -429,7 +448,7 @@ export function YeisSystemScene({
         } else {
           delete document.documentElement.dataset.universeSystemFocus;
         }
-        onScaleFocus?.(best?.planet ?? null);
+        onScaleFocus?.(bestPlanet);
       }
     }
 
@@ -448,15 +467,7 @@ export function YeisSystemScene({
       star.radius,
       resources.sunColor,
       state.clock.elapsedTime,
-      {
-        atmospheres: quality !== "low",
-        clouds: quality !== "low",
-        rings: true,
-        ringParticles: false,
-        shadows: quality !== "low",
-        imagery: false,
-        fill: focusFillRef.current,
-      },
+      bodyRenderOptions,
     );
     resources.points.setPixelRatio(gl.getPixelRatio());
     resources.points.update(
@@ -469,7 +480,7 @@ export function YeisSystemScene({
       true,
       quality !== "low",
       pxPerRad,
-      (id) => resources.bodies.byId.get(id)?.apparentRadiusPx ?? 0,
+      apparentRadiusForBody,
       focusedNativeIdRef.current,
     );
   });
