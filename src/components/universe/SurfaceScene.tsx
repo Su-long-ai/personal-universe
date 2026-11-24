@@ -9,7 +9,8 @@ import {
 } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import type { PlanetDefinition, QualityMode, UniversePhase } from "../../lib/universe/types";\nimport { buildSurfaceWorldProfile } from "../../lib/universe/surface";
+import type { PlanetDefinition, QualityMode, UniversePhase } from "../../lib/universe/types";
+import { buildSurfaceWorldProfile } from "../../lib/universe/surface";
 import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
