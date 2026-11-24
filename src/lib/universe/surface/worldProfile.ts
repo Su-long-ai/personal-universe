@@ -53,6 +53,7 @@ export interface SurfaceContentAnchor {
   title: string;
   position: [number, number];
   landmarkId?: string;
+  regionId?: string;
   cluster: number;
 }
 
@@ -421,7 +422,7 @@ export function buildSurfaceWorldProfile(
   }));
 
   const contentAnchors: SurfaceContentAnchor[] = contentEntries.map(
-    (entry, index) => {
+    (entry) => {
       const key = entry.placementKey?.trim() || entry.id;
       const local = new SeededRng(`${planet.seed}:surface-content:${key}`);
       const landmark =
@@ -429,7 +430,12 @@ export function buildSurfaceWorldProfile(
           hashSeed(`${planet.seed}:${key}:landmark`) %
             Math.max(1, landmarks.length)
         ];
-      const base = landmark?.position ?? LANDING;
+      const region =
+        regions[
+          hashSeed(`${planet.seed}:${key}:region`) %
+            Math.max(1, regions.length)
+        ];
+      const base = landmark?.position ?? region?.center ?? LANDING;
       const angle = local.range(0, Math.PI * 2);
       const distance = local.range(0.55, 1.75);
       return {
@@ -441,7 +447,10 @@ export function buildSurfaceWorldProfile(
           base[1] + Math.sin(angle) * distance,
         ],
         ...(landmark ? { landmarkId: landmark.id } : {}),
-        cluster: index % Math.max(1, Math.min(3, regions.length)),
+        ...(region ? { regionId: region.id } : {}),
+        cluster:
+          hashSeed(`${planet.seed}:${key}:cluster`) %
+          Math.max(1, Math.min(3, regions.length)),
       };
     },
   );
