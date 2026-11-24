@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MutableRefObject,
 } from "react";
@@ -8,6 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { createTerrain, type FiniteTerrain } from "procedural-terrains";
 import * as THREE from "three";
+import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
 
@@ -49,6 +51,13 @@ export function SurfaceTerrain({
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
   const [activated, setActivated] = useState(active);
+  const softwareRenderer = isSoftwareRenderer(gl);
+  const terrainViewInitialized = useRef(false);
+  const lastCameraPosition = useRef(new THREE.Vector3());
+  const lastCameraQuaternion = useRef(new THREE.Quaternion());
+  const lastProjection = useRef(new THREE.Matrix4());
+  const currentCameraPosition = useRef(new THREE.Vector3());
+  const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
     if (active) setActivated(true);
@@ -84,7 +93,12 @@ export function SurfaceTerrain({
           heightScale: 34,
           seaLevel: -20,
           material: {
-            terrainDetailQuality: 2,
+            // Detail pages are useful on a real GPU, but their per-frame
+            // streaming/upload path is disproportionately expensive under
+            // SwiftShader. The software fallback keeps the same terrain
+            // geometry/height identity and omits only that optional detail
+            // layer so navigation remains interruptible.
+            terrainDetailQuality: softwareRenderer ? 0 : 2,
             terrainTriplanar: true,
           },
           style: {
@@ -125,6 +139,7 @@ export function SurfaceTerrain({
         instance.dispose();
         return;
       }
+      terrainViewInitialized.current = false;
       setTerrain(instance);
       onAnchorHeight?.((instance.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
     })().catch((error) => {
@@ -146,7 +161,7 @@ export function SurfaceTerrain({
       controller.abort();
       instance?.dispose();
     };
-  }, [activated, camera, gl, onAnchorHeight]);
+  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
 
   useEffect(() => {
     const lifecycle = !activated
@@ -170,14 +185,44 @@ export function SurfaceTerrain({
   }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
-    // `active` is delivered through the R3F reconciler. On hosted
-    // software WebGL, one expensive terrain update can run after the outer
-    // navigation event has already requested Surface -> Atmosphere but before
-    // that prop update reaches this subtree. Read the same navigation phase
-    // ref that the coordinator mutates synchronously so no stale Surface frame
-    // can starve the phase/camera handoff.
-    if (!active || phaseRef.current !== "surface") return;
-    terrain?.update(delta, { camera });
+    // `active` is delivered through the R3F reconciler. Read the coordinator
+    // ref first so no *new* Surface work starts after an outward wheel intent.
+    if (!active || phaseRef.current !== "surface" || !terrain) return;
+
+    if (softwareRenderer) {
+      // FiniteTerrain.update() performs LOD/culling and optional detail-cache
+      // work. Repeating it every frame for an unchanged camera is redundant,
+      // and under SwiftShader one already-running update can monopolize the
+      // main thread long enough to starve the React/R3F phase handoff. Keep
+      // software fallback updates camera-driven: first visible frame plus any
+      // real camera/projection change (manual exploration and resize still
+      // update normally).
+      camera.updateWorldMatrix(true, false);
+      camera.getWorldPosition(currentCameraPosition.current);
+      camera.getWorldQuaternion(currentCameraQuaternion.current);
+      const positionChanged =
+        !terrainViewInitialized.current ||
+        currentCameraPosition.current.distanceToSquared(
+          lastCameraPosition.current,
+        ) > 1e-8;
+      const rotationChanged =
+        !terrainViewInitialized.current ||
+        1 - Math.abs(
+          currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
+        ) > 1e-8;
+      const projectionChanged =
+        !terrainViewInitialized.current ||
+        !camera.projectionMatrix.equals(lastProjection.current);
+
+      if (!positionChanged && !rotationChanged && !projectionChanged) return;
+
+      lastCameraPosition.current.copy(currentCameraPosition.current);
+      lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
+      lastProjection.current.copy(camera.projectionMatrix);
+      terrainViewInitialized.current = true;
+    }
+
+    terrain.update(delta, { camera });
   });
 
   const rockInstances = useMemo(() => {
