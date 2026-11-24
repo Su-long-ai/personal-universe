@@ -1,0 +1,40 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-RENDERER-CONTINUITY-001",
+  "approved_at": "2026-11-24T12:38:56.284Z",
+  "baseline_commit": "b8c396c3076b75d98c83a85203a425f222d31473",
+  "record_path": "docs/reuse-gate/tasks/SCALE-RENDERER-CONTINUITY-001.json",
+  "record_sha256": "ce00fcf9a698538a850be70ff19acf9ef6c90c6ce3fe931d8dfaee9c31089dba",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Reuse the existing R3F Canvas, ProceduralPlanets Planet/PlanetPass and ProceduralTerrains fallback to prewarm close-world resources before System handoff, retain compositor/world identity across scale phases, and prepare fallback terrain before Surface"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "existing-stack-stable-lifecycle",
+    "stable-planet-pass-composer",
+    "retained-terrain-prewarm"
+  ],
+  "candidate_scores": {
+    "existing-stack-stable-lifecycle": 54,
+    "stable-planet-pass-composer": 51,
+    "retained-terrain-prewarm": 51,
+    "second-transition-renderer": 23
+  }
+}
