@@ -1,0 +1,127 @@
+{
+  "schema": 2,
+  "task_id": "SYSTEM-RENDER-HOT-PATH-ALLOC-001",
+  "title": "Reuse stable System renderer inputs inside the R3F frame loop",
+  "scope": {
+    "level": "implementation",
+    "subject": "Remove avoidable per-frame object, callback and focus-record allocations from the existing YEIS/native and fallback System render loops without changing navigation, camera or renderer authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The current System scenes already reuse the pinned MIT YEIS renderer inside the single React Three Fiber Canvas, but the native frame loop recreates the BodyRenderer options object and OrbitLines radius callback every frame, while both native and fallback focus scans allocate temporary best-candidate records. R3F explicitly recommends mutating stable frame-loop data rather than routing fast updates through React state, and the existing YEIS renderer APIs accept reusable inputs. Keep the current renderer/camera/navigation design and hoist immutable-or-quality-scoped inputs out of useFrame; use scalar best-candidate tracking instead of transient records. No scheduler, cache layer or second rendering abstraction is needed.",
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The pinned MIT YEIS renderer remains the product's native System implementation; this task only reuses its existing update inputs and ownership."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/advanced/pitfalls",
+      "finding": "React Three Fiber recommends direct mutation inside useFrame for fast updates and avoiding unnecessary React scheduling or allocation in frame loops."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "useFrame is the framework-owned render-loop hook, so stable renderer inputs should remain attached to this loop rather than introducing another scheduler."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": ["your-eyes-in-space-mit-e520568"],
+      "source_refs": [0],
+      "conclusion": "Retain the already-integrated pinned YEIS System renderer; replacing it to remove a few JavaScript allocations would lose substantially more product coverage than it gains."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": ["react-three-fiber"],
+      "source_refs": [1, 2],
+      "conclusion": "Use R3F's existing useFrame ownership and stable React refs/memos to keep hot-loop inputs reusable without adding another frame scheduler."
+    },
+    {
+      "level": "subsystem",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "The measured implementation shape does not require a new pooling or scheduling subsystem; the current renderers already expose all required update inputs."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No additional component or asset is needed because the allocations are local JavaScript wrappers around existing renderer calls."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "pinned-yeis-stable-update-inputs",
+      "name": "Pinned YEIS renderer with stable update inputs",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing product System renderer at the verified MIT commit",
+      "license": "MIT at e520568 with existing data notices",
+      "decision": "reuse",
+      "reason": "The renderer already provides the complete System behavior and accepts caller-owned update inputs; hoisting wrappers preserves all native behavior.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "r3f-stable-frame-loop-values",
+      "name": "R3F useFrame with memoized and ref-backed values",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing single Canvas and framework frame loop",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "R3F already owns the frame loop; stable memos/refs remove wrapper allocations while preserving the same execution ordering and renderer authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "custom-system-frame-pool",
+      "name": "Project-owned frame object pool and scheduling layer",
+      "level": "subsystem",
+      "source": "New project-specific pooling/scheduler code",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "A custom pool/scheduler would duplicate R3F frame ownership, add lifecycle state and increase complexity for allocations that can be removed with ordinary stable values.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 3,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": ["pinned-yeis-stable-update-inputs", "r3f-stable-frame-loop-values"],
+    "rationale": "Keep the verified YEIS System renderer and the single R3F frame loop. Move quality-scoped BodyRenderer options and the orbit radius callback out of useFrame, and replace temporary best-focus records with scalar references. This removes recurring allocations without altering coordinates, navigation, focus thresholds, camera ownership or visual quality.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a reused options object is found to be mutated by an upstream renderer, keep the same design but clone only at renderer initialization or quality changes; do not reintroduce per-frame allocation or a new scheduler."
+  }
+}
