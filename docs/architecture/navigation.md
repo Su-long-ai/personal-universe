@@ -377,6 +377,14 @@ native star, the YEIS reference frame switches with `Universe.switchTo()`,
 and `CameraController.shiftFrame()` preserves the same absolute camera while
 the target system becomes the current native frame.
 
+Task `GALAXY-NATIVE-SCALE-PROGRESS-EXECUTOR-001` keeps the pinned YEIS
+`gotoPoint` trajectory itself as the native executor, but gives it an optional
+normalized progress override while continuous scale owns the gesture. In that
+mode `CameraController.update()` evaluates the existing logarithmic distance,
+direction and quaternion curve at the supplied coordinate without incrementing
+or completing it from elapsed `dt`. Search/Places/click travel leaves the
+override absent and retains the original time-driven native behavior.
+
 Task `GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001` then makes that restored
 native LOD path part of the same product scale coordinate. Galaxy is coordinate
 0 and System is coordinate 1. Every signed wheel/trackpad sample changes that

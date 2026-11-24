@@ -42,10 +42,14 @@ distance with the same perspective sphere-fit formula and
 `SYSTEM_OVERVIEW_FRAME_SCALE` used by camera-controls on the product side.
 Task `GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001` retains the pinned
 `CameraController.goToPoint()` interpolation but replaces elapsed-time
-progress with the normalized product coordinate: Galaxy=0 and System=1. Each
-wheel/trackpad sample therefore scrubs the existing logarithmic native camera
-trajectory directly. No second camera, tween loop, transition renderer or
-alternate LOD representation is introduced.
+progress with the normalized product coordinate: Galaxy=0 and System=1. Task
+`GALAXY-NATIVE-SCALE-PROGRESS-EXECUTOR-001` makes that ownership explicit in
+the retained controller: a progress override evaluates the native trajectory
+at the requested coordinate without advancing `t` from frame time or invoking
+normal timed completion at coordinate 1. Each wheel/trackpad sample therefore
+scrubs the existing logarithmic native camera trajectory directly. No second
+camera, tween loop, transition renderer or alternate LOD representation is
+introduced.
 
 The resulting `starId + position + quaternion + systemOverview` view state is
 persisted continuously and written at coordinate 1. When product System takes

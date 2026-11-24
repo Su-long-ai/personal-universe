@@ -2025,8 +2025,22 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
   // 384 px spans Galaxy=0 -> System=1. These values deliberately land on
   // product-visible intermediate coordinates without crossing a semantic phase.
   await driveTo(-76.8, 0.2);
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
   await driveTo(-96, 0.45);
   await driveTo(-19.2, 0.5);
+
+  // Elapsed frame time must not advance the native Galaxy trajectory. Holding
+  // the wheel at coordinate 0.5 keeps the physical camera at the same point;
+  // only another scale sample may move it.
+  const ratioAtHalf = previousRatio;
+  await page.waitForTimeout(300);
+  expect(
+    Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
+  ).toBeCloseTo(ratioAtHalf, 4);
+
   await driveTo(-96, 0.75);
   await driveTo(-19.2, 0.8);
 
