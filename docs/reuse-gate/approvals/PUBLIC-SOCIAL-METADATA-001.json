@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "PUBLIC-SOCIAL-METADATA-001",
+  "approved_at": "2026-11-24T09:01:30.000Z",
+  "baseline_commit": "c8b1401991555cb2e7f8b40530a772dc88749b1e",
+  "record_path": "docs/reuse-gate/tasks/PUBLIC-SOCIAL-METADATA-001.json",
+  "record_sha256": "7dd4a0d3e4656aaff13a3a3fc55cc64ec347e31e2b37a339fd151e8169fb90f1",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-base-url": "ebdc55c69abbc1db2612243fb329c538a480a83af0c06dfcb9d2623d20153b98",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Use Astro's native site/url primitives and standard HTML metadata to publish canonical, Open Graph and Twitter/X preview tags for the single public Personal Universe page, reusing an already-hosted Galaxy acceptance screenshot as the preview image instead of adding an SEO runtime or promotional rendering system"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/pages/index.astro",
+    "public/social-preview.png",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "astro-native-social-metadata",
+    "hosted-galaxy-social-preview"
+  ],
+  "candidate_scores": {
+    "astro-seo-package": 51.5,
+    "astro-native-social-metadata": 57,
+    "hosted-galaxy-social-preview": 56
+  }
+}
