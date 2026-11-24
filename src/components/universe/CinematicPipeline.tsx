@@ -73,10 +73,10 @@ export function CinematicPipeline({
     next.addPass(new RenderPass(scene, camera));
 
     // Keep the composer topology stable across product quality changes.
-    // PlanetPass is provisioned lazily below only when a live world is
-    // actually requested, then retained and parked for later fallback modes.
-    // This avoids paying its construction cost on AUTO/software while also
-    // preventing LOW/AUTO/HIGH switches from reallocating the whole pipeline.
+    // On a real GPU the retained PlanetPass host may be provisioned while
+    // System still presents; software WebGL keeps it lazy until a live world
+    // is actually visible. Either way the same pass is retained and parked
+    // across later fallback/quality switches instead of rebuilding topology.
     const bloomPass = !softwareRenderer
       ? new UnrealBloomPass(
           new THREE.Vector2(1, 1),
