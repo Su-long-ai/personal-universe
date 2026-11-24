@@ -1219,6 +1219,10 @@ export function YeisGalaxyScene({
             },
           );
           scaleBridgeControllerKeyRef.current = bridgeControllerKey;
+          scaleBridgeAutopilotRevisionRef.current =
+            state.controller.autopilotRevision;
+          document.documentElement.dataset.universeGalaxyScaleExecutorRevision =
+            String(state.controller.autopilotRevision);
         }
 
         const visualScalePosition =
@@ -1240,12 +1244,6 @@ export function YeisGalaxyScene({
           state.systemOverview
             ? bridge.starId
             : "approaching:" + bridge.starId;
-        document.documentElement.dataset.universeTravelArrivalRatio =
-          (
-            state.controller.position.distanceTo(
-              scaleBridgeTargetCentre.fromArray(bridge.targetCentreKm),
-            ) / Math.max(state.nativeSystemSpanKm, 1)
-          ).toFixed(4);
         document.documentElement.dataset.universeGalaxyScaleBridge =
           state.systemOverview
             ? "system-endpoint"
@@ -1274,6 +1272,7 @@ export function YeisGalaxyScene({
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
       delete document.documentElement.dataset.universeGalaxyScaleExecutor;
+      delete document.documentElement.dataset.universeGalaxyScaleExecutorRevision;
       delete document.documentElement.dataset.universeGalaxyScalePathId;
       delete document.documentElement.dataset.universeGalaxyScaleAppliedPosition;
       delete document.documentElement.dataset.universeGalaxyScaleVisualProgress;
