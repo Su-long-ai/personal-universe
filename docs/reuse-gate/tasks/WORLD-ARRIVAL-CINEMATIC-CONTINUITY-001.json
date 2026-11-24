@@ -1,0 +1,143 @@
+{
+  "schema": 2,
+  "task_id": "WORLD-ARRIVAL-CINEMATIC-CONTINUITY-001",
+  "title": "Keep close-world arrival on one illuminated hemisphere with the existing camera authority",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing camera-controls phase shots so Orbit, Atmosphere and Surface remain visually continuous on the same lit hemisphere without changing renderer or navigation authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The current close-world renderer already reuses ProceduralPlanets and one camera-controls authority, but the Orbit shot sits on the opposite side of the planet from the product sun and the canonical lit Surface anchor. This makes the live HIGH world read almost black and forces a large camera reversal before landing. Reuse the existing camera-controls shot orchestration and keep the renderer/light model unchanged: move Orbit and Atmosphere onto the same illuminated side that already contains the Surface anchor, preserving sphere-fit distance, phase semantics, and the single camera authority.",
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/yomotsu/camera-controls/blob/v3.1.2/src/CameraControls.ts",
+      "finding": "The installed camera-controls line already owns setLookAt transitions, spherical camera interpolation and fit-distance calculation; phase composition should stay inside this authority instead of adding another camera animator."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "The adopted close-world renderer already supplies the planet, atmosphere and surface terrain. The visual defect is camera/light-side composition, not missing planet rendering capability."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber already provides the single shared camera/render lifecycle; changing only the existing cinematic shot coordinates preserves that lifecycle and avoids a second render or camera surface."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep the selected YEIS universe/navigation backbone; this close-world composition issue does not justify replacing the cross-scale product."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the existing R3F Canvas and camera lifecycle; no new framework or render surface is needed for this visual correction."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep ProceduralPlanets as the close-world visual authority and preserve its existing sun/light model instead of replacing or layering another planet renderer."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse the already-installed camera-controls shot executor and its existing fit-distance path; only the selected Orbit and Atmosphere view directions need refinement."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "camera-controls-lit-side-shot-refinement",
+      "name": "Existing camera-controls phase-shot refinement",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Current CinematicCamera setLookAt / fit-sphere path",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It directly fixes the observed phase-to-phase camera reversal while keeping the existing transition executor, settlement contract and viewport-aware framing.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "procedural-planets-existing-world-authority",
+      "name": "Existing ProceduralPlanets world/light authority",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Existing ProceduralPlanets live world",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "The renderer is already the correct visual authority and should be retained, but changing its lighting/shader path is broader than necessary for a camera-side composition defect.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4,
+        "customization_fit": 4,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "custom-second-camera-animation",
+      "name": "Project-owned second camera animation path",
+      "level": "component_asset",
+      "source": "New local camera interpolation",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "It would duplicate camera-controls, risk settlement races already closed during release hardening, and create a second source of camera transition truth.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "camera-controls-lit-side-shot-refinement",
+      "procedural-planets-existing-world-authority"
+    ],
+    "rationale": "Retain ProceduralPlanets unchanged as the world renderer and refine only the existing camera-controls phase shots. Orbit and Atmosphere should approach the same illuminated hemisphere as the canonical Surface anchor, while keeping the current fit-distance, transition timing, settlement generation guards and single-camera authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If the new viewing direction causes a transition collision or composition regression, retain the existing renderer and adjust only camera-controls azimuth/elevation within the same distance envelope; do not add a shader fork or second camera system."
+  }
+}
