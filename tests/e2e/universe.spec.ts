@@ -618,6 +618,67 @@ test("low-quality Surface retains the existing terrain fallback", async ({
     "procedural-terrains-fallback",
     { timeout: 15_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-profile",
+    /^surface:/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-landmarks",
+    /[1-9][0-9]*/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-world",
+    /^surface:/,
+    { timeout: 60_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("generated secondary terrestrial worlds receive deterministic Surface product profiles @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?engine=v2&phase=surface&star=proc%3A0&body=personal-universe-v2%3Asystem%3A0%3Aplanet%3A0&freeze=1",
+  );
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-engine", "v2", {
+    timeout: 15_000,
+  });
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 15_000 },
+  );
+  await page.getByLabel("QUALITY").selectOption("low");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 60_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-profile",
+    /^surface:/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-biome",
+    /.+/,
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-surface-landmarks")),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0);
+  const profile = await html.getAttribute("data-universe-surface-profile");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-world",
+    profile!,
+    { timeout: 60_000 },
+  );
 
   await runtime.assertClean(testInfo);
 });
