@@ -3142,17 +3142,78 @@ test("Search keyboard navigation reaches personal content", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Places featured destination navigates", async ({ page }, testInfo) => {
+test("Search ranks bilingual personal alias above generic catalog matches", async ({
+  page,
+}, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const featured = page.locator(".navigator-result-row", {
-    has: page.locator(".kind-featured"),
-  }).first();
-  await expect(featured).toBeVisible();
-  await featured.locator(".navigator-result-open").click();
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("个人宇宙");
+
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toBeVisible();
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-origin",
+    "personal",
+  );
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-id",
+    /^personal:/,
+  );
+  await expect(rows.first()).toContainText("Personal Universe");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Search exact canonical id wins deterministic ranking", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("body:c0/earth");
+
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-id",
+    "body:c0/earth",
+  );
+  await expect(rows.first()).toContainText("Earth");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Places Featured keeps the canonical destination id across reload", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const featuredGroup = dialog.locator(
+    '.navigator-result-group[aria-label="Featured"]',
+  );
+  const featuredStar = featuredGroup
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-star") })
+    .first();
+  await expect(featuredStar).toBeVisible();
+  await expect(featuredStar).toHaveAttribute(
+    "data-destination-featured",
+    "true",
+  );
+  const canonicalId = await featuredStar.getAttribute("data-destination-id");
+  expect(canonicalId).toMatch(/^star:/);
+  expect(canonicalId).not.toMatch(/^featured:/);
+
+  await featuredStar.locator(".navigator-result-open").click();
 
   await expect(dialog).toBeHidden();
   await expect(page.locator("html")).toHaveAttribute(
@@ -3160,14 +3221,22 @@ test("Places featured destination navigates", async ({ page }, testInfo) => {
     "system",
   );
   await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
-  const activeFeatured = await page
-    .locator("html")
-    .getAttribute("data-universe-active-destination");
-  expect(activeFeatured).toMatch(/^featured:star:/);
-  const placeTarget = await page
-    .locator("html")
-    .getAttribute("data-universe-navigation-target");
-  expect(placeTarget).toBeTruthy();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    canonicalId!,
+  );
+
+  const shared = new URL(page.url());
+  expect(shared.searchParams.get("destination")).toBe(canonicalId);
+  await page.goto(shared.toString());
+  await waitForYeisEngine(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    canonicalId!,
+  );
+  expect(
+    await page.locator("html").getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
 
   await runtime.assertClean(testInfo);
 });
@@ -3180,9 +3249,9 @@ test("Earth body navigation preserves async search and shareable return flow", a
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const featuredRows = dialog
-    .locator(".navigator-result-row")
-    .filter({ has: page.locator(".kind-featured") });
+  const featuredRows = dialog.locator(
+    '.navigator-result-group[aria-label="Featured"] .navigator-result-row',
+  );
   await expect(featuredRows.first()).toBeVisible();
 
   const search = page.getByRole("combobox", { name: "Search universe" });
