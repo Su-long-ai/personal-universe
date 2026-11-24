@@ -13,6 +13,8 @@ import * as THREE from "three";
 import {
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
 import { isSoftwareRenderer } from "./CinematicPipeline";
@@ -350,18 +352,34 @@ export function SurfaceTerrain({
     );
   }, [profile.id, softwareRenderer, terrain]);
 
-  const visibleLandmarks = softwareRenderer
-    ? profile.landmarks.slice(0, 3)
-    : profile.landmarks;
-  const visibleRegions = softwareRenderer
-    ? profile.regions.slice(0, 2)
-    : profile.regions;
   const rankedContent = useMemo(
     () => rankSurfaceContentAnchors(profile.contentAnchors, focusedEntryId),
     [focusedEntryId, profile.contentAnchors],
   );
   const focusedAnchor =
     rankedContent.find((anchor) => anchor.entryId === focusedEntryId) ?? null;
+  const rankedLandmarks = useMemo(
+    () =>
+      rankSurfaceWorldLandmarks(
+        profile.landmarks,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.landmarks],
+  );
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const visibleLandmarks = softwareRenderer
+    ? rankedLandmarks.slice(0, 3)
+    : rankedLandmarks;
+  const visibleRegions = softwareRenderer
+    ? rankedRegions.slice(0, 2)
+    : rankedRegions;
   const visibleContent = softwareRenderer
     ? rankedContent.slice(0, 3)
     : rankedContent;
@@ -460,6 +478,8 @@ export function SurfaceTerrain({
       {visibleRegions.map((region) => {
         const height =
           (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) + 0.12;
+        const focused = region.id === focusedAnchor?.regionId;
+        const focusScale = focused ? 1.12 : 1;
         return (
           <mesh
             key={region.id}
@@ -468,15 +488,17 @@ export function SurfaceTerrain({
           >
             <ringGeometry
               args={[
-                Math.max(0.34, region.radius * 0.1),
-                Math.max(0.5, region.radius * 0.14),
+                Math.max(0.34, region.radius * 0.1) * focusScale,
+                Math.max(0.5, region.radius * 0.14) * focusScale,
                 softwareRenderer ? 12 : 24,
               ]}
             />
             <meshBasicMaterial
-              color={profile.accent}
+              color={focused ? "#fff0cf" : profile.accent}
               transparent
-              opacity={softwareRenderer ? 0.2 : 0.12}
+              opacity={
+                focused ? 0.42 : softwareRenderer ? 0.2 : 0.12
+              }
               side={THREE.DoubleSide}
               depthWrite={false}
             />
@@ -484,14 +506,20 @@ export function SurfaceTerrain({
         );
       })}
       {visibleLandmarks.map((landmark) => {
+        const focused = landmark.id === focusedAnchor?.landmarkId;
+        const focusScale = focused ? 1.18 : 1;
         const height =
           (terrain.sampleHeight(landmark.position[0], landmark.position[1]) ??
-            0) + 0.34 * landmark.scale;
+            0) + 0.34 * landmark.scale * focusScale;
         return (
           <mesh
             key={landmark.id}
             position={[landmark.position[0], height, landmark.position[1]]}
-            scale={[0.32 * landmark.scale, 0.9 * landmark.scale, 0.32 * landmark.scale]}
+            scale={[
+              0.32 * landmark.scale * focusScale,
+              0.9 * landmark.scale * focusScale,
+              0.32 * landmark.scale * focusScale,
+            ]}
           >
             {landmark.kind === "crater" || landmark.kind === "basin" ? (
               <torusGeometry args={[0.68, 0.13, 6, softwareRenderer ? 10 : 18]} />
@@ -501,9 +529,11 @@ export function SurfaceTerrain({
               <coneGeometry args={[0.55, 1.55, softwareRenderer ? 5 : 8]} />
             )}
             <meshBasicMaterial
-              color={profile.accent}
+              color={focused ? "#fff0cf" : profile.accent}
               transparent
-              opacity={0.38 + landmark.prominence * 0.22}
+              opacity={
+                focused ? 0.84 : 0.38 + landmark.prominence * 0.22
+              }
             />
           </mesh>
         );
