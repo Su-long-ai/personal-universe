@@ -177,7 +177,11 @@ export function UniverseNavigator({
             markers,
             currentSystem ?? null,
           ).then(navigationSectionsForResults)
-        : loadUniversePlaces(placements, markers);
+        : loadUniversePlaces(
+            placements,
+            markers,
+            currentSystem ?? null,
+          );
 
       void request
         .then((next) => {
@@ -469,6 +473,14 @@ export function UniverseNavigator({
                       (isKeyboardActive ? " is-active" : "") +
                       (isCurrent ? " is-current" : "") +
                       (isPendingDestination ? " is-pending" : "")
+                    }
+                    data-destination-id={result.id}
+                    data-destination-origin={result.origin ?? "catalog"}
+                    data-destination-featured={
+                      result.featured ? "true" : undefined
+                    }
+                    data-destination-current={
+                      isCurrent ? "true" : undefined
                     }
                     role="option"
                     aria-selected={isKeyboardActive}
