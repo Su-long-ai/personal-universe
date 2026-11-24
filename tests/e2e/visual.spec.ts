@@ -339,6 +339,23 @@ async function visualCase(
       triangles: Number(data.universeWebglTriangles ?? "0"),
     };
   });
+  const continuity = await page.evaluate(() => {
+    const data = document.documentElement.dataset;
+    return {
+      phase: data.universeNavigationPhase ?? null,
+      position: Number(data.universeScalePosition ?? "NaN"),
+      segment: data.universeScaleCameraSegment ?? null,
+      direction: data.universeScaleDirection ?? null,
+      authority: data.universeRenderAuthority ?? null,
+      handoff: data.universeHandoffState ?? null,
+      queued: data.universeScaleQueued ?? null,
+      projectedRadius: Number(data.universeProjectedRadius ?? "NaN"),
+      worldRenderer: data.universeWorldRenderer ?? null,
+      worldPipeline: data.universeWorldPipeline ?? null,
+      worldReady: data.universeWorldReady ?? null,
+      canvasCount: document.querySelectorAll("canvas").length,
+    };
+  });
 
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
