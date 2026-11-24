@@ -80,6 +80,10 @@ export function SurfaceTerrain({
     const controller = new AbortController();
 
     void (async () => {
+      const html = document.documentElement;
+      html.dataset.universeSurfaceTerrainAllocations = String(
+        Number(html.dataset.universeSurfaceTerrainAllocations ?? "0") + 1,
+      );
       instance = await createInfiniteTerrain({
         renderer: gl,
         signal: controller.signal,
