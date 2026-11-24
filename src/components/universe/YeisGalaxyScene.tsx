@@ -1117,6 +1117,15 @@ export function YeisGalaxyScene({
               ? "galaxy-endpoint"
               : "active";
       }
+    } else if (scaleBridgeRef.current) {
+      // A real authority takeover (manual camera, Search result, Journey,
+      // explicit navigation) clears the retained path. Merely reaching Galaxy
+      // coordinate zero does not: the target is still present in that case and
+      // reverse/forward scrubbing must keep the same path identity.
+      scaleBridgeRef.current = null;
+      state.systemOverview = false;
+      delete document.documentElement.dataset.universeGalaxyScaleBridge;
+      delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
 
     state.input.wheel = 0;
