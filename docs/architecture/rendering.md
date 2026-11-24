@@ -331,7 +331,8 @@ Runtime evidence:
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
 - `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget;
-- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` exposes the cancellable prime lifecycle.
+- `data-universe-surface-terrain-allocations` counts actual Infinite World construction attempts so rapid reversals/re-entry can prove the retained instance stayed singular;
+- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` distinguishes an idle prime cancelled before construction from an already-started retained preparation that may finish while parked.
 
 Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
 fallback could gain useful visual depth from ProceduralTerrains' existing
