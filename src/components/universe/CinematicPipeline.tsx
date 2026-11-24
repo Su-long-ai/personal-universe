@@ -52,6 +52,7 @@ export function CinematicPipeline({
   const useLiveWorld = liveWorld && !fallbackReason;
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
+  const appliedImpostorPixels = useRef<number | null>(null);
   const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
 
   const composer = useMemo(() => {
@@ -130,18 +131,6 @@ export function CinematicPipeline({
   }, [composer, high]);
 
   useEffect(() => {
-    if (!planetPass) return;
-    const impostorPixels = softwareRenderer ? 180 : high ? 90 : 120;
-    planetPass.planetRenderer?.setOptions({ impostorPixels });
-    document.documentElement.dataset.universeWorldImpostorPixels =
-      String(impostorPixels);
-    return () => {
-      delete document.documentElement.dataset.universeWorldImpostorPixels;
-    };
-  }, [high, planetPass, softwareRenderer]);
-
-
-  useEffect(() => {
     if (!liveWorld) {
       delete document.documentElement.dataset.universeWorldPipeline;
       delete document.documentElement.dataset.universeWorldReady;
@@ -206,9 +195,11 @@ export function CinematicPipeline({
   useEffect(() => {
     return () => {
       stableFrames.current = 0;
+      appliedImpostorPixels.current = null;
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
+      delete document.documentElement.dataset.universeWorldImpostorPixels;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
       composer.composer.dispose();
@@ -216,9 +207,45 @@ export function CinematicPipeline({
   }, [composer]);
 
   useFrame((_, delta) => {
+    const desiredImpostorPixels = softwareRenderer ? 180 : high ? 90 : 120;
+    const rendererBeforeDraw = planetPass?.planetRenderer;
+    if (
+      rendererBeforeDraw &&
+      appliedImpostorPixels.current !== desiredImpostorPixels
+    ) {
+      // PlanetPass creates PlanetRenderer lazily. Once it exists, apply the
+      // current quality profile before the next composer draw rather than
+      // rebuilding the pass. This also handles a quality switch that lands
+      // between pass provisioning and renderer creation.
+      rendererBeforeDraw.setOptions({
+        impostorPixels: desiredImpostorPixels,
+      });
+      appliedImpostorPixels.current = desiredImpostorPixels;
+    }
+
     composer.composer.render(delta);
 
     const html = document.documentElement;
+    const rendererAfterDraw = planetPass?.planetRenderer;
+    let rendererProfileReady = false;
+    if (rendererAfterDraw) {
+      if (appliedImpostorPixels.current !== desiredImpostorPixels) {
+        // First PlanetPass draw may be the moment the lazy renderer appears.
+        // Correct its options now, but do not count that just-drawn frame as
+        // first-paint evidence; the following frame will use the matched
+        // profile from the start.
+        rendererAfterDraw.setOptions({
+          impostorPixels: desiredImpostorPixels,
+        });
+        appliedImpostorPixels.current = desiredImpostorPixels;
+      } else {
+        rendererProfileReady = true;
+      }
+      html.dataset.universeWorldImpostorPixels =
+        String(desiredImpostorPixels);
+    } else {
+      delete html.dataset.universeWorldImpostorPixels;
+    }
 
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
@@ -266,8 +293,9 @@ export function CinematicPipeline({
       return;
     }
 
-    const renderer = planetPass?.planetRenderer;
+    const renderer = rendererAfterDraw;
     const frameReady = Boolean(
+      rendererProfileReady &&
       renderer &&
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
