@@ -25,6 +25,7 @@ import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
 } from "../../lib/universe/surface";
 import {
   attachContentToSystem,
@@ -3204,14 +3205,16 @@ export default function UniverseApp({
               className="surface-cluster-index"
               aria-label="Surface signal clusters"
             >
-              {surfaceProfile.contentClusters.slice(0, 3).map((cluster) => (
-                <span
-                  data-priority={cluster.priority}
-                  key={cluster.id}
-                >
-                  {cluster.label} · {cluster.anchorIds.length}
-                </span>
-              ))}
+              {rankSurfaceContentClusters(surfaceProfile.contentClusters)
+                .slice(0, 3)
+                .map((cluster) => (
+                  <span
+                    data-priority={cluster.priority}
+                    key={cluster.id}
+                  >
+                    {cluster.label} · {cluster.anchorIds.length}
+                  </span>
+                ))}
             </div>
           )}
           <em className="surface-explore-hint">
