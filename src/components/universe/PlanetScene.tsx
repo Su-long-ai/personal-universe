@@ -844,7 +844,9 @@ export function PlanetScene({
         ) : null}
       </group>
 
-      {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
+      {(phase === "surface" || worldScalePosition > 4) &&
+      planet.surfaceMode !== "none" &&
+      livePlanet ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
           profile={surfaceProfile}
