@@ -34,21 +34,31 @@ calls `Universe.switchTo()` and `CameraController.shiftFrame()`, preserving
 the absolute camera position while local coordinates change. The current-system
 renderers are then retargeted to the new `StarSystem`; as apparent size grows,
 their existing culling and point/mesh rules determine which detail becomes
-visible. The product System renderer is not mounted during this native flight.
+visible. The product System renderer is not mounted during this native path.
 
 The native endpoint is not a magic distance. `nativeSystemSpan()` is shared
 with the product similarity adapter, and the Galaxy camera computes its arrival
 distance with the same perspective sphere-fit formula and
 `SYSTEM_OVERVIEW_FRAME_SCALE` used by camera-controls on the product side.
+Task `GALAXY-SYSTEM-DIRECT-SCALE-COORDINATE-001` retains the pinned
+`CameraController.goToPoint()` interpolation but replaces elapsed-time
+progress with the normalized product coordinate: Galaxy=0 and System=1. Each
+wheel/trackpad sample therefore scrubs the existing logarithmic native camera
+trajectory directly. No second camera, tween loop, transition renderer or
+alternate LOD representation is introduced.
+
 The resulting `starId + position + quaternion + systemOverview` view state is
-persisted continuously and written again at arrival. When product System takes
+persisted continuously and written at coordinate 1. When product System takes
 authority, `CinematicCamera` reuses that quaternion and the normal
 viewport-aware System fit distance, so camera ownership changes without
-resetting the view direction.
+resetting the view direction. A persistent bridge snapshot keeps the original
+Galaxy endpoint, target star, approach direction and native arrival distance
+across the renderer handoff. Reverse System→Galaxy reconstructs the same
+pinned trajectory at coordinate 1 and scrubs it backward toward coordinate 0
+rather than reinterpreting target-system kilometres or playing a separate
+return animation.
 
-Reverse travel retains the same native reference-frame view state rather than
-reinterpreting target-system kilometres in the Solar frame. Exact body
-Search/Places/click travel remains unchanged; only wheel scale travel
+Exact body Search/Places/click travel remains unchanged; only wheel scale travel
 normalizes a body/content focus to its owning star before the System boundary.
 
 Runtime evidence includes:
@@ -133,11 +143,15 @@ direction and radius-relative target offset converge to the existing Approach
 composition, so coordinate 2 has matched apparent framing even though renderer
 coordinates change after the boundary.
 
-The renderer handoff is deliberately delayed until the matched System endpoint
-has had a paint opportunity. The reverse path mounts System at coordinate 2
-while retaining the selected planet as scale focus; if its body frame is not
-ready yet, the camera holds the last Approach frame rather than snapping to the
-System overview. No transition planet, fade, second camera or custom tween loop
+The renderer handoff prefers one real paint at the matched endpoint, but that
+preference has a 64 ms deadline. On healthy GPU rendering the paint path wins;
+on throttled/software WebGL the composition-matched endpoint hands authority
+over directly so sustained wheel input cannot be stranded at coordinate 1 or 2.
+Repeated same-direction samples at an endpoint do not invalidate the scheduled
+handoff. The reverse path mounts System at coordinate 2 while retaining the
+selected planet as scale focus; if its body frame is not ready yet, the camera
+holds the last Approach frame rather than snapping to the System overview. No
+transition planet, fade, second camera, input replay queue or custom tween loop
 is introduced.
 
 Runtime evidence:
@@ -173,10 +187,14 @@ landing frame.
 The product reuses ProceduralPlanets inside that host:
 
 - a lightweight product sphere appears immediately;
-- live `Planet` construction is delayed until the initial navigation frame is
-  stable;
-- `PlanetPass` is inserted into the existing EffectComposer only for the live
-  path;
+- once a System scale target is locked, the selected close-world module can
+  begin warming while the System renderer still owns presentation;
+- the System renderer remains mounted across the semantic boundary until the
+  close world has participated in two real composer frames, so lazy import or
+  shader warmup cannot expose an empty Canvas;
+- one `PlanetPass` is allocated with the stable EffectComposer and is enabled
+  or parked as presentation changes; phase changes do not dispose and recreate
+  the composer/pass pair;
 - LOW quality always uses the lightweight fallback;
 - AUTO quality falls back on software renderers such as SwiftShader/llvmpipe;
 - HIGH quality explicitly requests the live renderer and is used by the
@@ -188,6 +206,10 @@ Runtime evidence:
 - `data-universe-world-pipeline`
 - `data-universe-world-ready`
 - `data-universe-world-scene-ready`
+- `data-universe-world-scene-lifecycle="prewarming|active"`
+- `data-universe-world-paint-ready="true"`
+- `data-universe-world-pipeline-lifecycle="parked|active"`
+- `data-universe-world-pipeline-allocations`
 
 A live HIGH world is accepted only when the renderer reports
 `procedural-planets-live`, the pipeline reports
@@ -249,18 +271,21 @@ terrain subsystem, not a second terrain engine. The fallback publishes
 `"infinite-hardware"`.
 
 Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
-first fallback Surface visit creates one retained Infinite World instance;
-leaving Surface hides the same scene and pauses its `terrain.update` call, but
-does not synchronously dispose streamed GPU/chunk resources on the wheel
-transition path. The retained instance is disposed only when its R3F Canvas host
-is actually destroyed. This remains a bounded one-instance residency tradeoff,
+fallback begins preparing during the inward Atmosphere interval at an
+idle/stable boundary instead of waiting for the Surface boundary. If navigation
+reverses before construction begins, the scheduled prime is cancelled. Once
+created, one retained Infinite World instance is reused; leaving Surface hides
+the same scene and pauses its `terrain.update` call, but does not synchronously
+dispose streamed GPU/chunk resources on the wheel transition path. The retained
+instance is disposed only when its R3F Canvas host is actually destroyed. This remains a bounded one-instance residency tradeoff,
 not a terrain cache and not a second renderer or navigation authority.
 
 Runtime evidence:
 
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
-- `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget.
+- `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget;
+- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` exposes the cancellable prime lifecycle.
 
 Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
 fallback could gain useful visual depth from ProceduralTerrains' existing
@@ -346,10 +371,22 @@ Fallbacks are product behavior, not hidden test exceptions:
 
 ## Lifecycle and loading
 
-Large renderer paths are lazy-loaded. Native system resources are constructed
-only in the system phase and disposed on unmount. Live close-world
-ProceduralPlanets resources exist only in close-world phases, now including
-Surface. Crucially, the live `Planet` is not disposed and recreated at the
+Task `SCALE-RENDERER-CONTINUITY-001` moves the ownership boundary outward
+without adding another renderer: once a planet focus is locked, the existing
+close-world scene may prewarm while System still presents. The System scene
+remains visible until the close world reports real painted frames, and the
+EffectComposer plus PlanetPass are parked rather than rebuilt when presentation
+is inactive. The same Planet/material/LOD identity therefore survives forward
+and reverse travel. LOW/AUTO-software retain the same Surface terrain instance,
+with cancellable Atmosphere-time preparation before the final boundary.
+
+Large renderer paths are lazy-loaded. The pinned native current-system LOD
+resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
+disposed with that scene; the product similarity-scaled native System renderer
+is still constructed only when product System owns coordinate 1→2. Live
+close-world ProceduralPlanets resources may begin prewarming during late System
+after a scale target is locked, then remain mounted through Approach, Orbit,
+Atmosphere and Surface. Crucially, the live `Planet` is not disposed and recreated at the
 Atmosphere → Surface boundary; React keeps the same close-world component and
 the same compositor path alive. The software/LOW Surface fallback is the one
 intentional exception: after its first use, one generic ProceduralTerrains

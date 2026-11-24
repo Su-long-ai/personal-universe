@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-INPUT-DYNAMICS-V2-001",
+  "approved_at": "2026-11-24T12:37:44.996Z",
+  "baseline_commit": "74fdcfcc710651975dc68c90b22da7d3f8c22c62",
+  "record_path": "docs/reuse-gate/tasks/SCALE-INPUT-DYNAMICS-V2-001.json",
+  "record_sha256": "f24b4a5c3aae1f10bc9b2cbee134cabfadeecaf8e0036daaf4ee1650a5930589",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Productize the existing System=1 to Surface=5 continuous coordinate with normalized WheelEvent units, reversible gesture sessions, immediate direction takeover, boundary idempotence, and navigation-authority cancellation"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/continuousScale.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "existing-coordinate-input-adapter"
+  ],
+  "candidate_scores": {
+    "existing-coordinate-input-adapter": 57,
+    "camera-controls-wheel-physics": 36,
+    "phase-threshold-wheel-queue": null
+  }
+}
