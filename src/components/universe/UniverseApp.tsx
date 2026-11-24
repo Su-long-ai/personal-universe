@@ -489,7 +489,13 @@ export default function UniverseApp({
 
   useEffect(() => {
     if (!navigatorOpen) return;
-    cancelPendingContinuousScaleIntent("navigator-open");
+    // Opening Search is a temporary higher-priority authority, not a new
+    // spatial destination. Freeze a partial Galaxy scale bridge exactly where
+    // it is so closing Search can resume the same 0↔1 path. Choosing a result
+    // still clears the bridge through handleNavigateDestination.
+    cancelPendingContinuousScaleIntent("navigator-open", {
+      preserveGalaxyScaleBridge: true,
+    });
   }, [cancelPendingContinuousScaleIntent, navigatorOpen]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
