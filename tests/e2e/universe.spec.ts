@@ -3423,6 +3423,173 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
 });
 
 
+test("LOW repeated 0 to 5 to 0 journeys retain one Canvas and terrain allocation", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Two complete renderer journeys intentionally exercise retained Surface and reverse lifecycle",
+  );
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline-allocations",
+    /\d+/,
+  );
+  const pipelineAllocations = Number(
+    await html.getAttribute("data-universe-world-pipeline-allocations"),
+  );
+  expect(pipelineAllocations).toBeGreaterThan(0);
+
+  const driveIn = async () => {
+    for (let sample = 0; sample < 4; sample += 1) {
+      await dispatchScaleWheel(page, -96);
+      await page.waitForTimeout(20);
+    }
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "system",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "1.000",
+    );
+
+    for (let sample = 0; sample < 3; sample += 1) {
+      await dispatchScaleWheel(page, -96);
+      await page.waitForTimeout(20);
+    }
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "approach",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.000",
+    );
+
+    for (let sample = 0; sample < 6; sample += 1) {
+      await dispatchScaleWheel(page, -96);
+      await page.waitForTimeout(20);
+    }
+    await dispatchScaleWheel(page, -48);
+    await page.waitForTimeout(20);
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "surface",
+      { timeout: 20_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "5.000",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-renderer",
+      "procedural-terrains-fallback",
+      { timeout: 30_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-allocations",
+      "1",
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+  };
+
+  const driveOut = async () => {
+    for (let sample = 0; sample < 6; sample += 1) {
+      await dispatchScaleWheel(page, 96);
+      await page.waitForTimeout(20);
+    }
+    await dispatchScaleWheel(page, 48);
+    await page.waitForTimeout(20);
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "approach",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.000",
+    );
+
+    for (let sample = 0; sample < 3; sample += 1) {
+      await dispatchScaleWheel(page, 96);
+      await page.waitForTimeout(20);
+    }
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "system",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "1.000",
+    );
+
+    for (let sample = 0; sample < 4; sample += 1) {
+      await dispatchScaleWheel(page, 96);
+      await page.waitForTimeout(20);
+    }
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "galaxy",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "0.000",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-world-scene-lifecycle",
+      "parked",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "parked",
+      { timeout: 10_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+  };
+
+  await driveIn();
+  await driveOut();
+
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(pipelineAllocations);
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
+  );
+
+  await driveIn();
+  await driveOut();
+
+  expect(
+    Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
+  ).toBe(pipelineAllocations);
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
+  );
+  expect(await page.locator("canvas").count()).toBe(1);
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel follows Hero focus from galaxy through system to surface", async ({
   page,
 }, testInfo) => {
