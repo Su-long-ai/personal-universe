@@ -35,10 +35,12 @@ const LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
 function LiveSurfaceAnchor({
   planet,
   profile,
+  expanded,
   onCameraFrame,
 }: {
   planet: Planet;
   profile: SurfaceWorldProfile;
+  expanded: boolean;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -143,11 +145,29 @@ function LiveSurfaceAnchor({
     document.documentElement.dataset.universeSurfaceAnchorReady = "true";
   });
 
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutTier = expanded
+      ? "full"
+      : "transition";
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutTier;
+    };
+  }, [expanded]);
+
   const tangentPoint = (point: [number, number]): [number, number, number] => [
     (point[0] - profile.landing[0]) * LIVE_SURFACE_LAYOUT_SCALE,
     0,
     (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
   ];
+  const visiblePaths = expanded ? profile.paths.slice(0, 4) : profile.paths.slice(0, 1);
+  const visibleRegions = expanded ? profile.regions.slice(0, 4) : [];
+  const visibleLandmarks = expanded
+    ? profile.landmarks.slice(0, 6)
+    : profile.landmarks
+        .slice()
+        .sort((a, b) => b.prominence - a.prominence)
+        .slice(0, 2);
+  const visibleContent = expanded ? profile.contentAnchors.slice(0, 6) : [];
 
   return (
     <group ref={group} name="live-surface-anchor">
@@ -162,7 +182,7 @@ function LiveSurfaceAnchor({
           />
         </mesh>
 
-        {profile.paths.map((path) => {
+        {visiblePaths.map((path) => {
           const from = tangentPoint(path.from);
           const to = tangentPoint(path.to);
           const dx = to[0] - from[0];
@@ -191,7 +211,7 @@ function LiveSurfaceAnchor({
           );
         })}
 
-        {profile.regions.map((region) => {
+        {visibleRegions.map((region) => {
           const point = tangentPoint(region.center);
           const radius = Math.max(
             0.009,
@@ -215,7 +235,7 @@ function LiveSurfaceAnchor({
           );
         })}
 
-        {profile.landmarks.map((landmark) => {
+        {visibleLandmarks.map((landmark) => {
           const point = tangentPoint(landmark.position);
           const scale = 0.006 + landmark.scale * 0.0045;
           return (
@@ -240,7 +260,7 @@ function LiveSurfaceAnchor({
           );
         })}
 
-        {profile.contentAnchors.map((anchor) => {
+        {visibleContent.map((anchor) => {
           const point = tangentPoint(anchor.position);
           return (
             <group
@@ -852,6 +872,7 @@ export function PlanetScene({
         <LiveSurfaceAnchor
           planet={livePlanet}
           profile={surfaceProfile}
+          expanded={phase === "surface"}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}
