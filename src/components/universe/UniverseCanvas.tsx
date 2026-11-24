@@ -113,6 +113,7 @@ export function UniverseCanvas({
   onNavigationFailed,
   selectedSystem,
   selectedPlanet,
+  surfaceFocusEntryId,
   systemScaleTargetPlanet,
   onSelectSystem,
   onNavigateDestination,
@@ -143,6 +144,7 @@ export function UniverseCanvas({
   ) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
+  surfaceFocusEntryId: string | null;
   systemScaleTargetPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
   onNavigateDestination: (
@@ -320,6 +322,7 @@ export function UniverseCanvas({
               phase={phase}
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
+              surfaceFocusEntryId={surfaceFocusEntryId}
               onPaintReady={() => setWorldPaintReady(true)}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
@@ -334,6 +337,7 @@ export function UniverseCanvas({
             phaseRef={phaseRef}
             quality={quality}
             planet={selectedPlanet}
+            surfaceFocusEntryId={surfaceFocusEntryId}
           />
         </Suspense>
       ) : null}
