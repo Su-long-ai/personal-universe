@@ -175,14 +175,15 @@ export function SurfaceScene({
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
+  const landable = Boolean(profile && planet?.surfaceMode !== "none");
   const active =
     anchored &&
-    Boolean(profile) &&
+    landable &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
   const prepare =
     anchored &&
-    Boolean(profile) &&
+    landable &&
     (phase === "atmosphere" || phase === "surface") &&
     Boolean(liveWorldFallbackReason(gl, quality));
 
