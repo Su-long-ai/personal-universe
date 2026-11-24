@@ -1412,6 +1412,62 @@ test("Surface taps stay selection-safe while drag exploration survives departure
   await runtime.assertClean(testInfo);
 });
 
+test("Orbit click remains picking-safe and drag starts manual camera takeover", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+    { timeout: 20_000 },
+  );
+
+  const canvas = page.locator("canvas");
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width * 0.82;
+  const y = box!.y + box!.height * 0.18;
+
+  await page.mouse.click(x, y);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "settled",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "orbit",
+  );
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 42, y + 16, { steps: 5 });
+  await page.mouse.up();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "manual",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("surface boundary blocks inward input and reverses cleanly to galaxy", async ({
   page,
 }, testInfo) => {
