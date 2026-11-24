@@ -17,7 +17,7 @@ export class BodyPoints {
   private geo = new BufferGeometry();
   private readonly mat: ShaderMaterial;
 
-  constructor(scene: Scene) {
+  constructor(private readonly scene: Scene) {
     this.mat = new ShaderMaterial({
       vertexShader: Shaders.pointsVert,
       fragmentShader: Shaders.pointsFrag,
@@ -129,5 +129,13 @@ export class BodyPoints {
     (this.geo.attributes.color as BufferAttribute).needsUpdate = true;
     (this.geo.attributes.size as BufferAttribute).needsUpdate = true;
     (this.geo.attributes.alpha as BufferAttribute).needsUpdate = true;
+  }
+
+  /** Terminal release for host-owned renderer lifecycles. */
+  dispose(): void {
+    this.scene.remove(this.points);
+    this.views = [];
+    this.geo.dispose();
+    this.mat.dispose();
   }
 }
