@@ -300,6 +300,28 @@ content-location context. Multiple world-content cards are laid out as one
 bounded readable stack rather than competing absolute overlays, so Surface
 remains a page-like destination instead of a game HUD or a separate application.
 
+Content hierarchy is also derived from the existing content model rather than
+authored again for Surface. Featured or high-importance entries become
+`primary` signals, normal active entries become `secondary`, and low-weight
+entries remain `ambient`. Stable content placement keys still own coordinates;
+priority changes presentation order and emphasis without changing an entry's
+terrain anchor. Deterministic clusters group those anchors into reusable
+region-level presentation units. Both ProceduralPlanets and ProceduralTerrains
+consume the same ranked anchors and clusters.
+
+This shared hierarchy is scale-aware. During the live Atmosphere→Surface
+interval the tangent overlay exposes only the highest-ranked signal and cluster,
+then expands at Surface without changing their coordinates. The bounded
+software fallback keeps the top-ranked signals rather than an arbitrary id
+slice. On narrow Surface layouts the product UI shows the first two ranked cards
+and keeps the destination copy below them; no fake content is generated for a
+secondary world whose existing content array is empty.
+
+Pointer/touch exploration continues to reuse the one `camera-controls`
+authority. Its wheel action remains disabled, so wheel/trackpad scale input
+continues to belong exclusively to the continuous-scale coordinator and can
+leave Surface immediately.
+
 Runtime evidence is shared across live and fallback paths:
 
 - `data-universe-surface-profile="surface:…"` identifies the deterministic
@@ -307,6 +329,13 @@ Runtime evidence is shared across live and fallback paths:
 - `data-universe-surface-biome` publishes the selected world archetype style;
 - `data-universe-surface-landmarks` and
   `data-universe-surface-content-anchors` expose generated layout density;
+- `data-universe-surface-content-clusters` and
+  `data-universe-surface-primary-signals` expose the shared semantic hierarchy;
+- live Surface additionally publishes
+  `data-universe-surface-layout-tier="transition|full"`,
+  `data-universe-surface-layout-signals`, and
+  `data-universe-surface-layout-clusters` so the 4→5 content handoff can be
+  validated independently of camera settlement;
 - fallback additionally publishes
   `data-universe-surface-terrain-world="<same profile id>"`, proving the
   terrain adapter and product layout are using the same world identity.
