@@ -689,7 +689,11 @@ export function PlanetScene({
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
+      presentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
     return () => {
       delete document.documentElement.dataset.universeWorldSceneReady;
       delete document.documentElement.dataset.universeWorldSceneLifecycle;
@@ -698,13 +702,17 @@ export function PlanetScene({
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
+      presentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
     if (!presentationActive) {
       paintedFrames.current = 0;
       paintReported.current = false;
       delete document.documentElement.dataset.universeWorldPaintReady;
     }
-  }, [presentationActive]);
+  }, [phase, presentationActive]);
 
   useEffect(() => {
     const mode = fallbackReason
@@ -741,7 +749,12 @@ export function PlanetScene({
   useFrame((_, delta) => {
     // Once landed, keep the terrain under the visitor fixed. Orbit/approach
     // retain the subtle planetary rotation.
-    if (livePlanet && !fallbackReason && phase !== "surface") {
+    if (
+      presentationActive &&
+      livePlanet &&
+      !fallbackReason &&
+      phase !== "surface"
+    ) {
       livePlanet.rotation.y += delta * 0.014;
     }
 
