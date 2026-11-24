@@ -12,7 +12,11 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
-import { buildSurfaceWorldProfile, type SurfaceWorldProfile } from "../../lib/universe/surface";
+import {
+  buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
@@ -169,7 +173,9 @@ function LiveSurfaceAnchor({
     0,
     (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
   ];
-  const visiblePaths = expanded ? profile.paths.slice(0, 4) : profile.paths.slice(0, 1);
+  const visiblePaths = expanded
+    ? profile.paths.slice(0, 4)
+    : profile.paths.slice(0, 1);
   const visibleRegions = expanded ? profile.regions.slice(0, 4) : [];
   const visibleLandmarks = expanded
     ? profile.landmarks.slice(0, 6)
@@ -177,7 +183,16 @@ function LiveSurfaceAnchor({
         .slice()
         .sort((a, b) => b.prominence - a.prominence)
         .slice(0, 2);
-  const visibleContent = expanded ? profile.contentAnchors.slice(0, 6) : [];
+  const rankedContent = useMemo(
+    () => rankSurfaceContentAnchors(profile.contentAnchors),
+    [profile.id],
+  );
+  const visibleContent = expanded
+    ? rankedContent.slice(0, 6)
+    : rankedContent.slice(0, 1);
+  const visibleClusters = expanded
+    ? profile.contentClusters.slice(0, 3)
+    : profile.contentClusters.slice(0, 1);
 
   return (
     <group ref={group} name="live-surface-anchor">
@@ -216,6 +231,38 @@ function LiveSurfaceAnchor({
                 transparent
                 opacity={0.2}
                 depthWrite={false}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleClusters.map((cluster) => {
+          const point = tangentPoint(cluster.center);
+          const radius =
+            cluster.priority === "primary"
+              ? 0.014
+              : cluster.priority === "secondary"
+                ? 0.011
+                : 0.009;
+          return (
+            <mesh
+              key={cluster.id}
+              position={[point[0], 0.005, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius, radius + 0.0014, 20]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  cluster.priority === "primary"
+                    ? 0.34
+                    : cluster.priority === "secondary"
+                      ? 0.22
+                      : 0.14
+                }
+                depthWrite={false}
+                side={THREE.DoubleSide}
               />
             </mesh>
           );
@@ -272,18 +319,31 @@ function LiveSurfaceAnchor({
 
         {visibleContent.map((anchor) => {
           const point = tangentPoint(anchor.position);
+          const priorityScale =
+            anchor.priority === "primary"
+              ? 1.25
+              : anchor.priority === "secondary"
+                ? 1
+                : 0.82;
           return (
             <group
               key={anchor.id}
               position={[point[0], 0.009, point[2]]}
+              scale={priorityScale}
             >
               <mesh scale={[0.003, 0.011, 0.003]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
-                <meshBasicMaterial color={profile.accent} />
+                <meshBasicMaterial
+                  color={profile.accent}
+                  transparent
+                  opacity={anchor.priority === "primary" ? 1 : 0.78}
+                />
               </mesh>
               <mesh position={[0, 0.014, 0]}>
                 <octahedronGeometry args={[0.0038, 0]} />
-                <meshBasicMaterial color="#ffffff" />
+                <meshBasicMaterial
+                  color={anchor.priority === "primary" ? "#fff0cf" : "#ffffff"}
+                />
               </mesh>
             </group>
           );
