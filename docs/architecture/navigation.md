@@ -292,6 +292,20 @@ If a Guided Journey is active, direct camera takeover stops that Journey
 immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
 intent wins, and orchestration must not fight the visitor for the same camera.
 
+Surface manual exploration additionally remembers the current
+`camera-controls` position/target as a **presentation endpoint**, scoped to the
+selected world id and the active live/fallback renderer mode. A subsequent
+Surface→Atmosphere wheel sample therefore starts the existing 5→4 scale segment
+from the view the visitor actually reached instead of snapping back to the
+canonical landing shot first. If the visitor reverses and returns to the same
+Surface, that endpoint is restored. Changing world or switching between live
+and fallback rendering invalidates the remembered frame, preventing coordinates
+from one terrain frame from leaking into another. The saved view is not
+navigation state, is not written to the URL, and does not own wheel input.
+
+Runtime evidence uses
+`data-universe-surface-manual-view="captured|scale-endpoint|restored"`.
+
 ## Continuous wheel scale navigation
 
 Implemented under task `CONTINUOUS-SCALE-WHEEL-NAV-001`.
