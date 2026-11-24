@@ -210,7 +210,7 @@ function mapPlanet(
     orbitalPeriodYears: periodYears,
     moons,
     hasRings: Boolean(data.rings),
-    surfaceMode: surfaceModeForArchetype(archetype),
+    surfaceMode: surfaceModeForYeisBody(data, temperature),
     heroKey: hero ? "home" : undefined,
     observed,
   };
@@ -264,6 +264,13 @@ function normalizeName(value: string): string {
 
 function appearanceSeed(data: BodyData): number {
   return "seed" in data.appearance ? data.appearance.seed : 0;
+}
+
+export function surfaceModeForYeisBody(
+  data: BodyData,
+  temperature: number,
+): PlanetDefinition["surfaceMode"] {
+  return surfaceModeForArchetype(archetypeFor(data, temperature));
 }
 
 function archetypeFor(data: BodyData, temperature: number): PlanetArchetype {
