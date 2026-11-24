@@ -497,16 +497,27 @@ Live first-paint authority is also renderer-derived rather than a component-age
 heuristic. The retained PlanetPass increments
 `data-universe-world-live-draw-frame` only after an actual PlanetRenderer frame
 reports at least one drawn planet and `pending=0`. PlanetScene snapshots that
-counter when capability/presentation authority changes and requires two
-consecutive new successful draw stamps before publishing
-`data-universe-world-paint-ready="true"`. System therefore cannot disappear
-just because the Planet object or pass exists; the matched world must have
-actually drawn. UniverseCanvas also keys the consumed first-paint state by
-`planet id + quality` rather than storing an unqualified boolean. The current
+counter when capability/presentation authority changes and exposes two stages.
+The first concrete matched draw publishes
+`data-universe-world-paint-started="true"`; UniverseCanvas then transfers only
+the selected target body's presentation from System to close-world. The pinned
+YEIS path reuses `BodyRenderer.byId` and hides that target `BodyView.group`
+after the ordinary YEIS update, while the prototype fallback simply omits the
+matching keyed `PlanetBody`. The star, orbit context and every other System
+body remain visible. After two consecutive matched draw stamps PlanetScene
+publishes `data-universe-world-paint-ready="true"`, and only then may the whole
+System renderer leave. This removes the duplicate target planet without a fade,
+mask, second renderer or blank ownership gap.
+
+UniverseCanvas keys both paint-started and paint-ready authority by
+`planet id + quality` rather than storing unqualified booleans. The current
 identity is mirrored in a ref, so a callback whose captured identity is already
 stale is discarded before it can mutate parent readiness at all. Old cleanup
 work therefore cannot either authorize a new world or revoke a new world's
-already-earned authority.
+already-earned authority. Runtime diagnostics
+`data-universe-system-handoff-target` and
+`data-universe-system-target-suppressed` make the intermediate ownership stage
+machine-verifiable.
 
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
@@ -526,9 +537,11 @@ Atmosphere → Surface boundary; React keeps the same close-world component and
 the same compositor path alive. The software/LOW Surface fallback is the one
 intentional exception: after its first use, one generic ProceduralTerrains
 instance remains parked under the shared Canvas so Surface → Atmosphere does not
-perform synchronous resource destruction in the input-critical path. Galaxy,
-system and live close-world rendering still do not need to remain resident
-together, and no additional camera or destination authority is introduced.
+perform synchronous resource destruction in the input-critical path. Only one close-world destination is retained at a time. It may coexist parked
+with Galaxy for a captured reverse endpoint and may coexist visibly with System
+for the short two-stage first-paint handoff above, but neither case introduces a
+second Canvas, renderer, camera or destination authority. Clearing/changing the
+captured destination releases the retained close-world resource set.
 
 The product release gate validates both semantic arrival and renderer readiness;
 screenshots remain evidence, not the authority for navigation state.
