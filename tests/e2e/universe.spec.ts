@@ -3,12 +3,55 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   continuousScaleResponseDistance,
 } from "../../src/lib/universe/continuousScale";
+import { nextSurfaceClusterEntryId } from "../../src/lib/universe/surface";
 import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+
+test("Surface cluster cycling keeps every signal reachable within render budgets", () => {
+  const anchors = [
+    {
+      id: "ambient",
+      entryId: "ambient",
+      title: "Ambient",
+      position: [0, 0] as [number, number],
+      cluster: 2,
+      priority: "ambient" as const,
+    },
+    {
+      id: "primary",
+      entryId: "primary",
+      title: "Primary",
+      position: [1, 0] as [number, number],
+      cluster: 2,
+      priority: "primary" as const,
+    },
+    {
+      id: "secondary",
+      entryId: "secondary",
+      title: "Secondary",
+      position: [2, 0] as [number, number],
+      cluster: 2,
+      priority: "secondary" as const,
+    },
+  ];
+
+  const sequence = [
+    nextSurfaceClusterEntryId(anchors, 2),
+    nextSurfaceClusterEntryId(anchors, 2, "primary"),
+    nextSurfaceClusterEntryId(anchors, 2, "secondary"),
+    nextSurfaceClusterEntryId(anchors, 2, "ambient"),
+  ];
+  expect(sequence).toEqual([
+    "primary",
+    "secondary",
+    "ambient",
+    "primary",
+  ]);
+});
 
 async function openNavigator(page: Page) {
   await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
