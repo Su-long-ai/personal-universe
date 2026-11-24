@@ -1,0 +1,133 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-CONTEXT-RECOVERY-STATE-001",
+  "title": "Make WebGL context loss and restore return product readiness to a known state",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing R3F WebGLRenderer and web-platform context-loss lifecycle so transient context loss invalidates world readiness immediately and restoration must reacquire render readiness without creating another renderer or recovery manager"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The product already has one React Three Fiber Canvas, Three.js context restoration support, a terminal pagehide release path, and world readiness signals. The missing behavior is state correctness during a recoverable WebGL loss: readiness can remain semantically stale while the underlying context is unavailable. Reuse the existing canvas WebGL context events to mark the renderer lost/active, invalidate product world readiness on loss, and let the existing CinematicPipeline reacquire readiness from real post-restore frames. No new renderer, retry loop, GPU registry, or recovery scheduler is required.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "tests/e2e/release.spec.ts",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/canvas",
+      "finding": "React Three Fiber Canvas owns the existing Three.js WebGLRenderer and its normal renderer lifecycle, so recovery should stay attached to that single renderer rather than construct a replacement."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/WebGLRenderer.html",
+      "finding": "Three.js WebGLRenderer owns the current WebGL context and handles browser context restoration internally; product code can preserve renderer ownership while invalidating higher-level readiness."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/webglcontextlost_event",
+      "finding": "The canvas webglcontextlost event is the platform signal that rendering resources are unavailable; cancelling a synthetic loss permits later restoration and gives the product a concrete invalidation boundary."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/webglcontextrestored_event",
+      "finding": "The webglcontextrestored event marks restoration of the context, after which resources/render state must be re-established before application-level readiness is trusted again."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "This is a bounded recovery-state correction inside the already selected renderer stack, not a replacement rendering application."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep the single R3F-owned Three.js renderer and its built-in context restoration lifecycle as the renderer authority."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Three.js and the browser context lifecycle already expose the required recovery boundary, so a separate GPU recovery subsystem would duplicate ownership."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "webgl-context-loss-api"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Use the standard canvas WebGL context loss/restoration events as the precise trigger for invalidating and reacquiring product readiness."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-existing-renderer-recovery",
+      "name": "Existing R3F/Three renderer context restoration lifecycle",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current single R3F Canvas and Three.js WebGLRenderer",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It preserves the existing renderer/camera authority and already handles the low-level WebGL restoration mechanics needed by the product.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "standard-webgl-context-events",
+      "name": "Standard WebGL context lost/restored events",
+      "level": "component_asset",
+      "registry_id": "webgl-context-loss-api",
+      "source": "Browser WebGL context lifecycle events used through the existing canvas",
+      "license": "Web platform API",
+      "decision": "reuse",
+      "reason": "These events provide the exact loss/restore boundary without polling, timers, replacement contexts, or a second lifecycle owner.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "r3f-existing-renderer-recovery",
+      "standard-webgl-context-events"
+    ],
+    "rationale": "Keep R3F/Three as the sole renderer authority and reuse standard WebGL context events only as readiness invalidation boundaries. On loss, clear stale world paint/pipeline/screenshot readiness immediately; on restore, retain the same renderer and require the existing pipeline to earn readiness again from real rendered frames. This is lower cost and more correct than adding a recovery manager or recreating the Canvas.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a specific upstream pass cannot survive Three.js context restoration, isolate and recreate only that pass after measured evidence; do not replace the Canvas or introduce a second renderer."
+  }
+}
