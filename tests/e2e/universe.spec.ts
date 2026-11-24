@@ -2064,6 +2064,78 @@ test("manual pointer takeover freezes a partial Galaxy scale coordinate", async 
   await runtime.assertClean(testInfo);
 });
 
+test("touch drag takeover freezes a partial Galaxy scale coordinate", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+
+  await page.locator("canvas").evaluate((canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = rect.left + rect.width * 0.55;
+    const y = rect.top + rect.height * 0.5;
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 41,
+      pointerType: "touch",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX: x,
+      clientY: y,
+    };
+    canvas.dispatchEvent(new PointerEvent("pointerdown", init));
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        ...init,
+        clientX: x + 72,
+        clientY: y + 20,
+      }),
+    );
+    window.dispatchEvent(
+      new PointerEvent("pointerup", {
+        ...init,
+        buttons: 0,
+        clientX: x + 72,
+        clientY: y + 20,
+      }),
+    );
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-superseded",
+    "manual-camera",
+  );
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
+
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("partial Galaxy scale tolerates repeated direction changes without hidden travel", async ({
   page,
 }, testInfo) => {
