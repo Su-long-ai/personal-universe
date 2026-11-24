@@ -7,12 +7,11 @@ export type ContinuousScaleDirection = "in" | "out";
 
 export const CONTINUOUS_SCALE_WHEEL_THRESHOLD = 72;
 // A single tiny wheel sample is treated as noise if no follow-up arrives
-// promptly. Hosted software WebGL can delay even the *second* delivered sample
-// by several hundred milliseconds, so the acquisition window must survive
-// those scheduler stalls long enough to establish a real same-direction
-// gesture. Once two samples establish it, the longer active window below keeps
-// the remaining partial intent alive across heavier render stalls.
-export const CONTINUOUS_SCALE_RESET_MS = 600;
+// promptly. Once two same-direction samples establish a gesture, keep that
+// partial intent alive across short main-thread/render stalls; hosted software
+// WebGL can delay the next delivered input by around a second even when the
+// physical/automation gesture itself is continuous.
+export const CONTINUOUS_SCALE_RESET_MS = 260;
 export const CONTINUOUS_SCALE_ACTIVE_RESET_MS = 2_000;
 
 export function continuousScaleDirection(
