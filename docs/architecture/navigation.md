@@ -175,6 +175,34 @@ presentation. Personal entries inherit importance/featured state directly from
 Astro Content Collections; current-system bodies are folded into the same
 Places graph rather than exposed through a separate local list.
 
+### Session continuity and derived filters
+
+Recent discovery is deliberately non-invasive. The app stores at most eight
+**canonical destination IDs** in tab-scoped `sessionStorage` under
+`personal-universe.recent-destinations.v1`. It records no camera position,
+phase transition, renderer state, query, content payload or duplicated target
+metadata. The list survives a reload in the same tab and naturally disappears
+with the browsing session. Storage failure is non-fatal.
+
+The empty-query Places surface derives five views from the same already-loaded
+destination graph:
+
+- **All** — the normal canonical Places graph;
+- **Personal** — destinations whose origin is authored personal content;
+- **Important** — featured/high-importance personal destinations plus Hero;
+- **Nearby** — destinations owned by the currently open native YEIS system;
+- **Recent** — canonical IDs present in the bounded session list.
+
+These are presentation filters only. They do not create alternate destinations,
+do not mutate section identity, and do not apply while the user is typing a
+Search query. Search continues through the shared query/ranking layer.
+
+Recent history is also a small ranking prior. Newer visits score slightly above
+older visits when textual relevance is otherwise comparable, but the prior is
+far below exact canonical-ID, exact title and exact alias relevance. Ranking
+therefore improves continuity without letting visit history override identity
+or query intent.
+
 ## Product Open vs native travel
 
 Personal Universe intentionally combines its React product scenes with YEIS
