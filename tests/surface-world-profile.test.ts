@@ -10,6 +10,10 @@ import {
   rankSurfaceWorldRegions,
   surfaceModeForArchetype,
 } from "../src/lib/universe/surface/worldProfile.ts";
+import {
+  SURFACE_STELLAR_LIGHT_DIRECTION,
+  surfaceStellarLightAngles,
+} from "../src/lib/universe/surface/stellarLighting.ts";
 import type {
   PlanetArchetype,
   PlanetDefinition,
@@ -70,6 +74,16 @@ test("surface profiles are exactly reproducible from stable planet identity", ()
     buildSurfaceWorldProfile(source),
     buildSurfaceWorldProfile(source),
   );
+});
+
+test("surface profile lighting metadata describes the shared stellar light axis", () => {
+  const profile = buildSurfaceWorldProfile(planet("lighting", "desert"));
+  const angles = surfaceStellarLightAngles();
+  const [x, y, z] = SURFACE_STELLAR_LIGHT_DIRECTION;
+
+  assert.ok(Math.abs(Math.hypot(x, y, z) - 1) < 1e-9);
+  assert.ok(Math.abs(profile.lighting.sunAzimuth - angles.azimuth) < 1e-9);
+  assert.ok(Math.abs(profile.lighting.sunElevation - angles.elevation) < 1e-9);
 });
 
 test("observed catalog worlds infer a landable Surface capability without runtime globals", () => {
