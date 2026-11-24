@@ -509,6 +509,9 @@ export function PlanetScene({
       : null;
   const liveKey = `${planet.id}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
+  const initialLiveStructureTier = useRef<"auto" | "high" | "software">(
+    softwareRenderer ? "software" : "auto",
+  );
   const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
   const paintReported = useRef(false);
@@ -544,7 +547,13 @@ export function PlanetScene({
     const idleWindow = window as IdleWindow;
 
     const enableLive = () => {
-      if (!cancelled) setWarmedKey(liveKey);
+      if (cancelled) return;
+      initialLiveStructureTier.current = softwareRenderer
+        ? "software"
+        : quality === "high"
+          ? "high"
+          : "auto";
+      setWarmedKey(liveKey);
     };
 
     firstFrame = window.requestAnimationFrame(() => {
@@ -578,22 +587,27 @@ export function PlanetScene({
     liveKey,
     phase,
     presentationActive,
+    quality,
     softwareRenderer,
     warmedKey,
   ]);
 
   const livePlanet = useMemo(() => {
     if (!liveProvisioned) return null;
+    const initialTier = initialLiveStructureTier.current;
+    const initialMode: LiveQualityMode =
+      initialTier === "high" ? "high" : "auto";
     const nextPlanet = new Planet({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      // Start real GPUs at AUTO structure. HIGH may promote this same Planet
-      // once, while later AUTO/LOW switches never throw away the LOD world.
-      ...liveStructuralQuality("auto", softwareRenderer),
-      ...liveDynamicQuality("auto", softwareRenderer),
+      // Build directly at the quality that triggered warmup. A direct HIGH
+      // visit therefore avoids constructing AUTO LOD structure just to rebuild
+      // it immediately; AUTO-first worlds may still promote exactly once.
+      ...liveStructuralQuality(initialMode, softwareRenderer),
+      ...liveDynamicQuality(initialMode, softwareRenderer),
     });
     const html = document.documentElement;
     html.dataset.universeWorldPlanetAllocations = String(
@@ -625,7 +639,7 @@ export function PlanetScene({
     if (currentStructure?.planet !== livePlanet) {
       liveStructure.current = {
         planet: livePlanet,
-        tier: softwareRenderer ? "software" : "auto",
+        tier: initialLiveStructureTier.current,
       };
     }
 
