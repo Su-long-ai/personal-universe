@@ -1,0 +1,151 @@
+{
+  "schema": 2,
+  "task_id": "PUBLIC-SOCIAL-METADATA-001",
+  "title": "Publish canonical and social preview metadata from the existing Astro page and hosted product evidence",
+  "scope": {
+    "level": "implementation",
+    "subject": "Use Astro's native site/url primitives and standard HTML metadata to publish canonical, Open Graph and Twitter/X preview tags for the single public Personal Universe page, reusing an already-hosted Galaxy acceptance screenshot as the preview image instead of adding an SEO runtime or promotional rendering system"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "The public Pages deployment has a stable Astro site/base configuration but index.astro currently exposes only a title, theme color and implementation-oriented description. Astro's official documentation recommends standard HTML head metadata and provides Astro.site/Astro.url for canonical and absolute social URLs. The Open Graph protocol needs title/type/image/url plus a concise description for a useful rich preview. Mature Astro SEO components exist, but this product has one static page and fixed metadata, so adding an SEO package would create dependency/configuration surface without replacing any missing domain logic. Reuse the existing hosted desktop Galaxy screenshot as the social image; Playwright already produces the accepted product frame in the same cloud environment used for release validation.",
+  "planned_files": [
+    "src/pages/index.astro",
+    "public/social-preview.png",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.astro.build/en/reference/configuration-reference/",
+      "finding": "Astro's site option is the final deployed URL and base is the deployment path, so the existing PUBLIC_SITE_URL/PUBLIC_BASE_PATH configuration already supplies the production URL authority."
+    },
+    {
+      "url": "https://docs.astro.build/en/reference/api-reference/",
+      "finding": "Astro.url and Astro.site are documented primitives for constructing canonical URLs and absolute social-image URLs directly in a page."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/configuring-astro/",
+      "finding": "Astro explicitly recommends adding common SEO/site metadata with standard HTML link/meta tags in the page head rather than configuration."
+    },
+    {
+      "url": "https://ogp.me/",
+      "finding": "The Open Graph protocol defines og:title, og:type, og:image and og:url as basic metadata, with og:description and image alt as useful additions."
+    },
+    {
+      "url": "https://github.com/jonasmerlin/astro-seo",
+      "finding": "astro-seo is a mature MIT component for canonical/Open Graph metadata, but using it here would add a package abstraction for one fixed static page whose tags Astro can render natively."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "Playwright can capture page screenshots as image buffers/files; the project already preserves hosted Galaxy screenshots as release artifacts suitable for reuse as a truthful product preview."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [4],
+      "conclusion": "A full Astro SEO component can render all required tags, but it is disproportionate for a single static route with fixed metadata and would add dependency/configuration surface without improving correctness."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "astro-base-url"
+      ],
+      "source_refs": [0, 1, 2],
+      "conclusion": "Reuse Astro's configured site/base plus Astro.site/Astro.url and ordinary head tags as the metadata authority."
+    },
+    {
+      "level": "subsystem",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [3],
+      "conclusion": "No sitemap, CMS SEO subsystem or JSON-LD graph is required to close the current single-page canonical/social-preview gap."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [5],
+      "conclusion": "Reuse the already-accepted hosted desktop Galaxy frame as a static social preview asset, and use the existing browser suite to validate emitted metadata and asset reachability."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "astro-seo-package",
+      "name": "astro-seo component",
+      "level": "full_solution",
+      "source": "jonasmerlin/astro-seo",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Provides broad SEO abstractions but this site has one fixed page and the required tags are directly supported by Astro/native HTML; adding a dependency creates more maintenance and upgrade surface than capability.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "astro-native-social-metadata",
+      "name": "Astro site/url plus native head metadata",
+      "level": "framework_engine",
+      "registry_id": "astro-base-url",
+      "source": "Existing Astro page/configuration and standard HTML metadata",
+      "license": "MIT (Astro) / platform HTML",
+      "decision": "reuse",
+      "reason": "Closes the exact canonical/Open Graph/Twitter gap with no new runtime or dependency and automatically respects the configured production site/base path.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "hosted-galaxy-social-preview",
+      "name": "Existing hosted Galaxy acceptance screenshot",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Protected hosted visual acceptance artifact from the current Personal Universe product",
+      "license": "project-owned product output / Apache-2.0 test tooling",
+      "decision": "reuse",
+      "reason": "Uses a truthful, already-accepted product frame rather than creating a separate marketing illustration that can drift from the actual experience.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "astro-native-social-metadata",
+      "hosted-galaxy-social-preview"
+    ],
+    "rationale": "Use the framework capabilities already present in Astro for URL construction and native head tags, and reuse a current hosted product screenshot for the preview image. This yields canonical and social previews without a new SEO dependency or separate promotional renderer.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "astro-seo-package",
+        "reason": "The full SEO component is broader, but this project currently has one static public route and fixed page metadata. Native Astro/HTML covers the entire required gap with fewer dependencies, no component-specific API to maintain, and direct alignment with Astro's own recommendation to place common metadata in the page head."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the site later grows multiple route-specific SEO schemas or structured-data graphs, reassess a reusable SEO component then; do not introduce it for the current one-page metadata gap."
+  }
+}
