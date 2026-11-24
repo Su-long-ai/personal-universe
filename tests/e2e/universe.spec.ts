@@ -3412,6 +3412,60 @@ test("Nearby Places only exposes destinations owned by current native system", a
   await runtime.assertClean(testInfo);
 });
 
+test("Default Places density expands local bodies from Galaxy to System while Search keeps long tail", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  let dialog = await openNavigator(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-discovery-density",
+    "galaxy",
+  );
+
+  const galaxyBodies = dialog.locator(
+    '.navigator-result-group[aria-label="Planets & Bodies"] .navigator-result-row',
+  );
+  await expect(galaxyBodies.first()).toBeVisible();
+  const galaxyBodyCount = await galaxyBodies.count();
+  expect(galaxyBodyCount).toBeGreaterThan(0);
+  expect(galaxyBodyCount).toBeLessThanOrEqual(5);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+  dialog = await openNavigator(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-discovery-density",
+    "system",
+  );
+
+  const systemBodies = dialog.locator(
+    '.navigator-result-group[aria-label="Planets & Bodies"] .navigator-result-row',
+  );
+  await expect(systemBodies.first()).toBeVisible();
+  const systemBodyCount = await systemBodies.count();
+  expect(systemBodyCount).toBeGreaterThan(galaxyBodyCount);
+  expect(systemBodyCount).toBeLessThanOrEqual(14);
+
+  // A default Places budget must not turn into a hidden long-tail cutoff.
+  // Canonical IDs outside the curated rows still resolve through Search.
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("star:c50000");
+  const first = dialog.locator(".navigator-result-row").first();
+  await expect(first).toHaveAttribute(
+    "data-destination-id",
+    "star:c50000",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Places Featured keeps the canonical destination id across reload", async ({
   page,
 }, testInfo) => {
