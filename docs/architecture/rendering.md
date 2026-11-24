@@ -74,8 +74,26 @@ Runtime evidence:
 
 ## Close-world renderer
 
-Approach, Orbit and Atmosphere keep the existing R3F canvas and cinematic
-camera. The product reuses ProceduralPlanets inside that host:
+Approach, Orbit and Atmosphere keep the existing R3F canvas and the same
+`camera-controls` camera authority. The product reuses ProceduralPlanets inside
+that host. Task `WORLD-CONTINUOUS-SCALE-COORDINATE-001` adds a normalized
+close-world scale coordinate (Approach=2, Orbit=3, Atmosphere=4, Surface=5).
+Wheel delta changes this coordinate directly. The camera resolves the existing
+viewport-aware shot anchors on either side and reuses
+`camera-controls.lerpLookAt()` with a reversible smoothstep interpolation;
+React `UniversePhase` is now a semantic/rendering boundary rather than a
+camera tween trigger.
+
+This does not add a RAF loop, tween library or second camera. On software/LOW
+fallback, Approach through Atmosphere still use the same continuous product
+camera path. Only the final Atmosphere→Surface segment may fall back to the
+existing semantic handoff because ProceduralTerrains intentionally owns a
+different local surface frame. A live ProceduralPlanets world instead exposes
+its terrain-derived Surface frame while the coordinate is still inside that
+final segment, allowing the primary path to interpolate all the way to the
+landing frame.
+
+The product reuses ProceduralPlanets inside that host:
 
 - a lightweight product sphere appears immediately;
 - live `Planet` construction is delayed until the initial navigation frame is

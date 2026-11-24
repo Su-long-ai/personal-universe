@@ -98,6 +98,8 @@ function RendererPageLifecycle() {
 export function UniverseCanvas({
   phase,
   phaseRef,
+  worldScalePosition,
+  worldScaleContinuous,
   engineMode,
   markers,
   contentPlacements,
@@ -121,6 +123,8 @@ export function UniverseCanvas({
 }: {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
+  worldScalePosition: number;
+  worldScaleContinuous: boolean;
   engineMode: UniverseEngine;
   markers: GalaxyMarker[];
   contentPlacements: UniverseContentPlacement[];
@@ -180,6 +184,8 @@ export function UniverseCanvas({
         <CinematicCamera
           phase={phase}
           phaseRef={phaseRef}
+          worldScalePosition={worldScalePosition}
+          worldScaleContinuous={worldScaleContinuous}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           quality={quality}
@@ -254,6 +260,7 @@ export function UniverseCanvas({
               planet={selectedPlanet}
               quality={quality}
               phase={phase}
+              worldScalePosition={worldScalePosition}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}

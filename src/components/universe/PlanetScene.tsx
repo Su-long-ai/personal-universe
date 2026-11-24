@@ -468,11 +468,13 @@ export function PlanetScene({
   planet,
   quality,
   phase,
+  worldScalePosition,
   onSurfaceCameraFrame,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
   phase: UniversePhase;
+  worldScalePosition: number;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const { gl } = useThree();
@@ -669,7 +671,7 @@ export function PlanetScene({
         ) : null}
       </group>
 
-      {phase === "surface" && livePlanet ? (
+      {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
           onCameraFrame={onSurfaceCameraFrame}
