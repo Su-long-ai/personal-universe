@@ -3237,6 +3237,160 @@ test("Search exact canonical id wins deterministic ranking", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Recent destination survives reload and filters canonical Places", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  let dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("body:c0/earth");
+
+  const earth = dialog.locator(
+    '.navigator-result-row[data-destination-id="body:c0/earth"]',
+  );
+  await expect(earth).toBeVisible();
+  await earth.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/earth",
+  );
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const raw = window.sessionStorage.getItem(
+          "personal-universe.recent-destinations.v1",
+        );
+        return raw ? (JSON.parse(raw) as string[])[0] : null;
+      }),
+    )
+    .toBe("body:c0/earth");
+
+  const reloadUrl = page.url();
+  await page.goto(reloadUrl);
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/earth",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-recent-destinations",
+    /(^|\|)body:c0\/earth(\||$)/,
+  );
+
+  dialog = await openNavigator(page);
+  const recent = dialog.getByRole("button", { name: "RECENT" });
+  await expect(recent).toBeEnabled();
+  await recent.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "recent",
+  );
+
+  const recentRows = dialog.locator(".navigator-result-row");
+  await expect(recentRows.first()).toBeVisible();
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="body:c0/earth"]',
+    ),
+  ).toBeVisible();
+  expect(
+    await recentRows.evaluateAll((rows) =>
+      rows.every((row) =>
+        (row as HTMLElement).dataset.destinationId?.startsWith(
+          "featured:",
+        ) === false,
+      ),
+    ),
+  ).toBe(true);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Places filters derive Personal and Important views from canonical graph", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const html = page.locator("html");
+
+  const personal = dialog.getByRole("button", { name: "PERSONAL" });
+  await personal.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "personal",
+  );
+  const personalRows = dialog.locator(".navigator-result-row");
+  await expect(personalRows.first()).toBeVisible();
+  expect(
+    await personalRows.evaluateAll((rows) =>
+      rows.every(
+        (row) =>
+          (row as HTMLElement).dataset.destinationOrigin === "personal",
+      ),
+    ),
+  ).toBe(true);
+
+  const important = dialog.getByRole("button", { name: "IMPORTANT" });
+  await important.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "important",
+  );
+  const importantRows = dialog.locator(".navigator-result-row");
+  await expect(importantRows.first()).toBeVisible();
+  await expect(
+    importantRows.locator('[data-destination-featured="true"]').first(),
+  ).toBeVisible();
+
+  const nearby = dialog.getByRole("button", { name: "NEARBY" });
+  await expect(nearby).toBeDisabled();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Nearby Places only exposes destinations owned by current native system", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+
+  const dialog = await openNavigator(page);
+  const html = page.locator("html");
+  const nearby = dialog.getByRole("button", { name: "NEARBY" });
+  await expect(nearby).toBeEnabled();
+  await nearby.click();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "nearby",
+  );
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toBeVisible();
+  expect(
+    await rows.evaluateAll((items) =>
+      items.every(
+        (item) =>
+          (item as HTMLElement).dataset.destinationSystem === "c0",
+      ),
+    ),
+  ).toBe(true);
+  await expect(
+    rows.locator('[data-destination-id="body:c0/earth"]'),
+  ).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Places Featured keeps the canonical destination id across reload", async ({
   page,
 }, testInfo) => {
