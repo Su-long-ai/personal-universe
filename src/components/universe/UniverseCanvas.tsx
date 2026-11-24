@@ -217,27 +217,31 @@ export function UniverseCanvas({
     worldPrewarmPlanet,
   ]);
 
-  const retainedWorldMatchesGalaxyTarget =
-    phase === "galaxy" &&
-    Boolean(
-      retainedWorldRenderer &&
-        galaxyScaleTarget?.id &&
-        retainedWorldRenderer.destinationId === galaxyScaleTarget.id,
-    );
+  // Keep exactly one previously entered world allocated while Galaxy is
+  // presented. Galaxy owns the visible renderer there; this retained world is
+  // parked and does no presentation work. Do not key retention to the current
+  // Galaxy scale target: ordinary Surface -> Galaxy reversal can legitimately
+  // clear that target while the same world should remain reusable on re-entry.
+  const retainedWorldParkedInGalaxy =
+    phase === "galaxy" && Boolean(retainedWorldRenderer);
   const worldRendererPlanet =
     worldPrewarmPlanet ??
-    (retainedWorldMatchesGalaxyTarget
+    (retainedWorldParkedInGalaxy
       ? retainedWorldRenderer?.planet ?? null
       : null);
   const keepWorldRendererMounted = Boolean(
     worldRendererPlanet &&
       (phase === "system" ||
         closeWorldPhase ||
-        retainedWorldMatchesGalaxyTarget),
+        retainedWorldParkedInGalaxy),
   );
 
+  // Readiness identity follows the retained concrete world, not only the
+  // currently selected/prewarm input. Otherwise parking in Galaxy changes the
+  // token to "none" and a re-entry loses the fresh-paint contract even though
+  // the same Planet instance is still retained.
   const worldPaintIdentity =
-    `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
+    `${worldRendererPlanet?.id ?? "none"}:${quality}`;
   const worldPaintIdentityRef = useRef(worldPaintIdentity);
   worldPaintIdentityRef.current = worldPaintIdentity;
   const worldPaintStarted =
