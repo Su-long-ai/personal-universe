@@ -9,6 +9,12 @@ export type SurfaceRgb = [number, number, number];
 
 export type SurfaceContentPriority = "primary" | "secondary" | "ambient";
 
+export const SURFACE_CONTENT_SIGNAL_BUDGET = {
+  transition: 1,
+  software: 3,
+  stable: 6,
+} as const;
+
 export interface SurfaceTerrainPalette {
   sand: SurfaceRgb;
   dune: SurfaceRgb;
