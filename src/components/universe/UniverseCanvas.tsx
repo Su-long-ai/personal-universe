@@ -8,6 +8,7 @@ import {
   type MutableRefObject,
 } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
+import type { Planet } from "procedural-planets";
 import { GalaxyScene } from "./GalaxyScene";
 import {
   SystemScene,
@@ -173,6 +174,11 @@ export function UniverseCanvas({
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
+  const worldPlanetReleaseRef =
+    useRef<((planet: Planet) => void) | null>(null);
+  const handleBeforeLivePlanetDispose = useCallback((planet: Planet) => {
+    worldPlanetReleaseRef.current?.(planet);
+  }, []);
   const [worldPaintStartedState, setWorldPaintStartedState] = useState<{
     identity: string;
     started: boolean;
@@ -433,6 +439,7 @@ export function UniverseCanvas({
               onPaintStartedChange={handleWorldPaintStarted}
               onPaintReadyChange={handleWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
+              onBeforeLivePlanetDispose={handleBeforeLivePlanetDispose}
             />
           )}
       </Suspense>
@@ -455,6 +462,7 @@ export function UniverseCanvas({
         quality={quality}
         liveWorld={liveWorld}
         prewarmLiveWorld={prewarmLiveWorld}
+        planetReleaseRef={worldPlanetReleaseRef}
       />
     </Canvas>
   );
