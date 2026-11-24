@@ -181,12 +181,14 @@ export function UniverseCanvas({
   }, []);
   const [worldPaintStartedState, setWorldPaintStartedState] = useState<{
     identity: string;
+    generation: number;
     started: boolean;
-  }>({ identity: "", started: false });
+  }>({ identity: "", generation: -1, started: false });
   const [worldPaintState, setWorldPaintState] = useState<{
     identity: string;
+    generation: number;
     ready: boolean;
-  }>({ identity: "", ready: false });
+  }>({ identity: "", generation: -1, ready: false });
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -244,46 +246,97 @@ export function UniverseCanvas({
 
   const worldPaintIdentity =
     `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
-  const worldPaintIdentityRef = useRef(worldPaintIdentity);
-  worldPaintIdentityRef.current = worldPaintIdentity;
+  const worldPaintAuthorityKey =
+    `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}`;
+  const worldPaintAuthorityRef = useRef({
+    key: worldPaintAuthorityKey,
+    generation: 0,
+  });
+  if (worldPaintAuthorityRef.current.key !== worldPaintAuthorityKey) {
+    worldPaintAuthorityRef.current = {
+      key: worldPaintAuthorityKey,
+      generation: worldPaintAuthorityRef.current.generation + 1,
+    };
+  }
+  const worldPaintGeneration =
+    worldPaintAuthorityRef.current.generation;
   const worldPaintStarted =
+    closeWorldPhase &&
     worldPaintStartedState.identity === worldPaintIdentity &&
+    worldPaintStartedState.generation === worldPaintGeneration &&
     worldPaintStartedState.started;
   const worldPaintReady =
+    closeWorldPhase &&
     worldPaintState.identity === worldPaintIdentity &&
+    worldPaintState.generation === worldPaintGeneration &&
     worldPaintState.ready;
   const handleWorldPaintStarted = useCallback(
     (started: boolean) => {
-      if (worldPaintIdentityRef.current !== worldPaintIdentity) return;
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
       setWorldPaintStartedState({
         identity: worldPaintIdentity,
+        generation: worldPaintGeneration,
         started,
       });
     },
-    [worldPaintIdentity],
+    [
+      worldPaintAuthorityKey,
+      worldPaintGeneration,
+      worldPaintIdentity,
+    ],
   );
   const handleWorldPaintReady = useCallback(
     (ready: boolean) => {
-      // Carry the concrete planet + quality identity with readiness. If an
-      // old PlanetScene cleanup arrives after a new identity has already
-      // rendered, ignore it completely rather than letting a stale token
-      // temporarily revoke the new world's authority.
-      if (worldPaintIdentityRef.current !== worldPaintIdentity) return;
+      // A repeated capability key is not the same paint authority activation.
+      // HIGH -> LOW -> HIGH and System -> Approach re-entry each get a fresh
+      // generation, so an older ready=true token can never resurrect merely
+      // because the string identity happens to match again.
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
       setWorldPaintState({
         identity: worldPaintIdentity,
+        generation: worldPaintGeneration,
         ready,
       });
     },
-    [worldPaintIdentity],
+    [
+      worldPaintAuthorityKey,
+      worldPaintGeneration,
+      worldPaintIdentity,
+    ],
   );
 
   useEffect(() => {
-    // DOM diagnostics are capability-scoped too. The product handoff itself
-    // is already synchronously protected by the keyed state above, so this
-    // effect only clears the stale public diagnostic after an identity change.
-    delete document.documentElement.dataset.universeWorldPaintStarted;
-    delete document.documentElement.dataset.universeWorldPaintReady;
-  }, [worldPaintIdentity]);
+    // Diagnostics follow the same activation generation as product authority.
+    // Clear first-paint evidence synchronously at each committed activation;
+    // the concrete renderer must publish it again for this generation.
+    const html = document.documentElement;
+    html.dataset.universeWorldPaintGeneration =
+      String(worldPaintGeneration);
+    delete html.dataset.universeWorldPaintStarted;
+    delete html.dataset.universeWorldPaintReady;
+    return () => {
+      if (
+        html.dataset.universeWorldPaintGeneration ===
+        String(worldPaintGeneration)
+      ) {
+        delete html.dataset.universeWorldPaintGeneration;
+      }
+      delete html.dataset.universeWorldPaintStarted;
+      delete html.dataset.universeWorldPaintReady;
+    };
+  }, [worldPaintGeneration]);
 
   useEffect(() => {
     if (phase === "system" && systemScaleTargetPlanet) return;
