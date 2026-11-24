@@ -97,7 +97,7 @@ export function CinematicPipeline({
         // Use one stable live-renderer budget for the lifetime of this WebGL
         // host. HIGH keeps its detailed GPU profile; software HIGH retains the
         // conservative hosted-runner impostor threshold.
-        impostorPixels: softwareRenderer ? 180 : 90,
+        impostorPixels: softwareRenderer ? 180 : high ? 90 : 120,
       });
       composer.composer.insertPass(nextPass, 1);
       planetPassRef.current = nextPass;
@@ -117,6 +117,7 @@ export function CinematicPipeline({
     camera,
     composer,
     fallbackReason,
+    high,
     scene,
     softwareRenderer,
     useLiveWorld,
@@ -127,6 +128,17 @@ export function CinematicPipeline({
       composer.bloomPass.enabled = high;
     }
   }, [composer, high]);
+
+  useEffect(() => {
+    if (!planetPass) return;
+    const impostorPixels = softwareRenderer ? 180 : high ? 90 : 120;
+    planetPass.planetRenderer?.setOptions({ impostorPixels });
+    document.documentElement.dataset.universeWorldImpostorPixels =
+      String(impostorPixels);
+    return () => {
+      delete document.documentElement.dataset.universeWorldImpostorPixels;
+    };
+  }, [high, planetPass, softwareRenderer]);
 
 
   useEffect(() => {
