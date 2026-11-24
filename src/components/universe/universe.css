@@ -561,6 +561,37 @@ select {
   color: rgba(145, 224, 236, 0.42);
 }
 
+.world-content-focus-action {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(115, 244, 255, 0.24);
+  background: rgba(8, 26, 34, 0.58);
+  color: rgba(190, 246, 255, 0.82);
+  font: inherit;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.world-content-focus-action:hover {
+  border-color: rgba(115, 244, 255, 0.52);
+  background: rgba(15, 43, 52, 0.68);
+}
+
+.world-content-focus-action[aria-pressed="true"] {
+  border-color: rgba(255, 224, 176, 0.62);
+  background: rgba(49, 35, 22, 0.66);
+  color: rgba(255, 234, 203, 0.92);
+}
+
+.world-content-focus-action:focus-visible {
+  outline: 2px solid rgba(156, 244, 255, 0.88);
+  outline-offset: 2px;
+}
+
 @media (max-width: 800px) {
   .world-content-stack {
     left: 24px;
@@ -584,6 +615,11 @@ select {
 
   .world-content-card strong {
     font-size: 17px;
+  }
+
+  .world-content-focus-action {
+    padding: 7px 9px;
+    font-size: 7px;
   }
 
   .surface-world-meta {
