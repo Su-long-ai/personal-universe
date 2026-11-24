@@ -16,6 +16,7 @@ type WebglMetrics = {
   fallbackTextureAllocations: number;
   renderPath: string | null;
   composerTargets: string | null;
+  bloom: string | null;
   lifecycle: string | null;
   pipelineLifecycle: string | null;
   sceneLifecycle: string | null;
@@ -168,6 +169,7 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       ),
       renderPath: data.universeWorldRenderPath ?? null,
       composerTargets: data.universeWorldComposerTargets ?? null,
+      bloom: data.universeWorldBloom ?? null,
       lifecycle: data.universeWebglLifecycle ?? null,
       pipelineLifecycle: data.universeWorldPipelineLifecycle ?? null,
       sceneLifecycle: data.universeWorldSceneLifecycle ?? null,
@@ -441,6 +443,7 @@ test("AUTO LOW AUTO quality switching reuses the existing pipeline @webgl-heavy"
   for (let cycle = 0; cycle < 2; cycle += 1) {
     await quality.selectOption("low");
     await expect(quality).toHaveValue("low");
+    await expect(html).toHaveAttribute("data-universe-world-bloom", "off");
     await expect
       .poll(
         async () =>
@@ -455,6 +458,10 @@ test("AUTO LOW AUTO quality switching reuses the existing pipeline @webgl-heavy"
 
     await quality.selectOption("auto");
     await expect(quality).toHaveValue("auto");
+    await expect(html).toHaveAttribute(
+      "data-universe-world-bloom",
+      initial.software ? "off" : "on",
+    );
     await expect
       .poll(
         async () =>
