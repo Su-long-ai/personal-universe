@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { createTerrain, type FiniteTerrain } from "procedural-terrains";
@@ -33,9 +38,11 @@ function seededClone(source: THREE.Object3D, index: number) {
 
 export function SurfaceTerrain({
   active,
+  phaseRef,
   onAnchorHeight,
 }: {
   active: boolean;
+  phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
@@ -163,7 +170,13 @@ export function SurfaceTerrain({
   }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
-    if (!active) return;
+    // `active` is delivered through the R3F reconciler. On hosted
+    // software WebGL, one expensive terrain update can run after the outer
+    // navigation event has already requested Surface -> Atmosphere but before
+    // that prop update reaches this subtree. Read the same navigation phase
+    // ref that the coordinator mutates synchronously so no stale Surface frame
+    // can starve the phase/camera handoff.
+    if (!active || phaseRef.current !== "surface") return;
     terrain?.update(delta, { camera });
   });
 
