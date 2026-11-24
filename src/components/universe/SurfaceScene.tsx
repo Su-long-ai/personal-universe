@@ -358,8 +358,25 @@ export function SurfaceScene({
       if (focusedAnchor) {
         document.documentElement.dataset.universeSurfaceFocusAnchor =
           focusedAnchor.id;
+        document.documentElement.dataset.universeSurfaceFocusCluster =
+          String(focusedAnchor.cluster);
+        if (focusedAnchor.regionId) {
+          document.documentElement.dataset.universeSurfaceFocusRegion =
+            focusedAnchor.regionId;
+        } else {
+          delete document.documentElement.dataset.universeSurfaceFocusRegion;
+        }
+        if (focusedAnchor.landmarkId) {
+          document.documentElement.dataset.universeSurfaceFocusLandmark =
+            focusedAnchor.landmarkId;
+        } else {
+          delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+        }
       } else {
         delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+        delete document.documentElement.dataset.universeSurfaceFocusCluster;
+        delete document.documentElement.dataset.universeSurfaceFocusRegion;
+        delete document.documentElement.dataset.universeSurfaceFocusLandmark;
       }
     }
     return () => {
@@ -378,6 +395,9 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceContentClusters;
       delete document.documentElement.dataset.universeSurfacePrimarySignals;
       delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      delete document.documentElement.dataset.universeSurfaceFocusCluster;
+      delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      delete document.documentElement.dataset.universeSurfaceFocusLandmark;
     };
   }, [active, profile, softwareRenderer, surfaceFocusEntryId]);
 
