@@ -308,13 +308,10 @@ export default function UniverseApp({
   cameraSettledPhaseRef.current = cameraSettledPhase;
   const [worldScalePosition, setWorldScalePosition] =
     useState(GALAXY_SCALE_MIN);
+  // Physical scale is imperative. Every state write below updates this ref
+  // first, so never mirror React state back into it from a passive effect: a
+  // delayed endpoint render must not overwrite a newer wheel reversal.
   const worldScalePositionRef = useRef(GALAXY_SCALE_MIN);
-  useEffect(() => {
-    // React state mirrors semantic/renderer boundaries. The Galaxy 0->1 hot
-    // path writes the physical coordinate straight through this ref so high-
-    // frequency wheel/trackpad samples do not rerender the product tree.
-    worldScalePositionRef.current = worldScalePosition;
-  }, [worldScalePosition]);
   const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
   const [galaxyScaleTarget, setGalaxyScaleTarget] =
     useState<UniverseNavigationDestination | null>(null);

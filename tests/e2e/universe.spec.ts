@@ -2587,6 +2587,63 @@ test("Galaxy direct scale reverses cleanly at 0.4 0.8 near-one and immediately a
 });
 
 
+test("Galaxy exact endpoint reversal beats pending System handoff", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  // Reach 0.75, then hit endpoint 1.0 and reverse in the same task before the
+  // two-RAF renderer handoff can commit. The newer coordinate must win; no
+  // passive React mirror or stale handoff may snap the path back to System.
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await page.evaluate(() => {
+    const root = document.querySelector(".universe-root");
+    if (!(root instanceof HTMLElement)) throw new Error("universe root missing");
+    root.dispatchEvent(new WheelEvent("wheel", { deltaY: -96, bubbles: true, cancelable: true }));
+    root.dispatchEvent(new WheelEvent("wheel", { deltaY: 96, bubbles: true, cancelable: true }));
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await page.waitForTimeout(350);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-bridge",
+    "active",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("Hero continuous scale traverses Galaxy to Surface and back without waiting for settlement", async ({
   page,
 }, testInfo) => {
