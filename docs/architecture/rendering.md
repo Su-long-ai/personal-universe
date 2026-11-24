@@ -320,7 +320,12 @@ secondary world whose existing content array is empty.
 Pointer/touch exploration continues to reuse the one `camera-controls`
 authority. Its wheel action remains disabled, so wheel/trackpad scale input
 continues to belong exclusively to the continuous-scale coordinator and can
-leave Surface immediately.
+leave Surface immediately. When pointer/touch exploration has changed the
+Surface camera, the same controller's current position/target is retained as a
+world- and renderer-scoped Surface endpoint. Reverse 5→4 scale motion and a
+same-world return therefore use the explored frame without introducing another
+camera store or another interpolation loop. Renderer-mode or world identity
+changes invalidate the retained endpoint.
 
 Runtime evidence is shared across live and fallback paths:
 
