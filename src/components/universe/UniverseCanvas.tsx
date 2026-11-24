@@ -3,6 +3,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -54,6 +55,15 @@ const LazyYeisSystemScene = lazy(() =>
     default: module.YeisSystemScene,
   })),
 );
+
+const UNIVERSE_CAMERA_CONFIG = {
+  position: [0, 26.5, 43] as [number, number, number],
+  fov: 48,
+  near: 0.05,
+  far: 260,
+};
+const UNIVERSE_DPR_LOW: [number, number] = [1, 1];
+const UNIVERSE_DPR_DEFAULT: [number, number] = [1, 1.75];
 
 function RendererPageLifecycle({
   onContextLost,
@@ -413,15 +423,22 @@ export function UniverseCanvas({
     };
   }, [handoffTargetPlanetId]);
 
+  const canvasDpr =
+    quality === "low" ? UNIVERSE_DPR_LOW : UNIVERSE_DPR_DEFAULT;
+  const canvasGl = useMemo(
+    () => ({
+      antialias: quality !== "low",
+      powerPreference: "high-performance" as const,
+      logarithmicDepthBuffer: engineMode === "yeis",
+    }),
+    [engineMode, quality],
+  );
+
   return (
     <Canvas
-      dpr={quality === "low" ? [1, 1] : [1, 1.75]}
-      camera={{ position: [0, 26.5, 43], fov: 48, near: 0.05, far: 260 }}
-      gl={{
-        antialias: quality !== "low",
-        powerPreference: "high-performance",
-        logarithmicDepthBuffer: engineMode === "yeis",
-      }}
+      dpr={canvasDpr}
+      camera={UNIVERSE_CAMERA_CONFIG}
+      gl={canvasGl}
     >
       <RendererPageLifecycle onContextLost={handleWebglContextLost} />
       {!(engineMode === "yeis" && phase === "galaxy") && (
