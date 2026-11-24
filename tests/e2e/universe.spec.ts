@@ -704,7 +704,7 @@ test("low-quality Surface retains the existing terrain fallback", async ({
   );
   if (signalCount > 0) {
     expect(clusterCount).toBeGreaterThan(0);
-    await expect(page.locator(".surface-cluster-index span").first()).toBeVisible();
+    await expect(page.locator(".surface-cluster-chip").first()).toBeVisible();
     await expect
       .poll(
         async () =>
@@ -3584,6 +3584,12 @@ test("Personal Signal deep link keeps its Surface focus through product landing 
       { timeout: 15_000 },
     )
     .toBeGreaterThan(0);
+
+  const focusedCluster = page.locator(
+    '.surface-cluster-chip[aria-pressed="true"]',
+  );
+  await expect(focusedCluster).toHaveCount(1);
+  await expect(focusedCluster).toBeVisible();
 
   const focusAction = focusedCard.locator(".world-content-focus-action");
   await expect(focusAction).toBeVisible();
