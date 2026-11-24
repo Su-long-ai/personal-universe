@@ -40,6 +40,8 @@ interface Autopilot {
 
 const _v = new Vector3();
 const _v2 = new Vector3();
+const _v3 = new Vector3();
+const _origin = new Vector3();
 const _q = new Quaternion();
 const _q2 = new Quaternion();
 const _m = new Matrix4();
@@ -383,7 +385,7 @@ export class CameraController {
       const tgt = ap.target;
       const tgtPos = tgt ? tgt.position : ap.point;
       if (ap.kind === 'centerDir' || !tgtPos) {
-        _m.lookAt(new Vector3(), ap.dir1, _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, ap.dir1, _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, s);
       } else if (ap.kind === 'goto' || ap.kind === 'gotoPoint') {
@@ -401,11 +403,11 @@ export class CameraController {
         }
         this.position.copy(tgtPos).addScaledVector(dir, dist);
         // orientation: blend toward looking at target
-        _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, _v.copy(tgtPos).sub(this.position), ap.up1 ? _v2.copy(ap.up1) : _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, smoothstep(Math.min(1, s * 1.6)));
       } else {
-        _m.lookAt(new Vector3(), _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));
+        _m.lookAt(_origin, _v.copy(tgtPos).sub(this.position), _v2.set(0, 1, 0).applyQuaternion(ap.q0));
         _q.setFromRotationMatrix(_m);
         this.quaternion.copy(ap.q0).slerp(_q, s);
       }
@@ -440,7 +442,7 @@ export class CameraController {
         if (dx !== 0 || dy !== 0) {
           const up = _v2.set(0, 1, 0).applyQuaternion(this.quaternion);
           _q.setFromAxisAngle(up, -dx * this.mouseSensitivity);
-          const right = new Vector3(1, 0, 0).applyQuaternion(this.quaternion);
+          const right = _v3.copy(X).applyQuaternion(this.quaternion);
           _q2.setFromAxisAngle(right, -dy * this.mouseSensitivity * ySign);
           _q.multiply(_q2);
           offset.applyQuaternion(_q);
@@ -461,7 +463,7 @@ export class CameraController {
         // Roll with Q/E in orbit mode
         const roll = (input.down('KeyQ') ? 1 : 0) - (input.down('KeyE') ? 1 : 0);
         if (roll !== 0) {
-          _q.setFromAxisAngle(Z.clone().applyQuaternion(this.quaternion), roll * dt * 1.2);
+          _q.setFromAxisAngle(_v3.copy(Z).applyQuaternion(this.quaternion), roll * dt * 1.2);
           this.quaternion.premultiply(_q);
         }
         this.position.copy(tgt.position).add(offset);
@@ -476,8 +478,8 @@ export class CameraController {
         const strafe = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
         const climb = (input.down('KeyR') ? 1 : 0) - (input.down('KeyF') ? 1 : 0);
         if (strafe !== 0 || climb !== 0) {
-          const up = new Vector3(0, 1, 0).applyQuaternion(this.quaternion);
-          const right = new Vector3(1, 0, 0).applyQuaternion(this.quaternion);
+          const up = _v2.copy(Y).applyQuaternion(this.quaternion);
+          const right = _v3.copy(X).applyQuaternion(this.quaternion);
           _q.setFromAxisAngle(up, -strafe * dt * 1.2);
           _q2.setFromAxisAngle(right, climb * dt * 1.2);
           _q.multiply(_q2);
