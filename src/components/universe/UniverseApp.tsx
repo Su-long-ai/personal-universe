@@ -1267,28 +1267,31 @@ export default function UniverseApp({
     document.documentElement.dataset.universeScaleSoftFocus = "disabled";
     if (phaseRef.current !== "galaxy") return;
 
-    continuousScaleIntentEpochRef.current += 1;
-    pendingScaleEnterSystemRef.current = null;
-    pendingWorldScaleStepsRef.current = 0;
     const frozenPosition = Math.min(
       SYSTEM_SCALE_MIN,
       Math.max(GALAXY_SCALE_MIN, worldScalePositionRef.current),
     );
-    galaxyScaleTargetRef.current = null;
-    setGalaxyScaleTarget(null);
+    // Pointer authority must supersede the same coordinator-owned intent as
+    // Search/Journey takeovers. Reuse the central cancellation path so stale
+    // native completion, queued wheel state, and diagnostics cannot survive.
+    cancelPendingContinuousScaleIntent("manual-camera");
+    worldScalePositionRef.current = frozenPosition;
+    setWorldScalePosition(frozenPosition);
     setWorldScaleContinuous(false);
-    lockedGalaxyScaleFocusRef.current = null;
     document.documentElement.dataset.universeScalePosition =
       frozenPosition.toFixed(3);
     document.documentElement.dataset.universeScaleProgress =
       galaxyScaleSegmentProgress(frozenPosition).toFixed(3);
     document.documentElement.dataset.universeGalaxyScaleBridge =
       "manual-frozen";
+    // Keep the explicit takeover diagnostic published by main in addition to
+    // the coordinator cancellation above. This is intentionally redundant for
+    // cleanup, but makes the winning pointer authority observable immediately.
     document.documentElement.dataset.universeScaleSuperseded =
       "manual-camera";
     delete document.documentElement.dataset.universeGalaxyScaleTarget;
     delete document.documentElement.dataset.universeScaleQueued;
-  }, []);
+  }, [cancelPendingContinuousScaleIntent]);
 
   const handleSystemScaleFocus = useCallback(
     (planet: PlanetDefinition | null) => {
