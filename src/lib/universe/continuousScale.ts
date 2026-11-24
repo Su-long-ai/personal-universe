@@ -26,6 +26,7 @@ export const WORLD_SCALE_WHEEL_SPAN = 192;
 export const WORLD_SCALE_EPSILON = 1e-3;
 export const WHEEL_LINE_PIXELS = 16;
 export const WHEEL_SAMPLE_LIMIT = 96;
+export const CONTINUOUS_SCALE_JITTER_FLOOR = 0.05;
 
 export type WheelDeltaMode = 0 | 1 | 2;
 
@@ -50,18 +51,21 @@ export function normalizeWheelDelta(
       : deltaMode === 2
         ? Math.max(WHEEL_LINE_PIXELS, pagePixels)
         : 1;
+  const normalized = deltaY * unit;
+  if (Math.abs(normalized) < CONTINUOUS_SCALE_JITTER_FLOOR) return 0;
   return Math.min(
     WHEEL_SAMPLE_LIMIT,
-    Math.max(-WHEEL_SAMPLE_LIMIT, deltaY * unit),
+    Math.max(-WHEEL_SAMPLE_LIMIT, normalized),
   );
 }
 
 export function continuousScaleDirection(
   deltaY: number,
 ): ContinuousScaleDirection | null {
-  if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.5) return null;
+  const normalized = continuousScaleDelta(deltaY);
+  if (normalized === 0) return null;
   // Browser wheel convention: negative delta = wheel forward/up = zoom in.
-  return deltaY < 0 ? "in" : "out";
+  return normalized < 0 ? "in" : "out";
 }
 
 export function continuousScaleDelta(deltaY: number): number {
@@ -119,6 +123,14 @@ export function applySystemScaleWheel(
     WORLD_SCALE_MIN,
     Math.max(SYSTEM_SCALE_MIN, position + delta),
   );
+}
+
+export function continuousScaleResponse(progress: number): number {
+  const linear = Math.min(1, Math.max(0, progress));
+  const smooth = linear * linear * (3 - 2 * linear);
+  // Keep substantial linear velocity at authored anchors so sustained wheel
+  // input reads as one scale gesture instead of stop/start cinematics.
+  return linear * 0.68 + smooth * 0.32;
 }
 
 export function systemScaleSegmentProgress(position: number): number {

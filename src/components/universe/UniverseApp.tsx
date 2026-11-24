@@ -309,7 +309,9 @@ export default function UniverseApp({
   const [worldScalePosition, setWorldScalePosition] =
     useState(GALAXY_SCALE_MIN);
   const worldScalePositionRef = useRef(GALAXY_SCALE_MIN);
-  worldScalePositionRef.current = worldScalePosition;
+  const worldScaleRenderFrameRef = useRef<number | null>(null);
+  const pendingWorldScaleRenderPositionRef = useRef<number | null>(null);
+  const worldScaleRenderCommitCountRef = useRef(0);
   const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
   const [galaxyScaleTarget, setGalaxyScaleTarget] =
     useState<UniverseNavigationDestination | null>(null);
@@ -354,6 +356,45 @@ export default function UniverseApp({
     samples: 0,
     gesture: 0,
   });
+
+  const publishWorldScalePosition = useCallback(
+    (position: number, immediate = false) => {
+      worldScalePositionRef.current = position;
+      pendingWorldScaleRenderPositionRef.current = position;
+      document.documentElement.dataset.universeScalePosition =
+        position.toFixed(3);
+
+      if (immediate) {
+        if (worldScaleRenderFrameRef.current !== null) {
+          window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
+          worldScaleRenderFrameRef.current = null;
+        }
+        pendingWorldScaleRenderPositionRef.current = null;
+        setWorldScalePosition(position);
+        return;
+      }
+
+      if (worldScaleRenderFrameRef.current !== null) return;
+      worldScaleRenderFrameRef.current = window.requestAnimationFrame(() => {
+        worldScaleRenderFrameRef.current = null;
+        const pending = pendingWorldScaleRenderPositionRef.current;
+        pendingWorldScaleRenderPositionRef.current = null;
+        if (pending === null) return;
+        setWorldScalePosition(pending);
+      });
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      if (worldScaleRenderFrameRef.current !== null) {
+        window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
+        worldScaleRenderFrameRef.current = null;
+      }
+    },
+    [],
+  );
 
   const cancelPendingContinuousScaleIntent = useCallback(
     (
@@ -536,12 +577,51 @@ export default function UniverseApp({
   }, [phase, systemScaleTargetPlanet]);
 
   useEffect(() => {
+    worldScalePositionRef.current = worldScalePosition;
+    worldScaleRenderCommitCountRef.current += 1;
     document.documentElement.dataset.universeScalePosition =
       worldScalePosition.toFixed(3);
-    return () => {
-      delete document.documentElement.dataset.universeScalePosition;
-    };
+    document.documentElement.dataset.universeScaleReactCommits = String(
+      worldScaleRenderCommitCountRef.current,
+    );
   }, [worldScalePosition]);
+
+  useEffect(() => {
+    const authority =
+      phase === "galaxy"
+        ? "galaxy"
+        : phase === "system"
+          ? "system"
+          : phase === "surface"
+            ? "surface"
+            : isWorldScalePhase(phase)
+              ? "world"
+              : "transition";
+    document.documentElement.dataset.universeRenderAuthority = authority;
+
+    if (phase === "system" && worldScalePosition > SYSTEM_SCALE_MIN) {
+      document.documentElement.dataset.universeHandoffState =
+        "system:approach";
+    } else if (
+      (phase === "atmosphere" || phase === "surface") &&
+      worldScalePosition > 4
+    ) {
+      document.documentElement.dataset.universeHandoffState =
+        "atmosphere:surface";
+    } else {
+      document.documentElement.dataset.universeHandoffState = "stable";
+    }
+  }, [phase, worldScalePosition]);
+
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.universeScalePosition;
+      delete document.documentElement.dataset.universeScaleReactCommits;
+      delete document.documentElement.dataset.universeRenderAuthority;
+      delete document.documentElement.dataset.universeHandoffState;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!navigatorOpen) return;
@@ -2155,11 +2235,13 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleQueued;
             delete document.documentElement.dataset.universeScaleBlocked;
 
-            worldScalePositionRef.current = nextPosition;
-            setWorldScalePosition(nextPosition);
+            // Native YEIS consumes Galaxy 0→1 scale through the React
+            // scene boundary, so every physical wheel sample must publish
+            // immediately. System/world camera positions can still batch to
+            // one React commit per animation frame because camera-controls
+            // owns their imperative interpolation.
+            publishWorldScalePosition(nextPosition, true);
             setWorldScaleContinuous(true);
-            document.documentElement.dataset.universeScalePosition =
-              nextPosition.toFixed(3);
             document.documentElement.dataset.universeScaleDirection =
               direction;
             document.documentElement.dataset.universeScaleProgress =
@@ -2206,11 +2288,8 @@ export default function UniverseApp({
             normalizedDelta,
           );
           setSystemScaleTargetPlanet(selectedPlanet);
-          worldScalePositionRef.current = nextPosition;
-          setWorldScalePosition(nextPosition);
+          publishWorldScalePosition(nextPosition, true);
           setWorldScaleContinuous(true);
-          document.documentElement.dataset.universeScalePosition =
-            nextPosition.toFixed(3);
           document.documentElement.dataset.universeScaleDirection = direction;
           document.documentElement.dataset.universeScaleProgress =
             systemScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2245,11 +2324,14 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeScaleQueued;
         delete document.documentElement.dataset.universeScaleBlocked;
 
-        worldScalePositionRef.current = nextPosition;
-        setWorldScalePosition(nextPosition);
+        publishWorldScalePosition(
+          nextPosition,
+          worldScalePhaseForPosition(
+            nextPosition,
+            selectedPlanet.surfaceMode,
+          ) !== currentPhase,
+        );
         setWorldScaleContinuous(true);
-        document.documentElement.dataset.universeScalePosition =
-          nextPosition.toFixed(3);
         document.documentElement.dataset.universeScaleDirection = direction;
         document.documentElement.dataset.universeScaleProgress =
           worldScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2291,8 +2373,7 @@ export default function UniverseApp({
               normalizedDelta,
             );
             setSystemScaleTargetPlanet(null);
-            worldScalePositionRef.current = nextPosition;
-            setWorldScalePosition(nextPosition);
+            publishWorldScalePosition(nextPosition, true);
             setWorldScaleContinuous(true);
             phaseRef.current = "galaxy";
             setPhase("galaxy");
@@ -2383,11 +2464,11 @@ export default function UniverseApp({
         const intentEpoch = continuousScaleIntentEpochRef.current;
         delete document.documentElement.dataset.universeScaleBlocked;
         delete document.documentElement.dataset.universeScaleQueued;
-        worldScalePositionRef.current = nextPosition;
-        setWorldScalePosition(nextPosition);
+        publishWorldScalePosition(
+          nextPosition,
+          nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+        );
         setWorldScaleContinuous(true);
-        document.documentElement.dataset.universeScalePosition =
-          nextPosition.toFixed(3);
         document.documentElement.dataset.universeScaleDirection = direction;
         document.documentElement.dataset.universeScaleProgress =
           systemScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2452,6 +2533,8 @@ export default function UniverseApp({
         lockedSystemScaleFocusRef.current = null;
       }
 
+      wheel.lastAt = now;
+      wheel.samples = Math.min(8, wheel.samples + 1);
       wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = String(
@@ -2660,6 +2743,7 @@ export default function UniverseApp({
       selectedSystem,
       setWorldScalePhase,
       systemScaleTargetPlanet,
+      publishWorldScalePosition,
     ],
   );
 
