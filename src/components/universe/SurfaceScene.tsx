@@ -138,12 +138,14 @@ export function SurfaceScene({
   phaseRef,
   quality,
   planet,
+  surfaceFocusEntryId,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
   planet: PlanetDefinition | null;
+  surfaceFocusEntryId: string | null;
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
@@ -301,6 +303,7 @@ export function SurfaceScene({
               active={active}
               phaseRef={phaseRef}
               profile={profile}
+              focusedEntryId={surfaceFocusEntryId}
               onAnchorHeight={handleAnchorHeight}
             />
           ) : null
@@ -346,6 +349,18 @@ export function SurfaceScene({
             (anchor) => anchor.priority === "primary",
           ).length,
         );
+      const focusedAnchor = profile.contentAnchors.find(
+        (anchor) => anchor.entryId === surfaceFocusEntryId,
+      );
+      if (focusedAnchor) {
+        document.documentElement.dataset.universeSurfaceFocusEntry =
+          focusedAnchor.entryId;
+        document.documentElement.dataset.universeSurfaceFocusAnchor =
+          focusedAnchor.id;
+      } else {
+        delete document.documentElement.dataset.universeSurfaceFocusEntry;
+        delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      }
     }
     return () => {
       if (
@@ -362,8 +377,10 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceContentAnchors;
       delete document.documentElement.dataset.universeSurfaceContentClusters;
       delete document.documentElement.dataset.universeSurfacePrimarySignals;
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
     };
-  }, [active, profile, softwareRenderer]);
+  }, [active, profile, softwareRenderer, surfaceFocusEntryId]);
 
   return (
     <>
