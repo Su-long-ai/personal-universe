@@ -232,14 +232,17 @@ function LiveSurfaceAnchor({
       ),
     [focusedAnchor?.regionId, profile.regions],
   );
-  const rankedLandmarks = useMemo(
-    () =>
-      rankSurfaceWorldLandmarks(
-        profile.landmarks,
-        focusedAnchor?.landmarkId ?? null,
-      ),
-    [focusedAnchor?.landmarkId, profile.landmarks],
-  );
+  const rankedLandmarks = useMemo(() => {
+    const baseLandmarks = expanded
+      ? profile.landmarks
+      : [...profile.landmarks].sort(
+          (a, b) => b.prominence - a.prominence,
+        );
+    return rankSurfaceWorldLandmarks(
+      baseLandmarks,
+      focusedAnchor?.landmarkId ?? null,
+    );
+  }, [expanded, focusedAnchor?.landmarkId, profile.landmarks]);
   const visibleRegions = expanded ? rankedRegions.slice(0, 4) : [];
   const visibleLandmarks = expanded
     ? rankedLandmarks.slice(0, 6)
