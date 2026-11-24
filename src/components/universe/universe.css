@@ -293,6 +293,7 @@ select {
   justify-content: flex-end;
   gap: 5px;
   margin-top: 7px;
+  pointer-events: auto;
 }
 
 .surface-cluster-chip {
@@ -647,6 +648,7 @@ select {
   }
 
   .world-content-focus-action {
+    min-height: 30px;
     margin-top: 7px;
     padding: 6px 8px;
     font-size: 7px;
@@ -677,6 +679,7 @@ select {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
+    touch-action: pan-x;
   }
 
   .surface-cluster-index::-webkit-scrollbar {
@@ -685,6 +688,7 @@ select {
 
   .surface-cluster-chip {
     flex: 0 0 auto;
+    min-height: 28px;
     white-space: nowrap;
   }
 
