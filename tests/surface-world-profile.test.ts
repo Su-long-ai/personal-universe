@@ -5,6 +5,7 @@ import {
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
   rankSurfaceWorldLandmarks,
+  rankSurfaceWorldPaths,
   rankSurfaceWorldRegions,
   surfaceModeForArchetype,
 } from "../src/lib/universe/surface/worldProfile.ts";
@@ -243,6 +244,41 @@ test("focused Surface context remains visible ahead of generic prominence", () =
       (landmark) => landmark.id,
     ),
     ["focus", "prominent"],
+  );
+});
+
+test("focused guide paths promote only the associated generated landmark route", () => {
+  const paths = [
+    {
+      id: "first",
+      from: [0, 0] as [number, number],
+      to: [1, 1] as [number, number],
+      width: 0.1,
+      landmarkId: "landmark-a",
+    },
+    {
+      id: "focus",
+      from: [1, 1] as [number, number],
+      to: [2, 2] as [number, number],
+      width: 0.1,
+      landmarkId: "landmark-b",
+    },
+    {
+      id: "third",
+      from: [2, 2] as [number, number],
+      to: [3, 3] as [number, number],
+      width: 0.1,
+      landmarkId: "landmark-c",
+    },
+  ];
+
+  assert.deepEqual(
+    rankSurfaceWorldPaths(paths, "landmark-b").map((path) => path.id),
+    ["focus", "first", "third"],
+  );
+  assert.deepEqual(
+    rankSurfaceWorldPaths(paths).map((path) => path.id),
+    ["first", "focus", "third"],
   );
 });
 
