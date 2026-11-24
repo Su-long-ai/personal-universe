@@ -1,0 +1,27 @@
+{
+  "schema": 3,
+  "task_id": "NARROW-SURFACE-VISUAL-ACCEPTANCE-001",
+  "approved_at": "2026-11-24T07:48:00.000Z",
+  "baseline_commit": "e1ca59b5f9e631c683e89c17f04dfac78737a80d",
+  "record_path": "docs/reuse-gate/tasks/NARROW-SURFACE-VISUAL-ACCEPTANCE-001.json",
+  "record_sha256": "088193f3850c7ca7ab371f183fd455dbf50fe997660efce27918a3cdbc1acd49",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing Playwright viewport and screenshot pipeline to capture settled Surface on tablet and mobile, using current renderer readiness evidence so any later polish is driven by hosted visual proof rather than a new test framework or speculative camera changes"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-playwright-narrow-surface-cases"
+  ],
+  "candidate_scores": {
+    "existing-playwright-narrow-surface-cases": 56.5,
+    "custom-surface-screenshot-runner": null
+  }
+}
