@@ -3249,8 +3249,8 @@ test("Chinese Moon alias preserves exact native-body travel identity", async ({
   await expect(dialog).toBeHidden();
 
   const html = page.locator("html");
-  const destinationId = "body:c0/earth";
-  const nativeTarget = "c0/earth";
+  const destinationId = "body:c0/moon";
+  const nativeTarget = "c0/moon";
   await expect(html).toHaveAttribute(
     "data-universe-active-destination",
     destinationId,
