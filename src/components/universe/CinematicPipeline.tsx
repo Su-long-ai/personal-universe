@@ -74,6 +74,12 @@ export function CinematicPipeline({
           ? "software-renderer"
           : null;
   const useLiveWorld = liveWorld && !fallbackReason;
+  // SwiftShader does not need an offscreen EffectComposer pass when the live
+  // ProceduralPlanets path is parked. Keep the single R3F renderer/camera
+  // authority and render the scene directly until an explicit HIGH live world
+  // actually needs PlanetPass.
+  const renderWithComposer = !softwareRenderer || useLiveWorld;
+  const parkComposerTargets = softwareRenderer && !useLiveWorld;
   const impostorPixels = softwareRenderer
     ? 180
     : quality === "high"
@@ -258,10 +264,23 @@ export function CinematicPipeline({
       "universeWebglPixelRatio",
       String(pixelRatioCap),
     );
-    composer.composer.setSize(size.width, size.height);
+    // A parked SwiftShader composer otherwise retains a full-size pair of
+    // render targets even though AUTO/LOW fallback and Galaxy/System render
+    // directly. Collapse those targets while parked; restoring live HIGH
+    // rendering resizes the same composer before PlanetPass draws again.
+    composer.composer.setSize(
+      parkComposerTargets ? 1 : size.width,
+      parkComposerTargets ? 1 : size.height,
+    );
+    publishDatasetMetric(
+      document.documentElement,
+      "universeWorldComposerTargets",
+      parkComposerTargets ? "parked-1x1" : "viewport",
+    );
   }, [
     composer,
     gl,
+    parkComposerTargets,
     pixelRatioCap,
     setDpr,
     size.height,
@@ -280,6 +299,8 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldImpostorPixels;
       delete document.documentElement.dataset.universeWorldLiveDrawFrame;
       delete document.documentElement.dataset.universeWebglPixelRatio;
+      delete document.documentElement.dataset.universeWorldRenderPath;
+      delete document.documentElement.dataset.universeWorldComposerTargets;
       appliedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
@@ -299,7 +320,19 @@ export function CinematicPipeline({
       appliedImpostorPixels.current = impostorPixels;
     }
 
-    composer.composer.render(delta);
+    if (renderWithComposer) {
+      composer.composer.render(delta);
+    } else {
+      // useFrame priority=1 intentionally owns the render step. On software
+      // fallback paths, draw with the same Three/R3F renderer directly instead
+      // of paying an offscreen RenderPass + OutputPass round trip.
+      gl.render(scene, camera);
+    }
+    publishDatasetMetric(
+      html,
+      "universeWorldRenderPath",
+      renderWithComposer ? "composer" : "direct",
+    );
 
     // PlanetPass creates PlanetRenderer lazily during its first live draw.
     // If that happened this frame, align the final profile now but do not
