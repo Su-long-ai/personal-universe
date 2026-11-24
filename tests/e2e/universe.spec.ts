@@ -598,6 +598,119 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
   await runtime.assertClean(testInfo);
 });
 
+test("Orbit capability switches reacquire paint without resurfacing System", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-renderer",
+    /.+/,
+  );
+
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const events: Array<{
+      capability: string | null;
+      paint: string | null;
+      system: string | null;
+    }> = [];
+    const sample = () => {
+      events.push({
+        capability: root.dataset.universeWorldCapability ?? null,
+        paint: root.dataset.universeWorldPaintReady ?? null,
+        system: root.dataset.universeSystemRenderer ?? null,
+      });
+    };
+    sample();
+    const observer = new MutationObserver(sample);
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: [
+        "data-universe-world-capability",
+        "data-universe-world-paint-ready",
+        "data-universe-system-renderer",
+      ],
+    });
+    Object.assign(window, {
+      __worldCapabilityEvents: events,
+      __worldCapabilityObserver: observer,
+    });
+  });
+
+  await page.getByLabel("QUALITY").selectOption("low");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-capability",
+    "fallback-low-quality",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 15_000 },
+  );
+
+  await page.getByLabel("QUALITY").selectOption("auto");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-capability",
+    "fallback-software-renderer",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-paint-ready",
+    "true",
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-renderer",
+    /.+/,
+  );
+
+  const events = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __worldCapabilityEvents?: Array<{
+          capability: string | null;
+          paint: string | null;
+          system: string | null;
+        }>;
+      }
+    ).__worldCapabilityEvents ?? [],
+  );
+  expect(
+    events.some(
+      (event) =>
+        event.capability === "fallback-low-quality" &&
+        event.paint !== "true",
+    ),
+  ).toBe(true);
+  expect(
+    events.some(
+      (event) =>
+        event.capability === "fallback-software-renderer" &&
+        event.paint !== "true",
+    ),
+  ).toBe(true);
+  expect(events.some((event) => event.system !== null)).toBe(false);
+
+  await page.evaluate(() => {
+    const runtimeWindow = window as typeof window & {
+      __worldCapabilityObserver?: MutationObserver;
+    };
+    runtimeWindow.__worldCapabilityObserver?.disconnect();
+  });
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel scale advances and reverses world layers without auto chaining", async ({
   page,
 }, testInfo) => {
