@@ -87,19 +87,23 @@ async function wheelScale(
   await page.waitForTimeout(320);
 }
 
-async function dispatchScaleWheel(page: Page, deltaY: number) {
+async function dispatchScaleWheel(
+  page: Page,
+  deltaY: number,
+  deltaMode = 0,
+) {
   await page.locator("main.universe-root").evaluate(
-    (root, value) => {
+    (root, sample) => {
       root.dispatchEvent(
         new WheelEvent("wheel", {
           bubbles: true,
           cancelable: true,
-          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
-          deltaY: value,
+          deltaMode: sample.deltaMode,
+          deltaY: sample.deltaY,
         }),
       );
     },
-    deltaY,
+    { deltaY, deltaMode },
   );
 }
 
@@ -751,6 +755,88 @@ test("trackpad-like small deltas move the close-world coordinate continuously", 
     "orbit",
     { timeout: 10_000 },
   );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("wheel units and stalled coalesced samples map to bounded scale distance", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  // Three line units become 48 CSS-pixel-equivalent units: exactly a quarter
+  // of one semantic interval, without treating line mode as three pixels.
+  await dispatchScaleWheel(page, -3, 1);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "2.250");
+  await expect(html).toHaveAttribute("data-universe-scale-input", "line");
+  await expect(html).toHaveAttribute("data-universe-scale-delta", "-48.000");
+
+  // Simulate a delivery delayed/coalesced by a short main-thread stall. One
+  // pathological sample is capped to one ordinary notch (96px), not replayed
+  // later as hidden momentum.
+  await page.waitForTimeout(350);
+  await dispatchScaleWheel(page, -900);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "2.750");
+  await expect(html).toHaveAttribute("data-universe-scale-delta", "-96.000");
+  const stalledPosition = await html.getAttribute(
+    "data-universe-scale-position",
+  );
+  await page.waitForTimeout(600);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    stalledPosition!,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("surface reversal starts a new gesture and moves outward immediately", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "surface",
+    { timeout: 15_000 },
+  );
+
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "5.000");
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-blocked",
+    "surface-limit",
+  );
+  const inwardGesture = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  );
+
+  await page.mouse.wheel(0, 120);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "4.500");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-scale-gesture")),
+    )
+    .toBeGreaterThan(inwardGesture);
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
   await runtime.assertClean(testInfo);

@@ -630,6 +630,28 @@ approval metadata before its first implementation commit.
 
 ## Runtime acceptance checklist
 
+### Continuous scale input dynamics
+
+System (1) through Surface (5) uses one real-valued coordinate and one input
+authority in `UniverseApp`. Wheel samples are converted to CSS-pixel-equivalent
+distance before touching that coordinate: pixel input is retained, line input
+uses 16 pixels per line, page input uses the viewport height, and every
+delivered event is capped at 96 pixels. The cap bounds a coalesced delivery
+after a main-thread stall; it does not create an accumulator, animation, or
+inertia. A conventional 120-unit mouse notch therefore moves 0.5 scale units,
+while small high-resolution trackpad deltas move proportionally and
+immediately.
+
+Gesture identity is diagnostic/cancellation state, not physics. A pause starts
+a new identity, a sign reversal immediately increments the intent epoch and
+invalidates pending handoff work, and Search/Places, Journey, deep links,
+manual camera takeover, return, or navigation failure clear the session through
+the shared cancellation path. Boundary samples clamp idempotently at System or
+Surface; no hidden delta is retained, so the first opposite sample moves away
+from the boundary immediately. Runtime acceptance exposes normalized input,
+signed delta, gesture identity, and reversal identity through `data-universe-*`
+attributes.
+
 A release candidate is accepted only after all of the following are exercised
 against a production build:
 

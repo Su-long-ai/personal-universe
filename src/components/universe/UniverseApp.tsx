@@ -39,6 +39,7 @@ import {
   applyWorldScaleWheel,
   continuousScaleDelta,
   continuousScaleDirection,
+  normalizeWheelDelta,
   isWorldScalePhase,
   nextWorldScalePhase,
   scalePhaseIndex,
@@ -297,11 +298,13 @@ export default function UniverseApp({
     direction: ContinuousScaleDirection | null;
     lastAt: number;
     samples: number;
+    gesture: number;
   }>({
     accumulated: 0,
     direction: null,
     lastAt: 0,
     samples: 0,
+    gesture: 0,
   });
 
   const cancelPendingContinuousScaleIntent = useCallback(
@@ -324,6 +327,7 @@ export default function UniverseApp({
       wheel.direction = null;
       wheel.lastAt = 0;
       wheel.samples = 0;
+      wheel.gesture += 1;
 
       delete document.documentElement.dataset.universeScaleQueued;
       delete document.documentElement.dataset.universeScaleDirection;
@@ -1804,9 +1808,53 @@ export default function UniverseApp({
         return;
       }
 
-      const direction = continuousScaleDirection(event.deltaY);
+      const normalizedDelta = normalizeWheelDelta(
+        event.deltaY,
+        event.deltaMode,
+        window.innerHeight,
+      );
+      const direction = continuousScaleDirection(normalizedDelta);
       if (!direction) return;
       const settledPhase = cameraSettledPhaseRef.current;
+
+      const now = performance.now();
+      const wheel = scaleWheelRef.current;
+      const previousDirection = wheel.direction;
+      const directionChanged =
+        previousDirection !== null && previousDirection !== direction;
+      const resetWindow =
+        wheel.samples >= 2
+          ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
+          : CONTINUOUS_SCALE_RESET_MS;
+      const gestureExpired =
+        wheel.direction !== null && now - wheel.lastAt > resetWindow;
+      if (wheel.direction === null || directionChanged || gestureExpired) {
+        wheel.gesture += 1;
+        wheel.accumulated = 0;
+        wheel.samples = 0;
+        wheel.direction = direction;
+        if (directionChanged) {
+          continuousScaleIntentEpochRef.current += 1;
+          pendingWorldScaleStepsRef.current = 0;
+          delete document.documentElement.dataset.universeScaleQueued;
+          document.documentElement.dataset.universeScaleReversal = String(
+            wheel.gesture,
+          );
+        }
+      }
+      wheel.lastAt = now;
+      wheel.samples = Math.min(255, wheel.samples + 1);
+      document.documentElement.dataset.universeScaleGesture = String(
+        wheel.gesture,
+      );
+      document.documentElement.dataset.universeScaleInput =
+        event.deltaMode === 1
+          ? "line"
+          : event.deltaMode === 2
+            ? "page"
+            : "pixel";
+      document.documentElement.dataset.universeScaleDelta =
+        normalizedDelta.toFixed(3);
 
       // Manual scale intent owns navigation immediately, even before a small
       // trackpad delta crosses the currentPhase threshold. This stops Journey
@@ -1847,7 +1895,7 @@ export default function UniverseApp({
 
         const nextPosition = applyWorldScaleWheel(
           currentPosition,
-          event.deltaY,
+          normalizedDelta,
           selectedPlanet.surfaceMode,
         );
 
@@ -1947,7 +1995,7 @@ export default function UniverseApp({
         const intentEpoch = continuousScaleIntentEpochRef.current;
         const nextPosition = applySystemScaleWheel(
           currentPosition,
-          event.deltaY,
+          normalizedDelta,
         );
 
         if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
@@ -2005,11 +2053,6 @@ export default function UniverseApp({
         return;
       }
 
-      const now = performance.now();
-      const wheel = scaleWheelRef.current;
-      const directionChanged =
-        wheel.direction !== null && wheel.direction !== direction;
-
       const worldTransitionUnsettled =
         currentPhase !== "galaxy" &&
         currentPhase !== "system" &&
@@ -2023,30 +2066,11 @@ export default function UniverseApp({
       // threshold already limits each browser event to at most one boundary,
       // while unsettled phases serialize extra steps through the existing
       // queue.
-      const resetWindow =
-        wheel.samples >= 2
-          ? CONTINUOUS_SCALE_ACTIVE_RESET_MS
-          : CONTINUOUS_SCALE_RESET_MS;
-      const newGesture = wheel.direction === null;
-      const gestureExpired =
-        !newGesture && now - wheel.lastAt > resetWindow;
-
-      if (newGesture || directionChanged || gestureExpired) {
-        wheel.accumulated = 0;
-        wheel.samples = 0;
-        wheel.direction = direction;
+      if (wheel.samples === 1) {
         lockedGalaxyScaleFocusRef.current = null;
         lockedSystemScaleFocusRef.current = null;
-        if (directionChanged) {
-          continuousScaleIntentEpochRef.current += 1;
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
-        }
       }
-
-      wheel.lastAt = now;
-      wheel.samples = Math.min(8, wheel.samples + 1);
-      wheel.accumulated += Math.abs(continuousScaleDelta(event.deltaY));
+      wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = String(
         Math.min(

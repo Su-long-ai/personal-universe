@@ -22,6 +22,37 @@ export const WORLD_SCALE_MIN = 2;
 export const WORLD_SCALE_MAX = 5;
 export const WORLD_SCALE_WHEEL_SPAN = 192;
 export const WORLD_SCALE_EPSILON = 1e-3;
+export const WHEEL_LINE_PIXELS = 16;
+export const WHEEL_SAMPLE_LIMIT = 96;
+
+export type WheelDeltaMode = 0 | 1 | 2;
+
+/**
+ * Convert browser wheel units to a bounded CSS-pixel-equivalent distance.
+ *
+ * Pixel devices (including high-resolution trackpads) retain every delivered
+ * sub-notch delta. Line wheels use the conventional 16px line height and page
+ * wheels use the current viewport height. The per-event cap makes a coalesced
+ * event after a main-thread stall no stronger than one ordinary mouse notch;
+ * subsequent events are still applied, so there is no queue or inertia.
+ */
+export function normalizeWheelDelta(
+  deltaY: number,
+  deltaMode: number,
+  pagePixels = 800,
+): number {
+  if (!Number.isFinite(deltaY)) return 0;
+  const unit =
+    deltaMode === 1
+      ? WHEEL_LINE_PIXELS
+      : deltaMode === 2
+        ? Math.max(WHEEL_LINE_PIXELS, pagePixels)
+        : 1;
+  return Math.min(
+    WHEEL_SAMPLE_LIMIT,
+    Math.max(-WHEEL_SAMPLE_LIMIT, deltaY * unit),
+  );
+}
 
 export function continuousScaleDirection(
   deltaY: number,
@@ -33,7 +64,10 @@ export function continuousScaleDirection(
 
 export function continuousScaleDelta(deltaY: number): number {
   if (!Number.isFinite(deltaY)) return 0;
-  return Math.min(96, Math.max(-96, deltaY));
+  return Math.min(
+    WHEEL_SAMPLE_LIMIT,
+    Math.max(-WHEEL_SAMPLE_LIMIT, deltaY),
+  );
 }
 
 export function isWorldScalePhase(phase: UniversePhase): boolean {
