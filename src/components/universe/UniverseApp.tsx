@@ -1478,6 +1478,10 @@ export default function UniverseApp({
       phaseRef.current = nextPhase;
       cameraSettledPhaseRef.current = null;
       setCameraSettledPhase(null);
+      // The navigation coordinator owns invalidation of the previous phase's
+      // settlement synchronously. CinematicCamera remains the only authority
+      // allowed to publish the next settled phase.
+      delete document.documentElement.dataset.universeCameraSettled;
       delete document.documentElement.dataset.universeScaleSettled;
       setPhase(nextPhase);
       document.documentElement.dataset.universeNavigationPhase = nextPhase;
@@ -1975,6 +1979,7 @@ export default function UniverseApp({
       <div className="universe-canvas">
         <UniverseCanvas
           phase={phase}
+          phaseRef={phaseRef}
           engineMode={activeEngine}
           markers={galaxy.markers}
           contentPlacements={contentPlacements}
