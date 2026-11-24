@@ -62,7 +62,6 @@ export function SurfaceTerrain({
   const { gl, camera } = useThree();
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
-  const [activated, setActivated] = useState(active);
   const softwareRenderer = isSoftwareRenderer(gl);
   const terrainViewInitialized = useRef(false);
   const terrainReadyPublished = useRef(false);
