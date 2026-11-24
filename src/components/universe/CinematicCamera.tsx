@@ -410,7 +410,7 @@ export function CinematicCamera({
       // Keep its fit distance as the safety floor, then choose a farther
       // vertical-composition distance with an aspect-aware horizontal cap.
       const aspect = viewportWidth / viewportHeight;
-      const preferredVerticalRadius = Math.min(0.22, 0.3 / frameScale);
+      const preferredVerticalRadius = Math.min(0.26, 0.36 / frameScale);
       const horizontalSafeVerticalRadius = Math.max(
         0.16,
         aspect * 0.44,
