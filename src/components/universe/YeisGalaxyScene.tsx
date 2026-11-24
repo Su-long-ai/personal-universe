@@ -4,9 +4,12 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
+  Material,
+  Mesh,
   PerspectiveCamera,
   Points,
   PointsMaterial,
+  Scene,
   Vector3,
 } from "three";
 import type { GalaxyMarker, QualityMode } from "../../lib/universe/types";
@@ -37,6 +40,18 @@ import {
 } from "../../vendor/yeis/core/constants";
 import { StarPoints } from "../../vendor/yeis/render/StarPoints";
 import { ProcStarPoints } from "../../vendor/yeis/render/ProcStarPoints";
+import {
+  BodyRenderer,
+  type RenderSettings,
+} from "../../vendor/yeis/render/BodyRenderer";
+import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
+import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
+import { starLightColor } from "../../vendor/yeis/astro/stellar";
+import { IMAGERY } from "../../vendor/yeis/data/imagery";
+import {
+  nativeSystemOverviewDistance,
+  nativeSystemSpan,
+} from "../../lib/universe/yeis/systemScale";
 import { GalaxyCloud } from "../../vendor/yeis/render/GalaxyCloud";
 import { GalaxySprites } from "../../vendor/yeis/render/GalaxySprites";
 import { LandmarkSprites } from "../../vendor/yeis/render/LandmarkSprites";
@@ -51,6 +66,14 @@ type NativeGalaxyState = {
   galaxyClouds: Map<number, GalaxyCloud>;
   galaxySprites: GalaxySprites;
   landmarkSprites: LandmarkSprites;
+  nativeSystemScene: Scene;
+  nativeBodies: BodyRenderer;
+  nativeBodyPoints: BodyPoints;
+  nativeOrbits: OrbitLines;
+  nativeSunColor: Vector3;
+  nativeLuminosity: number;
+  nativeSystemSpanKm: number;
+  systemOverview: boolean;
   galaxyBoost: number;
   maxPointPx: number;
   cameraPc: Vector3;
@@ -67,8 +90,10 @@ type NativeGalaxyState = {
 };
 
 export type YeisGalaxyViewState = {
+  starId: string;
   positionKm: [number, number, number];
   quaternion: [number, number, number, number];
+  systemOverview: boolean;
 };
 
 export type YeisSignalHover = {
@@ -77,6 +102,86 @@ export type YeisSignalHover = {
   clientX: number;
   clientY: number;
 } | null;
+
+const NATIVE_GALAXY_SYSTEM_SETTINGS: RenderSettings = {
+  atmospheres: true,
+  clouds: true,
+  rings: true,
+  ringParticles: false,
+  shadows: true,
+  imagery: false,
+  fill: null,
+};
+
+function retargetNativeSystemRenderers(state: NativeGalaxyState) {
+  const system = state.runtime.universe.current;
+  system.update(2451545.0, performance.now() / 1000);
+
+  // BodyView eagerly constructs TileGlobe and queues root imagery in its
+  // constructor, even when RenderSettings.imagery is false. Galaxy-scale LOD
+  // only needs the pinned procedural/native geometry, never external surface
+  // tiles. Suppress registry entries synchronously while views are rebuilt,
+  // then restore the shared registry for exact native body travel elsewhere.
+  const suppressedImagery = new Map<
+    string,
+    (typeof IMAGERY)[string]
+  >();
+  for (const body of system.bodies) {
+    const imagery = IMAGERY[body.data.id];
+    if (!imagery) continue;
+    suppressedImagery.set(body.data.id, imagery);
+    delete IMAGERY[body.data.id];
+  }
+  try {
+    state.nativeBodies.setSystem(system);
+  } finally {
+    for (const [id, imagery] of suppressedImagery) {
+      IMAGERY[id] = imagery;
+    }
+  }
+  state.nativeBodyPoints.setViews(state.nativeBodies.views);
+  state.nativeOrbits.setSystem(system);
+  const [r, g, b] = starLightColor(system.starTemperature);
+  state.nativeSunColor.set(r, g, b);
+  state.nativeLuminosity =
+    state.runtime.universe.starInfo(system.starId).luminosity;
+  state.nativeSystemSpanKm = nativeSystemSpan(system);
+  document.documentElement.dataset.yeisNativeSystem = system.starId;
+  document.documentElement.dataset.yeisNativeSystemReady = "true";
+  document.documentElement.dataset.yeisNativeSystemSpanKm =
+    state.nativeSystemSpanKm.toExponential(6);
+}
+
+function disposeNativeSystemRenderers(
+  state: NativeGalaxyState,
+  parentScene: Scene,
+) {
+  const geometries = new Set<BufferGeometry>();
+  const materials = new Set<Material>();
+
+  state.nativeSystemScene.traverse((object) => {
+    const mesh = object as Mesh;
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    const material = mesh.material;
+    if (Array.isArray(material)) {
+      for (const entry of material) materials.add(entry);
+    } else if (material) {
+      materials.add(material);
+    }
+  });
+
+  for (const view of state.nativeBodies.views) {
+    view.dispose(state.nativeSystemScene);
+  }
+  for (const line of state.nativeOrbits.lines) {
+    state.nativeSystemScene.remove(line.line);
+  }
+  state.nativeSystemScene.remove(state.nativeBodyPoints.points);
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) material.dispose();
+  state.nativeSystemScene.clear();
+  parentScene.remove(state.nativeSystemScene);
+}
 
 const heroProjection = new Vector3();
 const contentProjection = new Vector3();
@@ -131,6 +236,9 @@ export function YeisGalaxyScene({
     [number, number, number, number] | null
   >(null);
   const navigationStartPositionRef = useRef<
+    [number, number, number] | null
+  >(null);
+  const navigationStartPcRef = useRef<
     [number, number, number] | null
   >(null);
   const pendingNavigationRef =
@@ -270,8 +378,29 @@ export function YeisGalaxyScene({
         contentSky.renderOrder = -6;
         scene.add(contentSky);
 
+        const savedView = viewStateRef.current;
+        if (
+          savedView &&
+          runtime.universe.current.starId !== savedView.starId
+        ) {
+          runtime.universe.switchTo(
+            savedView.starId,
+            2451545.0,
+            performance.now() / 1000,
+          );
+        }
+
         const input = new Input(gl.domElement);
         const controller = new CameraController(runtime.universe);
+        const nativeSystemScene = new Scene();
+        scene.add(nativeSystemScene);
+        const nativeBodies = new BodyRenderer(
+          nativeSystemScene,
+          gl.capabilities.getMaxAnisotropy(),
+        );
+        const nativeBodyPoints = new BodyPoints(nativeSystemScene);
+        const nativeOrbits = new OrbitLines(nativeSystemScene);
+        const nativeSunColor = new Vector3(1, 1, 1);
         const onScaleWheel = () => {
           if (controller.autoOrbit !== 0) {
             controller.autoOrbit = 0;
@@ -298,10 +427,18 @@ export function YeisGalaxyScene({
         const cameraPc = milkyWay.toScene(viewLocal, new Vector3());
         const orbitCenterKm = milkyWay.center.clone().multiplyScalar(PARSEC_KM);
         const orbitRadiusKm = milkyWay.radius * 0.045 * PARSEC_KM;
-        const savedView = viewStateRef.current;
         if (savedView) {
           controller.position.fromArray(savedView.positionKm);
-          controller.orbitPoint(orbitCenterKm, orbitRadiusKm, "Milky Way");
+          if (savedView.systemOverview) {
+            const span = nativeSystemSpan(runtime.universe.current);
+            controller.orbitPoint(
+              runtime.universe.star.position,
+              span,
+              runtime.universe.star.name,
+            );
+          } else {
+            controller.setReference(runtime.universe.star);
+          }
           controller.quaternion.fromArray(savedView.quaternion);
           runtime.universe.toParsecs(controller.position, cameraPc);
         } else {
@@ -344,6 +481,14 @@ export function YeisGalaxyScene({
           galaxyClouds,
           galaxySprites,
           landmarkSprites,
+          nativeSystemScene,
+          nativeBodies,
+          nativeBodyPoints,
+          nativeOrbits,
+          nativeSunColor,
+          nativeLuminosity: 1,
+          nativeSystemSpanKm: 1,
+          systemOverview: savedView?.systemOverview ?? false,
           galaxyBoost: 0,
           maxPointPx,
           cameraPc,
@@ -359,6 +504,7 @@ export function YeisGalaxyScene({
           disposed: false,
         };
         stateRef.current = state;
+        retargetNativeSystemRenderers(state);
 
         const navigateDestination = (
           destination: UniverseNavigationDestination,
@@ -694,6 +840,7 @@ export function YeisGalaxyScene({
       const state = stateRef.current;
       if (state) {
         viewStateRef.current = {
+          starId: state.runtime.universe.current.starId,
           positionKm: state.controller.position.toArray() as [number, number, number],
           quaternion: state.controller.quaternion.toArray() as [
             number,
@@ -701,9 +848,11 @@ export function YeisGalaxyScene({
             number,
             number,
           ],
+          systemOverview: state.systemOverview,
         };
         state.disposed = true;
         state.input.dispose();
+        disposeNativeSystemRenderers(state, scene);
         state.starPoints.dispose(scene);
         state.procPoints.dispose(scene);
         for (const cloud of state.galaxyClouds.values()) cloud.dispose(scene);
@@ -742,6 +891,11 @@ export function YeisGalaxyScene({
       delete document.documentElement.dataset.yeisGalaxyClouds;
       delete document.documentElement.dataset.yeisCurrentGalaxy;
       delete document.documentElement.dataset.yeisOpeningMotion;
+      delete document.documentElement.dataset.yeisNativeSystem;
+      delete document.documentElement.dataset.yeisNativeSystemReady;
+      delete document.documentElement.dataset.yeisNativeSystemSpanKm;
+      delete document.documentElement.dataset.yeisNativeSystemOverview;
+      delete document.documentElement.dataset.yeisNativeSystemArrivalRatio;
       locatedScaleFocusRef.current = null;
       if (scaleFocusIdRef.current !== null) {
         scaleFocusIdRef.current = null;
@@ -769,6 +923,10 @@ export function YeisGalaxyScene({
     if (manualCameraInput) {
       locatedDestinationIdRef.current = null;
       locatedScaleFocusRef.current = null;
+      if (state.systemOverview) {
+        state.systemOverview = false;
+        delete document.documentElement.dataset.yeisNativeSystemOverview;
+      }
     }
 
     const fovRad = perspective.fov * DEG;
@@ -817,6 +975,18 @@ export function YeisGalaxyScene({
       state.controller.position,
       state.cameraPc,
     );
+
+    viewStateRef.current = {
+      starId: runtime.universe.current.starId,
+      positionKm: state.controller.position.toArray() as [number, number, number],
+      quaternion: state.controller.quaternion.toArray() as [
+        number,
+        number,
+        number,
+        number,
+      ],
+      systemOverview: state.systemOverview,
+    };
 
     if (scaleFocusRef.current) {
       scaleFocusFrameRef.current = (scaleFocusFrameRef.current + 1) % 6;
@@ -1000,10 +1170,17 @@ export function YeisGalaxyScene({
         ];
       navigationStartPositionRef.current =
         state.controller.position.toArray() as [number, number, number];
+      navigationStartPcRef.current = runtime.universe
+        .toParsecs(state.controller.position, new Vector3())
+        .toArray() as [number, number, number];
       pendingNavigationRef.current = null;
       locatedDestinationIdRef.current = null;
       locatedScaleFocusRef.current = null;
       lastNavigationRequestRef.current = request.requestId;
+      if (request.mode === "travel") {
+        state.systemOverview = false;
+        delete document.documentElement.dataset.yeisNativeSystemOverview;
+      }
 
       if (request.mode === "locate") {
         if (request.target.kind === "star") {
@@ -1081,6 +1258,77 @@ export function YeisGalaxyScene({
               reason,
           );
         }
+      } else if (request.target.kind === "star") {
+        const targetStarId = request.target.nativeId;
+        try {
+          if (runtime.universe.current.starId !== targetStarId) {
+            const frameDelta = runtime.universe.switchTo(
+              targetStarId,
+              2451545.0,
+              performance.now() / 1000,
+            );
+            state.controller.shiftFrame(
+              frameDelta,
+              runtime.universe.star,
+            );
+          }
+          retargetNativeSystemRenderers(state);
+
+          const star = runtime.universe.star;
+          const arrivalDistance = nativeSystemOverviewDistance(
+            runtime.universe.current,
+            perspective.getEffectiveFOV(),
+            perspective.aspect,
+          );
+          navigationDirection
+            .copy(state.controller.position)
+            .sub(star.position);
+          if (navigationDirection.lengthSq() <= 1e-18) {
+            navigationDirection
+              .set(0, 0, 1)
+              .applyQuaternion(state.controller.quaternion);
+          }
+          navigationDirection.normalize();
+
+          state.controller.goToPoint(
+            star.position,
+            arrivalDistance,
+            navigationDirection,
+            {
+              radius: state.nativeSystemSpanKm,
+              name: star.name,
+            },
+          );
+          pendingNavigationRef.current = request;
+          document.documentElement.dataset.universeTraveling = targetKey;
+          document.documentElement.dataset.yeisNativeSystemOverview =
+            "approaching:" + targetStarId;
+          document.documentElement.dataset.universeTravelArrivalRatio =
+            (
+              state.controller.position.distanceTo(star.position) /
+              Math.max(state.nativeSystemSpanKm, 1)
+            ).toFixed(4);
+          console.info(
+            "[YEIS-NATIVE-TRAVEL] start " +
+              targetKey +
+              " system=" +
+              targetStarId +
+              " arriveKm=" +
+              arrivalDistance.toExponential(6),
+          );
+        } catch (error) {
+          const reason =
+            error instanceof Error ? error.message : String(error);
+          document.documentElement.dataset.universeNavigationError =
+            targetKey;
+          navigationFailureRef.current(request, reason);
+          console.error(
+            "[YEIS-NATIVE-TRAVEL] failed " +
+              targetKey +
+              " · " +
+              reason,
+          );
+        }
       } else if (request.target.kind === "body") {
         const starId = request.target.starId;
         if (runtime.universe.current.starId !== starId) {
@@ -1090,6 +1338,7 @@ export function YeisGalaxyScene({
             performance.now() / 1000,
           );
           state.controller.shiftFrame(frameDelta, runtime.universe.star);
+          retargetNativeSystemRenderers(state);
         }
 
         const body = runtime.universe.get(request.target.bodyId);
@@ -1124,6 +1373,7 @@ export function YeisGalaxyScene({
               performance.now() / 1000,
             );
             state.controller.shiftFrame(frameDelta, runtime.universe.star);
+            retargetNativeSystemRenderers(state);
           }
           const body = runtime.universe.get(blackHole.entry.bodyId);
           if (body) {
@@ -1227,8 +1477,22 @@ export function YeisGalaxyScene({
     }
 
     const pendingNavigation = pendingNavigationRef.current;
+    if (
+      pendingNavigation?.mode === "travel" &&
+      pendingNavigation.target.kind === "star" &&
+      state.controller.autopilot
+    ) {
+      const star = runtime.universe.star;
+      document.documentElement.dataset.universeTravelArrivalRatio =
+        (
+          state.controller.position.distanceTo(star.position) /
+          Math.max(state.nativeSystemSpanKm, 1)
+        ).toFixed(4);
+    }
+
     const startQuaternion = navigationStartQuaternionRef.current;
     const startPosition = navigationStartPositionRef.current;
+    const startPc = navigationStartPcRef.current;
     if (
       pendingNavigation &&
       pendingNavigation.requestId === lastNavigationRequestRef.current &&
@@ -1268,11 +1532,19 @@ export function YeisGalaxyScene({
             " deltaRad=" +
             deltaRad.toFixed(6),
         );
-      } else if (pendingNavigation.mode === "travel" && startPosition) {
-        const dx = state.controller.position.x - startPosition[0];
-        const dy = state.controller.position.y - startPosition[1];
-        const dz = state.controller.position.z - startPosition[2];
-        const deltaPc = Math.hypot(dx, dy, dz) / PARSEC_KM;
+      } else if (
+        pendingNavigation.mode === "travel" &&
+        startPosition
+      ) {
+        const currentPc = runtime.universe.toParsecs(
+          state.controller.position,
+          new Vector3(),
+        );
+        const deltaPc = startPc
+          ? currentPc.distanceTo(new Vector3().fromArray(startPc))
+          : state.controller.position
+              .distanceTo(new Vector3().fromArray(startPosition)) /
+            PARSEC_KM;
         document.documentElement.dataset.universeTravelComplete = targetKey;
         document.documentElement.dataset.universeTravelDeltaPc =
           deltaPc.toExponential(6);
@@ -1289,6 +1561,29 @@ export function YeisGalaxyScene({
           );
           document.documentElement.dataset.universeTravelArrivalRatio =
             (distancePc / Math.max(landmark.def.radiusPc, 1e-9)).toFixed(4);
+        } else if (pendingNavigation.target.kind === "star") {
+          const star = runtime.universe.star;
+          const distance = state.controller.position.distanceTo(star.position);
+          document.documentElement.dataset.universeTravelArrivalRatio =
+            (distance / Math.max(state.nativeSystemSpanKm, 1)).toFixed(4);
+          state.systemOverview = true;
+          viewStateRef.current = {
+            starId: runtime.universe.current.starId,
+            positionKm: state.controller.position.toArray() as [
+              number,
+              number,
+              number,
+            ],
+            quaternion: state.controller.quaternion.toArray() as [
+              number,
+              number,
+              number,
+              number,
+            ],
+            systemOverview: true,
+          };
+          document.documentElement.dataset.yeisNativeSystemOverview =
+            runtime.universe.current.starId;
         }
         delete document.documentElement.dataset.universeTraveling;
         console.info(
@@ -1303,6 +1598,7 @@ export function YeisGalaxyScene({
       pendingNavigationRef.current = null;
       navigationStartQuaternionRef.current = null;
       navigationStartPositionRef.current = null;
+      navigationStartPcRef.current = null;
     }
 
     state.galaxyAcc += delta;
@@ -1386,6 +1682,39 @@ export function YeisGalaxyScene({
     const pixelRatio = gl.getPixelRatio();
     const pxPerRad =
       size.height / 2 / Math.tan(fovRad / 2);
+
+    const nativeStar = runtime.universe.star;
+    state.nativeBodies.update(
+      state.controller.position,
+      state.controller.quaternion,
+      perspective,
+      size.height,
+      fovRad,
+      nativeStar.position,
+      nativeStar.radius,
+      state.nativeSunColor,
+      performance.now() / 1000,
+      {
+        ...NATIVE_GALAXY_SYSTEM_SETTINGS,
+        atmospheres: quality !== "low",
+        clouds: quality !== "low",
+        shadows: quality !== "low",
+      },
+    );
+    state.nativeBodyPoints.setPixelRatio(pixelRatio);
+    state.nativeBodyPoints.update(
+      nativeStar.position,
+      state.controller.position,
+      state.nativeLuminosity,
+    );
+    state.nativeOrbits.update(
+      state.controller.position,
+      true,
+      quality !== "low",
+      pxPerRad,
+      (id) => state.nativeBodies.byId.get(id)?.apparentRadiusPx ?? 0,
+      null,
+    );
 
     state.starPoints.setPixelRatio(pixelRatio);
     state.starPoints.update(

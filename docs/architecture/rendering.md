@@ -18,6 +18,48 @@ The reusable YEIS source boundary is fixed at
 `e52056897364e060fbd6d00951628f163b57d7a1`. Newer upstream AGPL code is not
 copied into this repository.
 
+## Galaxy → native System LOD bridge
+
+Task `GALAXY-SYSTEM-SCALE-CONTINUITY-001` restores the full-scale renderer
+composition present at the pinned MIT YEIS boundary instead of inventing a
+transition scene. The Galaxy YEIS scene now keeps the pinned current-system
+`BodyRenderer`, `BodyPoints`, and `OrbitLines` beside `StarPoints`.
+This is the engine's original LOD contract: the catalogue renderer suppresses
+the current system's star point while that same star and its local bodies are
+represented by native meshes/points/orbits.
+
+Scale-in to a stellar destination stays under the native
+`CameraController`. If the target belongs to another frame, the engine first
+calls `Universe.switchTo()` and `CameraController.shiftFrame()`, preserving
+the absolute camera position while local coordinates change. The current-system
+renderers are then retargeted to the new `StarSystem`; as apparent size grows,
+their existing culling and point/mesh rules determine which detail becomes
+visible. The product System renderer is not mounted during this native flight.
+
+The native endpoint is not a magic distance. `nativeSystemSpan()` is shared
+with the product similarity adapter, and the Galaxy camera computes its arrival
+distance with the same perspective sphere-fit formula and
+`SYSTEM_OVERVIEW_FRAME_SCALE` used by camera-controls on the product side.
+The resulting `starId + position + quaternion + systemOverview` view state is
+persisted continuously and written again at arrival. When product System takes
+authority, `CinematicCamera` reuses that quaternion and the normal
+viewport-aware System fit distance, so camera ownership changes without
+resetting the view direction.
+
+Reverse travel retains the same native reference-frame view state rather than
+reinterpreting target-system kilometres in the Solar frame. Exact body
+Search/Places/click travel remains unchanged; only wheel scale travel
+normalizes a body/content focus to its owning star before the System boundary.
+
+Runtime evidence includes:
+
+- `data-yeis-native-system="<star id>"`
+- `data-yeis-native-system-ready="true"`
+- `data-yeis-native-system-span-km`
+- `data-yeis-native-system-overview="approaching:<star id>|<star id>"`
+- `data-universe-travel-arrival-ratio`
+- `data-universe-system-entry-view="yeis-native"`
+
 ## Native system adapter
 
 YEIS renderer shaders are authored around a floating origin where the camera is

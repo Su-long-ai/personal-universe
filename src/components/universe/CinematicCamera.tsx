@@ -8,7 +8,7 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
-import { Vector3 } from "three";
+import { Quaternion, Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
@@ -22,10 +22,14 @@ import {
   scalePhaseIndex,
 } from "../../lib/universe/continuousScale";
 import {
+  SYSTEM_OVERVIEW_FRAME_SCALE,
+} from "../../lib/universe/yeis/systemScale";
+import {
   isSoftwareRenderer,
   liveWorldFallbackReason,
 } from "./CinematicPipeline";
 import type { SystemScaleFrame } from "./SystemScene";
+import type { YeisGalaxyViewState } from "./YeisGalaxyScene";
 
 export type SurfaceCameraFrame = {
   position: [number, number, number];
@@ -43,6 +47,7 @@ type CinematicCameraProps = {
   quality: QualityMode;
   surfaceCameraFrame: SurfaceCameraFrame | null;
   systemScaleFrame: SystemScaleFrame | null;
+  galaxyViewState: YeisGalaxyViewState | null;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -106,7 +111,7 @@ const SHOTS: Partial<Record<UniversePhase, CameraShot>> = {
     positionTolerance: 0.16,
     targetTolerance: 0.1,
     fitRadius: SYSTEM_OVERVIEW_RADIUS,
-    frameScale: 1.15,
+    frameScale: SYSTEM_OVERVIEW_FRAME_SCALE,
   },
   approach: {
     position: [1.35, 1.15, 13.6],
@@ -171,6 +176,7 @@ export function CinematicCamera({
   quality,
   surfaceCameraFrame,
   systemScaleFrame,
+  galaxyViewState,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -396,6 +402,18 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemScaleRadius;
     }
 
+    const nativeSystemEntryView =
+      phase === "system" && galaxyViewState?.systemOverview === true;
+    const nativeSystemEntryQuaternion = nativeSystemEntryView
+      ? new Quaternion().fromArray(galaxyViewState.quaternion)
+      : null;
+    if (nativeSystemEntryView) {
+      document.documentElement.dataset.universeSystemEntryView =
+        "yeis-native";
+    } else {
+      delete document.documentElement.dataset.universeSystemEntryView;
+    }
+
     const continuousWorldCamera =
       worldScaleContinuous &&
       isWorldScalePhase(phase) &&
@@ -425,6 +443,13 @@ export function CinematicCamera({
       activeSurfaceCameraFrame
     ) {
       camera.up.set(...activeSurfaceCameraFrame.up).normalize();
+    } else if (
+      nativeSystemEntryQuaternion
+    ) {
+      camera.up
+        .set(0, 1, 0)
+        .applyQuaternion(nativeSystemEntryQuaternion)
+        .normalize();
     } else if (
       continuousWorldCamera &&
       activeSurfaceCameraFrame &&
@@ -470,11 +495,20 @@ export function CinematicCamera({
           controls.getDistanceToFitSphere(
             systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
           ) * systemShot.frameScale;
-        systemPosition
-          .sub(systemTarget)
-          .normalize()
-          .multiplyScalar(distance)
-          .add(systemTarget);
+        if (nativeSystemEntryQuaternion) {
+          const forward = new Vector3(0, 0, -1)
+            .applyQuaternion(nativeSystemEntryQuaternion)
+            .normalize();
+          systemPosition
+            .copy(systemTarget)
+            .addScaledVector(forward, -distance);
+        } else {
+          systemPosition
+            .sub(systemTarget)
+            .normalize()
+            .multiplyScalar(distance)
+            .add(systemTarget);
+        }
       }
 
       // Preserve the authored Approach composition at the renderer boundary:
@@ -696,11 +730,20 @@ export function CinematicCamera({
         controls.getDistanceToFitSphere(
           shot.fitRadius ?? PLANET_RENDER_RADIUS,
         ) * shot.frameScale;
-      desiredPosition.current
-        .sub(desiredTarget.current)
-        .normalize()
-        .multiplyScalar(distance)
-        .add(desiredTarget.current);
+      if (phase === "system" && nativeSystemEntryQuaternion) {
+        const forward = new Vector3(0, 0, -1)
+          .applyQuaternion(nativeSystemEntryQuaternion)
+          .normalize();
+        desiredPosition.current
+          .copy(desiredTarget.current)
+          .addScaledVector(forward, -distance);
+      } else {
+        desiredPosition.current
+          .sub(desiredTarget.current)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(desiredTarget.current);
+      }
     }
 
     configuredPhase.current = phase;
@@ -779,6 +822,7 @@ export function CinematicCamera({
     activeSurfaceCameraFrame,
     camera,
     controlsReady,
+    galaxyViewState,
     phase,
     phaseRef,
     reducedMotion,
@@ -839,6 +883,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemScaleFrame;
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
+      delete document.documentElement.dataset.universeSystemEntryView;
     },
     [],
   );
