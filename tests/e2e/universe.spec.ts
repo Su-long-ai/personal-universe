@@ -1505,6 +1505,37 @@ test("LOW fallback prewarm cancels on immediate reverse and resumes before Surfa
 
   const html = page.locator("html");
 
+  // Hold the first Atmosphere idle job so reversal and the stale callback can
+  // be delivered in the same browser task. This reproduces the renderer-stall
+  // ordering where phaseRef has already moved outward but React effect cleanup
+  // has not necessarily reconciled yet.
+  await page.evaluate(() => {
+    const runtimeWindow = window as typeof window & {
+      __surfaceIdleQueue?: Array<() => void>;
+      __restoreSurfaceIdle?: () => void;
+    };
+    const originalRequestIdle = window.requestIdleCallback?.bind(window);
+    const originalCancelIdle = window.cancelIdleCallback?.bind(window);
+    runtimeWindow.__surfaceIdleQueue = [];
+    window.requestIdleCallback = ((
+      callback: Parameters<typeof window.requestIdleCallback>[0],
+    ) => {
+      const queue = runtimeWindow.__surfaceIdleQueue!;
+      queue.push(() =>
+        callback({
+          didTimeout: true,
+          timeRemaining: () => 0,
+        }),
+      );
+      return queue.length;
+    }) as typeof window.requestIdleCallback;
+    window.cancelIdleCallback = (() => {}) as typeof window.cancelIdleCallback;
+    runtimeWindow.__restoreSurfaceIdle = () => {
+      window.requestIdleCallback = originalRequestIdle!;
+      window.cancelIdleCallback = originalCancelIdle!;
+    };
+  });
+
   await dispatchScaleWheel(page, -96);
   await dispatchScaleWheel(page, -96);
   await expect(html).toHaveAttribute(
@@ -1515,12 +1546,44 @@ test("LOW fallback prewarm cancels on immediate reverse and resumes before Surfa
     "data-universe-surface-prewarm",
     "scheduled",
   );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __surfaceIdleQueue?: Array<() => void>;
+            }
+          ).__surfaceIdleQueue?.length ?? 0,
+      ),
+    )
+    .toBeGreaterThan(0);
 
-  await dispatchScaleWheel(page, 96);
+  await page.locator("main.universe-root").evaluate((root) => {
+    root.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: 96,
+      }),
+    );
+    const runtimeWindow = window as typeof window & {
+      __surfaceIdleQueue?: Array<() => void>;
+      __restoreSurfaceIdle?: () => void;
+    };
+    const staleJobs = runtimeWindow.__surfaceIdleQueue?.splice(0) ?? [];
+    for (const run of staleJobs) run();
+    runtimeWindow.__restoreSurfaceIdle?.();
+  });
+
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
   await expect(html).toHaveAttribute(
     "data-universe-surface-prewarm",
     "cancelled",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    /\d+/,
   );
 
   await dispatchScaleWheel(page, -96);
