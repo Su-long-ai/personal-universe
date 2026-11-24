@@ -870,7 +870,7 @@ test("Chinese and English switch in place and persist", async ({
   await waitForYeis(page);
   await expect(
     page.getByText(
-      "Personal signals are scattered among observed and imagined worlds. Follow one, search for a destination, or keep drifting through the galaxy.",
+      "Personal signals are scattered among observed and imagined worlds. Scroll or use the trackpad to move closer, or open Search / Places to choose a destination.",
     ),
   ).toBeVisible();
 
@@ -900,7 +900,7 @@ test("Chinese and English switch in place and persist", async ({
   ).toBeVisible();
   await expect(
     page.getByText(
-      "个人信号散落在真实观测与想象世界之间。跟随一个信号、搜索目的地，或继续在银河中漫游。",
+      "个人信号散落在真实观测与想象世界之间。滚动鼠标滚轮或触控板向前靠近，也可以打开“搜索 / 地点”选择目的地。",
     ),
   ).toBeVisible();
   expect(mainFrameNavigations).toBe(0);
