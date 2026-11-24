@@ -335,8 +335,6 @@ export default function UniverseApp({
   const lockedSystemScaleFocusRef = useRef<PlanetDefinition | null>(null);
   const preferredSystemScaleDestinationRef =
     useRef<UniverseNavigationDestination | null>(null);
-  const pendingScaleEnterSystemRef =
-    useRef<UniverseNavigationDestination | null>(null);
   const galaxySoftFocusAvailableRef = useRef(true);
   const continuousScaleIntentEpochRef = useRef(0);
   const scaleWheelRef = useRef<{
@@ -398,7 +396,6 @@ export default function UniverseApp({
       options: { preserveGalaxyScaleBridge?: boolean } = {},
     ) => {
       continuousScaleIntentEpochRef.current += 1;
-      pendingScaleEnterSystemRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
       lockedSystemScaleFocusRef.current = null;
       if (!options.preserveGalaxyScaleBridge) {
@@ -1879,15 +1876,6 @@ export default function UniverseApp({
     [galaxy.markers, handleNavigateDestination],
   );
 
-  const enterScaleFocusedSystem = useCallback(
-    async (focus: UniverseNavigationDestination) => {
-      preferredSystemScaleDestinationRef.current = focus;
-      const marker = await navigationMarker(focus, galaxy.markers);
-      await handleNavigateDestination(scaleSystemDestinationForMarker(marker));
-    },
-    [galaxy.markers, handleNavigateDestination],
-  );
-
   const commitGalaxyScaleFocusedSystem = useCallback(
     async (focus: UniverseNavigationDestination) => {
       const marker = await navigationMarker(focus, galaxy.markers);
@@ -1944,22 +1932,6 @@ export default function UniverseApp({
     },
     [ensurePlaying, galaxy.markers, resolveMarker],
   );
-
-  useEffect(() => {
-    const queued = pendingScaleEnterSystemRef.current;
-    if (!queued || phase !== "galaxy") return;
-    if (activeDestinationId !== queued.id) return;
-    if (pendingDestinationId === queued.id) return;
-
-    pendingScaleEnterSystemRef.current = null;
-    delete document.documentElement.dataset.universeScaleQueued;
-    void enterScaleFocusedSystem(queued);
-  }, [
-    activeDestinationId,
-    enterScaleFocusedSystem,
-    pendingDestinationId,
-    phase,
-  ]);
 
   const handleContinuousScaleWheel = useCallback(
     (event: ReactWheelEvent<HTMLElement>) => {
@@ -2123,7 +2095,6 @@ export default function UniverseApp({
 
             continuousScaleIntentEpochRef.current += 1;
             const intentEpoch = continuousScaleIntentEpochRef.current;
-            pendingScaleEnterSystemRef.current = null;
             setNavigationRequest(null);
             setPendingDestinationId(null);
             setPendingDestinationMode(null);
@@ -2446,7 +2417,6 @@ export default function UniverseApp({
             "no-galaxy-focus";
           return;
         }
-        pendingScaleEnterSystemRef.current = null;
         delete document.documentElement.dataset.universeScaleQueued;
         if (
           activeDestinationId === "galaxy:0" &&
@@ -2491,7 +2461,6 @@ export default function UniverseApp({
       commitGalaxyScaleFocusedSystem,
       contentPlacements,
       defaultGalaxyScaleFocus,
-      enterScaleFocusedSystem,
       galaxy.markers,
       galaxyScaleTarget,
       handleContinuousScaleIntentStart,
