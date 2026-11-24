@@ -3709,6 +3709,35 @@ test("Personal Signal deep link keeps its Surface focus through product landing 
     "personal-universe",
   );
 
+  await driveCloseWorldScaleTo(page, 4);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-source",
+    "surface-selection",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-entry",
+    "personal-universe",
+  );
+
+  await driveCloseWorldScaleTo(page, 5);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-source",
+    "surface-selection",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-focus-entry",
+    "personal-universe",
+  );
+  await expect(focusedCard).toHaveAttribute("data-surface-focus", "true");
+
   await focusAction.click();
   await expect(html).toHaveAttribute(
     "data-universe-surface-focus-source",
