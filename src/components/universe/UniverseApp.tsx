@@ -2235,13 +2235,7 @@ export default function UniverseApp({
         <section className="hero-copy">
           <span className="eyebrow">{text(locale, "heroEyebrow")}</span>
           <h1>{text(locale, "heroTitle")}</h1>
-          <p>
-            {locale === "zh"
-              ? `${contentPlacements.length} 个个人信号已映射到稳定的恒星地址。观测世界与程序化世界保持天文属性，直到真实内容与其关联。`
-              : `${contentPlacements.length} personal ${
-                  contentPlacements.length === 1 ? "signal is" : "signals are"
-                } mapped onto stable stellar addresses. Observed and procedural worlds remain astronomical until real content is attached.`}
-          </p>
+          <p>{text(locale, "heroDescription")}</p>
         </section>
       )}
 
