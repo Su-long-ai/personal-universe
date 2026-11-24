@@ -225,6 +225,7 @@ export function UniverseCanvas({
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           quality={quality}
+          surfaceIdentity={selectedPlanet?.id ?? null}
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
