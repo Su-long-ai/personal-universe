@@ -88,6 +88,7 @@ export function CinematicPipeline({
   const stableFrames = useRef(0);
   const appliedImpostorPixels = useRef<number | null>(null);
   const metricFrame = useRef(0);
+  const liveDrawFrames = useRef(0);
   const reportedReady = useRef<boolean | null>(null);
   const onReadyChangeRef = useRef(onReadyChange);
   onReadyChangeRef.current = onReadyChange;
@@ -342,6 +343,7 @@ export function CinematicPipeline({
   useEffect(() => {
     return () => {
       stableFrames.current = 0;
+      liveDrawFrames.current = 0;
       publishReady(false);
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
@@ -430,6 +432,11 @@ export function CinematicPipeline({
         "universeWebglTriangles",
         String(gl.info.render.triangles),
       );
+      publishDatasetMetric(
+        html,
+        "universeWorldLiveDrawFrame",
+        String(liveDrawFrames.current),
+      );
     }
 
     const cameraReady =
@@ -476,11 +483,7 @@ export function CinematicPipeline({
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
     );
-    if (frameReady) {
-      html.dataset.universeWorldLiveDrawFrame = String(
-        Number(html.dataset.universeWorldLiveDrawFrame ?? "0") + 1,
-      );
-    }
+    if (frameReady) liveDrawFrames.current += 1;
     stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
 
     // A single pending=0 sample is not enough: moving the near-surface camera
