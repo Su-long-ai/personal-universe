@@ -1521,6 +1521,67 @@ test("release scale trace is monotonic from Galaxy zero to Surface five and back
   await runtime.assertClean(testInfo);
 });
 
+test("high-frequency sustained wheel crosses renderer handoffs without losing scale intent", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  // Approximate a 60 Hz sustained wheel/trackpad burst. Samples that arrive
+  // while Galaxy/System are sitting on a matched endpoint must not invalidate
+  // the paint/deadline handoff and strand the scale coordinate there.
+  for (let sample = 0; sample < 28; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(16);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    if (position >= 4.999) break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "5.000",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  for (let sample = 0; sample < 28; sample += 1) {
+    await dispatchScaleWheel(page, 96);
+    await page.waitForTimeout(16);
+    const position = Number(
+      await html.getAttribute("data-universe-scale-position"),
+    );
+    const phase = await html.getAttribute("data-universe-navigation-phase");
+    if (position <= 0.001 && phase === "galaxy") break;
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.000",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  expect(await page.locator("canvas").count()).toBe(1);
+  await runtime.assertClean(testInfo);
+});
+
 test("Search freezes and resumes a partial Galaxy scale path", async ({
   page,
 }, testInfo) => {
