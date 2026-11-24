@@ -169,8 +169,8 @@ export function UniverseCanvas({
   const [systemScaleFrame, setSystemScaleFrame] =
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
+  const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
   const [worldPaintReady, setWorldPaintReady] = useState(false);
-  const [worldPipelineReady, setWorldPipelineReady] = useState(false);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -189,10 +189,10 @@ export function UniverseCanvas({
     // Paint readiness belongs to the concrete renderer capability, not only
     // the planet identity. A quality switch can replace live ProceduralPlanets
     // with a lightweight/software path (or the reverse) while the same planet
-    // remains selected; keep the System handoff frame until the new authority
-    // has painted as well.
+    // remains selected. Reacquire first paint for camera/readiness consumers;
+    // only the actual System -> Approach boundary is allowed to retain System
+    // presentation as a fallback.
     setWorldPaintReady(false);
-    setWorldPipelineReady(false);
     delete document.documentElement.dataset.universeWorldPaintReady;
   }, [quality, worldPrewarmPlanet?.id]);
 
@@ -203,7 +203,7 @@ export function UniverseCanvas({
 
   const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
   const keepSystemForHandoff =
-    closeWorldPhase && Boolean(selectedSystem) && !worldPaintReady;
+    phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
 
   return (
     <Canvas
@@ -228,7 +228,8 @@ export function UniverseCanvas({
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={yeisViewStateRef.current}
-          worldFrameReady={worldPaintReady || worldPipelineReady}
+          worldFrameReady={worldPaintReady}
+          surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -319,7 +320,8 @@ export function UniverseCanvas({
               phase={phase}
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
-              onPaintReady={() => setWorldPaintReady(true)}
+              surfaceFallbackReady={surfaceFallbackReady}
+              onPaintReadyChange={setWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}
@@ -333,6 +335,8 @@ export function UniverseCanvas({
             phaseRef={phaseRef}
             quality={quality}
             hasPlanet={Boolean(selectedPlanet)}
+            ready={surfaceFallbackReady}
+            onReadyChange={setSurfaceFallbackReady}
           />
         </Suspense>
       ) : null}
@@ -340,7 +344,6 @@ export function UniverseCanvas({
       <CinematicPipeline
         quality={quality}
         liveWorld={liveWorld}
-        onReadyChange={setWorldPipelineReady}
       />
     </Canvas>
   );
