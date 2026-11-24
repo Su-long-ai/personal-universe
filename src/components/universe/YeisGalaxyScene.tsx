@@ -56,6 +56,7 @@ import { GalaxyCloud } from "../../vendor/yeis/render/GalaxyCloud";
 import { GalaxySprites } from "../../vendor/yeis/render/GalaxySprites";
 import { LandmarkSprites } from "../../vendor/yeis/render/LandmarkSprites";
 import { LANDMARK_IMAGES } from "../../vendor/yeis/data/landmarkImages";
+import { WORLD_SCALE_EPSILON } from "../../lib/universe/continuousScale";
 
 type NativeGalaxyState = {
   runtime: YeisCoreRuntime;
@@ -94,6 +95,15 @@ export type YeisGalaxyViewState = {
   positionKm: [number, number, number];
   quaternion: [number, number, number, number];
   systemOverview: boolean;
+};
+
+export type YeisGalaxyScaleBridgeState = {
+  targetId: string;
+  starId: string;
+  startPositionKm: [number, number, number];
+  startQuaternion: [number, number, number, number];
+  arrivalDistanceKm: number;
+  approachDirection: [number, number, number];
 };
 
 export type YeisSignalHover = {
@@ -193,6 +203,25 @@ const navigationPoint = new Vector3();
 const navigationNormal = new Vector3();
 const navigationOrigin = new Vector3();
 
+const scaleBridgeDirection = new Vector3();
+
+function scaleTargetNativeStarId(
+  destination: UniverseNavigationDestination,
+  markers: GalaxyMarker[],
+): string | null {
+  const target = destination.target;
+  if (target.kind === "star") return target.nativeId;
+  if (target.kind === "body") return target.starId;
+  if (target.kind === "content") return target.nativeId;
+  if (target.kind === "marker" || target.kind === "observed-body") {
+    return (
+      markers.find((marker) => marker.id === target.markerId)?.nativeId ??
+      null
+    );
+  }
+  return null;
+}
+
 export function YeisGalaxyScene({
   markers,
   contentPlacements,
@@ -205,6 +234,9 @@ export function YeisGalaxyScene({
   onScaleManualTakeover,
   quality,
   reducedMotion,
+  scalePosition,
+  scaleTarget,
+  scaleBridgeRef,
   viewStateRef,
 }: {
   markers: GalaxyMarker[];
@@ -223,6 +255,9 @@ export function YeisGalaxyScene({
   onScaleManualTakeover?: () => void;
   quality: QualityMode;
   reducedMotion: boolean;
+  scalePosition: number;
+  scaleTarget: UniverseNavigationDestination | null;
+  scaleBridgeRef: MutableRefObject<YeisGalaxyScaleBridgeState | null>;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
   const { gl, scene, camera, size } = useThree();
@@ -255,6 +290,12 @@ export function YeisGalaxyScene({
   const scaleManualTakeoverReportedRef = useRef(false);
   const scaleFocusIdRef = useRef<string | null>(null);
   const scaleFocusFrameRef = useRef(0);
+  const scalePositionRef = useRef(scalePosition);
+  const scaleTargetRef =
+    useRef<UniverseNavigationDestination | null>(scaleTarget);
+
+  scalePositionRef.current = scalePosition;
+  scaleTargetRef.current = scaleTarget;
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
@@ -943,6 +984,141 @@ export function YeisGalaxyScene({
       scaleManualTakeoverReportedRef.current = true;
       scaleManualTakeoverRef.current?.();
     }
+    const scaleDestination = scaleTargetRef.current;
+    const scalePosition = Math.min(
+      1,
+      Math.max(0, scalePositionRef.current),
+    );
+    let scaleBridgeActive = false;
+
+    if (scaleDestination && !manualScaleTakeover) {
+      const targetStarId = scaleTargetNativeStarId(
+        scaleDestination,
+        markersRef.current,
+      );
+      if (targetStarId) {
+        scaleBridgeActive = true;
+        let bridge = scaleBridgeRef.current;
+
+        if (
+          !bridge ||
+          bridge.targetId !== scaleDestination.id ||
+          bridge.starId !== targetStarId
+        ) {
+          if (runtime.universe.current.starId !== targetStarId) {
+            const frameDelta = runtime.universe.switchTo(
+              targetStarId,
+              2451545.0,
+              performance.now() / 1000,
+            );
+            state.controller.shiftFrame(
+              frameDelta,
+              runtime.universe.star,
+            );
+          }
+          retargetNativeSystemRenderers(state);
+
+          const star = runtime.universe.star;
+          const arrivalDistance = nativeSystemOverviewDistance(
+            runtime.universe.current,
+            perspective.getEffectiveFOV(),
+            perspective.aspect,
+          );
+          scaleBridgeDirection
+            .copy(state.controller.position)
+            .sub(star.position);
+          if (scaleBridgeDirection.lengthSq() <= 1e-18) {
+            scaleBridgeDirection
+              .set(0, 0, 1)
+              .applyQuaternion(state.controller.quaternion);
+          }
+          scaleBridgeDirection.normalize();
+
+          bridge = {
+            targetId: scaleDestination.id,
+            starId: targetStarId,
+            startPositionKm:
+              state.controller.position.toArray() as [
+                number,
+                number,
+                number,
+              ],
+            startQuaternion:
+              state.controller.quaternion.toArray() as [
+                number,
+                number,
+                number,
+                number,
+              ],
+            arrivalDistanceKm: arrivalDistance,
+            approachDirection:
+              scaleBridgeDirection.toArray() as [
+                number,
+                number,
+                number,
+              ],
+          };
+          scaleBridgeRef.current = bridge;
+        } else if (runtime.universe.current.starId !== bridge.starId) {
+          const frameDelta = runtime.universe.switchTo(
+            bridge.starId,
+            2451545.0,
+            performance.now() / 1000,
+          );
+          state.controller.shiftFrame(
+            frameDelta,
+            runtime.universe.star,
+          );
+          retargetNativeSystemRenderers(state);
+        }
+
+        // Recreate the pinned YEIS gotoPoint trajectory whenever Galaxy
+        // remounts from product System or a full endpoint previously settled.
+        // Then scrub its native interpolation by normalized scale position
+        // instead of elapsed wall-clock time.
+        if (!state.controller.autopilot) {
+          state.controller.position.fromArray(bridge.startPositionKm);
+          state.controller.quaternion.fromArray(bridge.startQuaternion);
+          state.controller.goToPoint(
+            runtime.universe.star.position,
+            bridge.arrivalDistanceKm,
+            scaleBridgeDirection.fromArray(bridge.approachDirection),
+            {
+              radius: state.nativeSystemSpanKm,
+              name: runtime.universe.star.name,
+            },
+          );
+        }
+
+        const autopilot = state.controller.autopilot;
+        if (autopilot) {
+          autopilot.t =
+            scalePosition * autopilot.duration - delta;
+        }
+        state.controller.autoOrbit = 0;
+        state.controller.speed = 0;
+        state.systemOverview =
+          scalePosition >= 1 - WORLD_SCALE_EPSILON;
+
+        document.documentElement.dataset.yeisNativeSystemOverview =
+          state.systemOverview
+            ? bridge.starId
+            : "approaching:" + bridge.starId;
+        document.documentElement.dataset.universeTravelArrivalRatio =
+          (
+            state.controller.position.distanceTo(
+              runtime.universe.star.position,
+            ) / Math.max(state.nativeSystemSpanKm, 1)
+          ).toFixed(4);
+        document.documentElement.dataset.universeGalaxyScaleBridge =
+          state.systemOverview
+            ? "system-endpoint"
+            : scalePosition <= WORLD_SCALE_EPSILON
+              ? "galaxy-endpoint"
+              : "active";
+      }
+    }
+
     state.input.wheel = 0;
     state.controller.update(
       delta,
@@ -951,6 +1127,38 @@ export function YeisGalaxyScene({
       size.height,
       fovRad,
     );
+
+    if (scaleBridgeActive && scaleBridgeRef.current) {
+      const bridge = scaleBridgeRef.current;
+      document.documentElement.dataset.universeTravelArrivalRatio =
+        (
+          state.controller.position.distanceTo(
+            runtime.universe.star.position,
+          ) / Math.max(state.nativeSystemSpanKm, 1)
+        ).toFixed(4);
+      if (scalePosition >= 1 - WORLD_SCALE_EPSILON) {
+        state.systemOverview = true;
+        viewStateRef.current = {
+          starId: runtime.universe.current.starId,
+          positionKm:
+            state.controller.position.toArray() as [
+              number,
+              number,
+              number,
+            ],
+          quaternion:
+            state.controller.quaternion.toArray() as [
+              number,
+              number,
+              number,
+              number,
+            ],
+          systemOverview: true,
+        };
+        document.documentElement.dataset.yeisNativeSystemOverview =
+          bridge.starId;
+      }
+    }
 
     if (
       state.openingMotionArmed &&
