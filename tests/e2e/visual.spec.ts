@@ -385,6 +385,38 @@ for (const viewport of [TABLET, MOBILE]) {
   });
 
   test(
+    `visual: ${viewport.name} Personal Signal system`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "system-personal-signal",
+        async () => {
+          const target = await personalTarget(page);
+          await page.goto(
+            `/?phase=system&star=${encodeURIComponent(target)}&freeze=1`,
+          );
+          await waitForYeisEngine(page);
+          const html = page.locator("html");
+          await expect(html).toHaveAttribute(
+            "data-universe-system-renderer",
+            "yeis-native",
+            { timeout: 30_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-system-ready",
+            "true",
+            { timeout: 30_000 },
+          );
+          await expect(page.locator(".content-signal-card")).toBeVisible();
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
+
+  test(
     `visual: ${viewport.name} Personal Signal orbit`,
     async ({ page }, testInfo) => {
       await visualCase(

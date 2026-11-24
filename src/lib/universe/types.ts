@@ -10,6 +10,8 @@ export type UniversePhase =
   | "returning";
 
 export type QualityMode = "auto" | "high" | "low";
+
+export const SYSTEM_OVERVIEW_RADIUS = 7;
 export type StarSource = "procedural" | "catalog" | "hero";
 export type UniverseEngine = "v2" | "yeis";
 export type PlanetSurfaceMode = "none" | "surface-terrain" | "custom";

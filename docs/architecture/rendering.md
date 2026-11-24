@@ -40,8 +40,14 @@ The product adapter instead builds a render-only similarity-transformed
 - the transformed system is render-only and never becomes a navigation or
   content authority.
 
-The outer native system is fitted to the existing product system shot rather
-than moving the product camera into astronomical kilometre ranges.
+The outer native system is fitted to a shared product overview radius
+(`SYSTEM_OVERVIEW_RADIUS = 7`) rather than moving the product camera into
+astronomical kilometre ranges. The renderer keeps that geometry budget stable
+across devices. `CinematicCamera` reuses camera-controls'
+`getDistanceToFitSphere()` against the same radius and current camera
+projection, so portrait/narrow viewports move the camera farther back instead
+of clipping or shrinking the native system. The existing System view direction,
+target, transition authority and settlement semantics stay unchanged.
 
 Pinned YEIS body, point and orbit renderers emit camera-relative child
 coordinates because their native floating-origin host keeps the camera at zero.
