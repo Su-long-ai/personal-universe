@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { test, expect, type Page, type TestInfo } from "./support/test";
 import {
@@ -37,6 +37,8 @@ const ULTRAWIDE: Viewport = {
 
 test.describe.configure({ retries: 0 });
 
+const pendingReadableWorldFrame = new WeakMap<Page, Buffer>();
+
 async function shot(
   page: Page,
   testInfo: TestInfo,
@@ -45,7 +47,13 @@ async function shot(
 ) {
   const path = testInfo.outputPath("visual", `${viewport}--${name}.png`);
   mkdirSync(dirname(path), { recursive: true });
-  await page.screenshot({ path });
+  const pendingFrame = pendingReadableWorldFrame.get(page);
+  if (pendingFrame) {
+    pendingReadableWorldFrame.delete(page);
+    writeFileSync(path, pendingFrame);
+  } else {
+    await page.screenshot({ path });
+  }
   await testInfo.attach(`${viewport}--${name}`, {
     path,
     contentType: "image/png",
@@ -79,7 +87,12 @@ async function waitForCameraSettled(
 }
 
 async function expectReadableWorldFrame(page: Page, label: string) {
-  const png = await page.locator(".universe-canvas canvas").screenshot();
+  // Capture the final viewport once and let visualCase reuse the exact same
+  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
+  // seconds on one screenshot, so a second identical read would make the
+  // acceptance itself stall the renderer it is measuring.
+  const png = await page.screenshot();
+  pendingReadableWorldFrame.set(page, png);
   const image = sharp(png);
   const metadata = await image.metadata();
   const width = metadata.width ?? 0;
