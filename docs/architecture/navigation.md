@@ -37,26 +37,38 @@ by UI components.
 
 ## Search
 
-The single navigator input searches, in product-priority order:
+The single navigator input resolves candidates from one canonical discovery
+graph first, then supplements that bounded set with long-tail pinned-YEIS
+domain searches for foreign bodies, catalogue stars, black holes, landmarks
+and galaxies. Search and Places therefore share destination constructors and
+identity instead of minting UI-specific results.
 
-1. Content Collection entries / Personal Signals;
-2. Hero world;
-3. observed exoplanet hosts;
-4. real observed exoplanets from the existing NASA Exoplanet Archive snapshot;
-5. bodies in the currently open product system;
-6. current/native YEIS bodies and bodies in other hand-authored systems;
-7. catalogue stars;
-8. black holes;
-9. landmarks, nebulae and clusters;
-10. galaxies.
+Ranking is deterministic across the combined candidate set. The strongest
+signals are, in order of magnitude:
 
-Personal content searches title, summary, tags, kind and status. Common Chinese
-astronomical aliases are translated into the same normalized YEIS query path
-without adding a second astronomy index. The pinned MIT normalization remains
-the canonical accent/case folding behavior.
+1. exact canonical destination ID;
+2. exact normalized title;
+3. exact alias;
+4. title/token prefix;
+5. exact keyword and general corpus match;
+6. product priors: Personal Signal importance/featured state, Hero, observed
+   and curated destinations;
+7. current-system context;
+8. stable group/title/canonical-ID tie breaking.
 
-Results are grouped. Personal content is intentionally ranked before generic
-astronomy. The keyboard contract is:
+Personal content searches canonical ID, title, summary, tags, kind and status.
+Common Chinese astronomical and personal/category aliases are translated into
+the same normalized YEIS query path without adding a second astronomy index.
+The pinned MIT normalization remains the canonical accent/case folding
+behavior.
+
+This is intentionally a bounded ranking layer over resolved destinations, not
+a second search database. cmdk/Fuse and Pagefind remain fallback candidates if
+future catalog volume justifies them, but neither may own spatial identity.
+
+Results are grouped. Personal/authored content is intentionally louder than
+generic catalogue filler when textual relevance is otherwise comparable. The
+keyboard contract is:
 
 - `Ctrl/Cmd+K` or `/` outside text editing: open navigator;
 - `ArrowUp / ArrowDown`: move selection;
@@ -149,6 +161,19 @@ to its first visible group, so one Personal Signal is not repeated again under
 Featured or its content-kind facet. The underlying grouped sections remain
 intact for Guided Journey derivation and Search semantics; this is display
 de-duplication, not a second destination index.
+
+Featured is now presentation membership only. A featured star remains
+`star:<nativeId>`, a featured black hole remains `blackhole:<id>`, a
+featured landmark remains `landmark:<id>`, and a featured galaxy remains
+`galaxy:<index>`. Featured never rewrites destination kind, group, target or
+deep-link identity. This means Search, Places, Guided Journey, active-state
+tracking and reloadable URLs all refer to the same destination.
+
+The canonical destination also carries lightweight discovery metadata
+(`origin`, `importance`, `featured`, aliases) used only for ranking and
+presentation. Personal entries inherit importance/featured state directly from
+Astro Content Collections; current-system bodies are folded into the same
+Places graph rather than exposed through a separate local list.
 
 ## Product Open vs native travel
 
