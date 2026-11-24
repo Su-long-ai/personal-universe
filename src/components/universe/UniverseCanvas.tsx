@@ -55,14 +55,36 @@ const LazyYeisSystemScene = lazy(() =>
   })),
 );
 
-function RendererPageLifecycle() {
+function RendererPageLifecycle({
+  onContextLost,
+}: {
+  onContextLost: () => void;
+}) {
   const { gl } = useThree();
 
   useEffect(() => {
     let released = false;
     let releaseTimer: number | null = null;
     const html = document.documentElement;
+    const canvas = gl.domElement;
     html.dataset.universeWebglLifecycle = "active";
+    html.dataset.universeWebglContextGeneration ??= "0";
+
+    const onWebglContextLost = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "lost";
+      delete html.dataset.universeWorldPaintStarted;
+      delete html.dataset.universeWorldPaintReady;
+      onContextLost();
+    };
+
+    const onWebglContextRestored = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "active";
+      html.dataset.universeWebglContextGeneration = String(
+        Number(html.dataset.universeWebglContextGeneration ?? "0") + 1,
+      );
+    };
 
     const onPageHide = (event: PageTransitionEvent) => {
       if (event.persisted || released) return;
@@ -85,18 +107,26 @@ function RendererPageLifecycle() {
       }, 0);
     };
 
+    canvas.addEventListener("webglcontextlost", onWebglContextLost);
+    canvas.addEventListener("webglcontextrestored", onWebglContextRestored);
     window.addEventListener("pagehide", onPageHide);
     return () => {
+      canvas.removeEventListener("webglcontextlost", onWebglContextLost);
+      canvas.removeEventListener(
+        "webglcontextrestored",
+        onWebglContextRestored,
+      );
       window.removeEventListener("pagehide", onPageHide);
       if (releaseTimer !== null) {
         window.clearTimeout(releaseTimer);
         releaseTimer = null;
       }
-      if (html.dataset.universeWebglLifecycle === "active") {
+      if (!released) {
         delete html.dataset.universeWebglLifecycle;
+        delete html.dataset.universeWebglContextGeneration;
       }
     };
-  }, [gl]);
+  }, [gl, onContextLost]);
 
   return null;
 }
@@ -174,6 +204,16 @@ export function UniverseCanvas({
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
+  const [webglContextGeneration, setWebglContextGeneration] = useState(0);
+  const handleWebglContextLost = useCallback(() => {
+    // A restored WebGL context keeps the same Canvas authority but none of the
+    // old first-paint evidence describes the newly restored GPU resources.
+    // Version product paint authority immediately; the retained scene must earn
+    // concrete paint again after Three/ProceduralPlanets restore their state.
+    setWebglContextGeneration((generation) => generation + 1);
+    delete document.documentElement.dataset.universeWorldPaintStarted;
+    delete document.documentElement.dataset.universeWorldPaintReady;
+  }, []);
   const worldPlanetReleaseRef =
     useRef<((planet: Planet) => void) | null>(null);
   const handleBeforeLivePlanetDispose = useCallback((planet: Planet) => {
@@ -250,7 +290,7 @@ export function UniverseCanvas({
   const worldPaintIdentity =
     `${worldRendererPlanet?.id ?? "none"}:${quality}`;
   const worldPaintAuthorityKey =
-    `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}`;
+    `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}:ctx${webglContextGeneration}`;
   const worldPaintAuthorityRef = useRef({
     key: worldPaintAuthorityKey,
     generation: 0,
@@ -383,7 +423,7 @@ export function UniverseCanvas({
         logarithmicDepthBuffer: engineMode === "yeis",
       }}
     >
-      <RendererPageLifecycle />
+      <RendererPageLifecycle onContextLost={handleWebglContextLost} />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
@@ -495,6 +535,7 @@ export function UniverseCanvas({
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
               surfaceFallbackReady={surfaceFallbackReady}
+              paintContextGeneration={webglContextGeneration}
               onPaintStartedChange={handleWorldPaintStarted}
               onPaintReadyChange={handleWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
