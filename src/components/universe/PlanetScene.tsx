@@ -477,6 +477,7 @@ export function PlanetScene({
   worldScalePosition,
   presentationActive = true,
   surfaceFallbackReady = false,
+  paintContextGeneration = 0,
   onPaintStartedChange,
   onPaintReadyChange,
   onSurfaceCameraFrame,
@@ -488,6 +489,7 @@ export function PlanetScene({
   worldScalePosition: number;
   presentationActive?: boolean;
   surfaceFallbackReady?: boolean;
+  paintContextGeneration?: number;
   onPaintStartedChange?: (started: boolean) => void;
   onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
@@ -765,9 +767,10 @@ export function PlanetScene({
     document.documentElement.dataset.universeWorldCapability = capability;
 
     // First-paint readiness is valid only for the currently visible renderer
-    // identity. Hiding the world for the System endpoint, changing quality, or
-    // selecting another planet invalidates the old paint even if the retained
-    // resource instance can be reused underneath.
+    // identity and current WebGL context generation. Hiding the world for the
+    // System endpoint, changing quality, selecting another planet, or restoring
+    // a lost context invalidates old paint even if retained JS resources can be
+    // reused underneath.
     paintedFrames.current = 0;
     lastLiveDrawFrame.current = Number(
       document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
@@ -785,6 +788,7 @@ export function PlanetScene({
   }, [
     fallbackReason,
     liveKey,
+    paintContextGeneration,
     worldPresentationActive,
     publishPaintReady,
     publishPaintStarted,
