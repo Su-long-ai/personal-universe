@@ -1143,10 +1143,10 @@ export function YeisGalaxyScene({
         }
 
         // Recreate the pinned YEIS gotoPoint trajectory whenever Galaxy
-        // remounts from product System, a full endpoint previously settled, or
-        // scale input supersedes an older Locate/Travel autopilot. The
-        // controller key prevents an unrelated native autopilot from being
-        // mistaken for scale progress.
+        // remounts from product System or scale input supersedes an older
+        // Locate/Travel autopilot. The trajectory itself is retained, but its
+        // execution is scrubbed directly from the product scale coordinate;
+        // elapsed time is not an authority for Galaxy -> System motion.
         const bridgeControllerKey =
           bridge.targetId + ":" + bridge.starId;
         if (
@@ -1169,11 +1169,9 @@ export function YeisGalaxyScene({
           scaleBridgeControllerKeyRef.current = bridgeControllerKey;
         }
 
-        const autopilot = state.controller.autopilot;
-        if (autopilot) {
-          autopilot.t =
-            scalePosition * autopilot.duration - delta;
-        }
+        state.controller.setAutopilotProgress(scalePosition);
+        document.documentElement.dataset.universeGalaxyScaleExecutor =
+          "native-progress";
         state.controller.autoOrbit = 0;
         state.controller.speed = 0;
         state.systemOverview =
@@ -1211,6 +1209,7 @@ export function YeisGalaxyScene({
       state.controller.speed = 0;
       state.systemOverview = false;
       delete document.documentElement.dataset.universeGalaxyScaleBridge;
+      delete document.documentElement.dataset.universeGalaxyScaleExecutor;
       delete document.documentElement.dataset.yeisNativeSystemOverview;
     }
 
