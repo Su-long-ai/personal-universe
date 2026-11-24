@@ -731,18 +731,25 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
     const root = document.documentElement;
     type HandoffEvent = {
       phase: string | null;
+      started: string | null;
       paint: string | null;
       camera: string | null;
       system: string | null;
+      target: string | null;
+      suppressed: string | null;
       world: string | null;
     };
     const events: HandoffEvent[] = [];
     const sample = () => {
       events.push({
         phase: root.dataset.universeNavigationPhase ?? null,
+        started: root.dataset.universeWorldPaintStarted ?? null,
         paint: root.dataset.universeWorldPaintReady ?? null,
         camera: root.dataset.universeCameraSettled ?? null,
         system: root.dataset.universeSystemRenderer ?? null,
+        target: root.dataset.universeSystemHandoffTarget ?? null,
+        suppressed:
+          root.dataset.universeSystemTargetSuppressed ?? null,
         world: root.dataset.universeWorldRenderer ?? null,
       });
     };
@@ -752,9 +759,12 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
       attributes: true,
       attributeFilter: [
         "data-universe-navigation-phase",
+        "data-universe-world-paint-started",
         "data-universe-world-paint-ready",
         "data-universe-camera-settled",
         "data-universe-system-renderer",
+        "data-universe-system-handoff-target",
+        "data-universe-system-target-suppressed",
         "data-universe-world-renderer",
       ],
     });
@@ -786,9 +796,12 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
         window as typeof window & {
           __worldHandoffEvents?: Array<{
             phase: string | null;
+            started: string | null;
             paint: string | null;
             camera: string | null;
             system: string | null;
+            target: string | null;
+            suppressed: string | null;
             world: string | null;
           }>;
         }
@@ -800,6 +813,20 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
         event.phase === "approach" &&
         event.paint !== "true" &&
         event.system !== null,
+    );
+    const paintStarted = events.findIndex(
+      (event) =>
+        event.phase === "approach" &&
+        event.started === "true" &&
+        event.system !== null,
+    );
+    const targetSuppressed = events.findIndex(
+      (event) =>
+        event.phase === "approach" &&
+        event.started === "true" &&
+        event.system !== null &&
+        event.target !== null &&
+        event.suppressed === event.target,
     );
     const painted = events.findIndex(
       (event) =>
@@ -813,7 +840,9 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
     );
 
     expect(unpaintedApproach).toBeGreaterThanOrEqual(0);
-    expect(painted).toBeGreaterThan(unpaintedApproach);
+    expect(paintStarted).toBeGreaterThan(unpaintedApproach);
+    expect(targetSuppressed).toBeGreaterThanOrEqual(paintStarted);
+    expect(painted).toBeGreaterThan(targetSuppressed);
     expect(settled).toBeGreaterThanOrEqual(painted);
   };
 
@@ -827,6 +856,18 @@ test("System handoff waits for a fresh close-world paint on every entry", async 
   await expect(html).not.toHaveAttribute(
     "data-universe-world-paint-ready",
     "true",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-world-paint-started",
+    "true",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-handoff-target",
+    /.+/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-target-suppressed",
+    /.+/,
   );
   await expect(html).toHaveAttribute(
     "data-universe-world-scene-lifecycle",
