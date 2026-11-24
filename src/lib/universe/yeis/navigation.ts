@@ -4,6 +4,10 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
+import {
+  placementForContentReference,
+  universeContentSearchTerms,
+} from "../content";
 import type {
   UniverseContentKind,
   UniverseContentPlacement,
@@ -392,8 +396,7 @@ export function navigationDestinationForPlacement(
     markerId: placement.markerId,
     entryId: placement.entry.id,
     keywords: [
-      placement.entry.summary,
-      ...placement.entry.tags,
+      ...universeContentSearchTerms(placement.entry),
       placement.entry.kind,
       placement.entry.status,
       marker?.name ?? "",
@@ -643,10 +646,7 @@ export async function resolveUniverseNavigationDestination(
   if (!key) return null;
 
   if (key.startsWith("personal:")) {
-    const entryId = key.slice("personal:".length);
-    const placement = placements.find(
-      (candidate) => candidate.entry.id === entryId,
-    );
+    const placement = placementForContentReference(placements, key);
     return placement
       ? navigationDestinationForPlacement(placement, markers)
       : null;

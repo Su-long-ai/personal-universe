@@ -1,0 +1,112 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-CONTENT-BROWSER-ACCEPTANCE-V1-001",
+  "title": "Exercise authored personal content through the existing browser product paths",
+  "scope": {
+    "level": "implementation",
+    "subject": "Playwright acceptance for bilingual authored discovery, Places navigation, and canonical Personal deep links"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Reuse the repository's existing Playwright browser harness, runtime cleanliness observer, YEIS wait helpers, Navigator UI, and URLSearchParams/History deep-link contract. The acceptance slice should prove that authored metadata travels through the actual product rather than creating an authoring-only preview route: English and Chinese authored names search the same canonical item, Places can open it, and a shareable personal:<contentId> URL reloads to the same destination. No additional browser runner, router, mock universe, or custom CDP harness is needed.",
+  "planned_files": [
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Playwright's existing locator and web-first assertion model is sufficient to verify Navigator results, URL state, product data attributes, and rendered content without adding another browser harness."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams",
+      "finding": "The existing single-page destination query parameter can represent canonical Personal content deep links and can be asserted directly after navigation and reload."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No domain-specific authored-content acceptance product is needed because Personal Universe already owns the running product and only needs tests through its existing UI."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test",
+        "web-url-history-api"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse Playwright Test for browser lifecycle/assertions and the existing browser URL contract for shareable destination state."
+    },
+    {
+      "level": "subsystem",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "Existing repository helpers already provide YEIS readiness, runtime cleanliness, and Navigator opening, so no additional testing subsystem is required."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "The test can reuse existing locators and HTML data attributes; no new test component or fixture package is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-playwright-product-acceptance",
+      "name": "Existing Personal Universe Playwright product harness",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current tests/e2e/universe.spec.ts plus Playwright Test",
+      "license": "Apache-2.0 Playwright tooling plus project-owned tests",
+      "decision": "reuse",
+      "reason": "It already boots the real app, waits for YEIS, observes runtime failures, opens Navigator, and asserts WebGL/navigation state, so authored-content acceptance should extend the same suite.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-browser-deeplink-contract",
+      "name": "Existing URLSearchParams and History deep-link contract",
+      "level": "framework_engine",
+      "registry_id": "web-url-history-api",
+      "source": "Current UniverseApp destination query serialization and restore flow",
+      "license": "Web Platform browser APIs / standards",
+      "decision": "reuse",
+      "reason": "It is already the product's shareable navigation state, so canonical Personal content identity should be tested through that contract rather than a new router or test-only route.",
+      "evaluation": {
+        "coverage": 3.5,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-playwright-product-acceptance",
+      "existing-browser-deeplink-contract"
+    ],
+    "rationale": "Extend the existing Playwright product suite and existing destination query contract. This exercises the real Search/Places/navigation/runtime path with no parallel test application, browser stack, or authoring-only destination model.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a future product surface cannot be reached through the existing browser harness, add only a shared Playwright helper inside the current test architecture rather than introducing a second runner."
+  }
+}

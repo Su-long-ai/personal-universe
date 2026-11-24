@@ -14,6 +14,7 @@ export function placeUniverseContent(
   if (entries.length === 0 || markers.length === 0) return [];
 
   const hero = markers.find((marker) => marker.source === "hero");
+  const hasYeisAuthority = markers.some((marker) => marker.engine === "yeis");
   const autoMarkers = markers.filter(
     (marker) =>
       marker.engine === "yeis" &&
@@ -21,7 +22,6 @@ export function placeUniverseContent(
       Boolean(marker.nativeId),
   );
 
-  const used = new Set<string>();
   const placements: UniverseContentPlacement[] = [];
 
   for (const entry of [...entries].sort(compareEntries)) {
@@ -32,14 +32,32 @@ export function placeUniverseContent(
       marker = hero;
     } else if (entry.placement === "pinned") {
       marker = resolvePinnedMarker(entry, markers);
+
+      // YEIS navigation can materialize native stars lazily even when they are
+      // outside the intentionally small Galaxy marker sample. Keep the
+      // authored Personal Signal alive as a virtual placement, then let the
+      // existing markerForYeisStarId path resolve the real spatial target.
+      if (
+        !marker &&
+        hasYeisAuthority &&
+        entry.starId &&
+        isLazyYeisNativeId(entry.starId)
+      ) {
+        placements.push({
+          entry,
+          markerId: `yeis:${entry.starId}`,
+          nativeId: entry.starId,
+          planetSlotSeed: stableHash(`${placementKey}:planet`),
+        });
+        continue;
+      }
     } else {
-      marker = chooseRendezvousMarker(placementKey, autoMarkers, used);
+      marker = chooseRendezvousMarker(placementKey, autoMarkers);
     }
 
-    // Pinned content must never silently drift to another star.
+    // Pinned non-YEIS marker IDs must never silently drift to another star.
     if (!marker) continue;
 
-    used.add(markerIdentity(marker));
     placements.push({
       entry,
       markerId: marker.id,
@@ -89,6 +107,27 @@ export function placementsForMarker(
   return placements.filter((placement) => placement.markerId === markerId);
 }
 
+/**
+ * Resolve one authored content placement by canonical or migration-era identity.
+ * Legacy IDs are exact aliases only; the returned placement always retains the
+ * canonical entry.id used by current Personal destinations.
+ */
+export function placementForContentReference(
+  placements: readonly UniverseContentPlacement[],
+  reference: string,
+): UniverseContentPlacement | undefined {
+  const entryId = reference.startsWith("personal:")
+    ? reference.slice("personal:".length)
+    : reference;
+  if (!entryId) return undefined;
+
+  return placements.find(
+    (placement) =>
+      placement.entry.id === entryId ||
+      placement.entry.legacyIds?.includes(entryId),
+  );
+}
+
 function resolvePinnedMarker(
   entry: UniverseContentEntry,
   markers: GalaxyMarker[],
@@ -99,6 +138,10 @@ function resolvePinnedMarker(
       marker.nativeId === entry.starId ||
       marker.id === entry.starId,
   );
+}
+
+function isLazyYeisNativeId(value: string): boolean {
+  return value === "h-aurora" || /^c(?:0|[1-9]\d*)$/.test(value);
 }
 
 function chooseRendezvousMarker(

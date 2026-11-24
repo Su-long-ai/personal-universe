@@ -181,3 +181,119 @@ The hover card is non-interactive and exposes only real Content Collection
 metadata (title and kind). It never fabricates content or becomes a second
 navigation authority.
 
+## Authoring pipeline v1
+
+Personal content now has an explicit canonical identity and a small repository
+workflow instead of relying on Astro's source filename as product identity.
+
+The canonical source is still the existing Astro `portfolio` Content
+Collection. Canonical records are JSON. Raw Markdown/MDX, YAML, CSV, exports,
+or manually curated batches may be future/import inputs, but the durable
+collection output is one deterministic JSON record per content identity. This
+keeps Astro schema validation and the authoring CLI looking at the exact same
+record set, so no source format can bypass cross-record ID, relation, media,
+destination, migration, or alias integrity checks.
+
+### Stable identity and compatibility
+
+Every item stores `contentId` explicitly. Astro's `glob.generateId` also
+uses that persisted value, so framework collection identity and product
+identity cannot drift apart. Runtime `UniverseContentEntry.id`,
+`personal:<id>` navigation destinations, relations, aliases, and generated
+indexes all derive from the same value.
+
+Therefore changing a filename, source ordering, display title, localized copy,
+ranking, or Surface placement does not change canonical identity. Intentional
+ID changes retain previous IDs in `legacyIds`, which the authoring resolver
+continues to accept for old content references. Migrations are versioned with
+`schemaVersion`; unsupported future/old versions fail instead of being
+silently reinterpreted.
+
+### One bilingual item
+
+English and Chinese copy live on the same item under `i18n`. The base
+`title` and `summary` remain the deterministic fallback, while explicit
+English localized copy may override them. Discovery aliases may be authored in
+both languages without cloning the content record.
+
+Catalog linting rejects ambiguous explicit aliases across different canonical
+items so Search does not gain multiple silent owners for the same authored
+alias.
+
+### Universe metadata
+
+The authoring schema contains only renderer-independent product hints:
+
+- `placement`, `placementKey`, and optional pinned `starId`;
+- semantic `surface` hints such as region, anchor category, cluster, order,
+  and featured behavior;
+- Personal Signal visibility/importance/featured state;
+- explicit related-content references;
+- authored/generated/observed provenance;
+- optional journey membership, media, and external links.
+
+It does not store Surface coordinates or create another destination graph.
+The existing placement adapter, Agent 07 discovery model, Agent 06 Surface
+profile, and YEIS destination identities remain authoritative.
+
+### Commands
+
+The repository exposes one thin Node CLI with no new runtime dependency:
+
+```text
+npm run content:new -- --title "Project" --summary "..." --kind project
+npm run content:import -- ./batch.json --dry-run
+npm run content:migrate -- ./old-record.json
+npm run content:migrate -- ./old-record.json --write
+npm run content:validate
+npm run content:preview -- --id personal-universe
+npm run content:index
+```
+
+`content:new` persists a stable ID. Supplying `--id` is supported for
+intentional public identities; otherwise the generated ID combines a readable
+slug with a UUID fragment, so identity is not derived solely from mutable
+display text.
+
+`content:import` accepts a JSON object, array, or `{ "items": [...] }`
+batch, rejects unknown fields (including unknown batch-envelope fields) and
+duplicate/colliding IDs, normalizes defaults, then stages the whole batch before
+renaming any file. A write failure removes the staged/committed files from that
+batch. `--dry-run` performs the same normalization without writes.
+
+`content:migrate` is non-destructive by default and prints the migrated
+record. `--write` is explicit. Version 0 records that used `id` migrate to
+version 1 `contentId` deterministically.
+
+`content:validate` checks duplicate/legacy identities, relations, aliases,
+date ranges, provenance, local public-media existence, and native YEIS pinned
+IDs against the frozen `stars.bin` catalogue header/count. Astro itself remains
+the schema authority for every collection record, and the production page also
+validates pinned destinations against the canonical galaxy/native-star
+authority before rendering.
+
+`content:preview` reports canonical identity, shareable Personal Signal
+destination, discovery copy/aliases, destination mapping and Surface hints
+without building a second preview site. `content:index` emits a deterministic
+derived identity/reference/alias index and never asks developers to edit a
+generated file.
+
+### Build enforcement
+
+`npm run build` now runs the repository reuse gate, content validation, and
+content unit tests before Astro builds. The normal CI build therefore catches
+bad authored content before production while keeping the mandatory checks
+local, deterministic, and fast. The 5,000-item validation fixture guards
+against accidental quadratic catalog checks as authored content grows.
+
+The original `personal-universe` source was mechanically normalized from
+Markdown frontmatter into the canonical JSON format while retaining canonical
+ID `personal-universe`,
+placement key `personal-universe`, and native YEIS star `c59669`. Its
+Chinese metadata and semantic Surface hints now exercise the richer contract
+without changing the established product destination.
+
+Keystatic remains the preferred optional future editor if repository authoring
+itself becomes the bottleneck. It would sit over the same collection files;
+it would not replace this canonical schema or create a second CMS/database.
+

@@ -1,0 +1,26 @@
+{
+  "schema": 3,
+  "task_id": "PERSONAL-CONTENT-REPRESENTATIVE-ITEM-V1-001",
+  "approved_at": "2026-11-24T19:28:00.000Z",
+  "baseline_commit": "ae4b2704fc10c7d34e5c3d61269cd971210110b0",
+  "record_path": "docs/reuse-gate/tasks/PERSONAL-CONTENT-REPRESENTATIVE-ITEM-V1-001.json",
+  "record_sha256": "54f55c85808af27949253b9c5c352b45d266783531e3a76dcc2b03b91734c7c8",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Canonical bilingual authored record for the existing Continuous Scale Navigation product artifact"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/content/portfolio/continuous-scale-navigation.json"
+  ],
+  "selected_ids": [
+    "existing-agent09-authoring-pipeline"
+  ],
+  "candidate_scores": {
+    "existing-agent09-authoring-pipeline": 57.5
+  }
+}

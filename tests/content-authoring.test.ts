@@ -1,0 +1,551 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import {
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  authoringRecordToUniverseContentEntry,
+  buildUniverseContentIndex,
+  derivePersonalSignalMetadata,
+  isYeisNativeStarId,
+  localizeUniverseContent,
+  migrateContentRecord,
+  parseYeisCatalogStarCount,
+  normalizeImportedContentBatch,
+  normalizeImportedContentRecord,
+  resolveUniverseContentReference,
+  validateUniverseContentCatalog,
+  validateUniverseContentDestinations,
+  validateUniverseContentMediaPresence,
+  universeContentSearchTerms,
+} from "../src/lib/universe/content/authoring.ts";
+import {
+  placeUniverseContent,
+  placementForContentReference,
+} from "../src/lib/universe/content/placement.ts";
+import type {
+  UniverseContentEntry,
+  UniverseContentPlacement,
+} from "../src/lib/universe/content/types.ts";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function runContentCli(...args: string[]) {
+  return spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      "scripts/content-author.mjs",
+      ...args,
+    ],
+    {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NO_COLOR: "1",
+      },
+    },
+  );
+}
+
+function entry(
+  overrides: Partial<UniverseContentEntry> = {},
+): UniverseContentEntry {
+  return {
+    id: "alpha",
+    title: "Alpha",
+    summary: "Alpha summary",
+    kind: "project",
+    status: "active",
+    importance: 3,
+    tags: [],
+    featured: false,
+    placement: "auto",
+    ...overrides,
+  };
+}
+
+test("canonical ids survive filename/order/localization changes", () => {
+  const before = [
+    entry({ id: "stable-project", title: "Old title" }),
+    entry({ id: "other", title: "Other" }),
+  ];
+  const after = [
+    entry({ id: "other", title: "Other" }),
+    entry({
+      id: "stable-project",
+      title: "Renamed title",
+      i18n: { zh: { title: "重命名" } },
+    }),
+  ];
+
+  assert.equal(
+    resolveUniverseContentReference(before, "personal:stable-project")?.id,
+    "stable-project",
+  );
+  assert.equal(
+    resolveUniverseContentReference(after, "personal:stable-project")?.id,
+    "stable-project",
+  );
+  assert.deepEqual(
+    buildUniverseContentIndex(before).ids.sort(),
+    buildUniverseContentIndex(after).ids.sort(),
+  );
+});
+
+test("duplicate ids and legacy references are rejected", () => {
+  const issues = validateUniverseContentCatalog([
+    entry({ id: "alpha" }),
+    entry({ id: "beta", legacyIds: ["alpha"] }),
+  ]);
+  assert.ok(issues.some((issue) => issue.code === "duplicate_reference"));
+});
+
+test("bilingual copy falls back without duplicating identity", () => {
+  const value = entry({
+    id: "bilingual",
+    title: "English title",
+    summary: "English summary",
+    i18n: { zh: { title: "中文标题" } },
+  });
+  assert.deepEqual(localizeUniverseContent(value, "zh"), {
+    title: "中文标题",
+    summary: "English summary",
+  });
+  assert.equal(value.id, "bilingual");
+});
+
+test("bilingual authored copy becomes deterministic discovery metadata", () => {
+  const value = entry({
+    id: "discoverable",
+    title: "Personal Universe",
+    summary: "English summary",
+    tags: ["portfolio"],
+    i18n: {
+      zh: {
+        title: "个人宇宙",
+        summary: "中文摘要",
+      },
+    },
+    aliases: {
+      en: ["Universe Home"],
+      zh: ["我的宇宙"],
+    },
+  });
+
+  assert.deepEqual(universeContentSearchTerms(value), [
+    "English summary",
+    "Personal Universe",
+    "Universe Home",
+    "portfolio",
+    "中文摘要",
+    "个人宇宙",
+    "我的宇宙",
+  ].sort((a, b) => a.localeCompare(b)));
+});
+
+test("authored discovery names cannot become ambiguous across content", () => {
+  const issues = validateUniverseContentCatalog([
+    entry({ id: "alpha", title: "Alpha title", aliases: { en: ["shared"] } }),
+    entry({ id: "beta", title: "Shared" }),
+    entry({
+      id: "gamma",
+      title: "Gamma",
+      i18n: { zh: { title: "冲突标题" } },
+    }),
+    entry({ id: "delta", title: "Delta", aliases: { zh: ["冲突标题"] } }),
+  ]);
+  assert.ok(
+    issues.filter((issue) => issue.code === "ambiguous_alias").length >= 2,
+  );
+});
+
+test("broken relations fail before product data is emitted", () => {
+  const issues = validateUniverseContentCatalog([
+    entry({
+      id: "alpha",
+      relations: [{ type: "related", targetId: "missing" }],
+    }),
+  ]);
+  assert.ok(issues.some((issue) => issue.code === "broken_relation"));
+});
+
+test("legacy ids resolve old deep-link identities", () => {
+  const value = entry({ id: "new-id", legacyIds: ["old-id"] });
+  assert.equal(
+    resolveUniverseContentReference([value], "personal:old-id")?.id,
+    "new-id",
+  );
+});
+
+test("placement lookup canonicalizes legacy Personal deep-link ids", () => {
+  const canonical = entry({
+    id: "current-id",
+    legacyIds: ["old-id"],
+  });
+  const placement: UniverseContentPlacement = {
+    entry: canonical,
+    markerId: "marker-1",
+    nativeId: "c1",
+    planetSlotSeed: 1,
+  };
+
+  assert.equal(
+    placementForContentReference([placement], "personal:current-id")?.entry.id,
+    "current-id",
+  );
+  assert.equal(
+    placementForContentReference([placement], "personal:old-id")?.entry.id,
+    "current-id",
+  );
+  assert.equal(
+    placementForContentReference([placement], "personal:missing"),
+    undefined,
+  );
+});
+
+test("schema v0 records migrate deterministically", () => {
+  const legacy = {
+    id: "legacy-project",
+    title: "Legacy",
+    summary: "Legacy summary",
+    kind: "project",
+    placement: "auto",
+  };
+  assert.deepEqual(migrateContentRecord(legacy), {
+    title: "Legacy",
+    summary: "Legacy summary",
+    kind: "project",
+    placement: "auto",
+    contentId: "legacy-project",
+    schemaVersion: 1,
+  });
+  assert.equal(
+    normalizeImportedContentRecord(legacy).contentId,
+    "legacy-project",
+  );
+});
+
+test("imports reject unknown fields rather than silently dropping them", () => {
+  assert.throws(
+    () =>
+      normalizeImportedContentRecord({
+        schemaVersion: 1,
+        contentId: "bad",
+        title: "Bad",
+        summary: "Bad",
+        kind: "project",
+        unexpected: true,
+      }),
+    /unknown field/,
+  );
+});
+
+test("batch import normalizes deterministically and preserves import provenance", () => {
+  const batch = normalizeImportedContentBatch(
+    [
+      {
+        schemaVersion: 1,
+        contentId: "z-item",
+        title: "Z",
+        summary: "Z summary",
+        kind: "note",
+      },
+      {
+        schemaVersion: 1,
+        contentId: "a-item",
+        title: "A",
+        summary: "A summary",
+        kind: "project",
+      },
+    ],
+    { source: "import:fixture.json" },
+  );
+  assert.deepEqual(
+    batch.map((item) => item.contentId),
+    ["a-item", "z-item"],
+  );
+  assert.deepEqual(batch[0]?.provenance, {
+    kind: "authored",
+    source: "import:fixture.json",
+  });
+  assert.throws(
+    () =>
+      normalizeImportedContentBatch([
+        {
+          contentId: "same",
+          title: "One",
+          summary: "One",
+          kind: "note",
+        },
+        {
+          contentId: "same",
+          title: "Two",
+          summary: "Two",
+          kind: "note",
+        },
+      ]),
+    /duplicate contentId/,
+  );
+  assert.throws(
+    () =>
+      normalizeImportedContentBatch({
+        items: [],
+        unexpectedEnvelopeField: true,
+      }),
+    /batch envelope contains unknown field/,
+  );
+});
+
+test("authoring normalization rejects invalid URLs", () => {
+  assert.throws(
+    () =>
+      normalizeImportedContentRecord({
+        contentId: "bad-link",
+        title: "Bad link",
+        summary: "Bad link",
+        kind: "note",
+        links: [{ label: "bad", url: "not-a-url" }],
+      }),
+    /absolute URL/,
+  );
+});
+
+test("media type and existence validation is actionable", () => {
+  const value = entry({
+    id: "with-media",
+    media: [
+      {
+        src: "/content/missing.exe",
+        alt: "missing",
+        kind: "image",
+      },
+    ],
+  });
+  const catalogIssues = validateUniverseContentCatalog([value]);
+  assert.ok(
+    catalogIssues.some((issue) => issue.code === "unsupported_media_type"),
+  );
+  const presenceIssues = validateUniverseContentMediaPresence(
+    [value],
+    () => false,
+  );
+  assert.deepEqual(
+    presenceIssues.map((issue) => issue.code),
+    ["missing_media_asset"],
+  );
+});
+
+test("vendored YEIS catalogue identity parsing is strict and bounded", () => {
+  const bytes = new Uint8Array(12 + 3 * 24);
+  bytes.set([89, 69, 83, 84], 0); // YEST
+  new DataView(bytes.buffer).setUint32(8, 3, true);
+
+  assert.equal(parseYeisCatalogStarCount(bytes), 3);
+  assert.equal(isYeisNativeStarId("c0", 3), true);
+  assert.equal(isYeisNativeStarId("c2", 3), true);
+  assert.equal(isYeisNativeStarId("c3", 3), false);
+  assert.equal(isYeisNativeStarId("c02", 3), false);
+  assert.equal(isYeisNativeStarId("h-aurora", 3), true);
+
+  assert.throws(
+    () => parseYeisCatalogStarCount(bytes.subarray(0, bytes.length - 1)),
+    /size does not match/,
+  );
+});
+
+test("pinned destinations are checked against canonical markers", () => {
+  const pinned = entry({
+    id: "pinned",
+    placement: "pinned",
+    starId: "c1",
+  });
+  assert.equal(
+    validateUniverseContentDestinations(
+      [pinned],
+      [
+        {
+          id: "marker-c1",
+          nativeId: "c1",
+          name: "C1",
+          position: [0, 0, 0],
+          seed: "c1",
+          source: "catalog",
+          engine: "yeis",
+        },
+      ],
+    ).length,
+    0,
+  );
+  assert.ok(
+    validateUniverseContentDestinations([pinned], []).some(
+      (issue) => issue.code === "unknown_destination",
+    ),
+  );
+  assert.equal(
+    validateUniverseContentDestinations(
+      [pinned],
+      [],
+      (starId) => starId === "c1",
+    ).length,
+    0,
+  );
+});
+
+test("Personal Signal metadata is derived from canonical content", () => {
+  const value = entry({
+    id: "signal",
+    title: "Signal",
+    summary: "Signal summary",
+    placement: "pinned",
+    starId: "c59669",
+    featured: true,
+    importance: 5,
+    aliases: { zh: ["信号"] },
+    surface: { anchorCategory: "project", cluster: "core" },
+    provenance: { kind: "authored" },
+  });
+  const signal = derivePersonalSignalMetadata(value, "en");
+  assert.equal(signal.id, "personal:signal");
+  assert.equal(signal.destinationId, "star:c59669");
+  assert.equal(signal.surface?.cluster, "core");
+  assert.deepEqual(signal.aliases, ["Signal", "信号"]);
+});
+
+test("derived indexes are deterministic across input ordering", () => {
+  const a = entry({ id: "a", aliases: { en: ["Alpha"] } });
+  const b = entry({ id: "b", aliases: { en: ["Beta"] } });
+  assert.deepEqual(
+    buildUniverseContentIndex([a, b]),
+    buildUniverseContentIndex([b, a]),
+  );
+});
+
+test("normalized records become runtime entries with stable ids", () => {
+  const runtime = authoringRecordToUniverseContentEntry({
+    schemaVersion: 1,
+    contentId: "runtime-entry",
+    title: "Runtime",
+    summary: "Runtime summary",
+    kind: "artifact",
+    placement: "auto",
+  });
+  assert.equal(runtime.id, "runtime-entry");
+  assert.equal(runtime.provenance?.kind, "authored");
+  assert.equal(runtime.signalVisible, true);
+});
+
+test("canonical portfolio source is JSON-only so CLI and Astro validate the same records", () => {
+  const configPath = resolve(REPO_ROOT, "src/content.config.ts");
+  const config = readFileSync(configPath, "utf8");
+  assert.match(config, /pattern: "\*\*\/\*\.json"/);
+  assert.doesNotMatch(config, /mdx?/);
+});
+
+test("authoring CLI dry-run, migrate, preview, and index workflows execute", () => {
+  const temp = mkdtempSync(resolve(tmpdir(), "personal-universe-content-"));
+  try {
+    const batchPath = resolve(temp, "batch.json");
+    writeFileSync(
+      batchPath,
+      JSON.stringify(
+        {
+          items: [
+            {
+              schemaVersion: 1,
+              contentId: "cli-import-smoke",
+              title: "CLI import smoke",
+              summary: "Dry-run import coverage",
+              kind: "note",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const legacyPath = resolve(temp, "legacy.json");
+    writeFileSync(
+      legacyPath,
+      JSON.stringify({
+        id: "cli-legacy",
+        title: "CLI legacy",
+        summary: "Migration smoke",
+        kind: "artifact",
+      }),
+    );
+
+    const created = runContentCli(
+      "new",
+      "--id",
+      "cli-new-smoke",
+      "--title",
+      "CLI new smoke",
+      "--summary",
+      "Dry-run scaffold coverage",
+      "--kind",
+      "project",
+      "--dry-run",
+    );
+    assert.equal(created.status, 0, created.stderr);
+    assert.match(created.stdout, /\[dry-run\] created/);
+    assert.match(created.stdout, /"contentId": "cli-new-smoke"/);
+
+    const imported = runContentCli("import", batchPath, "--dry-run");
+    assert.equal(imported.status, 0, imported.stderr);
+    assert.match(imported.stdout, /normalized 1 content item/);
+    assert.match(imported.stdout, /cli-import-smoke\.json/);
+
+    const migrated = runContentCli("migrate", legacyPath);
+    assert.equal(migrated.status, 0, migrated.stderr);
+    assert.match(migrated.stdout, /"schemaVersion": 1/);
+    assert.match(migrated.stdout, /"contentId": "cli-legacy"/);
+
+    const previewed = runContentCli("preview", "--id", "personal-universe");
+    assert.equal(previewed.status, 0, previewed.stderr);
+    const preview = JSON.parse(previewed.stdout);
+    assert.equal(preview.canonicalId, "personal-universe");
+    assert.equal(preview.sharePath, "?destination=personal%3Apersonal-universe");
+    assert.equal(preview.placement.nativeDestinationStatus, "verified-native");
+
+    const indexed = runContentCli("index");
+    assert.equal(indexed.status, 0, indexed.stderr);
+    const index = JSON.parse(indexed.stdout);
+    assert.ok(index.ids.includes("personal-universe"));
+    assert.equal(
+      index.references["personal-universe"],
+      "personal-universe",
+    );
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("large catalogs validate in linear-time practice", () => {
+  const catalog = Array.from({ length: 5000 }, (_, index) =>
+    entry({
+      id: "item-" + index,
+      title: "Item " + index,
+      aliases: { en: ["alias-" + index] },
+      relations:
+        index === 0
+          ? []
+          : [{ type: "related", targetId: "item-" + (index - 1) }],
+    }),
+  );
+  const started = performance.now();
+  const issues = validateUniverseContentCatalog(catalog);
+  const elapsed = performance.now() - started;
+  assert.equal(issues.length, 0);
+  assert.ok(elapsed < 1500, "5000-entry validation took " + elapsed + "ms");
+});

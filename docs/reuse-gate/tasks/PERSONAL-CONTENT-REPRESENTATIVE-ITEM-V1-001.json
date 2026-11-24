@@ -1,0 +1,95 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-CONTENT-REPRESENTATIVE-ITEM-V1-001",
+  "title": "Add one representative authored product artifact through the canonical content pipeline",
+  "scope": {
+    "level": "implementation",
+    "subject": "Canonical bilingual authored record for the existing Continuous Scale Navigation product artifact"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Use the Agent 09 repository-backed authoring pipeline already built on Astro Content Collections and its canonical JSON record format. The representative item is an existing product artifact from this repository, not invented biography: Continuous Scale Navigation. Persist it as one canonical JSON record with explicit stable contentId, bilingual copy, deterministic auto placement, relation to Personal Universe, semantic Surface hints, discovery aliases, provenance, and no parallel CMS or renderer-owned coordinates.",
+  "planned_files": [
+    "src/content/portfolio/continuous-scale-navigation.json"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro Content Collections remain the existing repository-backed loading and schema-validation authority for the representative authored record."
+    },
+    {
+      "url": "https://www.rfc-editor.org/rfc/rfc8259",
+      "finding": "RFC 8259 standardizes JSON as an interoperable structured data format, matching the Agent 09 pipeline's canonical normalized record output without introducing a second content database or parser-specific identity."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No CMS or second authoring application is needed; the repository already has the required canonical authoring workflow."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse Astro Content Collections for loading, schema validation, typed product data, and build integration."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse the existing Agent 09 normalized JSON authoring contract and deterministic placement/discovery adapters rather than introducing a new content shape."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "The representative record requires no new package, media parser, renderer asset, or generated component."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-agent09-authoring-pipeline",
+      "name": "Existing Astro-backed canonical personal-content authoring pipeline",
+      "level": "subsystem",
+      "registry_id": "astro-content-collections",
+      "source": "Current Agent 09 branch schema, CLI, validators, placement and discovery metadata adapters",
+      "license": "MIT Astro plus project-owned authoring data",
+      "decision": "reuse",
+      "reason": "It already provides stable identity, localization, relations, deterministic placement, provenance, Surface hints, validation and product integration, so the representative content should be data-only.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-agent09-authoring-pipeline"
+    ],
+    "rationale": "Add the representative product artifact as data only through the already-approved canonical pipeline. Do not add a CMS, parser, route, renderer path, or placement algorithm.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If future authored items need richer source ingestion, extend import adapters while preserving the same canonical JSON record and product identity contract."
+  }
+}
