@@ -199,6 +199,22 @@ export function rankSurfaceContentClusters(
   );
 }
 
+export function nextSurfaceClusterEntryId(
+  anchors: readonly SurfaceContentAnchor[],
+  clusterIndex: number,
+  focusedEntryId: string | null = null,
+): string | null {
+  const entries = rankSurfaceContentAnchors(
+    anchors.filter((anchor) => anchor.cluster === clusterIndex),
+  ).map((anchor) => anchor.entryId);
+  if (entries.length === 0) return null;
+
+  const currentIndex = focusedEntryId
+    ? entries.indexOf(focusedEntryId)
+    : -1;
+  return entries[(currentIndex + 1) % entries.length] ?? null;
+}
+
 export function rankSurfaceWorldRegions(
   regions: readonly SurfaceWorldRegion[],
   focusedRegionId: string | null = null,
