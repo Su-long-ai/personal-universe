@@ -1028,6 +1028,62 @@ test("YEIS native System suppresses only the matched handoff target after first 
     /.+/,
   );
 
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "orbit",
+    { timeout: 15_000 },
+  );
+
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-lifecycle",
+    "prewarming",
+    { timeout: 15_000 },
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-system-renderer",
+    /.+/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-native-allocations",
+    /\d+/,
+  );
+  const reversePrewarmAllocations = Number(
+    await html.getAttribute("data-universe-system-native-allocations"),
+  );
+  expect(reversePrewarmAllocations).toBeGreaterThan(0);
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-prewarm"),
+      { timeout: 30_000 },
+    )
+    .toMatch(/^(ready|resources-ready)$/);
+
+  await wheelScale(page, "out");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-renderer",
+    "yeis-native",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-system-lifecycle",
+    "active",
+  );
+  expect(
+    Number(await html.getAttribute("data-universe-system-native-allocations")),
+  ).toBe(reversePrewarmAllocations);
+
   await page.evaluate(() => {
     const runtimeWindow = window as typeof window & {
       __nativeWorldHandoffObserver?: MutationObserver;
