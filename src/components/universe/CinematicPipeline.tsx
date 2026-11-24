@@ -18,6 +18,9 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import type { QualityMode } from "../../lib/universe/types";
 
+const softwareRendererCache =
+  new WeakMap<THREE.WebGLRenderer, boolean>();
+
 function rendererLabel(gl: THREE.WebGLRenderer) {
   const context = gl.getContext();
   try {
@@ -34,9 +37,15 @@ function rendererLabel(gl: THREE.WebGLRenderer) {
 }
 
 export function isSoftwareRenderer(gl: THREE.WebGLRenderer) {
-  return /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
-    rendererLabel(gl),
-  );
+  const cached = softwareRendererCache.get(gl);
+  if (cached !== undefined) return cached;
+
+  const software =
+    /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(
+      rendererLabel(gl),
+    );
+  softwareRendererCache.set(gl, software);
+  return software;
 }
 
 export function liveWorldFallbackReason(
