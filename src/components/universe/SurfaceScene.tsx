@@ -227,7 +227,9 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceTerrainState;
       document.documentElement.dataset.universeSurfacePrewarm = ready
         ? "ready"
-        : "cancelled";
+        : terrainEnabled
+          ? "preparing"
+          : "cancelled";
       return;
     }
 
