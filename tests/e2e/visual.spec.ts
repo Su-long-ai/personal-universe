@@ -19,6 +19,15 @@ const DESKTOP: Viewport = {
   width: 1440,
   height: 900,
 };
+// HIGH ProceduralPlanets transition evidence uses a smaller desktop viewport
+// that stays above the product's 900px responsive breakpoint. This keeps the
+// same desktop composition contract while bounding SwiftShader's framebuffer
+// workload; normal DESKTOP/WQHD/ULTRAWIDE cases still own the layout matrix.
+const HIGH_TRANSITION_DESKTOP: Viewport = {
+  name: "desktop-high-960x600",
+  width: 960,
+  height: 600,
+};
 const WQHD: Viewport = {
   name: "wqhd-2560x1440",
   width: 2560,
@@ -107,7 +116,15 @@ async function waitForCameraSettled(
   );
 }
 
-async function expectReadableWorldFrame(page: Page, label: string) {
+type ReadableWorldFrameOptions = {
+  subjectRoiOnly?: boolean;
+};
+
+async function expectReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
   // Stable endpoint screenshots deliberately wait for the renderer's
   // quiescent-pipeline signal.
   await expect(page.locator("html")).toHaveAttribute(
@@ -116,15 +133,32 @@ async function expectReadableWorldFrame(page: Page, label: string) {
     { timeout: 60_000 },
   );
 
-  await captureReadableWorldFrame(page, label);
+  await captureReadableWorldFrame(page, label, options);
 }
 
-async function captureReadableWorldFrame(page: Page, label: string) {
-  // Capture the final viewport once and let visualCase reuse the exact same
-  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
-  // seconds on one screenshot, so a second identical read would make the
-  // acceptance itself stall the renderer it is measuring.
-  const png = await page.screenshot();
+async function captureReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
+  // Capture once and let visualCase reuse the exact same framebuffer read for
+  // the artifact. HIGH transition acceptance only needs the same central ROI
+  // that this probe measures; asking SwiftShader to read the surrounding
+  // black-space/HUD pixels first can dominate the entire test budget without
+  // adding visual evidence.
+  const viewport = page.viewportSize();
+  const subjectClip =
+    options.subjectRoiOnly && viewport
+      ? {
+          x: Math.floor(viewport.width * 0.2),
+          y: Math.floor(viewport.height * 0.2),
+          width: Math.max(1, Math.floor(viewport.width * 0.6)),
+          height: Math.max(1, Math.floor(viewport.height * 0.6)),
+        }
+      : undefined;
+  const png = await page.screenshot(
+    subjectClip ? { clip: subjectClip } : undefined,
+  );
   pendingReadableWorldFrame.set(page, png);
   const image = sharp(png);
   const metadata = await image.metadata();
@@ -140,10 +174,10 @@ async function captureReadableWorldFrame(page: Page, label: string) {
   // Keep this probe off the browser main thread: decoding a PNG with
   // createImageBitmap can block hosted SwiftShader long enough to distort the
   // renderer acceptance that the probe is supposed to observe.
-  const left = Math.floor(width * 0.2);
-  const top = Math.floor(height * 0.2);
-  const roiWidth = Math.max(1, Math.floor(width * 0.6));
-  const roiHeight = Math.max(1, Math.floor(height * 0.6));
+  const left = subjectClip ? 0 : Math.floor(width * 0.2);
+  const top = subjectClip ? 0 : Math.floor(height * 0.2);
+  const roiWidth = subjectClip ? width : Math.max(1, Math.floor(width * 0.6));
+  const roiHeight = subjectClip ? height : Math.max(1, Math.floor(height * 0.6));
   const { data, info } = await image
     .extract({
       left,
@@ -751,7 +785,7 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
   await visualCase(
     page,
     testInfo,
-    DESKTOP,
+    HIGH_TRANSITION_DESKTOP,
     "atmosphere-surface-midpoint-live",
     async () => {
       await page.goto(
@@ -784,7 +818,93 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
-      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+        { subjectRoiOnly: true },
+      );
+    },
+  );
+});
+
+test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuity @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    HIGH_TRANSITION_DESKTOP,
+    "surface-atmosphere-reverse-live",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-anchor-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-frame",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-applied",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+
+      await dispatchVisualWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "4.600",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "atmosphere",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "atmosphere:surface",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-render-authority",
+        "world",
+      );
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+        { subjectRoiOnly: true },
+      );
     },
   );
 });
