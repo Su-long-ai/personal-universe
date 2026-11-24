@@ -441,19 +441,23 @@ export function CinematicPipeline({
 
     if (fallbackReason) {
       const sceneReady = html.dataset.universeWorldSceneReady === "true";
-      publishReady(sceneReady);
-      if (sceneReady) {
+      const surfaceTerrainReady =
+        html.dataset.universeNavigationPhase !== "surface" ||
+        html.dataset.universeSurfaceTerrainState === "ready";
+      const fallbackReady = sceneReady && surfaceTerrainReady;
+      publishReady(fallbackReady);
+      if (fallbackReady) {
         html.dataset.universeWorldReady = "true";
       } else {
         delete html.dataset.universeWorldReady;
       }
-      if (sceneReady && cameraReady) {
+      if (fallbackReady && cameraReady) {
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
       }
       if (
-        sceneReady &&
+        fallbackReady &&
         html.dataset.universeWorldRecovery === "warming"
       ) {
         html.dataset.universeWorldRecovery = "ready";
