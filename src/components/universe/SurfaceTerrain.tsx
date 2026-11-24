@@ -13,9 +13,9 @@ import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
-const SOFTWARE_FULL_COVERAGE_CHUNKS = 13;
+const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
-const SOFTWARE_STREAM_WARMUP_UPDATES = 16;
+const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
 
 const ROCKS = [
   { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
@@ -90,7 +90,7 @@ export function SurfaceTerrain({
                 // scheduled update and keeps its clipmap at the minimum supported
                 // resolution.
                 chunkSize: 32,
-                viewRadius: 2,
+                viewRadius: 3,
                 triangleBudget: 35000,
                 maxCreatesPerFrame: 3,
                 streamBudgetMs: 0.6,
@@ -287,10 +287,10 @@ export function SurfaceTerrain({
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };
-      // ProceduralTerrains uses radial (not square) coverage. Radius 2 has
-      // exactly 13 desired chunks and radius 3 has 29. Publish readiness only
-      // when the complete initial ring exists, so the product never treats a
-      // partially streamed horizon as settled.
+      // ProceduralTerrains uses radial (not square) coverage. Radius 3 has
+      // exactly 29 desired chunks. Publish readiness only when the complete
+      // initial ring exists, so the product never treats a partially streamed
+      // horizon as settled.
       const readyChunkCount = softwareRenderer
         ? SOFTWARE_FULL_COVERAGE_CHUNKS
         : HARDWARE_FULL_COVERAGE_CHUNKS;
