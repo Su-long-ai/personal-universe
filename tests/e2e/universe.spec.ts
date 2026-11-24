@@ -2570,14 +2570,21 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     previousRatio = ratio;
   }
 
-  // Gesture lifetime may reset, but the continuous coordinate and captured
-  // path do not. A later tiny sample resumes exactly where the user stopped.
-  await page.waitForTimeout(650);
+  // Cross the full active-gesture reset window. Resetting gesture identity is
+  // diagnostic only: the retained path and continuous coordinate must not
+  // reset, jump, or require a new threshold before the next tiny sample acts.
+  const gestureBeforePause = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  );
+  await page.waitForTimeout(2_100);
   accumulated += 16 / 384;
   await dispatchScaleWheel(page, -16);
   await expect
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
     .toBeCloseTo(accumulated, 2);
+  await expect
+    .poll(async () => Number(await html.getAttribute("data-universe-scale-gesture")))
+    .toBeGreaterThan(gestureBeforePause);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
