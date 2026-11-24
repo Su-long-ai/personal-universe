@@ -1,0 +1,177 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-SOFTWARE-HORIZON-BLEND-001",
+  "title": "Blend software Surface horizon with the installed terrain fog color",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reduce the software Surface fallback's hard black-sky/terrain horizon seam by reusing the existing Three.js Scene background color and the installed ProceduralTerrains fog-color contract, without adding textures, alpha compositing, sky/cloud/water layers, new geometry, post-processing or another renderer"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-24",
+  "research_summary": "After SURFACE-SOFTWARE-DEPTH-CUES-001 landed a cheap software arrival beacon, mobile/tablet screenshots still show the main residual composition defect: ProceduralTerrains ends against SurfaceScene's very dark #030b12 background as a visibly hard horizon. The installed procedural-terrains@2.0.5 shader owns its own fog and defaults uFogColor to 0x0b0e14, while Three.js Scene already supports a uniform Color background and its own fog guidance explicitly recommends matching background and fog colors when the goal is a seamless distance fade. Because the custom terrain shader does not rely on host-scene fog, the narrowest candidate is background-color alignment only: software Surface uses #0b0e14, while real-GPU fallback and all other phases keep their existing backgrounds. This adds no draw call, texture, geometry, animation or renderer ownership.",
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://threejs.org/docs/pages/Scene",
+      "finding": "Three.js Scene.background natively accepts a Color, so a uniform horizon/background adjustment requires no new mesh, texture, pass or renderer."
+    },
+    {
+      "url": "https://threejs.org/manual/pages/fog.html",
+      "finding": "Three.js fog guidance recommends keeping fog and background colors aligned when the intended result is a visually continuous distance fade."
+    },
+    {
+      "url": "https://threejs.org/manual/pages/backgrounds.html",
+      "finding": "Three.js supports heavier texture/skybox background approaches, but a solid scene background is the lower-cost native option when no sky asset is required."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/releases/tag/v2.0.5",
+      "finding": "The installed ProceduralTerrains 2.0.5 remains the fallback terrain subsystem; local inspection of that pinned installed runtime shows its terrain shader default uFogColor is 0x0b0e14."
+    },
+    {
+      "url": "https://playwright.dev/docs/screenshots",
+      "finding": "The existing mobile/tablet Playwright Surface screenshots can judge whether a background-only change materially improves the horizon without introducing a second visual test stack."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "A replacement sky or environment product is disproportionate for a single hard horizon seam; the existing scene already has a native background authority."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1,
+        4
+      ],
+      "conclusion": "Reuse the current R3F/Three scene background and current Playwright visual acceptance; no new rendering or screenshot framework is needed."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-terrains"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Use the installed terrain runtime's own fog-color contract as the color reference instead of inventing a second atmospheric palette."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Do not add a background image, cubemap, sky dome or other asset for the first probe; a single native scene color has lower cost and directly targets the seam."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "three-scene-background-fog-match",
+      "name": "Three.js Scene background matched to ProceduralTerrains fog color",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing R3F <color attach=\"background\"> plus installed ProceduralTerrains uFogColor",
+      "license": "MIT dependencies / project configuration",
+      "decision": "reuse",
+      "reason": "Directly targets the black-sky/terrain seam with zero extra geometry, texture, pass or per-frame work and stays inside the current scene authority.",
+      "evaluation": {
+        "coverage": 4.6,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-surface-playwright-acceptance",
+      "name": "Existing mobile/tablet Surface Playwright acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Current narrow Surface screenshot cases",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Provides direct before/after evidence on the software-rendered viewports with no new testing infrastructure.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "three-background-texture-skybox",
+      "name": "Three.js background texture / skybox",
+      "level": "component_asset",
+      "source": "Three.js texture, cubemap or equirectangular Scene.background",
+      "license": "MIT engine plus new asset provenance",
+      "decision": "reject",
+      "reason": "Adds texture memory, loading and asset-provenance work before a zero-cost native color probe has been exhausted."
+    },
+    {
+      "id": "transparent-canvas-css-background",
+      "name": "Transparent WebGL canvas with CSS background",
+      "level": "framework_engine",
+      "source": "Three.js alpha renderer plus CSS background",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would change Canvas/WebGL alpha ownership across the product and is much broader than a Surface-only horizon seam."
+    },
+    {
+      "id": "software-sky-cloud-water-stack",
+      "name": "Sky/cloud/water subsystem on software Surface",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "ProceduralTerrains optional clouds/water or another sky subsystem",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Adds runtime effects on the exact software tier whose cost is tightly bounded; it is not justified before a background-only probe."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "three-scene-background-fog-match",
+      "existing-surface-playwright-acceptance"
+    ],
+    "rationale": "Probe one software-only background color change: match SurfaceScene's existing Three.js background to the installed ProceduralTerrains terrain fog color (#0b0e14), leaving GPU fallback and every other phase unchanged. Promote only if mobile/tablet screenshots materially soften the horizon without reducing foreground/UI readability; otherwise revert and record the negative result rather than escalating inside this task.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "three-background-texture-skybox",
+        "reason": "A texture/skybox is broader and more expensive than the native color authority for the specific seam being tested."
+      },
+      {
+        "candidate_id": "transparent-canvas-css-background",
+        "reason": "Renderer-alpha ownership would cut across the whole shared Canvas for a Surface-only visual defect."
+      },
+      {
+        "candidate_id": "software-sky-cloud-water-stack",
+        "reason": "Effect subsystems add continuous software-renderer cost and ownership while a zero-draw background alignment remains available."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If exact fog-color matching is visually neutral or worse, keep the existing background and close this unit as a negative probe. Any gradient or atmospheric layer requires a new reuse-first task rather than broadening this approval."
+  }
+}
