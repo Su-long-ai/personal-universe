@@ -1,5 +1,20 @@
 import { defineConfig } from "@playwright/test";
 
+function localPreviewPort() {
+  let hash = 2166136261;
+  for (const char of process.cwd().toLowerCase()) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 20_000 + ((hash >>> 0) % 20_000);
+}
+
+const previewPort = Number(
+  process.env.PLAYWRIGHT_PORT ??
+    (process.env.CI ? 4321 : localPreviewPort()),
+);
+const previewBaseURL = `http://127.0.0.1:${previewPort}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "test-results",
@@ -29,10 +44,16 @@ export default defineConfig({
       name: "webgl-heavy",
       grep: /@webgl-heavy/,
       fullyParallel: false,
+      use: {
+        // Trace capture includes a screencast and can materially perturb the
+        // SwiftShader workload this lane is measuring. Keep the primary run
+        // clean and capture the full trace on CI's first retry after failure.
+        trace: "on-first-retry",
+      },
     },
   ],
   use: {
-    baseURL: "http://127.0.0.1:4321",
+    baseURL: previewBaseURL,
     headless: true,
     channel: "chromium",
     trace: "retain-on-failure",
@@ -48,8 +69,8 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4321",
-    url: "http://127.0.0.1:4321/",
+    command: `npm run preview -- --host 127.0.0.1 --port ${previewPort}`,
+    url: `${previewBaseURL}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     stdout: "pipe",
