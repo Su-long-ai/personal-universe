@@ -284,7 +284,7 @@ export function SurfaceScene({
             castShadow
           />
           <pointLight
-            position={[0.4, anchorHeight + 1.0, -5.4]}
+            position={[profile?.landing[0] ?? 0.4, anchorHeight + 1.0, profile?.landing[1] ?? -5.4]}
             intensity={beaconActive ? 7 : 2.8}
             distance={11}
             color={beaconActive ? "#ffb46d" : (profile?.accent ?? "#74d8ff")}
