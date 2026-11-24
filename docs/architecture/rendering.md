@@ -186,7 +186,12 @@ existing semantic handoff because ProceduralTerrains intentionally owns a
 different local surface frame. A live ProceduralPlanets world instead exposes
 its terrain-derived Surface frame while the coordinate is still inside that
 final segment, allowing the primary path to interpolate all the way to the
-landing frame.
+landing frame. Once that frame becomes active at position > 4, the same live
+planet's subtle idle rotation is locked until reversal reaches <= 4. The
+terrain-derived frame and rendered landing patch therefore keep one transform
+through the whole 4 -> 5 -> 4 interval instead of drifting relative to each
+other; the anchor itself resolves once per activation rather than resampling
+the same static surface every frame.
 
 The product reuses ProceduralPlanets inside that host:
 
@@ -196,12 +201,14 @@ The product reuses ProceduralPlanets inside that host:
 - the System renderer remains mounted across the semantic boundary until the
   close world has participated in two real composer frames, so lazy import or
   shader warmup cannot expose an empty Canvas;
-- on real GPU paths the retained `PlanetPass` host is provisioned as soon as
-  the System target is locked, while System still owns presentation; software
-  WebGL keeps that allocation lazy until live presentation so hidden prewarm
-  cannot create expensive hosted-runner resources. The pass is then enabled or
-  parked as presentation changes, and phase changes never dispose/recreate the
-  composer/pass pair;
+- on real GPU paths the retained `PlanetPass` and its single
+  `PlanetRenderer` host are provisioned as soon as the System target is locked,
+  while System still owns presentation; this moves synchronous renderer host /
+  ProgramWarmer construction away from the handoff edge without starting
+  target-specific `prepare()` work. Software WebGL keeps that allocation lazy
+  until live presentation so hidden prewarm cannot create expensive hosted-
+  runner resources. The pass is then enabled or parked as presentation changes,
+  and phase changes never dispose/recreate the composer/pass pair;
 - LOW quality always uses the lightweight fallback;
 - AUTO quality falls back on software renderers such as SwiftShader/llvmpipe;
 - HIGH quality explicitly requests the live renderer and is used by the
