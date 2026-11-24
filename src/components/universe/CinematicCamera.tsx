@@ -12,6 +12,7 @@ import { Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
+  SYSTEM_OVERVIEW_RADIUS,
   type QualityMode,
   type UniversePhase,
 } from "../../lib/universe/types";
@@ -85,6 +86,7 @@ const SHOTS: Partial<
       maxSpeed: number;
       positionTolerance: number;
       targetTolerance: number;
+      fitRadius?: number;
       frameScale?: number;
       transition?: boolean;
     }
@@ -97,6 +99,8 @@ const SHOTS: Partial<
     maxSpeed: 28,
     positionTolerance: 0.16,
     targetTolerance: 0.1,
+    fitRadius: SYSTEM_OVERVIEW_RADIUS,
+    frameScale: 1.15,
   },
   approach: {
     position: [1.35, 1.15, 13.6],
@@ -163,6 +167,8 @@ export function CinematicCamera({
 }: CinematicCameraProps) {
   const gl = useThree((state) => state.gl);
   const camera = useThree((state) => state.camera);
+  const viewportWidth = useThree((state) => state.size.width);
+  const viewportHeight = useThree((state) => state.size.height);
   const softwareRenderer = isSoftwareRenderer(gl);
   const surfaceFallback =
     phase === "surface" && Boolean(liveWorldFallbackReason(gl, quality));
@@ -390,7 +396,9 @@ export function CinematicCamera({
 
     if (shot.frameScale) {
       const distance =
-        controls.getDistanceToFitSphere(PLANET_RENDER_RADIUS) * shot.frameScale;
+        controls.getDistanceToFitSphere(
+          shot.fitRadius ?? PLANET_RENDER_RADIUS,
+        ) * shot.frameScale;
       desiredPosition.current
         .sub(desiredTarget.current)
         .normalize()
@@ -480,6 +488,8 @@ export function CinematicCamera({
     scrollDepth,
     softwareRenderer,
     surfaceFallback,
+    viewportHeight,
+    viewportWidth,
     publishIfReached,
   ]);
 

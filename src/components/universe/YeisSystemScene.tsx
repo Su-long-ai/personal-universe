@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
-import type {
-  PlanetDefinition,
-  QualityMode,
-  SystemDefinition,
+import {
+  SYSTEM_OVERVIEW_RADIUS,
+  type PlanetDefinition,
+  type QualityMode,
+  type SystemDefinition,
 } from "../../lib/universe/types";
 import { loadYeisCore } from "../../lib/universe/yeis";
 import { J2000_JD } from "../../vendor/yeis/core/constants";
@@ -22,7 +23,6 @@ import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import { SystemScene } from "./SystemScene";
 
-const TARGET_SYSTEM_RADIUS = 7.0;
 const HIT_RADIUS = 0.34;
 
 type NativeResources = {
@@ -55,7 +55,7 @@ function systemScale(system: StarSystem) {
     if (body.data.type !== "planet" && body.data.type !== "dwarf") continue;
     span = Math.max(span, body.position.distanceTo(star.position));
   }
-  return TARGET_SYSTEM_RADIUS / Math.max(span, 1);
+  return SYSTEM_OVERVIEW_RADIUS / Math.max(span, 1);
 }
 
 function scaledOrbit(body: CelestialBody, scale: number): OrbitElements | undefined {
