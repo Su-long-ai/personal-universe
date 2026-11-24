@@ -4,6 +4,7 @@ import type {
   PlanetSurfaceMode,
 } from "../types";
 import { hashSeed, SeededRng } from "../generation/seededRng";
+import { surfaceStellarLightAngles } from "./stellarLighting";
 
 export type SurfaceRgb = [number, number, number];
 
@@ -612,6 +613,7 @@ export function buildSurfaceWorldProfile(
 
   const terrainRng = rng.fork("terrain");
   const lightRng = rng.fork("light");
+  const stellarLightAngles = surfaceStellarLightAngles();
   const rugged =
     planet.archetype === "lava" ||
     planet.archetype === "volcanic" ||
@@ -638,8 +640,8 @@ export function buildSurfaceWorldProfile(
             ? [1, 0.42, 0.2]
             : [1, 0.7, 0.45],
       sunIntensity: lightRng.range(1.18, authored ? 1.72 : 1.58),
-      sunAzimuth: lightRng.range(110, 190),
-      sunElevation: lightRng.range(11, 24),
+      sunAzimuth: stellarLightAngles.azimuth,
+      sunElevation: stellarLightAngles.elevation,
       skyAmbient: rgb(palette.fog).map((value) =>
         Math.min(0.25, value * 0.36),
       ) as SurfaceRgb,
