@@ -1662,6 +1662,83 @@ test("Search freezes and resumes a partial Galaxy scale path", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("Guided Journey supersedes a partial Galaxy scale path without stale System handoff", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+
+  // Search temporarily freezes the retained path. Starting a Journey is a
+  // stronger authority takeover: it must discard that path before the first
+  // Journey destination is opened.
+  const dialog = await openNavigator(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const phases: string[] = [];
+    Object.assign(window, { __journeyTakeoverPhases: phases });
+    new MutationObserver(() => {
+      phases.push(root.dataset.universeNavigationPhase ?? "");
+    }).observe(root, {
+      attributes: true,
+      attributeFilter: ["data-universe-navigation-phase"],
+    });
+  });
+
+  await page.getByRole("button", { name: /Featured Journey/ }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".universe-journey-controls")).toBeVisible();
+  await expect(html).not.toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+  );
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+
+  // The first Featured Journey stop is an Approach destination. A stale
+  // coordinate-1 completion would briefly or permanently reassert System after
+  // Journey takeover, which is forbidden.
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await page.waitForTimeout(500);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+
+  const phaseHistory = await page.evaluate(() =>
+    ((window as typeof window & { __journeyTakeoverPhases?: string[] })
+      .__journeyTakeoverPhases ?? []),
+  );
+  expect(phaseHistory.filter(Boolean)).not.toContain("system");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("manual pointer takeover freezes a partial Galaxy scale coordinate", async ({
   page,
 }, testInfo) => {
