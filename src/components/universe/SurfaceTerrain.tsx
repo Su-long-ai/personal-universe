@@ -273,9 +273,18 @@ export function SurfaceTerrain({
   }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
-    // `active` is delivered through the R3F reconciler. Read the coordinator
-    // ref first so no *new* Surface work starts after an outward wheel intent.
-    if (!active || phaseRef.current !== "surface" || !terrain) return;
+    // Hidden Atmosphere prewarm is allowed to populate the destination ring,
+    // but only while the coordinator still owns Atmosphere. A reverse to
+    // Orbit pauses streaming immediately; an already-created terrain remains
+    // retained for the next inward journey.
+    const surfaceStreaming =
+      active && phaseRef.current === "surface";
+    const hiddenLandingPrestream =
+      prepare &&
+      !active &&
+      phaseRef.current === "atmosphere" &&
+      !terrainReadyPublished.current;
+    if ((!surfaceStreaming && !hiddenLandingPrestream) || !terrain) return;
 
     const streamCamera = presenting ? camera : landingStreamCamera;
     if (!presenting) {
