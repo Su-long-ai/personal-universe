@@ -3,6 +3,8 @@ import { waitForYeis } from "./support/runtime";
 
 test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async ({
   browser,
+  context,
+  page: firstPage,
 }, testInfo) => {
   const baseURL = String(
     testInfo.project.use.baseURL ?? "http://127.0.0.1:4321",
@@ -12,8 +14,10 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
     viewport: { width: 1440, height: 900 },
   };
 
-  const first = await browser.newContext(contextOptions);
-  const firstPage = await first.newPage();
+  // Reuse Playwright's standard per-test BrowserContext for the first half.
+  // The acceptance condition below is the *second* fresh context after terminal
+  // release; manually creating an extra first context only adds a runner-owned
+  // Browser.setDownloadBehavior setup path before the product is even loaded.
   await firstPage.goto("/?freeze=1");
   await waitForYeis(firstPage);
 
@@ -72,7 +76,7 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
     )
     .toBe(true);
 
-  await first.close();
+  await context.close();
 
   // The acceptance condition is not merely a lost first context: Chromium
   // must be able to create and boot a fresh WebGL BrowserContext immediately.
