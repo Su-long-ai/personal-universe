@@ -5,7 +5,7 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
-import { hashSeed } from "./seededRng";
+import { surfaceModeForArchetype } from "../surface";\nimport { hashSeed } from "./seededRng";
 
 type CatalogPlanet = {
   name: string;
@@ -149,7 +149,7 @@ function observedPlanet(
     id: seed,
     name: planet.name,
     seed,
-    archetype: inferArchetype(equilibriumTempK, massEarth),
+    archetype,
     radiusEarth,
     massEarth,
     equilibriumTempK,
@@ -159,7 +159,7 @@ function observedPlanet(
     ),
     moons: [],
     hasRings: false,
-    surfaceMode: "none",
+    surfaceMode: surfaceModeForArchetype(archetype),
     observed: true,
   };
 }
