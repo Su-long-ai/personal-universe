@@ -342,6 +342,10 @@ Runtime evidence is shared across live and fallback paths:
   `data-universe-surface-layout-clusters` so the 4→5 content handoff can be
   validated independently of camera settlement;
 - fallback additionally publishes
+  `data-universe-surface-terrain-instance` as the retained terrain identity;
+  repeated 4.6↔5 reversals must preserve that identity while lifecycle changes
+  only between `parked` and `active`;
+- fallback additionally publishes
   `data-universe-surface-terrain-world="<same profile id>"`, proving the
   terrain adapter and product layout are using the same world identity.
 
