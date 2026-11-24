@@ -264,8 +264,26 @@ async function expectReadableNarrowSurfaceLayout(
       stackBox!.y + stackBox!.height,
       "mobile prioritized Surface cards should end before destination copy begins",
     ).toBeLessThanOrEqual(surfaceBox!.y + 2);
+    if ((await cards.count()) > 0) {
+      await expect(cards.first().locator("small")).toBeHidden();
+      await expect(
+        cards.first().locator(".world-content-priority"),
+      ).toBeHidden();
+    }
     if ((await cards.count()) > 2) {
       await expect(cards.nth(2)).toBeHidden();
+    }
+    if (viewport.height <= 720 && (await cards.count()) > 1) {
+      await expect(cards.nth(1)).toBeHidden();
+    }
+
+    if ((await clusterChips.count()) > 2) {
+      expect(
+        await clusterChips.nth(2).evaluate(
+          (element) => getComputedStyle(element).display !== "none",
+        ),
+        "mobile cluster strip should retain every generated cluster",
+      ).toBe(true);
     }
   }
 }
