@@ -642,10 +642,11 @@ test("Search takeover cancels queued world scale intent", async ({
     box!.y + box!.height * 0.5,
   );
 
-  // Queue both inward steps in one browser task. The first event moves the
-  // coordinator to Orbit synchronously; the second must therefore be recorded
-  // as pending before React/camera settlement can legitimately consume it.
-  // This tests takeover semantics rather than runner-dependent camera speed.
+  // Keep the whole takeover in one browser task. The coordinator permits
+  // only one world boundary per tick, so the second wheel sample is queued;
+  // opening Search in that same turn must cancel it before the next frame can
+  // consume it. This mirrors a user invoking a higher-priority authority while
+  // a continuous gesture still carries pending scale intent.
   await page.locator("main.universe-root").evaluate((root) => {
     for (const deltaY of [-120, -120]) {
       root.dispatchEvent(
@@ -657,23 +658,26 @@ test("Search takeover cancels queued world scale intent", async ({
         }),
       );
     }
+    const searchButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("SEARCH / PLACES"),
+    );
+    if (!(searchButton instanceof HTMLButtonElement)) {
+      throw new Error("Search button unavailable during scale takeover");
+    }
+    searchButton.click();
   });
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "orbit",
   );
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-queued",
-    "world:+1",
-  );
 
-  // Search is a higher-priority manual authority and must invalidate the
-  // queued scale intent instead of letting it fire later.
-
-  await page.getByRole("button", { name: /SEARCH \/ PLACES/ }).click();
   const dialog = page.getByRole("dialog", { name: "Universe navigator" });
   await expect(dialog).toBeVisible();
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-cancelled-queue",
+    "world:+1",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-scale-superseded",
     "navigator-open",
