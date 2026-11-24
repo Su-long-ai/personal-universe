@@ -87,6 +87,7 @@ export function CinematicPipeline({
       : 120;
   const stableFrames = useRef(0);
   const appliedImpostorPixels = useRef<number | null>(null);
+  const reportedImpostorPixels = useRef<number | null>(null);
   const metricFrame = useRef(0);
   const liveDrawFrames = useRef(0);
   const reportedReady = useRef<boolean | null>(null);
@@ -356,6 +357,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldBloom;
       delete document.documentElement.dataset.universeWorldRecovery;
       appliedImpostorPixels.current = null;
+      reportedImpostorPixels.current = null;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
       composer.bloomPass?.dispose();
@@ -372,6 +374,10 @@ export function CinematicPipeline({
     ) {
       rendererBeforeDraw.setOptions({ impostorPixels });
       appliedImpostorPixels.current = impostorPixels;
+      if (reportedImpostorPixels.current !== impostorPixels) {
+        reportedImpostorPixels.current = impostorPixels;
+        html.dataset.universeWorldImpostorPixels = String(impostorPixels);
+      }
     }
 
     if (renderWithComposer) {
@@ -392,15 +398,15 @@ export function CinematicPipeline({
       if (appliedImpostorPixels.current !== impostorPixels) {
         rendererAfterDraw.setOptions({ impostorPixels });
         appliedImpostorPixels.current = impostorPixels;
+        if (reportedImpostorPixels.current !== impostorPixels) {
+          reportedImpostorPixels.current = impostorPixels;
+          html.dataset.universeWorldImpostorPixels = String(impostorPixels);
+        }
       } else {
         rendererProfileReady = true;
       }
-      publishDatasetMetric(
-        html,
-        "universeWorldImpostorPixels",
-        String(impostorPixels),
-      );
-    } else {
+    } else if (reportedImpostorPixels.current !== null) {
+      reportedImpostorPixels.current = null;
       delete html.dataset.universeWorldImpostorPixels;
     }
 
