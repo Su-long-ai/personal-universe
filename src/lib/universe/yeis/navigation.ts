@@ -350,22 +350,36 @@ export async function loadUniverseNavigation(
     import("../../../vendor/yeis/core/Universe"),
   ]);
   const runtime = await loadYeisCore();
-  if (!query.trim()) {
+  const trimmed = query.trim();
+  if (!trimmed) {
     return dedupe(
       buildPlaces(runtime, placements, markers, currentSystem).flatMap(
         (section) => section.destinations,
       ),
     ).slice(0, 80);
   }
-  return searchDestinations(
+
+  const resolvedExact = /^(?:personal:|hero(?::|$)|observed:|exoplanet:|star:|body:|landmark:|galaxy:|blackhole:)/i.test(
+    trimmed,
+  )
+    ? await resolveUniverseNavigationDestination(
+        trimmed,
+        placements,
+        markers,
+      )
+    : null;
+  const ranked = searchDestinations(
     runtime,
-    query,
+    trimmed,
     placements,
     markers,
     currentSystem,
     recentDestinationIds,
     normalizeQuery,
   );
+  return resolvedExact
+    ? dedupe([resolvedExact, ...ranked]).slice(0, 80)
+    : ranked;
 }
 
 export async function loadUniversePlaces(
