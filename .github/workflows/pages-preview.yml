@@ -88,7 +88,7 @@ jobs:
       - name: Preserve deployable Pages build
         uses: actions/upload-artifact@v4
         with:
-          name: pages-preview-dist-${{ github.run_id }}
+          name: pages-preview-dist-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
           if-no-files-found: error
           retention-days: 7
@@ -110,6 +110,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: dist
 
   deploy:
@@ -123,6 +124,8 @@ jobs:
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
       - name: Verify live homepage and YEIS catalogue
         shell: bash
@@ -188,6 +191,7 @@ jobs:
           const base = `${process.env.PAGE_URL.replace(/\/$/, "")}/`;
           const origin = new URL(base).origin;
           const pageErrors = [];
+          const consoleErrors = [];
           const criticalFailures = [];
 
           const browser = await chromium.launch({
@@ -207,6 +211,11 @@ jobs:
             page.on("pageerror", (error) => {
               pageErrors.push(error.message);
             });
+            page.on("console", (message) => {
+              if (message.type() === "error") {
+                consoleErrors.push(message.text());
+              }
+            });
             page.on("requestfailed", (request) => {
               const url = new URL(request.url());
               if (url.origin !== origin) return;
@@ -214,6 +223,9 @@ jobs:
               if (
                 path.includes("/_astro/") ||
                 path.includes("/vendor/yeis/") ||
+                path.includes("/textures/") ||
+                path.includes("/audio/") ||
+                path.includes("/nebulae/") ||
                 path.endsWith("/stars.bin")
               ) {
                 criticalFailures.push(
@@ -228,7 +240,9 @@ jobs:
             });
 
             await page.waitForFunction(
-              () => document.documentElement.dataset.universeEngine === "yeis",
+              () =>
+                document.documentElement.dataset.universeEngine === "yeis" &&
+                document.documentElement.dataset.yeisNativeGalaxy === "ready",
               undefined,
               { timeout: 30_000 },
             );
@@ -280,6 +294,11 @@ jobs:
               );
             }
 
+            // Preserve the frame that actually proves direct live scale motion.
+            // The reversed Galaxy endpoint is already covered by state + Canvas
+            // assertions below, so avoid a second redundant SwiftShader read.
+            await page.screenshot({ path: "pages-live-smoke.png" });
+
             await page.mouse.wheel(0, 120);
             await page.waitForFunction(
               () => {
@@ -298,9 +317,20 @@ jobs:
 
             await page.waitForTimeout(500);
 
+            const finalCanvasCount = await page.locator("canvas").count();
+            if (finalCanvasCount !== 1) {
+              throw new Error(
+                `Expected one canvas after live scale reversal, found ${finalCanvasCount}`,
+              );
+            }
             if (pageErrors.length) {
               throw new Error(
                 `Live browser page errors: ${pageErrors.join(" | ")}`,
+              );
+            }
+            if (consoleErrors.length) {
+              throw new Error(
+                `Live browser console errors: ${consoleErrors.join(" | ")}`,
               );
             }
             if (criticalFailures.length) {
@@ -314,8 +344,18 @@ jobs:
           NODE
 
           {
-            echo "- Live Chromium YEIS boot: PASS"
+            echo "- Live Chromium YEIS native Galaxy ready: PASS"
             echo "- Live single-Canvas probe: PASS"
             echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
-            echo "- Live critical asset/browser error probe: PASS"
+            echo "- Live midpoint screenshot evidence: PASS"
+            echo "- Live critical asset/browser/console error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload live Pages browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-live-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: pages-live-smoke.png
+          if-no-files-found: warn
+          retention-days: 14
