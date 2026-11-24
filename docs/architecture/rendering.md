@@ -436,15 +436,23 @@ being keyed to LOW/AUTO/HIGH capability. PlanetPass is provisioned lazily only
 when a live world is first requested, then retained and parked across later
 fallback/quality switches; bloom is likewise retained and toggled rather than
 rebuilt. This keeps AUTO/software cheap before a live request while preventing
-quality changes from reallocating the complete post-processing chain. The same
-Planet/material/LOD identity therefore survives forward and reverse travel.
-LOW/AUTO-software retain the same Surface terrain instance, with cancellable
-Atmosphere-time preparation before the final boundary.
+quality changes from reallocating the complete post-processing chain. The live
+ProceduralPlanets world follows the same lifetime rule: its resource identity is
+planet + renderer class, not the current LOW/AUTO/HIGH selector. A real-GPU
+world uses the retained HIGH-capability budget for its lifetime; software HIGH
+uses the bounded hosted-runner budget. Switching temporarily to a fallback mode
+hides and parks that same live Planet instead of disposing terrain/material/LOD
+state, so returning to a live capability reuses the warmed world immediately.
+The same Planet/material/LOD identity therefore survives forward and reverse
+travel as well as quality fallback cycles. LOW/AUTO-software retain the same
+Surface terrain instance, with cancellable Atmosphere-time preparation before
+the final boundary.
 
 Runtime evidence:
 
 - `data-universe-world-pipeline-allocations` counts shared composer allocation;
-- `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation.
+- `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation;
+- `data-universe-world-planet-allocations` counts live Planet construction.
 
 Large renderer paths are lazy-loaded. The pinned native current-system LOD
 resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
