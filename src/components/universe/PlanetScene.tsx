@@ -432,7 +432,7 @@ function liveStructuralQuality(
   if (softwareRenderer) {
     return {
       chunkRes: 16,
-      maxDepth: 5,
+      maxDepth: 4,
     } as const;
   }
 
@@ -453,7 +453,7 @@ function liveDynamicQuality(
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
-      splitFactor: 2.3,
+      splitFactor: 2.1,
     } as const;
   }
 
