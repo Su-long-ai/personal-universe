@@ -789,6 +789,68 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
   );
 });
 
+test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuity @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "surface-atmosphere-reverse-live",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-anchor-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+
+      await dispatchVisualWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "4.600",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "atmosphere",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "atmosphere:surface",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-render-authority",
+        "world",
+      );
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+      );
+    },
+  );
+});
+
 test("visual: ultrawide close-world composition", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, ULTRAWIDE, "approach-orbit-midpoint", async () => {
     await page.goto(
