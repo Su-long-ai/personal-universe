@@ -332,6 +332,94 @@ test("System wheel approaches the focused planet before the Approach boundary", 
   await runtime.assertClean(testInfo);
 });
 
+test("System to Approach handoff preserves apparent size and orientation", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.500",
+  );
+  await dispatchScaleWheel(page, -96);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () =>
+        html.getAttribute("data-universe-handoff-exit-projected-radius"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+  await expect
+    .poll(
+      async () =>
+        html.getAttribute("data-universe-handoff-entry-projected-radius"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  const exitRadius = Number(
+    await html.getAttribute("data-universe-handoff-exit-projected-radius"),
+  );
+  const entryRadius = Number(
+    await html.getAttribute("data-universe-handoff-entry-projected-radius"),
+  );
+  expect(exitRadius).toBeGreaterThan(0);
+  expect(entryRadius).toBeGreaterThan(0);
+  expect(entryRadius / exitRadius).toBeGreaterThan(0.97);
+  expect(entryRadius / exitRadius).toBeLessThan(1.03);
+
+  const parseQuaternion = (value: string | null) =>
+    (value ?? "")
+      .split(",")
+      .map(Number)
+      .filter((component) => Number.isFinite(component));
+  const exitQuaternion = parseQuaternion(
+    await html.getAttribute("data-universe-handoff-exit-quaternion"),
+  );
+  const entryQuaternion = parseQuaternion(
+    await html.getAttribute("data-universe-handoff-entry-quaternion"),
+  );
+  expect(exitQuaternion).toHaveLength(4);
+  expect(entryQuaternion).toHaveLength(4);
+  const quaternionDot = Math.abs(
+    exitQuaternion.reduce(
+      (sum, component, index) =>
+        sum + component * entryQuaternion[index],
+      0,
+    ),
+  );
+  expect(quaternionDot).toBeGreaterThan(0.995);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+  await runtime.assertClean(testInfo);
+});
+
 test("wheel scale advances and reverses world layers without auto chaining", async ({
   page,
 }, testInfo) => {
