@@ -38,6 +38,30 @@ const ULTRAWIDE: Viewport = {
 test.describe.configure({ retries: 0 });
 
 const pendingReadableWorldFrame = new WeakMap<Page, Buffer>();
+const visualCaptureMode = new WeakMap<Page, "full" | "world-roi">();
+
+async function captureVisualFrame(page: Page) {
+  if (visualCaptureMode.get(page) !== "world-roi") {
+    return page.screenshot();
+  }
+
+  const viewport = page.viewportSize();
+  if (!viewport) return page.screenshot();
+
+  // Hosted SwiftShader can spend most of a heavy visual case reading a full
+  // framebuffer even though readability acceptance only measures the central
+  // spatial subject. Capture that exact ROI directly instead of reading the
+  // whole viewport and cropping it afterward. Full-layout evidence remains in
+  // the normal release visual lane.
+  return page.screenshot({
+    clip: {
+      x: Math.floor(viewport.width * 0.2),
+      y: Math.floor(viewport.height * 0.2),
+      width: Math.max(1, Math.floor(viewport.width * 0.6)),
+      height: Math.max(1, Math.floor(viewport.height * 0.6)),
+    },
+  });
+}
 
 async function shot(
   page: Page,
@@ -52,7 +76,7 @@ async function shot(
     pendingReadableWorldFrame.delete(page);
     writeFileSync(path, pendingFrame);
   } else {
-    await page.screenshot({ path });
+    writeFileSync(path, await captureVisualFrame(page));
   }
   await testInfo.attach(`${viewport}--${name}`, {
     path,
@@ -112,11 +136,10 @@ async function expectReadableWorldFrame(page: Page, label: string) {
     { timeout: 60_000 },
   );
 
-  // Capture the final viewport once and let visualCase reuse the exact same
-  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
-  // seconds on one screenshot, so a second identical read would make the
-  // acceptance itself stall the renderer it is measuring.
-  const png = await page.screenshot();
+  // Capture once and let visualCase reuse the exact same framebuffer read.
+  // The WebGL-heavy lane reads only the central world ROI; normal release
+  // visuals retain the full viewport for layout evidence.
+  const png = await captureVisualFrame(page);
   pendingReadableWorldFrame.set(page, png);
   const image = sharp(png);
   const metadata = await image.metadata();
@@ -132,17 +155,16 @@ async function expectReadableWorldFrame(page: Page, label: string) {
   // Keep this probe off the browser main thread: decoding a PNG with
   // createImageBitmap can block hosted SwiftShader long enough to distort the
   // renderer acceptance that the probe is supposed to observe.
-  const left = Math.floor(width * 0.2);
-  const top = Math.floor(height * 0.2);
-  const roiWidth = Math.max(1, Math.floor(width * 0.6));
-  const roiHeight = Math.max(1, Math.floor(height * 0.6));
-  const { data, info } = await image
-    .extract({
-      left,
-      top,
-      width: Math.min(roiWidth, width - left),
-      height: Math.min(roiHeight, height - top),
-    })
+  const source =
+    visualCaptureMode.get(page) === "world-roi"
+      ? image
+      : image.extract({
+          left: Math.floor(width * 0.2),
+          top: Math.floor(height * 0.2),
+          width: Math.max(1, Math.floor(width * 0.6)),
+          height: Math.max(1, Math.floor(height * 0.6)),
+        });
+  const { data, info } = await source
     .resize(160, 100, { fit: "fill" })
     .removeAlpha()
     .raw()
@@ -219,6 +241,10 @@ async function visualCase(
 ) {
   const startedAt = Date.now();
   const runtime = await observeRuntime(page);
+  visualCaptureMode.set(
+    page,
+    testInfo.project.name === "webgl-heavy" ? "world-roi" : "full",
+  );
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({
@@ -669,7 +695,9 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
       );
       await waitForYeisEngine(page);
       await page.getByLabel("QUALITY").selectOption("high");
-      await waitForCameraSettled(page, "surface");
+      // HIGH live Surface derives its landing shot from the displaced terrain.
+      // Let the renderer publish the anchor/camera frame before requiring the
+      // final camera settlement; the later check proves the full contract.
       const html = page.locator("html");
       await expect(html).toHaveAttribute(
         "data-universe-world-renderer",

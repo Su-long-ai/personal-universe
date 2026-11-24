@@ -151,6 +151,18 @@ async function dispatchScaleWheel(
   );
 }
 
+async function waitForUniverseRenderFrame(page: Page) {
+  // The scale coordinate updates synchronously, but the native YEIS camera
+  // consumes it on the next render frame. Read physical-path diagnostics only
+  // after that renderer-owned boundary instead of sampling stale frame data.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      }),
+  );
+}
+
 test("public page publishes canonical and social preview metadata", async ({
   page,
 }, testInfo) => {
@@ -709,6 +721,7 @@ test("the first opening wheel always acquires a scale target", async ({
     "data-universe-scale-position",
     "0.250",
   );
+  await waitForUniverseRenderFrame(page);
   await expect
     .poll(
       async () => html.getAttribute("data-universe-galaxy-scale-target"),
@@ -1345,6 +1358,7 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.500",
   );
+  await waitForUniverseRenderFrame(page);
   const inwardRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
