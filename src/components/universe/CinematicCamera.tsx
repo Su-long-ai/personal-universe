@@ -388,6 +388,56 @@ export function CinematicCamera({
     publishIfReached();
   }, [currentWorldFrameReady, publishIfReached]);
 
+  const framedWorldDistance = useCallback(
+    (
+      controls: CameraControlsApi,
+      radius: number,
+      frameScale: number,
+    ) => {
+      const fitDistance = controls.getDistanceToFitSphere(radius);
+      if (
+        !(camera instanceof PerspectiveCamera) ||
+        viewportWidth <= 0 ||
+        viewportHeight <= 0
+      ) {
+        return fitDistance * frameScale;
+      }
+
+      // camera-controls correctly treats the narrow screen dimension as the
+      // hard no-clipping constraint. A constant multiplier on that distance,
+      // however, makes portrait worlds look much smaller than ultrawide worlds.
+      // Keep its fit distance as the safety floor, then choose a farther
+      // vertical-composition distance with an aspect-aware horizontal cap.
+      const aspect = viewportWidth / viewportHeight;
+      const preferredVerticalRadius = Math.min(0.22, 0.3 / frameScale);
+      const horizontalSafeVerticalRadius = Math.max(
+        0.16,
+        aspect * 0.44,
+      );
+      const targetVerticalRadius = Math.max(
+        0.16,
+        Math.min(
+          preferredVerticalRadius,
+          horizontalSafeVerticalRadius,
+        ),
+      );
+      const verticalFov = (camera.fov * Math.PI) / 180;
+      const verticalDistance =
+        Math.max(radius, 1e-8) /
+        Math.max(
+          2 *
+            targetVerticalRadius *
+            Math.tan(verticalFov / 2),
+          1e-8,
+        );
+
+      // Preserve a small safety margin over camera-controls' exact fit even
+      // when an unusually narrow viewport makes the horizontal constraint win.
+      return Math.max(fitDistance * 1.04, verticalDistance);
+    },
+    [camera, viewportHeight, viewportWidth],
+  );
+
   const publishScaleFrameDiagnostics = useCallback(
     (center: Vector3, radius: number) => {
       const distance = Math.max(1e-8, camera.position.distanceTo(center));
@@ -667,9 +717,11 @@ export function CinematicCamera({
       );
       const endpointDistance = Math.max(
         1e-8,
-        controls.getDistanceToFitSphere(
+        framedWorldDistance(
+          controls,
           Math.max(systemScaleFrame.radius, 1e-8),
-        ) * (approachShot.frameScale ?? 1),
+          approachShot.frameScale ?? 1,
+        ),
       );
       const distance = Math.exp(
         Math.log(startDistance) * (1 - t) +
@@ -767,10 +819,11 @@ export function CinematicCamera({
         ...lowerShot.position,
       );
       if (lowerShot.frameScale) {
-        const distance =
-          controls.getDistanceToFitSphere(
-            lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          ) * lowerShot.frameScale;
+        const distance = framedWorldDistance(
+          controls,
+          lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          lowerShot.frameScale,
+        );
         fromPosition
           .sub(fromTarget)
           .normalize()
@@ -781,10 +834,11 @@ export function CinematicCamera({
       const toTarget = scratchToTarget.current.set(...upperShot.target);
       const toPosition = scratchToPosition.current.set(...upperShot.position);
       if (upperShot.frameScale) {
-        const distance =
-          controls.getDistanceToFitSphere(
-            upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          ) * upperShot.frameScale;
+        const distance = framedWorldDistance(
+          controls,
+          upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          upperShot.frameScale,
+        );
         toPosition
           .sub(toTarget)
           .normalize()
@@ -880,10 +934,11 @@ export function CinematicCamera({
     desiredTargetTolerance.current = shot.targetTolerance;
 
     if (shot.frameScale) {
+      const fitRadius = shot.fitRadius ?? PLANET_RENDER_RADIUS;
       const distance =
-        controls.getDistanceToFitSphere(
-          shot.fitRadius ?? PLANET_RENDER_RADIUS,
-        ) * shot.frameScale;
+        phase === "approach" || phase === "orbit"
+          ? framedWorldDistance(controls, fitRadius, shot.frameScale)
+          : controls.getDistanceToFitSphere(fitRadius) * shot.frameScale;
       if (phase === "system" && nativeSystemEntryQuaternion) {
         const forward = new Vector3(0, 0, -1)
           .applyQuaternion(nativeSystemEntryQuaternion)
@@ -1017,6 +1072,7 @@ export function CinematicCamera({
     viewportWidth,
     worldScaleContinuous,
     worldScalePosition,
+    framedWorldDistance,
     publishIfReached,
     publishScaleFrameDiagnostics,
   ]);
