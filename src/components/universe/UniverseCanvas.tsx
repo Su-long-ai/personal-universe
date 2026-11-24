@@ -179,6 +179,7 @@ export function UniverseCanvas({
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
+          phaseRef={phaseRef}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           quality={quality}
