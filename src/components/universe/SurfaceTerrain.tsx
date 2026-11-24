@@ -13,11 +13,14 @@ import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
-const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
+// Radius 2 contains 13 radial chunks. A generated software horizon already
+// supplies the far-distance depth cue, so SwiftShader does not need the
+// radius-3 / 29-chunk ring used by hardware fallback.
+const SOFTWARE_FULL_COVERAGE_CHUNKS = 13;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
 const SOFTWARE_TERRAIN_CHUNK_SIZE = 32;
-const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
-const SOFTWARE_STREAM_REBASE_UPDATES = 12;
+const SOFTWARE_STREAM_WARMUP_UPDATES = 16;
+const SOFTWARE_STREAM_REBASE_UPDATES = 6;
 const SOFTWARE_VIEW_REFRESH_UPDATES = 1;
 const SOFTWARE_POSITION_REFRESH_DISTANCE_SQ = 1;
 const SOFTWARE_ROTATION_REFRESH_EPSILON = 1e-5;
@@ -96,11 +99,11 @@ export function SurfaceTerrain({
                 // scheduled update and keeps its clipmap at the minimum supported
                 // resolution.
                 chunkSize: SOFTWARE_TERRAIN_CHUNK_SIZE,
-                viewRadius: 3,
-                triangleBudget: 35000,
-                maxCreatesPerFrame: 3,
-                streamBudgetMs: 0.6,
-                cacheResolution: 64,
+                viewRadius: 2,
+                triangleBudget: 20000,
+                maxCreatesPerFrame: 2,
+                streamBudgetMs: 0.45,
+                cacheResolution: 48,
               }
             : {
                 // LOW-quality hardware fallback can afford a slightly broader
