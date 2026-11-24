@@ -2091,8 +2091,6 @@ export default function UniverseApp({
             document.documentElement.dataset.universeNavigationTarget =
               nativeStarId;
 
-            continuousScaleIntentEpochRef.current += 1;
-            const intentEpoch = continuousScaleIntentEpochRef.current;
             const nextPosition = applyGalaxyScaleWheel(
               currentPosition,
               normalizedDelta,
@@ -2102,9 +2100,13 @@ export default function UniverseApp({
               Math.abs(nextPosition - currentPosition) <=
               WORLD_SCALE_EPSILON
             ) {
+              // Same-direction input at the matched endpoint must not
+              // invalidate the paint/deadline handoff already in flight.
               return;
             }
 
+            continuousScaleIntentEpochRef.current += 1;
+            const intentEpoch = continuousScaleIntentEpochRef.current;
             pendingScaleEnterSystemRef.current = null;
             pendingWorldScaleStepsRef.current = 0;
             setNavigationRequest(null);
@@ -2316,17 +2318,19 @@ export default function UniverseApp({
           setSystemScaleTargetPlanet(targetPlanet);
         }
 
-        continuousScaleIntentEpochRef.current += 1;
-        const intentEpoch = continuousScaleIntentEpochRef.current;
         const nextPosition = applySystemScaleWheel(
           currentPosition,
           normalizedDelta,
         );
 
         if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
+          // Preserve the already-scheduled System→Approach handoff while
+          // sustained input continues against the coordinate-2 endpoint.
           return;
         }
 
+        continuousScaleIntentEpochRef.current += 1;
+        const intentEpoch = continuousScaleIntentEpochRef.current;
         delete document.documentElement.dataset.universeScaleBlocked;
         delete document.documentElement.dataset.universeScaleQueued;
         worldScalePositionRef.current = nextPosition;
