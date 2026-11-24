@@ -39,6 +39,13 @@ type NativeResources = {
   sunColor: THREE.Vector3;
 };
 
+type ProductTargetResources = {
+  hitGeometry: THREE.SphereGeometry;
+  haloGeometry: THREE.SphereGeometry;
+  hitMaterial: THREE.MeshBasicMaterial;
+  haloMaterial: THREE.MeshBasicMaterial;
+};
+
 function nativeStarId(system: SystemDefinition) {
   return system.id.startsWith("yeis-system:")
     ? system.id.slice("yeis-system:".length)
@@ -175,10 +182,12 @@ function disposeResources(resources: NativeResources) {
 function ProductPlanetTarget({
   planet,
   resources,
+  targetResources,
   onSelect,
 }: {
   planet: PlanetDefinition;
   resources: NativeResources;
+  targetResources: ProductTargetResources;
   onSelect: (planet: PlanetDefinition) => void;
 }) {
   const hit = useRef<THREE.Mesh>(null);
@@ -213,28 +222,17 @@ function ProductPlanetTarget({
           document.body.classList.add("planet-hover");
         }}
         onPointerOut={() => document.body.classList.remove("planet-hover")}
-      >
-        <sphereGeometry args={[HIT_RADIUS, 12, 12]} />
-        <meshBasicMaterial
-          transparent
-          opacity={0.001}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
+        geometry={targetResources.hitGeometry}
+        material={targetResources.hitMaterial}
+      />
 
       {hasContent ? (
-        <mesh ref={halo} position={body.position}>
-          <sphereGeometry args={[HIT_RADIUS * 0.78, 18, 18]} />
-          <meshBasicMaterial
-            color="#73f4ff"
-            transparent
-            opacity={0.38}
-            wireframe
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
+        <mesh
+          ref={halo}
+          position={body.position}
+          geometry={targetResources.haloGeometry}
+          material={targetResources.haloMaterial}
+        />
       ) : null}
     </>
   );
@@ -266,6 +264,37 @@ export function YeisSystemScene({
   const focusProjectionRef = useRef(new THREE.Vector3());
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
+  const targetResources = useMemo<ProductTargetResources>(
+    () => ({
+      hitGeometry: new THREE.SphereGeometry(HIT_RADIUS, 12, 12),
+      haloGeometry: new THREE.SphereGeometry(HIT_RADIUS * 0.78, 18, 18),
+      hitMaterial: new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.001,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+      haloMaterial: new THREE.MeshBasicMaterial({
+        color: "#73f4ff",
+        transparent: true,
+        opacity: 0.38,
+        wireframe: true,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    }),
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      targetResources.hitGeometry.dispose();
+      targetResources.haloGeometry.dispose();
+      targetResources.hitMaterial.dispose();
+      targetResources.haloMaterial.dispose();
+    },
+    [targetResources],
+  );
 
   useEffect(() => {
     let active = true;
@@ -501,6 +530,7 @@ export function YeisSystemScene({
           key={planet.id}
           planet={planet}
           resources={resources}
+          targetResources={targetResources}
           onSelect={onSelectPlanet}
         />
       ))}
