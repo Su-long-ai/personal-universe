@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "CONTENT-DISCOVERY-JOURNEY-DEEPLINK-V1-001",
+  "approved_at": "2026-11-24T17:57:00.000Z",
+  "baseline_commit": "8e56d70dd7e35da5084ace9f31bb302e0163c342",
+  "record_path": "docs/reuse-gate/tasks/CONTENT-DISCOVERY-JOURNEY-DEEPLINK-V1-001.json",
+  "record_sha256": "c76670444a78241df2f628bc54878c951297bf84ae2a69fae36534d7dac08382",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112",
+    "web-url-history-api": "77f33a919f6f3efedd54f6b619b7dda4be7823975a54147bf7f4a55c6d9fd9d8",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Give existing Guided Journeys stable route IDs and reloadable browser URLs while retaining the current Journey orchestration, canonical destination executor and interruption semantics"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "existing-journey-runtime-url-identity",
+    "browser-history-journey-params",
+    "playwright-journey-deeplink"
+  ],
+  "candidate_scores": {
+    "existing-journey-runtime-url-identity": 57,
+    "browser-history-journey-params": 57,
+    "second-tour-player-runtime": null,
+    "server-journey-session": null,
+    "playwright-journey-deeplink": 57
+  }
+}
