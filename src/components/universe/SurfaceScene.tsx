@@ -9,7 +9,10 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { QualityMode, UniversePhase } from "../../lib/universe/types";
-import { liveWorldFallbackReason } from "./CinematicPipeline";
+import {
+  isSoftwareRenderer,
+  liveWorldFallbackReason,
+} from "./CinematicPipeline";
 import { SurfaceTerrain } from "./SurfaceTerrain";
 
 type IdleWindow = Window & {
@@ -98,6 +101,7 @@ export function SurfaceScene({
   hasPlanet: boolean;
 }) {
   const { gl } = useThree();
+  const softwareRenderer = isSoftwareRenderer(gl);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
@@ -178,12 +182,14 @@ export function SurfaceScene({
         color="#ffc27d"
         castShadow
       />
-      <pointLight
-        position={[0.4, anchorHeight + 1.0, -5.4]}
-        intensity={beaconActive ? 7 : 2.8}
-        distance={11}
-        color={beaconActive ? "#ffb46d" : "#74d8ff"}
-      />
+      {!softwareRenderer ? (
+        <pointLight
+          position={[0.4, anchorHeight + 1.0, -5.4]}
+          intensity={beaconActive ? 7 : 2.8}
+          distance={11}
+          color={beaconActive ? "#ffb46d" : "#74d8ff"}
+        />
+      ) : null}
 
       <Suspense fallback={null}>
         {terrainEnabled ? (
@@ -195,12 +201,16 @@ export function SurfaceScene({
         ) : null}
       </Suspense>
 
-      <DistantMoon />
-      <ArrivalBeacon
-        active={beaconActive}
-        height={anchorHeight}
-        onToggle={() => setBeaconActive((value) => !value)}
-      />
+      {!softwareRenderer ? (
+        <>
+          <DistantMoon />
+          <ArrivalBeacon
+            active={beaconActive}
+            height={anchorHeight}
+            onToggle={() => setBeaconActive((value) => !value)}
+          />
+        </>
+      ) : null}
     </>
   );
 
@@ -223,7 +233,9 @@ export function SurfaceScene({
       {active ? (
         <>
           <color attach="background" args={["#030b12"]} />
-          <fog attach="fog" args={["#07141d", 34, 118]} />
+          {!softwareRenderer ? (
+            <fog attach="fog" args={["#07141d", 34, 118]} />
+          ) : null}
         </>
       ) : null}
       <group ref={surfaceGroupRef} visible={active}>{content}</group>
