@@ -287,7 +287,12 @@ The same profile is consumed by both renderer adapters:
 Hero worlds set `authored=true` and receive denser geography through the same
 model. Generated and observed terrestrial archetypes automatically expose
 `surface-terrain` and can therefore become complete Surface destinations
-without per-world scene authoring. Gas and ice giants retain
+without per-world scene authoring. Task `SURFACE-YEIS-SECONDARY-WORLDS-001`
+applies the same archetype capability rule inside the default YEIS bridge:
+native terrestrial secondary bodies are ordinary Surface destinations too,
+while gas and ice giants remain orbit-only. The bridge does not introduce a
+YEIS-specific terrain or content model; it only exposes capability metadata to
+the same downstream Surface product layer. Gas and ice giants retain
 `surfaceMode="none"`; even a forced deep link must not invent a ground layer.
 
 The product UI reads this same profile to show biome, region, landmark and
