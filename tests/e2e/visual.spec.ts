@@ -1150,3 +1150,57 @@ for (const viewport of [TABLET, MOBILE]) {
     },
   );
 }
+
+
+test("visual: mobile default YEIS secondary Surface @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Hosted software-WebGL mobile secondary Surface capture belongs in the heavy lane",
+  );
+  await visualCase(
+    page,
+    testInfo,
+    MOBILE,
+    "default-yeis-secondary-surface-low",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=c0&body=yeis-planet%3Aearth&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      const html = page.locator("html");
+      await page.getByLabel("QUALITY").selectOption("low");
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-renderer",
+        "procedural-terrains-fallback",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-profile",
+        /^surface:/,
+        { timeout: 60_000 },
+      );
+      const profile = await html.getAttribute(
+        "data-universe-surface-profile",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-terrain-world",
+        profile!,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-terrain-state",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+      await expectReadableWorldFrame(
+        page,
+        "mobile default YEIS secondary Surface",
+      );
+      await expectCompactNarrowHud(page);
+      await expectReadableNarrowSurfaceLayout(page, MOBILE);
+    },
+  );
+});
