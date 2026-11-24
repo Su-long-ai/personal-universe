@@ -234,10 +234,15 @@ test("focused Surface context remains visible ahead of generic prominence", () =
     rankSurfaceWorldLandmarks(landmarks, "focus")[0]?.id,
     "focus",
   );
-  assert.equal(rankSurfaceWorldRegions(regions)[0]?.id, "wide");
-  assert.equal(
-    rankSurfaceWorldLandmarks(landmarks)[0]?.id,
-    "prominent",
+  assert.deepEqual(
+    rankSurfaceWorldRegions([...regions].reverse()).map((region) => region.id),
+    ["focus", "wide"],
+  );
+  assert.deepEqual(
+    rankSurfaceWorldLandmarks([...landmarks].reverse()).map(
+      (landmark) => landmark.id,
+    ),
+    ["focus", "prominent"],
   );
 });
 
