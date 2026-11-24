@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
@@ -22,6 +28,7 @@ export type SurfaceCameraFrame = {
 
 type CinematicCameraProps = {
   phase: UniversePhase;
+  phaseRef: MutableRefObject<UniversePhase>;
   scrollDepth: number;
   reducedMotion: boolean;
   quality: QualityMode;
@@ -140,6 +147,7 @@ const SHOTS: Partial<
 
 export function CinematicCamera({
   phase,
+  phaseRef,
   scrollDepth,
   reducedMotion,
   quality,
@@ -212,6 +220,7 @@ export function CinematicCamera({
       if (
         expectedGeneration !== transitionGeneration.current ||
         manualOverride.current ||
+        phaseRef.current !== phase ||
         configuredPhase.current !== phase ||
         completedPhase.current === phase
       ) {
@@ -229,7 +238,7 @@ export function CinematicCamera({
         String(expectedGeneration);
       onPhaseComplete(phase);
     },
-    [onPhaseComplete, phase],
+    [onPhaseComplete, phase, phaseRef],
   );
 
   const publishIfReached = useCallback(
@@ -237,6 +246,7 @@ export function CinematicCamera({
       if (
         expectedGeneration !== transitionGeneration.current ||
         manualOverride.current ||
+        phaseRef.current !== phase ||
         configuredPhase.current !== phase
       ) {
         return;
@@ -258,7 +268,7 @@ export function CinematicCamera({
         publishSettled(expectedGeneration);
       }
     },
-    [phase, publishSettled],
+    [phase, phaseRef, publishSettled],
   );
 
   const handleUserControlStart = useCallback(() => {
@@ -416,6 +426,7 @@ export function CinematicCamera({
     const watchdogId = window.setTimeout(() => {
       if (
         transitionGeneration.current !== generation ||
+        phaseRef.current !== phase ||
         configuredPhase.current !== phase ||
         manualOverride.current
       ) {
@@ -458,6 +469,7 @@ export function CinematicCamera({
     camera,
     controlsReady,
     phase,
+    phaseRef,
     reducedMotion,
     scrollDepth,
     softwareRenderer,
@@ -486,6 +498,7 @@ export function CinematicCamera({
     if (
       !controls ||
       !shot ||
+      phaseRef.current !== phase ||
       configuredPhase.current !== phase ||
       manualOverride.current ||
       completedPhase.current === phase
