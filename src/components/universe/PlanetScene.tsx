@@ -70,6 +70,14 @@ function LiveSurfaceAnchor({
       String(profile.landmarks.length);
     document.documentElement.dataset.universeSurfaceContentAnchors =
       String(profile.contentAnchors.length);
+    document.documentElement.dataset.universeSurfaceContentClusters =
+      String(profile.contentClusters.length);
+    document.documentElement.dataset.universeSurfacePrimarySignals =
+      String(
+        profile.contentAnchors.filter(
+          (anchor) => anchor.priority === "primary",
+        ).length,
+      );
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -83,6 +91,8 @@ function LiveSurfaceAnchor({
       delete document.documentElement.dataset.universeSurfaceBiome;
       delete document.documentElement.dataset.universeSurfaceLandmarks;
       delete document.documentElement.dataset.universeSurfaceContentAnchors;
+      delete document.documentElement.dataset.universeSurfaceContentClusters;
+      delete document.documentElement.dataset.universeSurfacePrimarySignals;
       onCameraFrame(null);
     };
   }, [onCameraFrame, profile]);
