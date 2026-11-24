@@ -553,6 +553,10 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-layout-tier",
+        "transition",
+      );
       await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
     },
   );
@@ -714,6 +718,11 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
       await expect(html).toHaveAttribute(
         "data-universe-surface-camera-applied",
         "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-layout-tier",
+        "full",
         { timeout: 60_000 },
       );
       await waitForCameraSettled(page, "surface");
