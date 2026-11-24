@@ -56,6 +56,7 @@ import { GalaxyCloud } from "../../vendor/yeis/render/GalaxyCloud";
 import { GalaxySprites } from "../../vendor/yeis/render/GalaxySprites";
 import { LandmarkSprites } from "../../vendor/yeis/render/LandmarkSprites";
 import { LANDMARK_IMAGES } from "../../vendor/yeis/data/landmarkImages";
+import { WORLD_SCALE_EPSILON } from "../../lib/universe/continuousScale";
 
 type NativeGalaxyState = {
   runtime: YeisCoreRuntime;
@@ -94,6 +95,15 @@ export type YeisGalaxyViewState = {
   positionKm: [number, number, number];
   quaternion: [number, number, number, number];
   systemOverview: boolean;
+};
+
+export type YeisGalaxyScaleBridgeState = {
+  targetId: string;
+  starId: string;
+  startPositionKm: [number, number, number];
+  startQuaternion: [number, number, number, number];
+  arrivalDistanceKm: number;
+  approachDirection: [number, number, number];
 };
 
 export type YeisSignalHover = {
@@ -193,6 +203,25 @@ const navigationPoint = new Vector3();
 const navigationNormal = new Vector3();
 const navigationOrigin = new Vector3();
 
+const scaleBridgeDirection = new Vector3();
+
+function scaleTargetNativeStarId(
+  destination: UniverseNavigationDestination,
+  markers: GalaxyMarker[],
+): string | null {
+  const target = destination.target;
+  if (target.kind === "star") return target.nativeId;
+  if (target.kind === "body") return target.starId;
+  if (target.kind === "content") return target.nativeId;
+  if (target.kind === "marker" || target.kind === "observed-body") {
+    return (
+      markers.find((marker) => marker.id === target.markerId)?.nativeId ??
+      null
+    );
+  }
+  return null;
+}
+
 export function YeisGalaxyScene({
   markers,
   contentPlacements,
@@ -205,6 +234,9 @@ export function YeisGalaxyScene({
   onScaleManualTakeover,
   quality,
   reducedMotion,
+  scalePosition,
+  scaleTarget,
+  scaleBridgeRef,
   viewStateRef,
 }: {
   markers: GalaxyMarker[];
@@ -223,6 +255,9 @@ export function YeisGalaxyScene({
   onScaleManualTakeover?: () => void;
   quality: QualityMode;
   reducedMotion: boolean;
+  scalePosition: number;
+  scaleTarget: UniverseNavigationDestination | null;
+  scaleBridgeRef: MutableRefObject<YeisGalaxyScaleBridgeState | null>;
   viewStateRef: MutableRefObject<YeisGalaxyViewState | null>;
 }) {
   const { gl, scene, camera, size } = useThree();
@@ -255,6 +290,12 @@ export function YeisGalaxyScene({
   const scaleManualTakeoverReportedRef = useRef(false);
   const scaleFocusIdRef = useRef<string | null>(null);
   const scaleFocusFrameRef = useRef(0);
+  const scalePositionRef = useRef(scalePosition);
+  const scaleTargetRef =
+    useRef<UniverseNavigationDestination | null>(scaleTarget);
+
+  scalePositionRef.current = scalePosition;
+  scaleTargetRef.current = scaleTarget;
 
   markersRef.current = markers;
   contentPlacementsRef.current = contentPlacements;
