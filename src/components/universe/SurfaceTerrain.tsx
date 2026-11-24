@@ -10,7 +10,10 @@ import { useGLTF } from "@react-three/drei";
 import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
-import type { SurfaceWorldProfile } from "../../lib/universe/surface";
+import {
+  rankSurfaceContentAnchors,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 
 const TERRAIN_Y = 0;
@@ -343,9 +346,16 @@ export function SurfaceTerrain({
   const visibleRegions = softwareRenderer
     ? profile.regions.slice(0, 2)
     : profile.regions;
+  const rankedContent = useMemo(
+    () => rankSurfaceContentAnchors(profile.contentAnchors),
+    [profile.id],
+  );
   const visibleContent = softwareRenderer
-    ? profile.contentAnchors.slice(0, 3)
-    : profile.contentAnchors;
+    ? rankedContent.slice(0, 3)
+    : rankedContent;
+  const visibleClusters = softwareRenderer
+    ? profile.contentClusters.slice(0, 2)
+    : profile.contentClusters;
 
   useEffect(() => {
     return () => {
@@ -380,6 +390,40 @@ export function SurfaceTerrain({
           />
         </mesh>
       ))}
+      {visibleClusters.map((cluster) => {
+        const height =
+          (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) + 0.08;
+        const radius =
+          cluster.priority === "primary"
+            ? 0.52
+            : cluster.priority === "secondary"
+              ? 0.4
+              : 0.3;
+        return (
+          <mesh
+            key={cluster.id}
+            position={[cluster.center[0], height, cluster.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[radius, radius + 0.045, softwareRenderer ? 14 : 28]}
+            />
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={
+                cluster.priority === "primary"
+                  ? 0.34
+                  : cluster.priority === "secondary"
+                    ? 0.22
+                    : 0.14
+              }
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
       {visibleRegions.map((region) => {
         const height =
           (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) + 0.12;
@@ -432,21 +476,34 @@ export function SurfaceTerrain({
         );
       })}
       {visibleContent.map((anchor) => {
+        const priorityScale =
+          anchor.priority === "primary"
+            ? 1.25
+            : anchor.priority === "secondary"
+              ? 1
+              : 0.82;
         const height =
           (terrain.sampleHeight(anchor.position[0], anchor.position[1]) ?? 0) +
-          0.42;
+          0.42 * priorityScale;
         return (
           <group
             key={anchor.id}
             position={[anchor.position[0], height, anchor.position[1]]}
+            scale={priorityScale}
           >
             <mesh>
               <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
-              <meshBasicMaterial color={profile.accent} transparent opacity={0.8} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={anchor.priority === "primary" ? 0.96 : 0.76}
+              />
             </mesh>
             <mesh position={[0, 0.48, 0]}>
               <octahedronGeometry args={[0.12, 0]} />
-              <meshBasicMaterial color="#ffffff" />
+              <meshBasicMaterial
+                color={anchor.priority === "primary" ? "#fff0cf" : "#ffffff"}
+              />
             </mesh>
           </group>
         );
