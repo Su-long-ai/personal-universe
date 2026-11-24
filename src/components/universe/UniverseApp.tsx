@@ -2427,15 +2427,9 @@ export default function UniverseApp({
         return;
       }
 
-      // Scale samples never enter a second threshold accumulator. The direct
-      // 0→5 coordinate consumed every executable scale sample above; the
-      // remaining cases are navigation outside that coordinate and act on the
-      // current delivered sample immediately.
-      if (wheel.samples === 1) {
-        lockedGalaxyScaleFocusRef.current = null;
-        lockedSystemScaleFocusRef.current = null;
-      }
-
+      // Scale samples never enter a second threshold or fallback state
+      // machine. The direct 0→5 coordinate consumed every executable sample
+      // above; only navigation beyond that coordinate remains here.
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = "0";
       document.documentElement.dataset.universeScaleIndex = String(
@@ -2443,100 +2437,15 @@ export default function UniverseApp({
       );
       delete document.documentElement.dataset.universeScaleBlocked;
 
-      if (direction === "in") {
-        if (currentPhase === "galaxy") {
-          const centerFocus =
-            lockedGalaxyScaleFocusRef.current ??
-            galaxyScaleFocusRef.current;
-          const focus =
-            centerFocus ??
-            (galaxySoftFocusAvailableRef.current
-              ? defaultGalaxyScaleFocus
-              : null);
-          if (!focus) {
-            document.documentElement.dataset.universeScaleBlocked =
-              "no-galaxy-focus";
-            return;
-          }
-          if (galaxySoftFocusAvailableRef.current) {
-            galaxySoftFocusAvailableRef.current = false;
-            document.documentElement.dataset.universeScaleSoftFocus =
-              centerFocus ? "consumed-center" : "consumed-fallback";
-          }
-          lockedGalaxyScaleFocusRef.current = focus;
-
-          // A located destination is only orientation state. Even when it is
-          // already active, inward scale must still perform the native YEIS
-          // star→system approach before product System takes visual authority.
-          if (activeDestinationId === focus.id) {
-            pendingScaleEnterSystemRef.current = focus;
-            document.documentElement.dataset.universeScaleQueued =
-              "enter-system:" + focus.id;
-            beginGalaxyScaleTravel(focus);
-            return;
-          }
-
-          if (pendingDestinationId === focus.id) {
-            pendingScaleEnterSystemRef.current = focus;
-            document.documentElement.dataset.universeScaleQueued =
-              "enter-system:" + focus.id;
-            return;
-          }
-
-          pendingScaleEnterSystemRef.current = focus;
-          document.documentElement.dataset.universeScaleQueued =
-            "enter-system:" + focus.id;
-          beginGalaxyScaleTravel(focus);
-          return;
-        }
-
-        if (currentPhase === "system") {
-          const preferred = preferredSystemScaleDestinationRef.current;
-          let preferredPlanet: PlanetDefinition | null = null;
-          if (preferred?.target.kind === "body") {
-            preferredPlanet =
-              selectedSystem?.planets.find(
-                (candidate) =>
-                  candidate.id === preferred.target.bodyId ||
-                  nativePlanetId(candidate) === preferred.target.bodyId,
-              ) ?? null;
-          } else if (preferred?.target.kind === "observed-body") {
-            preferredPlanet =
-              selectedSystem?.planets.find(
-                (candidate) =>
-                  candidate.id === preferred.target.bodyId ||
-                  nativePlanetId(candidate) === preferred.target.bodyId,
-              ) ?? null;
-          } else if (preferred?.target.kind === "content") {
-            preferredPlanet =
-              selectedSystem?.planets.find((candidate) =>
-                candidate.content?.some(
-                  (entry) => entry.id === preferred.target.entryId,
-                ),
-              ) ?? null;
-          }
-          const planet =
-            preferredPlanet ??
-            lockedSystemScaleFocusRef.current ??
-            systemScaleFocusRef.current;
-          if (!planet || !selectedSystem) {
-            document.documentElement.dataset.universeScaleBlocked =
-              "no-planet-focus";
-            return;
-          }
-          // Normal System wheel input is consumed by the continuous 1→2
-          // segment above. Reaching this branch means System identity exists
-          // without its normal active-system authority; keep focus recovery
-          // immediate rather than accumulating another wheel gesture.
-          lockedSystemScaleFocusRef.current = planet;
-          setSystemScaleTargetPlanet(planet);
-          return;
-        }
-
-        return;
-      }
-
       if (currentPhase === "galaxy") {
+        // All valid inward Galaxy scale was consumed by the native direct path
+        // above. Reaching here means outward intent at the coordinate-0 limit
+        // (or an outward non-native navigation target).
+        if (direction === "in") {
+          document.documentElement.dataset.universeScaleBlocked =
+            "no-galaxy-focus";
+          return;
+        }
         pendingScaleEnterSystemRef.current = null;
         delete document.documentElement.dataset.universeScaleQueued;
         if (
@@ -2558,14 +2467,21 @@ export default function UniverseApp({
       }
 
       if (currentPhase === "system") {
+        // A valid System with an active system/planet focus was consumed by the
+        // direct 1→2 path above. Do not synthesize an alternate inward path.
+        if (direction === "in") {
+          document.documentElement.dataset.universeScaleBlocked =
+            "no-planet-focus";
+          return;
+        }
         preferredSystemScaleDestinationRef.current = null;
         delete document.documentElement.dataset.universeScalePreferred;
         handleReturn();
         return;
       }
 
-      // A world phase without selectedPlanet returned above; no deferred
-      // world-step fallback remains here.
+      // returning is navigation-owned; world phases without selectedPlanet
+      // already returned above.
     },
     [
       activeDestinationId,
