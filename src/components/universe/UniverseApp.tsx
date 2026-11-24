@@ -268,6 +268,8 @@ export default function UniverseApp({
   const phaseRef = useRef<UniversePhase>("galaxy");
   phaseRef.current = phase;
   const [selectedSystem, setSelectedSystem] = useState<SystemDefinition | null>(null);
+  const selectedSystemRef = useRef<SystemDefinition | null>(null);
+  selectedSystemRef.current = selectedSystem;
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -694,6 +696,7 @@ export default function UniverseApp({
       `[UNIVERSE-DEBUG] star=${targetMarker.id} engine=${targetMarker.engine ?? "v2"} ` +
         `system=${system.name} planets=${system.planets.length} source=${system.source}`,
     );
+    selectedSystemRef.current = system;
     setSelectedSystem(system);
 
     if (requestedPhase === "system" || requestedPhase === "returning") {
@@ -774,6 +777,7 @@ export default function UniverseApp({
         marker,
         contentPlacements,
       );
+      selectedSystemRef.current = system;
       setSelectedSystem(system);
       setSelectedPlanet(null);
       setScrollDepth(0);
@@ -877,6 +881,7 @@ export default function UniverseApp({
           );
           if (cameraTarget) {
             navigationRequestSeq.current += 1;
+            selectedSystemRef.current = null;
             setSelectedSystem(null);
             setSelectedPlanet(null);
             setPhase("galaxy");
@@ -924,6 +929,7 @@ export default function UniverseApp({
         setActiveDestinationId(destination.id);
         document.documentElement.dataset.universeActiveDestination =
           destination.id;
+        selectedSystemRef.current = system;
         setSelectedSystem(system);
         setSelectedPlanet(planet);
         openedWorldDestinationRef.current = planet ? destination.id : null;
@@ -992,6 +998,7 @@ export default function UniverseApp({
       if (!cameraTarget) return;
 
       navigationRequestSeq.current += 1;
+      selectedSystemRef.current = null;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
@@ -1066,6 +1073,7 @@ export default function UniverseApp({
       setPendingDestinationMode("locating");
       document.documentElement.dataset.universePendingDestination =
         destination.id;
+      selectedSystemRef.current = null;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
@@ -1540,6 +1548,7 @@ export default function UniverseApp({
     delete document.documentElement.dataset.universeJourneyComplete;
 
     if (phase === "system") {
+      selectedSystemRef.current = null;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setActiveDestinationId(null);
@@ -1827,6 +1836,7 @@ export default function UniverseApp({
       setCameraSettledPhase(null);
       setNavigationFailure(null);
       delete document.documentElement.dataset.universeNavigationError;
+      selectedSystemRef.current = null;
       setSelectedSystem(null);
       setSelectedPlanet(null);
       setPhase("galaxy");
@@ -1892,6 +1902,7 @@ export default function UniverseApp({
       const system = resolveMarker(marker);
       const systemDestination = scaleSystemDestinationForMarker(marker);
       preferredSystemScaleDestinationRef.current = focus;
+      selectedSystemRef.current = system;
       setSelectedSystem(system);
       setSelectedPlanet(null);
       setSystemScaleTargetPlanet(null);
@@ -2223,7 +2234,9 @@ export default function UniverseApp({
         return;
       }
 
-      if (currentPhase === "system" && selectedSystem) {
+      const activeSystem =
+        selectedSystemRef.current ?? selectedSystem;
+      if (currentPhase === "system" && activeSystem) {
         const currentPosition = Math.min(
           WORLD_SCALE_MIN,
           Math.max(SYSTEM_SCALE_MIN, worldScalePositionRef.current),
@@ -2280,21 +2293,21 @@ export default function UniverseApp({
         const preferred = preferredSystemScaleDestinationRef.current;
         if (preferred?.target.kind === "body") {
           preferredPlanet =
-            selectedSystem.planets.find(
+            activeSystem.planets.find(
               (candidate) =>
                 candidate.id === preferred.target.bodyId ||
                 nativePlanetId(candidate) === preferred.target.bodyId,
             ) ?? null;
         } else if (preferred?.target.kind === "observed-body") {
           preferredPlanet =
-            selectedSystem.planets.find(
+            activeSystem.planets.find(
               (candidate) =>
                 candidate.id === preferred.target.bodyId ||
                 nativePlanetId(candidate) === preferred.target.bodyId,
             ) ?? null;
         } else if (preferred?.target.kind === "content") {
           preferredPlanet =
-            selectedSystem.planets.find((candidate) =>
+            activeSystem.planets.find((candidate) =>
               candidate.content?.some(
                 (entry) => entry.id === preferred.target.entryId,
               ),
@@ -2351,7 +2364,7 @@ export default function UniverseApp({
           nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON
         ) {
           const destination = navigationDestinationForPlanet(
-            selectedSystem,
+            activeSystem,
             targetPlanet,
             galaxy.markers,
             contentPlacements,
