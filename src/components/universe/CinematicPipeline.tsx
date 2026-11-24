@@ -7,7 +7,11 @@ import {
 } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { PlanetPass, type Planet } from "procedural-planets";
+import {
+  PlanetPass,
+  PlanetRenderer,
+  type Planet,
+} from "procedural-planets";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -110,6 +114,22 @@ export function CinematicPipeline({
 
   useEffect(() => {
     if (provisionLiveWorld && !planetPassRef.current) {
+      const impostorPixels =
+        softwareRenderer ? 180 : highQuality ? 90 : 120;
+      // PlanetPass itself creates PlanetRenderer only on its first render.
+      // While a real-GPU System target is already locked, construct that same
+      // renderer host now so Pipeline/ProgramWarmer allocation is not left on
+      // the presentation handoff edge. Do not call prepare(): its target-
+      // specific async work is intentionally not cancellable upstream.
+      const provisionedRenderer =
+        !softwareRenderer && prewarmLiveWorld
+          ? new PlanetRenderer(gl, {
+              background: "transparent",
+              output: "linear",
+              impostors: true,
+              impostorPixels,
+            })
+          : undefined;
       const nextPass = new PlanetPass(scene, camera, {
         background: "transparent",
         output: "linear",
@@ -117,7 +137,8 @@ export function CinematicPipeline({
         // Use one stable live-renderer budget for the lifetime of this WebGL
         // host. HIGH keeps its detailed GPU profile; software HIGH retains the
         // conservative hosted-runner impostor threshold.
-        impostorPixels: softwareRenderer ? 180 : highQuality ? 90 : 120,
+        impostorPixels,
+        planetRenderer: provisionedRenderer,
       });
       composer.composer.insertPass(nextPass, 1);
       planetPassRef.current = nextPass;
@@ -140,6 +161,7 @@ export function CinematicPipeline({
     highQuality,
     scene,
     softwareRenderer,
+    prewarmLiveWorld,
     provisionLiveWorld,
     useLiveWorld,
   ]);
