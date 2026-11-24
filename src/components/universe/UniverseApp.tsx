@@ -192,6 +192,46 @@ type UniverseJourneyState = {
   completed: boolean;
 };
 
+const RECENT_DESTINATIONS_STORAGE_KEY =
+  "personal-universe.recent-destinations.v1";
+const RECENT_DESTINATIONS_LIMIT = 8;
+
+function readRecentDestinationIds(): string[] {
+  try {
+    const raw = window.sessionStorage.getItem(
+      RECENT_DESTINATIONS_STORAGE_KEY,
+    );
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    return parsed
+      .filter(
+        (value): value is string =>
+          typeof value === "string" &&
+          value.length > 0 &&
+          value.length <= 200 &&
+          !seen.has(value) &&
+          Boolean(seen.add(value)),
+      )
+      .slice(0, RECENT_DESTINATIONS_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentDestinationIds(ids: string[]) {
+  try {
+    window.sessionStorage.setItem(
+      RECENT_DESTINATIONS_STORAGE_KEY,
+      JSON.stringify(ids),
+    );
+  } catch {
+    // Storage can be unavailable in privacy/sandbox modes. Recent discovery is
+    // optional presentation state and must never block navigation.
+  }
+}
 
 function cameraTargetLabel(
   target: UniverseNavigationCameraRequest["target"],
@@ -291,12 +331,49 @@ export default function UniverseApp({
   const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
     null,
   );
+  const [recentDestinationIds, setRecentDestinationIds] = useState<string[]>([]);
+  const [recentHistoryReady, setRecentHistoryReady] = useState(false);
   const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
     null,
   );
   const [pendingDestinationMode, setPendingDestinationMode] = useState<
     "locating" | "traveling" | null
   >(null);
+  useEffect(() => {
+    const hydrated = readRecentDestinationIds();
+    setRecentDestinationIds(hydrated);
+    document.documentElement.dataset.universeRecentDestinations =
+      hydrated.join("|");
+    setRecentHistoryReady(true);
+
+    return () => {
+      delete document.documentElement.dataset.universeRecentDestinations;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recentHistoryReady || !activeDestinationId) return;
+
+    setRecentDestinationIds((previous) => {
+      const next = [
+        activeDestinationId,
+        ...previous.filter((id) => id !== activeDestinationId),
+      ].slice(0, RECENT_DESTINATIONS_LIMIT);
+
+      if (
+        next.length === previous.length &&
+        next.every((id, index) => id === previous[index])
+      ) {
+        return previous;
+      }
+
+      persistRecentDestinationIds(next);
+      document.documentElement.dataset.universeRecentDestinations =
+        next.join("|");
+      return next;
+    });
+  }, [activeDestinationId, recentHistoryReady]);
+
   const [signalHover, setSignalHover] = useState<{
     title: string;
     kind: string;
@@ -2956,6 +3033,7 @@ export default function UniverseApp({
         placements={contentPlacements}
         currentSystem={selectedSystem}
         activeDestinationId={activeDestinationId}
+        recentDestinationIds={recentDestinationIds}
         pendingDestinationId={pendingDestinationId}
         pendingDestinationMode={pendingDestinationMode}
         onClose={() => setNavigatorOpen(false)}
