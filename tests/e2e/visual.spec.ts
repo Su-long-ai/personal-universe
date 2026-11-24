@@ -196,6 +196,54 @@ async function expectCompactNarrowHud(page: Page) {
   ).toBeLessThan(310);
 }
 
+async function expectReadableNarrowSurfaceLayout(
+  page: Page,
+  viewport: Viewport,
+) {
+  const surfaceCopy = page.locator(".surface-copy");
+  await expect(surfaceCopy).toBeVisible();
+  const surfaceBox = await surfaceCopy.boundingBox();
+  expect(surfaceBox, "Surface destination copy should have a layout box").not.toBeNull();
+  expect(surfaceBox!.x).toBeGreaterThanOrEqual(0);
+  expect(surfaceBox!.y).toBeGreaterThanOrEqual(0);
+  expect(surfaceBox!.x + surfaceBox!.width).toBeLessThanOrEqual(
+    viewport.width + 1,
+  );
+  expect(surfaceBox!.y + surfaceBox!.height).toBeLessThanOrEqual(
+    viewport.height + 1,
+  );
+
+  const stack = page.locator(".world-content-stack");
+  if ((await stack.count()) === 0) return;
+
+  await expect(stack).toBeVisible();
+  const stackBox = await stack.boundingBox();
+  expect(stackBox, "Surface content stack should have a layout box").not.toBeNull();
+  expect(stackBox!.x).toBeGreaterThanOrEqual(0);
+  expect(stackBox!.y).toBeGreaterThanOrEqual(0);
+  expect(stackBox!.x + stackBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(stackBox!.y + stackBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const cards = stack.locator(".world-content-card");
+  if ((await cards.count()) > 0) {
+    await expect(cards.first()).toBeVisible();
+    await expect(cards.first()).toHaveAttribute(
+      "data-surface-priority",
+      /primary|secondary|ambient/,
+    );
+  }
+
+  if (viewport.width <= 800) {
+    expect(
+      stackBox!.y + stackBox!.height,
+      "mobile prioritized Surface cards should end before destination copy begins",
+    ).toBeLessThanOrEqual(surfaceBox!.y + 2);
+    if ((await cards.count()) > 2) {
+      await expect(cards.nth(2)).toBeHidden();
+    }
+  }
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -557,6 +605,19 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-surface-layout-tier",
         "transition",
       );
+      const totalSurfaceSignals = Number(
+        await html.getAttribute("data-universe-surface-content-anchors"),
+      );
+      if (totalSurfaceSignals > 0) {
+        await expect(html).toHaveAttribute(
+          "data-universe-surface-layout-signals",
+          "1",
+        );
+        await expect(html).toHaveAttribute(
+          "data-universe-surface-layout-clusters",
+          "1",
+        );
+      }
       await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
     },
   );
@@ -1016,6 +1077,7 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} AUTO Hero surface`,
           );
           await expectCompactNarrowHud(page);
+          await expectReadableNarrowSurfaceLayout(page, viewport);
         },
       );
     },
