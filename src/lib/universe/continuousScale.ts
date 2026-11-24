@@ -103,6 +103,16 @@ export function applySystemScaleWheel(
   );
 }
 
+export function continuousScaleResponse(progress: number): number {
+  const linear = Math.min(1, Math.max(0, progress));
+  const smooth = linear * linear * (3 - 2 * linear);
+  // Keep substantial linear velocity at authored anchors so sustained wheel
+  // input does not feel like a sequence of stop/start cinematics. The smooth
+  // component still softens the middle of each segment, and the function is
+  // deterministic/reversible for the same product coordinate.
+  return linear * 0.68 + smooth * 0.32;
+}
+
 export function systemScaleSegmentProgress(position: number): number {
   return Math.min(
     1,
