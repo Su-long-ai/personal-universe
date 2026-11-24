@@ -521,6 +521,7 @@ export function PlanetScene({
   const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
   const paintReported = useRef(false);
+  const lastLiveDrawFrame = useRef(0);
   const appliedLiveProfile = useRef<{
     planet: Planet;
     key: "gpu-auto" | "gpu-high" | "software-high";
@@ -732,6 +733,9 @@ export function PlanetScene({
     // selecting another planet invalidates the old paint even if the retained
     // resource instance can be reused underneath.
     paintedFrames.current = 0;
+    lastLiveDrawFrame.current = Number(
+      document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+    );
     publishPaintReady(false);
 
     return () => {
@@ -796,7 +800,28 @@ export function PlanetScene({
       !paintReported.current &&
       concreteRendererReady
     ) {
-      paintedFrames.current += 1;
+      if (fallbackReason) {
+        // The lightweight fallback is part of the ordinary R3F render, so two
+        // presented frames are enough to hand off from System.
+        paintedFrames.current += 1;
+      } else {
+        // Live authority comes only from PlanetRenderer itself. The pipeline
+        // publishes this counter after a frame where a planet was actually
+        // drawn and no shader/program work remained pending. Because this
+        // component runs before the priority-1 pipeline frame, seeing a new
+        // stamp here proves the previous browser frame really contained the
+        // matched live world.
+        const liveDrawFrame = Number(
+          document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+        );
+        if (liveDrawFrame > lastLiveDrawFrame.current) {
+          lastLiveDrawFrame.current = liveDrawFrame;
+          paintedFrames.current += 1;
+        } else {
+          paintedFrames.current = 0;
+        }
+      }
+
       if (paintedFrames.current >= 2) {
         publishPaintReady(true);
       }
