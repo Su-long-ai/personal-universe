@@ -1358,6 +1358,7 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.500",
   );
+  await waitForUniverseRenderFrame(page);
   const inwardRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
@@ -1371,6 +1372,7 @@ test("Galaxy scale reverses the same native LOD path before System", async ({
     "data-universe-scale-position",
     "0.250",
   );
+  await waitForUniverseRenderFrame(page);
   await expect
     .poll(async () =>
       Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
