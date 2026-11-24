@@ -308,10 +308,10 @@ export default function UniverseApp({
   cameraSettledPhaseRef.current = cameraSettledPhase;
   const [worldScalePosition, setWorldScalePosition] =
     useState(GALAXY_SCALE_MIN);
-  // Physical scale is imperative. Every state write below updates this ref
-  // first, so never mirror React state back into it from a passive effect: a
-  // delayed endpoint render must not overwrite a newer wheel reversal.
   const worldScalePositionRef = useRef(GALAXY_SCALE_MIN);
+  const worldScaleRenderFrameRef = useRef<number | null>(null);
+  const pendingWorldScaleRenderPositionRef = useRef<number | null>(null);
+  const worldScaleRenderCommitCountRef = useRef(0);
   const [worldScaleContinuous, setWorldScaleContinuous] = useState(false);
   const [galaxyScaleTarget, setGalaxyScaleTarget] =
     useState<UniverseNavigationDestination | null>(null);
@@ -356,6 +356,61 @@ export default function UniverseApp({
     samples: 0,
     gesture: 0,
   });
+
+  const publishWorldScalePosition = useCallback(
+    (
+      position: number,
+      immediate = false,
+      imperativeOnly = false,
+    ) => {
+      worldScalePositionRef.current = position;
+      document.documentElement.dataset.universeScalePosition =
+        position.toFixed(3);
+
+      if (imperativeOnly) {
+        // Native Galaxy scale is consumed directly from the shared ref by the
+        // YEIS frame loop. Cancel any older scheduled React mirror so a stale
+        // render cannot overwrite a newer reversal coordinate.
+        if (worldScaleRenderFrameRef.current !== null) {
+          window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
+          worldScaleRenderFrameRef.current = null;
+        }
+        pendingWorldScaleRenderPositionRef.current = null;
+        return;
+      }
+
+      pendingWorldScaleRenderPositionRef.current = position;
+      if (immediate) {
+        if (worldScaleRenderFrameRef.current !== null) {
+          window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
+          worldScaleRenderFrameRef.current = null;
+        }
+        pendingWorldScaleRenderPositionRef.current = null;
+        setWorldScalePosition(position);
+        return;
+      }
+
+      if (worldScaleRenderFrameRef.current !== null) return;
+      worldScaleRenderFrameRef.current = window.requestAnimationFrame(() => {
+        worldScaleRenderFrameRef.current = null;
+        const pending = pendingWorldScaleRenderPositionRef.current;
+        pendingWorldScaleRenderPositionRef.current = null;
+        if (pending === null) return;
+        setWorldScalePosition(pending);
+      });
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      if (worldScaleRenderFrameRef.current !== null) {
+        window.cancelAnimationFrame(worldScaleRenderFrameRef.current);
+        worldScaleRenderFrameRef.current = null;
+      }
+    },
+    [],
+  );
 
   const cancelPendingContinuousScaleIntent = useCallback(
     (
@@ -538,12 +593,53 @@ export default function UniverseApp({
   }, [phase, systemScaleTargetPlanet]);
 
   useEffect(() => {
+    // Every scale publisher updates the imperative ref before React state.
+    // Never mirror state back into the ref here: an older endpoint commit can
+    // otherwise overwrite a newer high-frequency Galaxy reversal.
+    worldScaleRenderCommitCountRef.current += 1;
     document.documentElement.dataset.universeScalePosition =
       worldScalePosition.toFixed(3);
-    return () => {
-      delete document.documentElement.dataset.universeScalePosition;
-    };
+    document.documentElement.dataset.universeScaleReactCommits = String(
+      worldScaleRenderCommitCountRef.current,
+    );
   }, [worldScalePosition]);
+
+  useEffect(() => {
+    const authority =
+      phase === "galaxy"
+        ? "galaxy"
+        : phase === "system"
+          ? "system"
+          : phase === "surface"
+            ? "surface"
+            : isWorldScalePhase(phase)
+              ? "world"
+              : "transition";
+    document.documentElement.dataset.universeRenderAuthority = authority;
+
+    if (phase === "system" && worldScalePosition > SYSTEM_SCALE_MIN) {
+      document.documentElement.dataset.universeHandoffState =
+        "system:approach";
+    } else if (
+      (phase === "atmosphere" || phase === "surface") &&
+      worldScalePosition > 4
+    ) {
+      document.documentElement.dataset.universeHandoffState =
+        "atmosphere:surface";
+    } else {
+      document.documentElement.dataset.universeHandoffState = "stable";
+    }
+  }, [phase, worldScalePosition]);
+
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.universeScalePosition;
+      delete document.documentElement.dataset.universeScaleReactCommits;
+      delete document.documentElement.dataset.universeRenderAuthority;
+      delete document.documentElement.dataset.universeHandoffState;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!navigatorOpen) return;
@@ -2157,19 +2253,19 @@ export default function UniverseApp({
             delete document.documentElement.dataset.universeScaleQueued;
             delete document.documentElement.dataset.universeScaleBlocked;
 
-            worldScalePositionRef.current = nextPosition;
-            // Galaxy scale is a native imperative camera coordinate. Keep
-            // React state for the two semantic endpoints only; intermediate
-            // samples are consumed directly by YEIS through the shared ref.
-            if (
+            // Native YEIS consumes Galaxy 0→1 directly from the shared
+            // imperative coordinate. React only mirrors semantic endpoints;
+            // System/world camera positions retain main's one-commit-per-RAF
+            // batching because camera-controls owns those interpolations.
+            const semanticGalaxyEndpoint =
               nextPosition === GALAXY_SCALE_MIN ||
-              nextPosition === SYSTEM_SCALE_MIN
-            ) {
-              setWorldScalePosition(nextPosition);
-            }
+              nextPosition === SYSTEM_SCALE_MIN;
+            publishWorldScalePosition(
+              nextPosition,
+              semanticGalaxyEndpoint,
+              !semanticGalaxyEndpoint,
+            );
             setWorldScaleContinuous(true);
-            document.documentElement.dataset.universeScalePosition =
-              nextPosition.toFixed(3);
             document.documentElement.dataset.universeScaleDirection =
               direction;
             document.documentElement.dataset.universeScaleProgress =
@@ -2216,11 +2312,8 @@ export default function UniverseApp({
             normalizedDelta,
           );
           setSystemScaleTargetPlanet(selectedPlanet);
-          worldScalePositionRef.current = nextPosition;
-          setWorldScalePosition(nextPosition);
+          publishWorldScalePosition(nextPosition, true);
           setWorldScaleContinuous(true);
-          document.documentElement.dataset.universeScalePosition =
-            nextPosition.toFixed(3);
           document.documentElement.dataset.universeScaleDirection = direction;
           document.documentElement.dataset.universeScaleProgress =
             systemScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2255,11 +2348,14 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeScaleQueued;
         delete document.documentElement.dataset.universeScaleBlocked;
 
-        worldScalePositionRef.current = nextPosition;
-        setWorldScalePosition(nextPosition);
+        publishWorldScalePosition(
+          nextPosition,
+          worldScalePhaseForPosition(
+            nextPosition,
+            selectedPlanet.surfaceMode,
+          ) !== currentPhase,
+        );
         setWorldScaleContinuous(true);
-        document.documentElement.dataset.universeScalePosition =
-          nextPosition.toFixed(3);
         document.documentElement.dataset.universeScaleDirection = direction;
         document.documentElement.dataset.universeScaleProgress =
           worldScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2301,8 +2397,7 @@ export default function UniverseApp({
               normalizedDelta,
             );
             setSystemScaleTargetPlanet(null);
-            worldScalePositionRef.current = nextPosition;
-            setWorldScalePosition(nextPosition);
+            publishWorldScalePosition(nextPosition, true);
             setWorldScaleContinuous(true);
             phaseRef.current = "galaxy";
             setPhase("galaxy");
@@ -2393,11 +2488,11 @@ export default function UniverseApp({
         const intentEpoch = continuousScaleIntentEpochRef.current;
         delete document.documentElement.dataset.universeScaleBlocked;
         delete document.documentElement.dataset.universeScaleQueued;
-        worldScalePositionRef.current = nextPosition;
-        setWorldScalePosition(nextPosition);
+        publishWorldScalePosition(
+          nextPosition,
+          nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+        );
         setWorldScaleContinuous(true);
-        document.documentElement.dataset.universeScalePosition =
-          nextPosition.toFixed(3);
         document.documentElement.dataset.universeScaleDirection = direction;
         document.documentElement.dataset.universeScaleProgress =
           systemScaleSegmentProgress(nextPosition).toFixed(3);
@@ -2462,6 +2557,8 @@ export default function UniverseApp({
         lockedSystemScaleFocusRef.current = null;
       }
 
+      wheel.lastAt = now;
+      wheel.samples = Math.min(8, wheel.samples + 1);
       wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
       document.documentElement.dataset.universeScaleDirection = direction;
       document.documentElement.dataset.universeScaleProgress = String(
@@ -2670,6 +2767,7 @@ export default function UniverseApp({
       selectedSystem,
       setWorldScalePhase,
       systemScaleTargetPlanet,
+      publishWorldScalePosition,
     ],
   );
 

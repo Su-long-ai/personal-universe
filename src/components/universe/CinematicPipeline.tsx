@@ -41,9 +41,11 @@ export function liveWorldFallbackReason(
 export function CinematicPipeline({
   quality,
   liveWorld,
+  onReadyChange,
 }: {
   quality: QualityMode;
   liveWorld: boolean;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
@@ -52,6 +54,14 @@ export function CinematicPipeline({
   const useLiveWorld = liveWorld && !fallbackReason;
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
+  const reportedReady = useRef<boolean | null>(null);
+  const onReadyChangeRef = useRef(onReadyChange);
+  onReadyChangeRef.current = onReadyChange;
+  const publishReady = (ready: boolean) => {
+    if (reportedReady.current === ready) return;
+    reportedReady.current = ready;
+    onReadyChangeRef.current?.(ready);
+  };
   const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
 
   const composer = useMemo(() => {
@@ -168,6 +178,7 @@ export function CinematicPipeline({
   useEffect(() => {
     return () => {
       stableFrames.current = 0;
+      publishReady(false);
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
@@ -198,6 +209,7 @@ export function CinematicPipeline({
 
     if (!liveWorld) {
       stableFrames.current = 0;
+      publishReady(false);
       delete html.dataset.universeWorldReady;
       delete html.dataset.universeWorldScreenshotReady;
       return;
@@ -205,6 +217,7 @@ export function CinematicPipeline({
 
     if (fallbackReason) {
       const sceneReady = html.dataset.universeWorldSceneReady === "true";
+      publishReady(sceneReady);
       if (sceneReady) {
         html.dataset.universeWorldReady = "true";
       } else {
@@ -230,6 +243,7 @@ export function CinematicPipeline({
     // can immediately enqueue another LOD generation pass. Require consecutive
     // settled frames before consumers are allowed to capture the canvas.
     if (stableFrames.current >= 3) {
+      publishReady(true);
       html.dataset.universeWorldReady = "true";
       if (cameraReady) {
         html.dataset.universeWorldScreenshotReady = "true";
@@ -237,6 +251,7 @@ export function CinematicPipeline({
         delete html.dataset.universeWorldScreenshotReady;
       }
     } else {
+      publishReady(false);
       delete html.dataset.universeWorldReady;
       delete html.dataset.universeWorldScreenshotReady;
     }

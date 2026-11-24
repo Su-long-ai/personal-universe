@@ -1868,19 +1868,12 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
 
   await dispatchScaleWheel(page, -96);
   await dispatchScaleWheel(page, -96);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "0.500",
-  );
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.500");
   await expect(html).toHaveAttribute(
     "data-universe-galaxy-scale-executor",
     "native-progress",
   );
 
-  // Opening Search freezes the retained scale path. Choosing a real native
-  // body is a stronger authority takeover and starts a fresh time-driven YEIS
-  // autopilot. Stale scale cleanup must not cancel that newer trajectory or
-  // write its 0.5 progress override into it.
   const dialog = await openNavigator(page);
   const search = page.getByRole("combobox", { name: "Search universe" });
   await search.fill("Moon");
@@ -1897,16 +1890,9 @@ test("Search native travel keeps autopilot authority after partial Galaxy scale"
     "data-universe-active-destination",
     "body:c0/moon",
   );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-target",
-    "c0/moon",
-  );
-  await expect(html).not.toHaveAttribute(
-    "data-universe-galaxy-scale-target",
-  );
-  await expect(html).not.toHaveAttribute(
-    "data-universe-galaxy-scale-executor",
-  );
+  await expect(html).toHaveAttribute("data-universe-navigation-target", "c0/moon");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-executor");
 
   await expect
     .poll(async () => {
@@ -2600,45 +2586,30 @@ test("Galaxy exact endpoint reversal beats pending System handoff", async ({
     "hero:aurora-01",
     { timeout: 20_000 },
   );
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
 
-  // Reach 0.75, then hit endpoint 1.0 and reverse in the same task before the
-  // two-RAF renderer handoff can commit. The newer coordinate must win; no
-  // passive React mirror or stale handoff may snap the path back to System.
-  await dispatchScaleWheel(page, -96);
-  await dispatchScaleWheel(page, -96);
-  await dispatchScaleWheel(page, -96);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "0.750",
-  );
-  await page.evaluate(() => {
-    const root = document.querySelector(".universe-root");
-    if (!(root instanceof HTMLElement)) throw new Error("universe root missing");
-    root.dispatchEvent(new WheelEvent("wheel", { deltaY: -96, bubbles: true, cancelable: true }));
-    root.dispatchEvent(new WheelEvent("wheel", { deltaY: 96, bubbles: true, cancelable: true }));
+  await page.locator("main.universe-root").evaluate((root) => {
+    root.dispatchEvent(new WheelEvent("wheel", {
+      deltaY: -96,
+      bubbles: true,
+      cancelable: true,
+    }));
+    root.dispatchEvent(new WheelEvent("wheel", {
+      deltaY: 96,
+      bubbles: true,
+      cancelable: true,
+    }));
   });
 
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "0.750",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "galaxy",
-  );
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
   await page.waitForTimeout(350);
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "galaxy",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "0.750",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-galaxy-scale-bridge",
-    "active",
-  );
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-bridge", "active");
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
   await runtime.assertClean(testInfo);
@@ -3887,6 +3858,556 @@ test("landmark Search shares the same travel destination contract", async ({
   const url = new URL(page.url());
   expect(url.searchParams.get("destination")).toMatch(/^landmark:/);
   expect(url.searchParams.get("phase")).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("System to Approach handoff preserves apparent size and orientation", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.500",
+  );
+  await dispatchScaleWheel(page, -96);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () =>
+        html.getAttribute("data-universe-handoff-exit-projected-radius"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+  await expect
+    .poll(
+      async () =>
+        html.getAttribute("data-universe-handoff-entry-projected-radius"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  const exitRadius = Number(
+    await html.getAttribute("data-universe-handoff-exit-projected-radius"),
+  );
+  const entryRadius = Number(
+    await html.getAttribute("data-universe-handoff-entry-projected-radius"),
+  );
+  expect(exitRadius).toBeGreaterThan(0);
+  expect(entryRadius).toBeGreaterThan(0);
+  expect(entryRadius / exitRadius).toBeGreaterThan(0.97);
+  expect(entryRadius / exitRadius).toBeLessThan(1.03);
+
+  const parseQuaternion = (value: string | null) =>
+    (value ?? "")
+      .split(",")
+      .map(Number)
+      .filter((component) => Number.isFinite(component));
+  const exitQuaternion = parseQuaternion(
+    await html.getAttribute("data-universe-handoff-exit-quaternion"),
+  );
+  const entryQuaternion = parseQuaternion(
+    await html.getAttribute("data-universe-handoff-entry-quaternion"),
+  );
+  expect(exitQuaternion).toHaveLength(4);
+  expect(entryQuaternion).toHaveLength(4);
+  const quaternionDot = Math.abs(
+    exitQuaternion.reduce(
+      (sum, component, index) =>
+        sum + component * entryQuaternion[index],
+      0,
+    ),
+  );
+  expect(quaternionDot).toBeGreaterThan(0.995);
+
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+  await runtime.assertClean(testInfo);
+});
+
+test("precision-trackpad deltas move the close-world camera immediately", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.005",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-mode",
+    "scale-continuous",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("line-mode wheel input normalizes to the same reversible scale domain", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -3, 1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.250",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-segment",
+    "approach:orbit",
+  );
+
+  await dispatchScaleWheel(page, 3, 1);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Galaxy high-frequency native scale stays off the React render hot path", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  const before = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 48; index += 1) {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        deltaY: -2,
+      }));
+    }
+  });
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.250");
+  await page.waitForTimeout(50);
+  const afterIn = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterIn - before).toBeLessThanOrEqual(1);
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-executor",
+    "native-progress",
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 48; index += 1) {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        deltaY: 2,
+      }));
+    }
+  });
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await page.waitForTimeout(50);
+  const afterOut = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterOut - afterIn).toBeLessThanOrEqual(1);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("high-frequency wheel bursts publish at most one scale render per frame", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+  const before = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 24; index += 1) {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: -2,
+        }),
+      );
+    }
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.250",
+  );
+  await page.waitForTimeout(50);
+  const afterIn = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterIn - before).toBeLessThanOrEqual(2);
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    for (let index = 0; index < 24; index += 1) {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: 2,
+        }),
+      );
+    }
+  });
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await page.waitForTimeout(50);
+  const afterOut = Number(
+    await html.getAttribute("data-universe-scale-react-commits"),
+  );
+  expect(afterOut - afterIn).toBeLessThanOrEqual(2);
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("apparent target radius grows monotonically during System approach", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=h-aurora&freeze=1");
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "system",
+    { timeout: 15_000 },
+  );
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-system-focus"),
+      { timeout: 15_000 },
+    )
+    .not.toBeNull();
+
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.250",
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-projected-radius")),
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(0);
+  const firstRadius = Number(
+    await html.getAttribute("data-universe-projected-radius"),
+  );
+  const firstDistance = Number(
+    await html.getAttribute("data-universe-camera-distance"),
+  );
+
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.500",
+  );
+  await expect
+    .poll(
+      async () =>
+        Number(await html.getAttribute("data-universe-projected-radius")),
+      { timeout: 10_000 },
+    )
+    .toBeGreaterThan(firstRadius);
+  const secondDistance = Number(
+    await html.getAttribute("data-universe-camera-distance"),
+  );
+  expect(secondDistance).toBeLessThan(firstDistance);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("rapid mid-segment reversal cancels stale scale settlement", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await dispatchScaleWheel(page, -80);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.417",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+  );
+
+  // Reverse before any semantic boundary. The signed coordinate must retrace
+  // the same path rather than queueing a completion from the prior direction.
+  await dispatchScaleWheel(page, 80);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "approach",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+  await page.waitForTimeout(300);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-cancelled-queue",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("fallback Surface terrain parks and resumes across reverse scale @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+  await page.getByLabel("QUALITY").selectOption("low");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 60_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 60_000 },
+  );
+  const terrainProfile = await html.getAttribute(
+    "data-universe-surface-terrain-profile",
+  );
+  expect(terrainProfile).toBeTruthy();
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-lifecycle",
+    "active",
+  );
+
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "4.500",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "parked",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-profile",
+    terrainProfile!,
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "5.000",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "surface",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-lifecycle",
+    "active",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-profile",
+    terrainProfile!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-webgl-lifecycle",
+    "active",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("desktop aspect ratios preserve comparable apparent scale", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const viewports = [
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+    { width: 3440, height: 1440 },
+  ];
+  const normalizedRadii: number[] = [];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute(
+      "data-universe-camera-settled",
+      "approach",
+      { timeout: 15_000 },
+    );
+
+    await dispatchScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-segment",
+      "approach:orbit",
+    );
+    await expect
+      .poll(
+        async () =>
+          Number(await html.getAttribute("data-universe-projected-radius")),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
+
+    const projectedRadius = Number(
+      await html.getAttribute("data-universe-projected-radius"),
+    );
+    const normalizedRadius = projectedRadius / viewport.height;
+    expect(
+      normalizedRadius,
+      `${viewport.width}x${viewport.height} projected target should stay visibly framed`,
+    ).toBeGreaterThan(0.15);
+    expect(
+      normalizedRadius,
+      `${viewport.width}x${viewport.height} projected target should not clip vertically`,
+    ).toBeLessThan(0.45);
+    normalizedRadii.push(normalizedRadius);
+  }
+
+  expect(
+    Math.max(...normalizedRadii) - Math.min(...normalizedRadii),
+    "desktop projected scale should remain comparable across 16:9 and ultrawide viewports",
+  ).toBeLessThan(0.08);
 
   await runtime.assertClean(testInfo);
 });
