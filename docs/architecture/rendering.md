@@ -311,13 +311,18 @@ gesture.
 
 At coordinate 5, fallback presentation has an explicit readiness handoff. The
 lightweight close-world globe remains the visible authority while the terrain is
-still deferred/preparing. `SurfaceTerrain` publishes ready only after the
-complete initial radial chunk ring exists. Only then does the retained terrain
-become the Surface renderer, the fallback Surface camera begin its local-frame
-move, the close-world scene enter `parked`, and pipeline/screenshot readiness
-become eligible. This keeps navigation coordinate ownership direct while
-preventing a semantic Surface state from exposing a blank or partially streamed
-terrain frame.
+still deferred/preparing. ProceduralTerrains Infinite World is camera-centred,
+so hidden preparation uses a detached, non-rendered view at the exact fallback
+landing frame rather than the still-visible globe camera. This view has no input
+or tween authority; camera-controls remains the only product camera.
+
+`SurfaceTerrain` publishes ready only after the complete initial radial chunk
+ring exists around that landing view. Only then does the retained terrain become
+the Surface renderer, the product camera begin its fallback local-frame move,
+the close-world scene enter `parked`, and pipeline/screenshot readiness become
+eligible. This keeps navigation coordinate ownership direct while preventing a
+semantic Surface state from exposing either a partially streamed horizon or a
+"ready" ring centred on the previous globe camera.
 
 Once created, one retained Infinite World instance is reused; leaving Surface
 hides the same scene and pauses its `terrain.update` call, but does not
@@ -332,6 +337,7 @@ Runtime evidence:
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
 - `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget;
 - `data-universe-surface-terrain-allocations` counts actual Infinite World construction attempts so rapid reversals/re-entry can prove the retained instance stayed singular;
+- `data-universe-surface-terrain-ready-view="landing-prestream"` proves the accepted initial ring was streamed around the destination Surface view before presentation took ownership;
 - `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` distinguishes an idle prime cancelled before construction from an already-started retained preparation that may finish while parked.
 
 Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
