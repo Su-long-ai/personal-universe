@@ -80,6 +80,29 @@ test("content anchors are stable when content input ordering changes", () => {
   assert.deepEqual(reverse.contentAnchors, forward.contentAnchors);
 });
 
+test("existing content anchors do not move when unrelated content is added", () => {
+  const base = buildSurfaceWorldProfile(
+    planet("insertion-stable", "temperate", {
+      content: [content("alpha"), content("omega")],
+    }),
+  );
+  const expanded = buildSurfaceWorldProfile(
+    planet("insertion-stable", "temperate", {
+      content: [content("alpha"), content("middle"), content("omega")],
+    }),
+  );
+
+  for (const entryId of ["alpha", "omega"]) {
+    const before = base.contentAnchors.find(
+      (anchor) => anchor.entryId === entryId,
+    );
+    const after = expanded.contentAnchors.find(
+      (anchor) => anchor.entryId === entryId,
+    );
+    assert.deepEqual(after, before);
+  }
+});
+
 test("hero worlds use the same model but receive richer landmark density", () => {
   const filler = buildSurfaceWorldProfile(planet("same", "ocean"));
   const hero = buildSurfaceWorldProfile(
