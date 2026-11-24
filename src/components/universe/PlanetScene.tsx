@@ -451,9 +451,12 @@ function liveDynamicQuality(
   // knobs may follow the active live profile without replacing the Planet.
   if (softwareRenderer) {
     return {
-      cloudQuality: 32,
-      cloudResolution: 0.35,
-      splitFactor: 2.1,
+      // Preserve the live ProceduralPlanets path under SwiftShader while
+      // bounding volumetric cloud and terrain-split cost enough for hosted
+      // input/screenshot convergence.
+      cloudQuality: 20,
+      cloudResolution: 0.25,
+      splitFactor: 1.8,
     } as const;
   }
 
