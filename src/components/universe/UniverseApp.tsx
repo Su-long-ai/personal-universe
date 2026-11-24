@@ -271,6 +271,8 @@ export default function UniverseApp({
   const galaxySoftFocusAvailableRef = useRef(true);
   const pendingWorldScaleStepsRef = useRef(0);
   const continuousScaleIntentEpochRef = useRef(0);
+  const worldScaleBoundaryLockedRef = useRef(false);
+  const worldScaleBoundaryUnlockFrameRef = useRef<number | null>(null);
   const scaleWheelRef = useRef<{
     accumulated: number;
     direction: ContinuousScaleDirection | null;
@@ -286,6 +288,13 @@ export default function UniverseApp({
   const cancelPendingContinuousScaleIntent = useCallback(
     (reason: string) => {
       continuousScaleIntentEpochRef.current += 1;
+      const queuedWorldSteps = pendingWorldScaleStepsRef.current;
+      if (queuedWorldSteps !== 0) {
+        document.documentElement.dataset.universeScaleCancelledQueue =
+          "world:" +
+          (queuedWorldSteps > 0 ? "+" : "") +
+          String(queuedWorldSteps);
+      }
       pendingWorldScaleStepsRef.current = 0;
       pendingScaleEnterSystemRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
@@ -1476,6 +1485,16 @@ export default function UniverseApp({
   const setWorldScalePhase = useCallback(
     (nextPhase: UniversePhase) => {
       phaseRef.current = nextPhase;
+      worldScaleBoundaryLockedRef.current = true;
+      if (worldScaleBoundaryUnlockFrameRef.current !== null) {
+        window.cancelAnimationFrame(worldScaleBoundaryUnlockFrameRef.current);
+      }
+      worldScaleBoundaryUnlockFrameRef.current = window.requestAnimationFrame(
+        () => {
+          worldScaleBoundaryLockedRef.current = false;
+          worldScaleBoundaryUnlockFrameRef.current = null;
+        },
+      );
       cameraSettledPhaseRef.current = null;
       setCameraSettledPhase(null);
       // The navigation coordinator owns invalidation of the previous phase's
@@ -1712,6 +1731,7 @@ export default function UniverseApp({
       // trackpad delta crosses the currentPhase threshold. This stops Journey
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
+      delete document.documentElement.dataset.universeScaleCancelledQueue;
 
       const now = performance.now();
       const wheel = scaleWheelRef.current;
@@ -1722,7 +1742,8 @@ export default function UniverseApp({
         currentPhase !== "galaxy" &&
         currentPhase !== "system" &&
         currentPhase !== "returning" &&
-        settledPhase !== currentPhase;
+        (settledPhase !== currentPhase ||
+          worldScaleBoundaryLockedRef.current);
 
       // Do not discard committed wheel samples merely because the previous
       // phase settled quickly. On SwiftShader a 220ms time cooldown caused
