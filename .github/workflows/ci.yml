@@ -137,13 +137,19 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
 
       - name: Cache Playwright Chromium
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium and host dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Verify cached Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
@@ -203,13 +209,19 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
 
       - name: Cache Playwright Chromium
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ env.PLAYWRIGHT_VERSION }}-chromium
 
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium and host dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Verify cached Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
