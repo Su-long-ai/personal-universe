@@ -212,10 +212,13 @@ test("default YEIS boots with native galaxy and personal signals", async ({
   const runtime = await observeRuntime(page);
   const initialRequests = new Set<string>();
   const initialScripts = new Set<string>();
+  const expectedOrigin = new URL(
+    String(testInfo.project.use.baseURL ?? "http://127.0.0.1:4321"),
+  ).origin;
 
   page.on("request", (request) => {
     const url = request.url();
-    if (!url.startsWith("http://127.0.0.1:4321/")) return;
+    if (new URL(url).origin !== expectedOrigin) return;
     const type = request.resourceType();
     if (!["document", "script", "stylesheet", "fetch", "xhr"].includes(type)) return;
     const parsed = new URL(url);
