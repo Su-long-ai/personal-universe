@@ -42,12 +42,14 @@ function LiveSurfaceAnchor({
   profile,
   expanded,
   surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   onCameraFrame,
 }: {
   planet: Planet;
   profile: SurfaceWorldProfile;
   expanded: boolean;
   surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -227,9 +229,13 @@ function LiveSurfaceAnchor({
       String(visibleContent.length);
     document.documentElement.dataset.universeSurfaceLayoutClusters =
       String(visibleClusters.length);
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      expanded ? visibleContent.length : 0,
+    );
     return () => {
       delete document.documentElement.dataset.universeSurfaceLayoutSignals;
       delete document.documentElement.dataset.universeSurfaceLayoutClusters;
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
     };
   }, [profile.id, expanded, visibleContent.length, visibleClusters.length]);
 
@@ -372,8 +378,18 @@ function LiveSurfaceAnchor({
           return (
             <group
               key={anchor.id}
+              name={`surface-signal-${anchor.id}`}
+              userData={{ surfaceEntryId: anchor.entryId }}
               position={[point[0], 0.009, point[2]]}
               scale={priorityScale}
+              onClick={
+                expanded
+                  ? (event) => {
+                      event.stopPropagation();
+                      onSurfaceFocusEntry(anchor.entryId);
+                    }
+                  : undefined
+              }
             >
               <mesh scale={[0.003, 0.011, 0.003]}>
                 <cylinderGeometry args={[1, 1, 1, 6]} />
@@ -730,6 +746,7 @@ export function PlanetScene({
   worldScalePosition,
   presentationActive = true,
   surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   onPaintReady,
   onSurfaceCameraFrame,
 }: {
@@ -739,6 +756,7 @@ export function PlanetScene({
   worldScalePosition: number;
   presentationActive?: boolean;
   surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   onPaintReady?: () => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
@@ -996,6 +1014,7 @@ export function PlanetScene({
           profile={surfaceProfile}
           expanded={phase === "surface"}
           surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={onSurfaceFocusEntry}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}
