@@ -77,10 +77,11 @@ export function SurfaceTerrain({
         configuration: {
           layout: softwareRenderer
             ? {
-                // Preserve the same 72-unit footprint with fewer chunks so
-                // SwiftShader does less geometry/material preparation.
-                chunkCount: 4,
-                chunkSize: 18,
+                // Preserve the same 72-unit footprint with only four chunks.
+                // Hosted SwiftShader traces show the first visible draw is now
+                // the dominant Surface cost, so minimize its mesh/shader fanout.
+                chunkCount: 2,
+                chunkSize: 36,
               }
             : {
                 chunkCount: 6,
@@ -94,7 +95,7 @@ export function SurfaceTerrain({
             // interrupted, so use the package's formal lower-complexity
             // configuration on software WebGL instead of starting the
             // seven-octave shader and trying to cancel it later.
-            octaves: softwareRenderer ? 3 : 7,
+            octaves: softwareRenderer ? 2 : 7,
             scale: 0.025,
             ridge: 0.7,
             warp: 0.3,
@@ -106,7 +107,7 @@ export function SurfaceTerrain({
           seaLevel: -20,
           quality: softwareRenderer
             ? {
-                lodSegments: [32, 16, 8, 4],
+                lodSegments: [16, 8, 4, 2],
                 lodDistanceScale: 1,
                 morphEnabled: false,
                 mergeEnabled: true,
@@ -254,7 +255,9 @@ export function SurfaceTerrain({
   });
 
   const rockInstances = useMemo(() => {
-    if (!terrain) return [];
+    // Decorative PBR glTF rocks add first-use shader programs but do not
+    // contribute to terrain identity. Keep them on real GPUs only.
+    if (!terrain || softwareRenderer) return [];
 
     return ROCKS.map((placement, index) => {
       const object = seededClone(boulder.scene, index);
@@ -268,7 +271,7 @@ export function SurfaceTerrain({
       object.scale.setScalar(placement.scale);
       return object;
     });
-  }, [boulder.scene, terrain]);
+  }, [boulder.scene, softwareRenderer, terrain]);
 
   useEffect(() => {
     return () => {
