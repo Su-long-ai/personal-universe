@@ -66,7 +66,12 @@ async function wheelScale(
 
       const atAnchor =
         Math.abs(position - Math.round(position)) <= 0.01;
-      if (atAnchor && startingPhase !== "galaxy") break;
+      if (
+        atAnchor &&
+        (startingPhase !== "galaxy" || direction === "out")
+      ) {
+        break;
+      }
 
       await page.mouse.wheel(0, deltaY);
     }
