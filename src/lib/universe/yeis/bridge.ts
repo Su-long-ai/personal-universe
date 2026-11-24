@@ -6,6 +6,7 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
+import { surfaceModeForArchetype } from "../surface";
 import type { Universe } from "../../../vendor/yeis/core/Universe";
 import type { StarCatalog } from "../../../vendor/yeis/data/StarCatalog";
 import type { BodyData, OrbitElements } from "../../../vendor/yeis/data/types";
@@ -195,12 +196,13 @@ function mapPlanet(
     }));
 
   const hero = data.id === HERO_PLANET_ID;
+  const archetype = archetypeFor(data, temperature);
 
   return {
     id: hero ? HERO_PLANET_ID : `yeis-planet:${data.id}`,
     name: _(data.name),
     seed: `yeis-planet:${data.id}:${appearanceSeed(data)}`,
-    archetype: archetypeFor(data, temperature),
+    archetype,
     radiusEarth: Math.max(0.01, data.radius / EARTH_RADIUS_KM),
     massEarth: Math.max(0.001, data.mass / EARTH_MASS_KG),
     equilibriumTempK: temperature,
@@ -208,7 +210,7 @@ function mapPlanet(
     orbitalPeriodYears: periodYears,
     moons,
     hasRings: Boolean(data.rings),
-    surfaceMode: hero ? "surface-terrain" : "none",
+    surfaceMode: surfaceModeForArchetype(archetype),
     heroKey: hero ? "home" : undefined,
     observed,
   };
