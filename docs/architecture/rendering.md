@@ -451,10 +451,12 @@ quality changes from reallocating the complete post-processing chain. The live
 ProceduralPlanets world follows the same lifetime rule: its resource identity is
 planet + renderer class, not the current LOW/AUTO/HIGH selector. The package
 marks `chunkRes` and `maxDepth` as structural rebuild keys, so real-GPU
-quality does not blindly toggle those through `Planet.set()`. A new live Planet
-starts with the AUTO 24/5 structure; the first real HIGH request promotes it once
-to 32/6, and that structural tier is never demoted for that Planet. Repeated
-LOW/AUTO/HIGH cycles therefore cannot repeatedly throw away its LOD world.
+quality does not blindly toggle those through `Planet.set()`. Warmup freezes
+the first requested live structural tier: a direct HIGH entry constructs 32/6
+immediately with no throwaway AUTO world, while an AUTO entry constructs 24/5.
+An AUTO-first Planet promotes once to 32/6 on its first later HIGH request, and
+that structural tier is never demoted for that Planet. Repeated LOW/AUTO/HIGH
+cycles therefore cannot repeatedly throw away its LOD world.
 Non-structural cloud quality, cloud resolution and split factor still follow
 AUTO/HIGH through the package's live `Planet.set()` API. The last applied
 dynamic profile is tracked per Planet, so a temporary LOW fallback followed by a
@@ -487,7 +489,10 @@ counter when capability/presentation authority changes and requires two
 consecutive new successful draw stamps before publishing
 `data-universe-world-paint-ready="true"`. System therefore cannot disappear
 just because the Planet object or pass exists; the matched world must have
-actually drawn.
+actually drawn. UniverseCanvas also keys the consumed first-paint state by
+`planet id + quality` rather than storing an unqualified boolean. A late
+callback from a previous planet/capability may update its own stale token, but
+cannot authorize the newly selected world's System handoff.
 
 Live pipeline convergence tokens are capability-scoped. Entering any fallback
 mode clears the retained PlanetPass consecutive-stable-frame counter; returning
