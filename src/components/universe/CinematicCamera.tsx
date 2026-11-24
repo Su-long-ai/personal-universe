@@ -476,8 +476,20 @@ export function CinematicCamera({
     ) {
       camera.up.set(...activeSurfaceCameraFrame.up).normalize();
     } else if (
+      continuousSystemCamera &&
       nativeSystemEntryQuaternion
     ) {
+      const linearUpT = Math.min(
+        1,
+        Math.max(0, worldScalePosition - 1),
+      );
+      const upT = linearUpT * linearUpT * (3 - 2 * linearUpT);
+      camera.up
+        .set(0, 1, 0)
+        .applyQuaternion(nativeSystemEntryQuaternion)
+        .lerp(new Vector3(0, 1, 0), upT)
+        .normalize();
+    } else if (nativeSystemEntryQuaternion) {
       camera.up
         .set(0, 1, 0)
         .applyQuaternion(nativeSystemEntryQuaternion)
@@ -633,6 +645,17 @@ export function CinematicCamera({
         new Vector3(...systemScaleFrame.position),
         systemScaleFrame.radius,
       );
+      if (worldScalePosition >= 2 - WORLD_SCALE_EPSILON) {
+        const html = document.documentElement;
+        if (html.dataset.universeProjectedRadius) {
+          html.dataset.universeHandoffExitProjectedRadius =
+            html.dataset.universeProjectedRadius;
+        }
+        if (html.dataset.universeCameraQuaternion) {
+          html.dataset.universeHandoffExitQuaternion =
+            html.dataset.universeCameraQuaternion;
+        }
+      }
       return;
     }
 
@@ -792,8 +815,19 @@ export function CinematicCamera({
     }
 
     configuredPhase.current = phase;
-    const enableTransition =
-      shot.transition ?? (!reducedMotion && !softwareRenderer);
+    const matchedSystemApproachHandoff =
+      phase === "approach" &&
+      Math.abs(worldScalePosition - 2) <= WORLD_SCALE_EPSILON &&
+      Boolean(
+        document.documentElement.dataset.universeHandoffExitProjectedRadius,
+      );
+    // The continuous System segment already performed the travel. At the
+    // renderer boundary the new coordinate space must paint the matched
+    // Approach frame immediately; starting another camera-controls transition
+    // here would expose the old System-space camera to the close-world scene.
+    const enableTransition = matchedSystemApproachHandoff
+      ? false
+      : shot.transition ?? (!reducedMotion && !softwareRenderer);
     const transition = controls.setLookAt(
       desiredPosition.current.x,
       desiredPosition.current.y,
@@ -809,6 +843,22 @@ export function CinematicCamera({
       // immediately. Validate and publish from that same authority without
       // waiting for an R3F frame that software WebGL may deliver very late.
       controls.update(0);
+      if (matchedSystemApproachHandoff) {
+        publishScaleFrameDiagnostics(
+          new Vector3(...WORLD),
+          PLANET_RENDER_RADIUS,
+        );
+        const html = document.documentElement;
+        if (html.dataset.universeProjectedRadius) {
+          html.dataset.universeHandoffEntryProjectedRadius =
+            html.dataset.universeProjectedRadius;
+        }
+        if (html.dataset.universeCameraQuaternion) {
+          html.dataset.universeHandoffEntryQuaternion =
+            html.dataset.universeCameraQuaternion;
+        }
+        html.dataset.universeHandoffState = "system:approach-matched";
+      }
       publishIfReached(generation);
     }
     void transition.then(() => publishIfReached(generation));
@@ -930,6 +980,10 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraDistance;
       delete document.documentElement.dataset.universeProjectedRadius;
       delete document.documentElement.dataset.universeCameraQuaternion;
+      delete document.documentElement.dataset.universeHandoffExitProjectedRadius;
+      delete document.documentElement.dataset.universeHandoffEntryProjectedRadius;
+      delete document.documentElement.dataset.universeHandoffExitQuaternion;
+      delete document.documentElement.dataset.universeHandoffEntryQuaternion;
       delete document.documentElement.dataset.universeSystemScaleFrame;
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
