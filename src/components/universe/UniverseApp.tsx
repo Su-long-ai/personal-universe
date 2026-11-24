@@ -1284,6 +1284,13 @@ export default function UniverseApp({
       galaxyScaleSegmentProgress(frozenPosition).toFixed(3);
     document.documentElement.dataset.universeGalaxyScaleBridge =
       "manual-frozen";
+    // Keep the explicit takeover diagnostic published by main in addition to
+    // the coordinator cancellation above. This is intentionally redundant for
+    // cleanup, but makes the winning pointer authority observable immediately.
+    document.documentElement.dataset.universeScaleSuperseded =
+      "manual-camera";
+    delete document.documentElement.dataset.universeGalaxyScaleTarget;
+    delete document.documentElement.dataset.universeScaleQueued;
   }, [cancelPendingContinuousScaleIntent]);
 
   const handleSystemScaleFocus = useCallback(
