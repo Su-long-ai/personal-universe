@@ -189,8 +189,9 @@ export function UniverseCanvas({
     // Paint readiness belongs to the concrete renderer capability, not only
     // the planet identity. A quality switch can replace live ProceduralPlanets
     // with a lightweight/software path (or the reverse) while the same planet
-    // remains selected; keep the System handoff frame until the new authority
-    // has painted as well.
+    // remains selected. Reacquire first paint for camera/readiness consumers;
+    // only the actual System -> Approach boundary is allowed to retain System
+    // presentation as a fallback.
     setWorldPaintReady(false);
     delete document.documentElement.dataset.universeWorldPaintReady;
   }, [quality, worldPrewarmPlanet?.id]);
@@ -202,7 +203,7 @@ export function UniverseCanvas({
 
   const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
   const keepSystemForHandoff =
-    closeWorldPhase && Boolean(selectedSystem) && !worldPaintReady;
+    phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
 
   return (
     <Canvas
