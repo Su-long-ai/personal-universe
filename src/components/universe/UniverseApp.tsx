@@ -1284,6 +1284,8 @@ export default function UniverseApp({
       galaxyScaleSegmentProgress(frozenPosition).toFixed(3);
     document.documentElement.dataset.universeGalaxyScaleBridge =
       "manual-frozen";
+    document.documentElement.dataset.universeScaleSuperseded =
+      "manual-camera";
     delete document.documentElement.dataset.universeGalaxyScaleTarget;
     delete document.documentElement.dataset.universeScaleQueued;
   }, []);
