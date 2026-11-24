@@ -634,6 +634,10 @@ export function PlanetScene({
         planet: livePlanet,
         key: profileKey,
       };
+      const html = document.documentElement;
+      html.dataset.universeWorldLiveProfileUpdates = String(
+        Number(html.dataset.universeWorldLiveProfileUpdates ?? "0") + 1,
+      );
     }
     document.documentElement.dataset.universeWorldLiveProfile = profileKey;
 
