@@ -15,7 +15,12 @@ import { isSoftwareRenderer } from "./CinematicPipeline";
 const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
+const SOFTWARE_TERRAIN_CHUNK_SIZE = 32;
 const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
+const SOFTWARE_STREAM_REBASE_UPDATES = 12;
+const SOFTWARE_VIEW_REFRESH_UPDATES = 1;
+const SOFTWARE_POSITION_REFRESH_DISTANCE_SQ = 1;
+const SOFTWARE_ROTATION_REFRESH_EPSILON = 1e-5;
 
 const ROCKS = [
   { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
@@ -65,6 +70,7 @@ export function SurfaceTerrain({
   const lastProjection = useRef(new THREE.Matrix4());
   const currentCameraPosition = useRef(new THREE.Vector3());
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
+  const lastSoftwareChunk = useRef<{ x: number; z: number } | null>(null);
 
   useEffect(() => {
     if (active) setActivated(true);
@@ -89,7 +95,7 @@ export function SurfaceTerrain({
                 // window. The runtime streams no more than three chunks per
                 // scheduled update and keeps its clipmap at the minimum supported
                 // resolution.
-                chunkSize: 32,
+                chunkSize: SOFTWARE_TERRAIN_CHUNK_SIZE,
                 viewRadius: 3,
                 triangleBudget: 35000,
                 maxCreatesPerFrame: 3,
@@ -242,36 +248,57 @@ export function SurfaceTerrain({
     if (!active || phaseRef.current !== "surface" || !terrain) return;
 
     if (softwareRenderer) {
-      // Infinite World needs several bounded updates to populate the initial
-      // camera-centred ring. SwiftShader still must not run streaming work every
-      // frame forever, so schedule a short warm-up burst, then return to the
-      // previous camera-driven policy. Any real manual camera/projection change
-      // restarts the bounded burst.
+      // Infinite World only changes its desired chunk set when the camera
+      // crosses a terrain chunk. The old policy restarted a 32-update warmup
+      // for every tiny position/quaternion/projection change, so a settling
+      // Surface camera could keep SwiftShader streaming almost continuously.
+      // Keep the initial bounded fill, do a smaller rebase burst on real chunk
+      // crossings, and use one update for same-chunk culling/LOD refreshes.
       camera.updateWorldMatrix(true, false);
       camera.getWorldPosition(currentCameraPosition.current);
       camera.getWorldQuaternion(currentCameraQuaternion.current);
+
+      const currentChunkX = Math.floor(
+        currentCameraPosition.current.x / SOFTWARE_TERRAIN_CHUNK_SIZE,
+      );
+      const currentChunkZ = Math.floor(
+        currentCameraPosition.current.z / SOFTWARE_TERRAIN_CHUNK_SIZE,
+      );
+      const previousChunk = lastSoftwareChunk.current;
+      const chunkChanged =
+        previousChunk === null ||
+        previousChunk.x !== currentChunkX ||
+        previousChunk.z !== currentChunkZ;
       const positionChanged =
         !terrainViewInitialized.current ||
         currentCameraPosition.current.distanceToSquared(
           lastCameraPosition.current,
-        ) > 1e-8;
+        ) > SOFTWARE_POSITION_REFRESH_DISTANCE_SQ;
       const rotationChanged =
         !terrainViewInitialized.current ||
-        1 - Math.abs(
-          currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
-        ) > 1e-8;
+        1 -
+          Math.abs(
+            currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
+          ) >
+          SOFTWARE_ROTATION_REFRESH_EPSILON;
       const projectionChanged =
         !terrainViewInitialized.current ||
         !camera.projectionMatrix.equals(lastProjection.current);
 
-      if (positionChanged || rotationChanged || projectionChanged) {
+      if (chunkChanged || positionChanged || rotationChanged || projectionChanged) {
         lastCameraPosition.current.copy(currentCameraPosition.current);
         lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
         lastProjection.current.copy(camera.projectionMatrix);
+        lastSoftwareChunk.current = { x: currentChunkX, z: currentChunkZ };
+        const requestedUpdates = chunkChanged
+          ? terrainViewInitialized.current
+            ? SOFTWARE_STREAM_REBASE_UPDATES
+            : SOFTWARE_STREAM_WARMUP_UPDATES
+          : SOFTWARE_VIEW_REFRESH_UPDATES;
         terrainViewInitialized.current = true;
         softwareStreamUpdates.current = Math.max(
           softwareStreamUpdates.current,
-          SOFTWARE_STREAM_WARMUP_UPDATES,
+          requestedUpdates,
         );
         softwareStreamAccumulator.current = 0;
       }
@@ -296,6 +323,12 @@ export function SurfaceTerrain({
         : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
+        if (softwareRenderer) {
+          // Full coverage is the stop condition for the initial fill. Further
+          // work is scheduled only by meaningful camera/chunk changes above.
+          softwareStreamUpdates.current = 0;
+          softwareStreamAccumulator.current = 0;
+        }
         onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
       }
     }
