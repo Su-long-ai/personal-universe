@@ -2103,14 +2103,25 @@ export default function UniverseApp({
 
         if (
           direction === "out" &&
-          currentPosition <= 2 + WORLD_SCALE_EPSILON
+          currentPosition <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
+          // The Approach -> System renderer boundary must not consume a wheel
+          // sample without changing scale. Apply this exact delta to the
+          // existing System segment first, then hand renderer authority over
+          // at the resulting coordinate (for a -/+96 sample: 2 -> 1.5).
+          const nextPosition = applySystemScaleWheel(
+            WORLD_SCALE_MIN,
+            event.deltaY,
+          );
           setSystemScaleTargetPlanet(selectedPlanet);
-          worldScalePositionRef.current = WORLD_SCALE_MIN;
-          setWorldScalePosition(WORLD_SCALE_MIN);
+          worldScalePositionRef.current = nextPosition;
+          setWorldScalePosition(nextPosition);
           setWorldScaleContinuous(true);
           document.documentElement.dataset.universeScalePosition =
-            WORLD_SCALE_MIN.toFixed(3);
+            nextPosition.toFixed(3);
+          document.documentElement.dataset.universeScaleDirection = direction;
+          document.documentElement.dataset.universeScaleProgress =
+            systemScaleSegmentProgress(nextPosition).toFixed(3);
           setWorldScalePhase("system", {
             preserveWorldScalePosition: true,
           });
