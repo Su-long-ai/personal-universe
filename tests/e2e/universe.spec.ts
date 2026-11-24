@@ -1454,6 +1454,11 @@ test("Galaxy native LOD reaches the matched System endpoint only at scale one", 
     { timeout: 10_000 },
   );
   await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "1.000",
+    { timeout: 10_000 },
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-system-entry-view",
     "yeis-native",
     { timeout: 10_000 },
