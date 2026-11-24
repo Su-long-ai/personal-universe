@@ -471,6 +471,14 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
     await html.getAttribute("data-universe-world-planet-allocations"),
   );
   expect(planetAllocations).toBeGreaterThan(0);
+  await expect(html).toHaveAttribute(
+    "data-universe-world-planet-pass-allocations",
+    /\d+/,
+  );
+  const planetPassAllocations = Number(
+    await html.getAttribute("data-universe-world-planet-pass-allocations"),
+  );
+  expect(planetPassAllocations).toBeGreaterThan(0);
 
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
@@ -503,6 +511,11 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
   expect(
     Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
   ).toBe(allocations);
+  expect(
+    Number(
+      await html.getAttribute("data-universe-world-planet-pass-allocations"),
+    ),
+  ).toBe(planetPassAllocations);
 
   await page.getByLabel("QUALITY").selectOption("high");
   await expect(html).toHaveAttribute(
@@ -531,6 +544,11 @@ test("HIGH close-world prewarms after focus lock and keeps one pipeline allocati
   expect(
     Number(await html.getAttribute("data-universe-world-pipeline-allocations")),
   ).toBe(allocations);
+  expect(
+    Number(
+      await html.getAttribute("data-universe-world-planet-pass-allocations"),
+    ),
+  ).toBe(planetPassAllocations);
 
   await runtime.assertClean(testInfo);
 });
