@@ -252,6 +252,12 @@ async function expectReadableNarrowSurfaceLayout(
     expect(focusBox!.x + focusBox!.width).toBeLessThanOrEqual(
       stackBox!.x + stackBox!.width + 1,
     );
+    if (viewport.width <= 800) {
+      expect(
+        focusBox!.height,
+        "mobile Surface focus action should retain a usable touch height",
+      ).toBeGreaterThanOrEqual(29);
+    }
   }
 
   const clusterChips = surfaceCopy.locator(".surface-cluster-chip");
@@ -280,6 +286,12 @@ async function expectReadableNarrowSurfaceLayout(
     expect(clusterBox!.x + clusterBox!.width).toBeLessThanOrEqual(
       surfaceBox!.x + surfaceBox!.width + 1,
     );
+    if (viewport.width <= 800) {
+      expect(
+        clusterBox!.height,
+        "mobile Surface cluster chip should retain a usable touch height",
+      ).toBeGreaterThanOrEqual(27);
+    }
   }
 
   if (viewport.width <= 800) {
