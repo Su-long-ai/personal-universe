@@ -180,6 +180,18 @@ export function rankSurfaceContentAnchors(
   );
 }
 
+export function rankSurfaceContentClusters(
+  clusters: readonly SurfaceContentCluster[],
+): SurfaceContentCluster[] {
+  return [...clusters].sort(
+    (a, b) =>
+      SURFACE_CONTENT_PRIORITY_WEIGHT[b.priority] -
+        SURFACE_CONTENT_PRIORITY_WEIGHT[a.priority] ||
+      a.label.localeCompare(b.label) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
 function rgb(hex: string): SurfaceRgb {
   const value = Number.parseInt(hex.replace("#", ""), 16);
   return [
@@ -472,11 +484,10 @@ export function buildSurfaceWorldProfile(
           hashSeed(`${planet.seed}:${key}:landmark`) %
             Math.max(1, landmarks.length)
         ];
-      const region =
-        regions[
-          hashSeed(`${planet.seed}:${key}:region`) %
-            Math.max(1, regions.length)
-        ];
+      const regionIndex =
+        hashSeed(`${planet.seed}:${key}:region`) %
+        Math.max(1, regions.length);
+      const region = regions[regionIndex];
       const base = landmark?.position ?? region?.center ?? LANDING;
       const angle = local.range(0, Math.PI * 2);
       const distance = local.range(0.55, 1.75);
@@ -490,9 +501,7 @@ export function buildSurfaceWorldProfile(
         ],
         ...(landmark ? { landmarkId: landmark.id } : {}),
         ...(region ? { regionId: region.id } : {}),
-        cluster:
-          hashSeed(`${planet.seed}:${key}:cluster`) %
-          Math.max(1, Math.min(3, regions.length)),
+        cluster: regionIndex,
         priority: surfaceContentPriority(entry),
       };
     },
@@ -507,24 +516,15 @@ export function buildSurfaceWorldProfile(
         contentAnchors.filter((anchor) => anchor.cluster === clusterIndex),
       );
       const lead = anchors[0]!;
-      const region = regions.find((candidate) => candidate.id === lead.regionId);
-      const center = anchors.reduce<[number, number]>(
-        (sum, anchor) => [
-          sum[0] + anchor.position[0],
-          sum[1] + anchor.position[1],
-        ],
-        [0, 0],
-      );
-      center[0] /= anchors.length;
-      center[1] /= anchors.length;
+      const region = regions[clusterIndex];
 
       return {
         id: `${planet.id}:surface:cluster:${clusterIndex}`,
         index: clusterIndex,
         label: region?.name ?? biome,
-        center,
+        center: region?.center ?? LANDING,
         anchorIds: anchors.map((anchor) => anchor.id),
-        ...(lead.regionId ? { regionId: lead.regionId } : {}),
+        ...(region ? { regionId: region.id } : {}),
         ...(lead.landmarkId ? { landmarkId: lead.landmarkId } : {}),
         priority: lead.priority,
       };
