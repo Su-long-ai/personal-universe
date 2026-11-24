@@ -965,7 +965,39 @@ test("LOW fallback prewarm cancels on immediate reverse and resumes before Surfa
       { timeout: 15_000 },
     )
     .toMatch(/preparing|parked/);
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
+  );
 
+  // Reverse after actual construction has started. This is no longer the
+  // cancellable idle timer: the one retained terrain may finish preparing
+  // while parked, and re-entry must not allocate a replacement.
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "orbit");
+  await expect
+    .poll(
+      async () => html.getAttribute("data-universe-surface-prewarm"),
+      { timeout: 10_000 },
+    )
+    .toMatch(/preparing|ready/);
+  await expect
+    .poll(
+      async () =>
+        html.getAttribute("data-universe-surface-terrain-lifecycle"),
+      { timeout: 10_000 },
+    )
+    .toMatch(/preparing|parked/);
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "atmosphere",
+  );
   await wheelScale(page, "in");
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "surface");
   await expect(html).toHaveAttribute(
@@ -973,10 +1005,25 @@ test("LOW fallback prewarm cancels on immediate reverse and resumes before Surfa
     "procedural-terrains-fallback",
     { timeout: 15_000 },
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
+  );
+
   await wheelScale(page, "out");
   await expect(html).toHaveAttribute(
     "data-universe-surface-terrain-lifecycle",
     "parked",
+  );
+  await wheelScale(page, "in");
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-renderer",
+    "procedural-terrains-fallback",
+    { timeout: 15_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-allocations",
+    "1",
   );
   await runtime.assertClean(testInfo);
 });
