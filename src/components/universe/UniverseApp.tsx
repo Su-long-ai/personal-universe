@@ -22,6 +22,7 @@ import {
   resolveSystem,
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
+import { buildSurfaceWorldProfile } from "../../lib/universe/surface";
 import {
   attachContentToSystem,
   placeUniverseContent,
@@ -271,6 +272,26 @@ export default function UniverseApp({
   const selectedSystemRef = useRef<SystemDefinition | null>(null);
   selectedSystemRef.current = selectedSystem;
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
+  const surfaceProfile = useMemo(
+    () =>
+      selectedPlanet && selectedPlanet.surfaceMode !== "none"
+        ? buildSurfaceWorldProfile(selectedPlanet)
+        : null,
+    [selectedPlanet],
+  );
+  const surfaceContentLocations = useMemo(() => {
+    if (!surfaceProfile) return new Map<string, string>();
+    const landmarkNames = new Map(
+      surfaceProfile.landmarks.map((landmark) => [landmark.id, landmark.name]),
+    );
+    return new Map(
+      surfaceProfile.contentAnchors.map((anchor) => [
+        anchor.entryId,
+        (anchor.landmarkId && landmarkNames.get(anchor.landmarkId)) ||
+          surfaceProfile.biome,
+      ]),
+    );
+  }, [surfaceProfile]);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -3041,24 +3062,63 @@ export default function UniverseApp({
 
       {phase !== "galaxy" &&
         phase !== "system" &&
-        selectedPlanet?.content?.map((entry) => (
-          <section className="world-content-card" key={entry.id}>
-            <span>
-              {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
-            </span>
-            <strong>{entry.title}</strong>
-            <small>{entry.summary}</small>
-            {entry.tags.length > 0 && (
-              <em>{entry.tags.slice(0, 4).join(" · ")}</em>
-            )}
-          </section>
-        ))}
+        selectedPlanet?.content?.length ? (
+          <div className="world-content-stack" aria-label="World content">
+            {selectedPlanet.content.map((entry) => {
+              const surfaceLocation =
+                phase === "surface"
+                  ? surfaceContentLocations.get(entry.id)
+                  : undefined;
+              return (
+                <section className="world-content-card" key={entry.id}>
+                  <span>
+                    {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
+                  </span>
+                  <strong>{entry.title}</strong>
+                  <small>{entry.summary}</small>
+                  {surfaceLocation && (
+                    <em className="world-content-location">
+                      {locale === "zh" ? "地表位置" : "SURFACE LOCATION"} //{" "}
+                      {surfaceLocation}
+                    </em>
+                  )}
+                  {entry.tags.length > 0 && (
+                    <em className="world-content-tags">
+                      {entry.tags.slice(0, 4).join(" · ")}
+                    </em>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        ) : null}
 
-      {phase === "surface" && selectedPlanet && (
+      {phase === "surface" && selectedPlanet && surfaceProfile && (
         <section className="surface-copy">
-          <span>{text(locale, "heroSurface")}</span>
+          <span>
+            {text(locale, "heroSurface")} // {surfaceProfile.biome.toUpperCase()}
+          </span>
           <strong>{astronomicalName(locale, selectedPlanet.name)}</strong>
           <small>{text(locale, "surfaceDescription")}</small>
+          <div className="surface-world-meta" aria-label="Surface world profile">
+            <b>
+              {surfaceProfile.regions.length}
+              <i>{locale === "zh" ? "区域" : "REGIONS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.landmarks.length}
+              <i>{locale === "zh" ? "地标" : "LANDMARKS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.contentAnchors.length}
+              <i>{locale === "zh" ? "内容点" : "SIGNALS"}</i>
+            </b>
+          </div>
+          <div className="surface-region-index" aria-label="Surface regions">
+            {surfaceProfile.regions.slice(0, 4).map((region) => (
+              <span key={region.id}>{region.name}</span>
+            ))}
+          </div>
         </section>
       )}
 
