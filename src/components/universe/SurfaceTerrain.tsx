@@ -240,6 +240,7 @@ export function SurfaceTerrain({
       controller.abort();
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
+      delete document.documentElement.dataset.universeSurfaceTerrainReadyView;
     };
   }, [
     activated,
