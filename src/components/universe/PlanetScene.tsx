@@ -194,6 +194,17 @@ function LiveSurfaceAnchor({
     ? profile.contentClusters.slice(0, 3)
     : profile.contentClusters.slice(0, 1);
 
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutSignals =
+      String(visibleContent.length);
+    document.documentElement.dataset.universeSurfaceLayoutClusters =
+      String(visibleClusters.length);
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutSignals;
+      delete document.documentElement.dataset.universeSurfaceLayoutClusters;
+    };
+  }, [profile.id, expanded, visibleContent.length, visibleClusters.length]);
+
   return (
     <group ref={group} name="live-surface-anchor">
       <group position={[0, -0.024, 0]} name="live-surface-product-layout">
