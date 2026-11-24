@@ -14,6 +14,8 @@ import {
 import { hashSeed } from "../../lib/universe/generation";
 import {
   SURFACE_CONTENT_SIGNAL_BUDGET,
+  SURFACE_STELLAR_LIGHT_DIRECTION,
+  SURFACE_STELLAR_SOURCE_POSITION,
   buildSurfaceWorldProfile,
   rankSurfaceContentAnchors,
   rankSurfaceContentClusters,
@@ -25,7 +27,6 @@ import {
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
-const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
 const LIVE_PLANET_RADIUS = 2000;
 const LIVE_WORLD_RADIUS = PLANET_RENDER_RADIUS;
 const FALLBACK_WORLD_RADIUS = PLANET_RENDER_RADIUS * 0.965;
@@ -849,12 +850,7 @@ export function PlanetScene({
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
-    () =>
-      new THREE.Vector3(
-        STAR_POSITION[0] - PLANET_ANCHOR[0],
-        STAR_POSITION[1] - PLANET_ANCHOR[1],
-        STAR_POSITION[2] - PLANET_ANCHOR[2],
-      ).normalize(),
+    () => new THREE.Vector3(...SURFACE_STELLAR_LIGHT_DIRECTION),
     [],
   );
   const softwareRenderer = isSoftwareRenderer(gl);
@@ -1059,7 +1055,7 @@ export function PlanetScene({
         color="#ffe0aa"
       />
 
-      <group position={STAR_POSITION}>
+      <group position={[...SURFACE_STELLAR_SOURCE_POSITION]}>
         <mesh>
           <sphereGeometry args={[1.25, 48, 48]} />
           <meshBasicMaterial toneMapped={false}>
