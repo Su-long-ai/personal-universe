@@ -8,7 +8,7 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
-import { Quaternion, Vector3 } from "three";
+import { PerspectiveCamera, Quaternion, Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
@@ -332,6 +332,38 @@ export function CinematicCamera({
     ],
   );
 
+  const publishScaleFrameDiagnostics = useCallback(
+    (center: Vector3, radius: number) => {
+      const distance = Math.max(1e-8, camera.position.distanceTo(center));
+      document.documentElement.dataset.universeCameraDistance =
+        distance.toExponential(4);
+
+      if (camera instanceof PerspectiveCamera && viewportHeight > 0) {
+        const verticalFov =
+          (camera.fov * Math.PI) / 180;
+        const projectedRadius =
+          (Math.max(radius, 1e-8) /
+            Math.max(distance * Math.tan(verticalFov / 2), 1e-8)) *
+          (viewportHeight / 2);
+        document.documentElement.dataset.universeProjectedRadius =
+          projectedRadius.toFixed(2);
+      } else {
+        delete document.documentElement.dataset.universeProjectedRadius;
+      }
+
+      const quaternion = camera.quaternion;
+      document.documentElement.dataset.universeCameraQuaternion = [
+        quaternion.x,
+        quaternion.y,
+        quaternion.z,
+        quaternion.w,
+      ]
+        .map((value) => value.toFixed(6))
+        .join(",");
+    },
+    [camera, viewportHeight],
+  );
+
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
@@ -593,8 +625,14 @@ export function CinematicCamera({
         "scale-continuous";
       document.documentElement.dataset.universeScaleCameraSegment =
         "system:approach";
+      document.documentElement.dataset.universeScaleSegment =
+        "system:approach";
       document.documentElement.dataset.universeSystemScaleDistance =
         distance.toExponential(4);
+      publishScaleFrameDiagnostics(
+        new Vector3(...systemScaleFrame.position),
+        systemScaleFrame.radius,
+      );
       return;
     }
 
@@ -689,6 +727,12 @@ export function CinematicCamera({
         "scale-continuous";
       document.documentElement.dataset.universeScaleCameraSegment =
         lowerPhase + ":" + upperPhase;
+      document.documentElement.dataset.universeScaleSegment =
+        lowerPhase + ":" + upperPhase;
+      publishScaleFrameDiagnostics(
+        new Vector3(...WORLD),
+        PLANET_RENDER_RADIUS,
+      );
 
       if (
         Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
@@ -700,6 +744,7 @@ export function CinematicCamera({
     }
 
     delete document.documentElement.dataset.universeScaleCameraSegment;
+    delete document.documentElement.dataset.universeScaleSegment;
 
     const shot =
       phase === "surface"
@@ -837,6 +882,7 @@ export function CinematicCamera({
     worldScaleContinuous,
     worldScalePosition,
     publishIfReached,
+    publishScaleFrameDiagnostics,
   ]);
 
   useEffect(() => {
@@ -880,6 +926,10 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;
       delete document.documentElement.dataset.universeScaleCameraSegment;
+      delete document.documentElement.dataset.universeScaleSegment;
+      delete document.documentElement.dataset.universeCameraDistance;
+      delete document.documentElement.dataset.universeProjectedRadius;
+      delete document.documentElement.dataset.universeCameraQuaternion;
       delete document.documentElement.dataset.universeSystemScaleFrame;
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
