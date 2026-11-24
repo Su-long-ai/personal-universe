@@ -5,8 +5,10 @@ import {
   authoringRecordToUniverseContentEntry,
   buildUniverseContentIndex,
   derivePersonalSignalMetadata,
+  isYeisNativeStarId,
   localizeUniverseContent,
   migrateContentRecord,
+  parseYeisCatalogStarCount,
   normalizeImportedContentBatch,
   normalizeImportedContentRecord,
   resolveUniverseContentReference,
@@ -268,6 +270,24 @@ test("media type and existence validation is actionable", () => {
   assert.deepEqual(
     presenceIssues.map((issue) => issue.code),
     ["missing_media_asset"],
+  );
+});
+
+test("vendored YEIS catalogue identity parsing is strict and bounded", () => {
+  const bytes = new Uint8Array(12 + 3 * 24);
+  bytes.set([89, 69, 83, 84], 0); // YEST
+  new DataView(bytes.buffer).setUint32(8, 3, true);
+
+  assert.equal(parseYeisCatalogStarCount(bytes), 3);
+  assert.equal(isYeisNativeStarId("c0", 3), true);
+  assert.equal(isYeisNativeStarId("c2", 3), true);
+  assert.equal(isYeisNativeStarId("c3", 3), false);
+  assert.equal(isYeisNativeStarId("c02", 3), false);
+  assert.equal(isYeisNativeStarId("h-aurora", 3), true);
+
+  assert.throws(
+    () => parseYeisCatalogStarCount(bytes.subarray(0, bytes.length - 1)),
+    /size does not match/,
   );
 });
 

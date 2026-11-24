@@ -15,17 +15,28 @@ import {
   authoringRecordToUniverseContentEntry,
   buildUniverseContentIndex,
   derivePersonalSignalMetadata,
+  isYeisNativeStarId,
   migrateContentRecord,
   normalizeImportedContentBatch,
+  parseYeisCatalogStarCount,
   normalizeImportedContentRecord,
   resolveUniverseContentReference,
   validateUniverseContentCatalog,
+  validateUniverseContentDestinations,
   validateUniverseContentMediaPresence,
 } from "../src/lib/universe/content/authoring.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTENT_DIR = resolve(ROOT, "src/content/portfolio");
 const PUBLIC_DIR = resolve(ROOT, "public");
+const YEIS_CATALOG_PATH = resolve(
+  PUBLIC_DIR,
+  "vendor/yeis/data/stars.bin",
+);
+
+function readYeisCatalogStarCount() {
+  return parseYeisCatalogStarCount(readFileSync(YEIS_CATALOG_PATH));
+}
 
 function fail(message) {
   throw new Error(message);
@@ -271,6 +282,39 @@ function allValidationFailures() {
         issue.message,
     );
   }
+
+  let yeisCatalogStarCount = 0;
+  try {
+    yeisCatalogStarCount = readYeisCatalogStarCount();
+  } catch (error) {
+    failures.push(
+      "YEIS catalogue: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+
+  if (yeisCatalogStarCount > 0) {
+    const nativePinnedEntries = entries.filter(
+      (entry) =>
+        entry.placement === "pinned" &&
+        Boolean(entry.starId) &&
+        (entry.starId === "h-aurora" || entry.starId!.startsWith("c")),
+    );
+    for (const issue of validateUniverseContentDestinations(
+      nativePinnedEntries,
+      [],
+      (starId) => isYeisNativeStarId(starId, yeisCatalogStarCount),
+    )) {
+      failures.push(
+        (issue.entryId
+          ? sources.get(issue.entryId) ?? issue.entryId
+          : "catalog") +
+          ": " +
+          issue.message,
+      );
+    }
+  }
+
   failures.push(...mediaFailures(entries, sources));
 
   const nonJson = files.filter((path) =>
@@ -473,6 +517,15 @@ function commandPreview(args) {
   if (!entry) fail('Unknown content reference "' + reference + '".');
 
   const signal = derivePersonalSignalMetadata(entry, "en");
+  const yeisCatalogStarCount = readYeisCatalogStarCount();
+  const pinnedNativeStatus =
+    entry.placement === "pinned" && entry.starId
+      ? isYeisNativeStarId(entry.starId, yeisCatalogStarCount)
+        ? "verified-native"
+        : entry.starId.startsWith("c")
+          ? "invalid-native"
+          : "marker-validated-at-build"
+      : "not-applicable";
   const query = new URLSearchParams({
     destination: "personal:" + entry.id,
   }).toString();
@@ -486,6 +539,13 @@ function commandPreview(args) {
           mode: entry.placement,
           placementKey: entry.placementKey ?? entry.id,
           starId: entry.starId ?? null,
+          strategy:
+            entry.placement === "pinned"
+              ? "explicit"
+              : entry.placement === "hero"
+                ? "hero"
+                : "deterministic-hrw",
+          nativeDestinationStatus: pinnedNativeStatus,
         },
         discovery: {
           title: signal.title,

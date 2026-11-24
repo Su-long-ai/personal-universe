@@ -194,9 +194,11 @@ collection inputs for long-form cases; they are not a second content store.
 
 ### Stable identity and compatibility
 
-Every item stores `contentId` explicitly. Runtime
-`UniverseContentEntry.id`, `personal:<id>` navigation destinations,
-relations, aliases, and generated indexes all derive from that persisted value.
+Every item stores `contentId` explicitly. Astro's `glob.generateId` also
+uses that persisted value, so framework collection identity and product
+identity cannot drift apart. Runtime `UniverseContentEntry.id`,
+`personal:<id>` navigation destinations, relations, aliases, and generated
+indexes all derive from the same value.
 
 Therefore changing a filename, source ordering, display title, localized copy,
 ranking, or Surface placement does not change canonical identity. Intentional
@@ -252,19 +254,21 @@ slug with a UUID fragment, so identity is not derived solely from mutable
 display text.
 
 `content:import` accepts a JSON object, array, or `{ "items": [...] }`
-batch, rejects unknown fields and duplicate/colliding IDs, normalizes defaults,
-and writes one canonical record per item. `--dry-run` performs the same
-normalization without writes.
+batch, rejects unknown fields (including unknown batch-envelope fields) and
+duplicate/colliding IDs, normalizes defaults, then stages the whole batch before
+renaming any file. A write failure removes the staged/committed files from that
+batch. `--dry-run` performs the same normalization without writes.
 
 `content:migrate` is non-destructive by default and prints the migrated
 record. `--write` is explicit. Version 0 records that used `id` migrate to
 version 1 `contentId` deterministically.
 
 `content:validate` checks duplicate/legacy identities, relations, aliases,
-date ranges, provenance, and local public-media existence. Astro itself remains
+date ranges, provenance, local public-media existence, and native YEIS pinned
+IDs against the frozen `stars.bin` catalogue header/count. Astro itself remains
 the schema authority for every collection record, and the production page also
-validates pinned destinations against the canonical galaxy marker set before
-rendering.
+validates pinned destinations against the canonical galaxy/native-star
+authority before rendering.
 
 `content:preview` reports canonical identity, shareable Personal Signal
 destination, discovery copy/aliases, destination mapping and Surface hints

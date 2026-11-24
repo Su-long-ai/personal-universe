@@ -5,6 +5,8 @@ import { getCollection } from "astro:content";
 import UniverseApp from "../components/universe/UniverseApp";
 import {
   assertUniverseContentCatalog,
+  isYeisNativeStarId,
+  parseYeisCatalogStarCount,
   type UniverseContentEntry,
 } from "../lib/universe/content";
 import { buildGalaxyIndex } from "../lib/universe/generation";
@@ -41,27 +43,11 @@ const contentEntries: UniverseContentEntry[] = portfolio.map(({ data }) => ({
 
 const canonicalGalaxy = buildGalaxyIndex("personal-universe-v2");
 
-async function readYeisCatalogStarCount(): Promise<number> {
-  const catalog = await readFile(
-    resolve(process.cwd(), "public/vendor/yeis/data/stars.bin"),
-  );
-  if (
-    catalog.byteLength < 12 ||
-    catalog.toString("ascii", 0, 4) !== "YEST"
-  ) {
-    throw new Error("Vendored YEIS star catalogue header is invalid.");
-  }
-  return catalog.readUInt32LE(8);
-}
-
-const yeisCatalogStarCount = await readYeisCatalogStarCount();
-const nativeYeisStarExists = (starId: string) => {
-  if (starId === "h-aurora") return true;
-  const match = /^c(\d+)$/.exec(starId);
-  if (!match) return false;
-  const index = Number(match[1]);
-  return Number.isSafeInteger(index) && index >= 0 && index < yeisCatalogStarCount;
-};
+const yeisCatalogStarCount = parseYeisCatalogStarCount(
+  await readFile(resolve(process.cwd(), "public/vendor/yeis/data/stars.bin")),
+);
+const nativeYeisStarExists = (starId: string) =>
+  isYeisNativeStarId(starId, yeisCatalogStarCount);
 
 assertUniverseContentCatalog(
   contentEntries,

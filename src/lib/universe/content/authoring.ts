@@ -848,6 +848,46 @@ export function validateUniverseContentCatalog(
   );
 }
 
+const YEIS_CATALOG_HEADER_BYTES = 12;
+const YEIS_CATALOG_RECORD_BYTES = 24;
+
+export function parseYeisCatalogStarCount(bytes: Uint8Array): number {
+  if (bytes.byteLength < YEIS_CATALOG_HEADER_BYTES) {
+    throw new Error("Vendored YEIS star catalogue is truncated.");
+  }
+  const magic = String.fromCharCode(bytes[0]!, bytes[1]!, bytes[2]!, bytes[3]!);
+  if (magic !== "YEST") {
+    throw new Error("Vendored YEIS star catalogue header is invalid.");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const count = view.getUint32(8, true);
+  const expectedBytes =
+    YEIS_CATALOG_HEADER_BYTES + count * YEIS_CATALOG_RECORD_BYTES;
+  if (count < 1 || expectedBytes !== bytes.byteLength) {
+    throw new Error(
+      "Vendored YEIS star catalogue size does not match its header count.",
+    );
+  }
+  return count;
+}
+
+export function isYeisNativeStarId(
+  starId: string,
+  catalogStarCount: number,
+): boolean {
+  if (starId === "h-aurora") return true;
+  const match = /^c(0|[1-9]\d*)$/.exec(starId);
+  if (!match) return false;
+  const index = Number(match[1]);
+  return (
+    Number.isSafeInteger(catalogStarCount) &&
+    catalogStarCount > 0 &&
+    Number.isSafeInteger(index) &&
+    index >= 0 &&
+    index < catalogStarCount
+  );
+}
+
 export function validateUniverseContentDestinations(
   entries: readonly UniverseContentEntry[],
   markers: readonly GalaxyMarker[],
