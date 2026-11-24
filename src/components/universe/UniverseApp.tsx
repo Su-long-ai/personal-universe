@@ -278,6 +278,18 @@ export default function UniverseApp({
   const selectedSystemRef = useRef<SystemDefinition | null>(null);
   selectedSystemRef.current = selectedSystem;
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
+  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
+    null,
+  );
+  const surfaceFocusEntryId = useMemo(() => {
+    if (!selectedPlanet || !activeDestinationId?.startsWith("personal:")) {
+      return null;
+    }
+    const entryId = activeDestinationId.slice("personal:".length);
+    return selectedPlanet.content?.some((entry) => entry.id === entryId)
+      ? entryId
+      : null;
+  }, [activeDestinationId, selectedPlanet]);
   const surfaceProfile = useMemo(
     () =>
       selectedPlanet && selectedPlanet.surfaceMode !== "none"
@@ -328,9 +340,10 @@ export default function UniverseApp({
     if (phase !== "surface" || !surfaceProfile) return entries;
 
     const rank = new Map(
-      rankSurfaceContentAnchors(surfaceProfile.contentAnchors).map(
-        (anchor, index) => [anchor.entryId, index],
-      ),
+      rankSurfaceContentAnchors(
+        surfaceProfile.contentAnchors,
+        surfaceFocusEntryId,
+      ).map((anchor, index) => [anchor.entryId, index]),
     );
     return [...entries].sort(
       (a, b) =>
@@ -338,7 +351,7 @@ export default function UniverseApp({
           (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
         a.title.localeCompare(b.title),
     );
-  }, [phase, selectedPlanet, surfaceProfile]);
+  }, [phase, selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -354,9 +367,6 @@ export default function UniverseApp({
     request: UniverseNavigationCameraRequest;
     reason: string;
   } | null>(null);
-  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
-    null,
-  );
   const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
     null,
   );
@@ -2850,6 +2860,7 @@ export default function UniverseApp({
           onNavigationFailed={handleNavigationFailed}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
+          surfaceFocusEntryId={surfaceFocusEntryId}
           systemScaleTargetPlanet={systemScaleTargetPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
@@ -3127,8 +3138,16 @@ export default function UniverseApp({
                   : undefined;
               return (
                 <section
-                  className="world-content-card"
+                  className={
+                    "world-content-card" +
+                    (surfaceFocusEntryId === entry.id
+                      ? " is-surface-focus"
+                      : "")
+                  }
                   data-surface-priority={surfacePresentation?.priority}
+                  data-surface-focus={
+                    surfaceFocusEntryId === entry.id ? "true" : undefined
+                  }
                   key={entry.id}
                 >
                   <span>
