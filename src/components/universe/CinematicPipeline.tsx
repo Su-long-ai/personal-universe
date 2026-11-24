@@ -491,11 +491,15 @@ export function CinematicPipeline({
 
     if (fallbackReason) {
       const sceneReady = html.dataset.universeWorldSceneReady === "true";
-      publishReady(sceneReady);
-      publishWorldReadyEvidence(sceneReady);
-      publishScreenshotReadyEvidence(sceneReady && cameraReady);
+      const surfaceTerrainReady =
+        html.dataset.universeNavigationPhase !== "surface" ||
+        html.dataset.universeSurfaceTerrainState === "ready";
+      const fallbackReady = sceneReady && surfaceTerrainReady;
+      publishReady(fallbackReady);
+      publishWorldReadyEvidence(fallbackReady);
+      publishScreenshotReadyEvidence(fallbackReady && cameraReady);
       if (
-        sceneReady &&
+        fallbackReady &&
         html.dataset.universeWorldRecovery === "warming"
       ) {
         html.dataset.universeWorldRecovery = "ready";
