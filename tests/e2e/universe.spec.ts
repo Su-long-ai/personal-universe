@@ -34,6 +34,7 @@ async function wheelScale(
     "data-universe-navigation-phase",
   );
   const continuousScaleDomain = [
+    "galaxy",
     "system",
     "approach",
     "orbit",
@@ -42,46 +43,64 @@ async function wheelScale(
   ].includes(startingPhase ?? "");
   const deltaY = direction === "in" ? -120 : 120;
 
-  // System and close-world input now share one real coordinate. A normal
-  // wheel sample moves half a semantic interval so the camera visibly travels
-  // before a boundary changes. Semantic transition tests use a second sample
-  // only when the first one remains inside the same continuous interval.
+  // Galaxy through Surface now share one normalized product scale. Keep a
+  // semantic-step helper for tests, but let each individual wheel sample move
+  // only its real proportional distance. Galaxy 0->1 deliberately spans more
+  // samples than the close-world intervals.
   await page.mouse.wheel(0, deltaY);
   if (continuousScaleDomain) {
-    await page.waitForTimeout(80);
-    const phaseAfterFirst = await html.getAttribute(
-      "data-universe-navigation-phase",
-    );
-    if (
-      ["system", "approach", "orbit", "atmosphere", "surface"].includes(
-        phaseAfterFirst ?? "",
-      )
-    ) {
+    for (let sample = 0; sample < 7; sample += 1) {
+      await page.waitForTimeout(80);
+      const phaseAfterSample = await html.getAttribute(
+        "data-universe-navigation-phase",
+      );
+      if (phaseAfterSample !== startingPhase) break;
+
+      const blocked = await html.getAttribute("data-universe-scale-blocked");
+      if (blocked) break;
+
       const position = Number(
         await html.getAttribute("data-universe-scale-position"),
       );
-      if (Number.isFinite(position) && Math.abs(position - Math.round(position)) > 0.01) {
-        await page.mouse.wheel(0, deltaY);
-      }
-    }
+      if (!Number.isFinite(position)) break;
 
-    // Reaching the System overview anchor (1.0) is still inside System. One
-    // further outward intent crosses the remaining semantic boundary to Galaxy.
-    if (startingPhase === "system" && direction === "out") {
-      await page.waitForTimeout(80);
-      const phaseAfterSystemTravel = await html.getAttribute(
-        "data-universe-navigation-phase",
-      );
-      const positionAfterSystemTravel = Number(
-        await html.getAttribute("data-universe-scale-position"),
-      );
+      // Integer scale anchors are not all semantic boundaries in both
+      // directions. For example Atmosphere spans [4, 5), so outward 4.5 -> 4.0
+      // is still Atmosphere and needs another physical sample to reach Orbit.
+      // Stop only at true domain endpoints or at asynchronous renderer
+      // handoffs that need paint time rather than more input.
       if (
-        phaseAfterSystemTravel === "system" &&
-        Number.isFinite(positionAfterSystemTravel) &&
-        positionAfterSystemTravel <= 1.01
+        startingPhase === "galaxy" &&
+        direction === "out" &&
+        position <= 0.001
       ) {
-        await page.mouse.wheel(0, deltaY);
+        break;
       }
+      if (
+        startingPhase === "galaxy" &&
+        direction === "in" &&
+        position >= 0.999
+      ) {
+        await page.waitForTimeout(160);
+        break;
+      }
+      if (
+        startingPhase === "system" &&
+        direction === "in" &&
+        position >= 1.999
+      ) {
+        await page.waitForTimeout(160);
+        break;
+      }
+      if (
+        startingPhase === "surface" &&
+        direction === "in" &&
+        position >= 4.999
+      ) {
+        break;
+      }
+
+      await page.mouse.wheel(0, deltaY);
     }
   }
   await page.waitForTimeout(320);
@@ -521,20 +540,25 @@ test("the first opening wheel always acquires a scale target", async ({
   );
   await page.mouse.wheel(0, -120);
 
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.250",
+  );
   await expect
-    .poll(async () => {
-      const pending = await html.getAttribute(
-        "data-universe-pending-destination",
-      );
-      const active = await html.getAttribute(
-        "data-universe-active-destination",
-      );
-      const phase = await html.getAttribute(
-        "data-universe-navigation-phase",
-      );
-      return pending ?? active ?? (phase === "system" ? "system" : null);
-    })
+    .poll(
+      async () => html.getAttribute("data-universe-galaxy-scale-target"),
+      { timeout: 10_000 },
+    )
     .not.toBeNull();
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-bridge",
+    "active",
+    { timeout: 10_000 },
+  );
   await expect(html).not.toHaveAttribute(
     "data-universe-scale-blocked",
     "no-galaxy-focus",
@@ -776,15 +800,14 @@ test("wheel units and stalled coalesced samples map to bounded scale distance", 
   );
 
   // Three line units become 48 CSS-pixel-equivalent units: exactly a quarter
-  // of one semantic interval, without treating line mode as three pixels.
+  // of the Approach -> Orbit interval, without treating line mode as 3 pixels.
   await dispatchScaleWheel(page, -3, 1);
   await expect(html).toHaveAttribute("data-universe-scale-position", "2.250");
   await expect(html).toHaveAttribute("data-universe-scale-input", "line");
   await expect(html).toHaveAttribute("data-universe-scale-delta", "-48.000");
 
-  // Simulate a delivery delayed/coalesced by a short main-thread stall. One
-  // pathological sample is capped to one ordinary notch (96px), not replayed
-  // later as hidden momentum.
+  // A pathological coalesced sample is capped to 96px and is not replayed as
+  // hidden momentum after the browser/main thread catches up.
   await page.waitForTimeout(350);
   await dispatchScaleWheel(page, -900);
   await expect(html).toHaveAttribute("data-universe-scale-position", "2.750");
@@ -1073,7 +1096,7 @@ test("wheel enters a centered YEIS star focus without clicking", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Galaxy inward scale resolves the focused star through native YEIS system LOD before product System", async ({
+test("Galaxy scale uses small wheel deltas as direct native LOD distance", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
@@ -1087,19 +1110,14 @@ test("Galaxy inward scale resolves the focused star through native YEIS system L
     { timeout: 20_000 },
   );
 
-  await dispatchScaleWheel(page, -120);
-
-  // The first inward intent remains in the native Galaxy authority while YEIS
-  // switches reference frame and approaches the same focused star. The current
-  // target system's physical bodies/orbits are already mounted in that scene.
+  await dispatchScaleWheel(page, -16);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
   );
   await expect(html).toHaveAttribute(
-    "data-universe-traveling",
-    "h-aurora",
-    { timeout: 10_000 },
+    "data-universe-scale-position",
+    "0.042",
   );
   await expect(html).toHaveAttribute(
     "data-yeis-native-system",
@@ -1115,15 +1133,106 @@ test("Galaxy inward scale resolves the focused star through native YEIS system L
     "approaching:h-aurora",
   );
 
-  const approachRatio = Number(
+  const firstRatio = Number(
     await html.getAttribute("data-universe-travel-arrival-ratio"),
   );
-  expect(approachRatio).toBeGreaterThan(1);
+  expect(firstRatio).toBeGreaterThan(1);
 
+  await dispatchScaleWheel(page, -16);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.083",
+  );
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
+    )
+    .toBeLessThan(firstRatio);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Galaxy scale reverses the same native LOD path before System", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.500",
+  );
+  const inwardRatio = Number(
+    await html.getAttribute("data-universe-travel-arrival-ratio"),
+  );
+
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.250",
+  );
+  await expect
+    .poll(async () =>
+      Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
+    )
+    .toBeGreaterThan(inwardRatio);
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-target",
+    "hero:aurora-01",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Galaxy native LOD reaches the matched System endpoint only at scale one", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+
+  for (let sample = 0; sample < 3; sample += 1) {
+    await dispatchScaleWheel(page, -96);
+  }
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.000",
+  );
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
-    { timeout: 20_000 },
+    { timeout: 10_000 },
   );
   await expect(html).toHaveAttribute(
     "data-universe-system-entry-view",
@@ -1131,6 +1240,23 @@ test("Galaxy inward scale resolves the focused star through native YEIS system L
     { timeout: 10_000 },
   );
   await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
+
+  // The first outward sample crosses back into Galaxy at a proportional 0.75,
+  // not through the legacy return jump.
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "galaxy",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "0.750",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-bridge",
+    "active",
+    { timeout: 10_000 },
+  );
 
   await runtime.assertClean(testInfo);
 });
