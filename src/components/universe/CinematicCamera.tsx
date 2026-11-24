@@ -91,6 +91,10 @@ const MANUAL_TOUCH = {
   three: CameraControlsImpl.ACTION.NONE,
 } as const;
 
+const MANUAL_DRAG_THRESHOLD_PX = 5;
+const MANUAL_DRAG_THRESHOLD_SQ =
+  MANUAL_DRAG_THRESHOLD_PX * MANUAL_DRAG_THRESHOLD_PX;
+
 type CameraShot = {
   position: [number, number, number];
   target: [number, number, number];
@@ -481,15 +485,62 @@ export function CinematicCamera({
   useEffect(() => {
     if (!manualCameraEnabled) return;
 
-    // Wheel belongs exclusively to the continuous-scale coordinator. Listen
-    // for an actual pointer/touch press instead of camera-controls' generic
-    // controlstart event so a wheel gesture can never be misclassified as a
-    // manual camera takeover and cancel an in-flight scale intent.
+    // Wheel belongs exclusively to the continuous-scale coordinator. A plain
+    // canvas click may select a planet/Surface signal, so pointerdown alone is
+    // not camera intent either. Keep camera-controls as the movement executor,
+    // but only supersede product navigation after the pointer has crossed a
+    // small drag threshold.
     const element = gl.domElement;
-    const handlePointerDown = () => handleUserControlStart();
+    const starts = new Map<number, { x: number; y: number }>();
+    let takeoverStarted = false;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.pointerType === "mouse" &&
+        event.button !== 0 &&
+        event.button !== 1
+      ) {
+        return;
+      }
+      starts.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (takeoverStarted) return;
+      const start = starts.get(event.pointerId);
+      if (!start) return;
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        starts.delete(event.pointerId);
+        return;
+      }
+
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (dx * dx + dy * dy < MANUAL_DRAG_THRESHOLD_SQ) return;
+
+      takeoverStarted = true;
+      handleUserControlStart();
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      starts.delete(event.pointerId);
+      if (starts.size === 0) takeoverStarted = false;
+    };
+
     element.addEventListener("pointerdown", handlePointerDown, true);
-    return () =>
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
+    return () => {
+      starts.clear();
       element.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerup", handlePointerEnd, true);
+      window.removeEventListener("pointercancel", handlePointerEnd, true);
+    };
   }, [gl, handleUserControlStart, manualCameraEnabled]);
 
   useEffect(() => {
