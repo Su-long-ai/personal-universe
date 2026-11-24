@@ -4584,53 +4584,68 @@ test("fallback Surface terrain parks and resumes across reverse scale @webgl-hea
   const terrainProfile = await html.getAttribute(
     "data-universe-surface-terrain-profile",
   );
+  const terrainInstance = await html.getAttribute(
+    "data-universe-surface-terrain-instance",
+  );
   expect(terrainProfile).toBeTruthy();
+  expect(terrainInstance).toBeTruthy();
   await expect(html).toHaveAttribute(
     "data-universe-webgl-lifecycle",
     "active",
   );
 
-  await dispatchScaleWheel(page, 96);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "4.600",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "atmosphere",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-terrain-lifecycle",
-    "parked",
-    { timeout: 10_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-terrain-profile",
-    terrainProfile!,
-  );
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await dispatchScaleWheel(page, 96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "4.600",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "atmosphere",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "parked",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-profile",
+      terrainProfile!,
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-instance",
+      terrainInstance!,
+    );
 
-  await dispatchScaleWheel(page, -96);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "5.000",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "surface",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-terrain-lifecycle",
-    "active",
-    { timeout: 10_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-terrain-profile",
-    terrainProfile!,
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-webgl-lifecycle",
-    "active",
-  );
+    await dispatchScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "5.000",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "surface",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-lifecycle",
+      "active",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-profile",
+      terrainProfile!,
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-terrain-instance",
+      terrainInstance!,
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-webgl-lifecycle",
+      "active",
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+  }
 
   await runtime.assertClean(testInfo);
 });
