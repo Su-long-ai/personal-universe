@@ -412,6 +412,13 @@ test("Galaxy System remounts retire WebGL geometry @webgl-heavy", async ({
 test("retained Surface fallback recovers and parks without resource growth @webgl-heavy", async ({
   page,
 }, testInfo) => {
+  let boulderRequests = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/models/boulder_01/boulder_01_1k.gltf")) {
+      boulderRequests += 1;
+    }
+  });
+
   await page.goto(
     "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
   );
@@ -436,6 +443,12 @@ test("retained Surface fallback recovers and parks without resource growth @webg
   );
   const initial = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-surface-initial.json", initial);
+  if (initial.software) {
+    expect(
+      boulderRequests,
+      "software Surface must not request decorative hardware-only GLTF",
+    ).toBe(0);
+  }
 
   const recovery = await forceWebglLossAndRestore(page);
   expect(recovery.supported).toBe(true);
