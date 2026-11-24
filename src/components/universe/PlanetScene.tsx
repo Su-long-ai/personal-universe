@@ -778,11 +778,18 @@ export function PlanetScene({
       livePlanet.rotation.y += delta * 0.014;
     }
 
+    const expectedLiveProfile = softwareRenderer
+      ? "software-high"
+      : quality === "high"
+        ? "gpu-high"
+        : "gpu-auto";
     const concreteRendererReady =
       Boolean(fallbackReason) ||
       (Boolean(livePlanet) &&
         document.documentElement.dataset.universeWorldPipeline ===
-          "procedural-planets-pass");
+          "procedural-planets-pass" &&
+        document.documentElement.dataset.universeWorldLiveProfile ===
+          expectedLiveProfile);
 
     if (
       worldPresentationActive &&
