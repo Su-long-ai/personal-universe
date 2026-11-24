@@ -1830,6 +1830,62 @@ export default function UniverseApp({
     [galaxy.markers, handleNavigateDestination],
   );
 
+  const commitGalaxyScaleFocusedSystem = useCallback(
+    async (focus: UniverseNavigationDestination) => {
+      const marker = await navigationMarker(focus, galaxy.markers);
+      if (
+        phaseRef.current !== "galaxy" ||
+        galaxyScaleTargetRef.current?.id !== focus.id ||
+        worldScalePositionRef.current <
+          SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+      ) {
+        return;
+      }
+
+      const system = resolveMarker(marker);
+      const systemDestination = scaleSystemDestinationForMarker(marker);
+      preferredSystemScaleDestinationRef.current = focus;
+      setSelectedSystem(system);
+      setSelectedPlanet(null);
+      setSystemScaleTargetPlanet(null);
+      setScrollDepth(0);
+      setNavigationRequest(null);
+      setNavigationStatus("arrived");
+      setPendingDestinationId(null);
+      setPendingDestinationMode(null);
+      delete document.documentElement.dataset.universePendingDestination;
+      setActiveDestinationId(systemDestination.id);
+      document.documentElement.dataset.universeActiveDestination =
+        systemDestination.id;
+      ensurePlaying();
+
+      phaseRef.current = "system";
+      setPhase("system");
+      setWorldScaleContinuous(true);
+      worldScalePositionRef.current = SYSTEM_SCALE_MIN;
+      setWorldScalePosition(SYSTEM_SCALE_MIN);
+      document.documentElement.dataset.universeScalePosition =
+        SYSTEM_SCALE_MIN.toFixed(3);
+      document.documentElement.dataset.universeScaleProgress = "0";
+      document.documentElement.dataset.universeScaleIndex =
+        String(scalePhaseIndex("system"));
+      document.documentElement.dataset.universeNavigationPhase = "system";
+      document.documentElement.dataset.universeNavigationTarget =
+        marker.nativeId ?? marker.id;
+      document.documentElement.dataset.universeGalaxyScaleBridge =
+        "system-endpoint";
+
+      replaceNavigationUrl({
+        phase: "system",
+        starId: marker.nativeId ?? marker.id,
+        bodyId: null,
+        destinationId: systemDestination.id,
+        navigationMode: "open",
+      });
+    },
+    [ensurePlaying, galaxy.markers, resolveMarker],
+  );
+
   useEffect(() => {
     const queued = pendingScaleEnterSystemRef.current;
     if (!queued || phase !== "galaxy") return;
@@ -1872,6 +1928,140 @@ export default function UniverseApp({
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
       delete document.documentElement.dataset.universeScaleCancelledQueue;
+
+      if (currentPhase === "galaxy") {
+        const currentPosition = Math.min(
+          SYSTEM_SCALE_MIN,
+          Math.max(GALAXY_SCALE_MIN, worldScalePositionRef.current),
+        );
+
+        if (
+          direction === "out" &&
+          currentPosition <= GALAXY_SCALE_MIN + WORLD_SCALE_EPSILON
+        ) {
+          galaxyScaleTargetRef.current = null;
+          setGalaxyScaleTarget(null);
+          setWorldScaleContinuous(false);
+          delete document.documentElement.dataset.universeGalaxyScaleTarget;
+          delete document.documentElement.dataset.universeGalaxyScaleBridge;
+          // Fall through to retained native outward Galaxy travel.
+        } else {
+          const centerFocus =
+            galaxyScaleTargetRef.current ??
+            lockedGalaxyScaleFocusRef.current ??
+            galaxyScaleFocusRef.current;
+          const focus =
+            centerFocus ??
+            (galaxySoftFocusAvailableRef.current
+              ? defaultGalaxyScaleFocus
+              : null);
+
+          if (!focus) {
+            document.documentElement.dataset.universeScaleBlocked =
+              "no-galaxy-focus";
+            return;
+          }
+
+          const resolvedTarget = navigationCameraTarget(
+            focus,
+            galaxy.markers,
+          );
+          const nativeStarId =
+            resolvedTarget?.kind === "star"
+              ? resolvedTarget.nativeId
+              : resolvedTarget?.kind === "body"
+                ? resolvedTarget.starId
+                : null;
+
+          // Non-native observed/spatial targets retain their existing travel
+          // path. We do not invent a fake physical scale model for them.
+          if (!nativeStarId) {
+            if (direction === "in") {
+              beginGalaxyScaleTravel(focus);
+              return;
+            }
+          } else {
+            if (
+              direction === "in" &&
+              galaxySoftFocusAvailableRef.current
+            ) {
+              galaxySoftFocusAvailableRef.current = false;
+              document.documentElement.dataset.universeScaleSoftFocus =
+                centerFocus ? "consumed-center" : "consumed-fallback";
+            }
+
+            lockedGalaxyScaleFocusRef.current = focus;
+            if (galaxyScaleTargetRef.current?.id !== focus.id) {
+              galaxyScaleTargetRef.current = focus;
+              setGalaxyScaleTarget(focus);
+            }
+            document.documentElement.dataset.universeGalaxyScaleTarget =
+              focus.id;
+            document.documentElement.dataset.universeNavigationTarget =
+              nativeStarId;
+
+            continuousScaleIntentEpochRef.current += 1;
+            const intentEpoch = continuousScaleIntentEpochRef.current;
+            const nextPosition = applyGalaxyScaleWheel(
+              currentPosition,
+              event.deltaY,
+            );
+
+            if (
+              Math.abs(nextPosition - currentPosition) <=
+              WORLD_SCALE_EPSILON
+            ) {
+              return;
+            }
+
+            pendingScaleEnterSystemRef.current = null;
+            pendingWorldScaleStepsRef.current = 0;
+            setNavigationRequest(null);
+            setPendingDestinationId(null);
+            setPendingDestinationMode(null);
+            setNavigationStatus(null);
+            delete document.documentElement.dataset.universePendingDestination;
+            delete document.documentElement.dataset.universeScaleQueued;
+            delete document.documentElement.dataset.universeScaleBlocked;
+
+            worldScalePositionRef.current = nextPosition;
+            setWorldScalePosition(nextPosition);
+            setWorldScaleContinuous(true);
+            document.documentElement.dataset.universeScalePosition =
+              nextPosition.toFixed(3);
+            document.documentElement.dataset.universeScaleDirection =
+              direction;
+            document.documentElement.dataset.universeScaleProgress =
+              galaxyScaleSegmentProgress(nextPosition).toFixed(3);
+            document.documentElement.dataset.universeGalaxyScaleBridge =
+              "active";
+
+            if (
+              direction === "in" &&
+              nextPosition >=
+                SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+            ) {
+              // Keep the restored YEIS native-system endpoint on screen for
+              // one painted frame before product System assumes authority.
+              window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
+                  if (
+                    continuousScaleIntentEpochRef.current !== intentEpoch ||
+                    phaseRef.current !== "galaxy" ||
+                    worldScalePositionRef.current <
+                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+                  ) {
+                    return;
+                  }
+                  void commitGalaxyScaleFocusedSystem(focus);
+                });
+              });
+            }
+
+            return;
+          }
+        }
+      }
 
       if (isWorldScalePhase(currentPhase) && selectedPlanet) {
         const currentPosition = worldScalePositionRef.current;
@@ -1954,6 +2144,43 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
+          const retainedGalaxyTarget = galaxyScaleTargetRef.current;
+          if (retainedGalaxyTarget) {
+            continuousScaleIntentEpochRef.current += 1;
+            const nextPosition = applyGalaxyScaleWheel(
+              SYSTEM_SCALE_MIN,
+              event.deltaY,
+            );
+            setSystemScaleTargetPlanet(null);
+            worldScalePositionRef.current = nextPosition;
+            setWorldScalePosition(nextPosition);
+            setWorldScaleContinuous(true);
+            phaseRef.current = "galaxy";
+            setPhase("galaxy");
+            cameraSettledPhaseRef.current = null;
+            setCameraSettledPhase(null);
+            delete document.documentElement.dataset.universeCameraSettled;
+            delete document.documentElement.dataset.universeScaleSettled;
+            document.documentElement.dataset.universeScalePosition =
+              nextPosition.toFixed(3);
+            document.documentElement.dataset.universeScaleDirection =
+              direction;
+            document.documentElement.dataset.universeScaleProgress =
+              galaxyScaleSegmentProgress(nextPosition).toFixed(3);
+            document.documentElement.dataset.universeNavigationPhase =
+              "galaxy";
+            document.documentElement.dataset.universeGalaxyScaleTarget =
+              retainedGalaxyTarget.id;
+            document.documentElement.dataset.universeGalaxyScaleBridge =
+              "active";
+            replaceNavigationUrl({
+              phase: "galaxy",
+              destinationId: retainedGalaxyTarget.id,
+              navigationMode: "open",
+            });
+            return;
+          }
+
           setSystemScaleTargetPlanet(null);
           setWorldScaleContinuous(false);
           handleReturn();
@@ -2053,7 +2280,9 @@ export default function UniverseApp({
                 return;
               }
               if (destination) {
-                void handleNavigateDestination(destination);
+                void handleNavigateDestination(destination, {
+                  preserveGalaxyScaleBridge: true,
+                });
               } else {
                 setSelectedPlanet(targetPlanet);
                 setWorldScalePhase("approach");
@@ -2296,10 +2525,12 @@ export default function UniverseApp({
       activeEngine,
       beginGalaxyScaleTravel,
       cameraSettledPhase,
+      commitGalaxyScaleFocusedSystem,
       contentPlacements,
       defaultGalaxyScaleFocus,
       enterScaleFocusedSystem,
       galaxy.markers,
+      galaxyScaleTarget,
       handleContinuousScaleIntentStart,
       handleNavigateDestination,
       handleReturn,
@@ -2331,6 +2562,7 @@ export default function UniverseApp({
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
           worldScaleContinuous={worldScaleContinuous}
+          galaxyScaleTarget={galaxyScaleTarget}
           engineMode={activeEngine}
           markers={galaxy.markers}
           contentPlacements={contentPlacements}
