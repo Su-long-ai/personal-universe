@@ -6010,14 +6010,15 @@ test("fallback Surface terrain parks and resumes across reverse scale @webgl-hea
   await runtime.assertClean(testInfo);
 });
 
-test("desktop aspect ratios preserve comparable apparent scale", async ({
+test("mobile tablet desktop and ultrawide preserve comparable apparent scale", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
   const viewports = [
-    { width: 1920, height: 1080 },
-    { width: 2560, height: 1440 },
-    { width: 3440, height: 1440 },
+    { width: 390, height: 844, label: "mobile portrait" },
+    { width: 834, height: 1194, label: "tablet portrait" },
+    { width: 1920, height: 1080, label: "desktop 16:9" },
+    { width: 3440, height: 1440, label: "desktop ultrawide" },
   ];
   const normalizedRadii: number[] = [];
 
@@ -6058,18 +6059,26 @@ test("desktop aspect ratios preserve comparable apparent scale", async ({
     const normalizedRadius = projectedRadius / viewport.height;
     expect(
       normalizedRadius,
-      `${viewport.width}x${viewport.height} projected target should stay visibly framed`,
+      `${viewport.label} projected target should stay visibly framed`,
     ).toBeGreaterThan(0.15);
     expect(
       normalizedRadius,
-      `${viewport.width}x${viewport.height} projected target should not clip vertically`,
+      `${viewport.label} projected target should not clip vertically`,
     ).toBeLessThan(0.45);
+    expect(
+      projectedRadius * 2,
+      `${viewport.label} projected target should fit the horizontal viewport`,
+    ).toBeLessThan(viewport.width * 0.96);
+    expect(
+      await page.locator("canvas").count(),
+      `${viewport.label} should retain one renderer canvas`,
+    ).toBe(1);
     normalizedRadii.push(normalizedRadius);
   }
 
   expect(
     Math.max(...normalizedRadii) - Math.min(...normalizedRadii),
-    "desktop projected scale should remain comparable across 16:9 and ultrawide viewports",
+    "projected scale should remain comparable from mobile portrait through ultrawide",
   ).toBeLessThan(0.08);
 
   await runtime.assertClean(testInfo);
