@@ -76,6 +76,11 @@ export function CinematicPipeline({
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const useLiveWorld = liveWorld && !fallbackReason;
+  // SwiftShader does not need an offscreen composer while the live world is
+  // parked/fallback. Keep the same R3F renderer and camera authority, but draw
+  // the scene directly until explicit HIGH live rendering needs PlanetPass.
+  const renderWithComposer = !softwareRenderer || useLiveWorld;
+  const parkComposerTargets = softwareRenderer && !useLiveWorld;
   // Real-GPU System prewarm may allocate the same retained PlanetPass before
   // presentation begins. Software WebGL keeps the existing lazy policy so a
   // hidden target cannot create expensive live-renderer resources.
@@ -195,10 +200,45 @@ export function CinematicPipeline({
   }, [planetReleaseRef]);
 
   useEffect(() => {
+    const canvas = gl.domElement;
+    const html = document.documentElement;
+    const invalidateRecovery = (state: "lost" | "warming") => {
+      stableFrames.current = 0;
+      delete html.dataset.universeWorldReady;
+      delete html.dataset.universeWorldScreenshotReady;
+      html.dataset.universeWorldRecovery = state;
+    };
+    const onContextLost = () => invalidateRecovery("lost");
+    const onContextRestored = () => invalidateRecovery("warming");
+
+    canvas.addEventListener("webglcontextlost", onContextLost);
+    canvas.addEventListener("webglcontextrestored", onContextRestored);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", onContextLost);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
+      delete html.dataset.universeWorldRecovery;
+    };
+  }, [gl]);
+
+  useEffect(() => {
     if (composer.bloomPass) {
       composer.bloomPass.enabled = high;
     }
+    document.documentElement.dataset.universeWorldBloom =
+      composer.bloomPass?.enabled ? "on" : "off";
+    return () => {
+      delete document.documentElement.dataset.universeWorldBloom;
+    };
   }, [composer, high]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    html.dataset.universeWorldRenderPath =
+      renderWithComposer ? "composer" : "direct";
+    return () => {
+      delete html.dataset.universeWorldRenderPath;
+    };
+  }, [renderWithComposer]);
 
   useEffect(() => {
     if (!liveWorld) {
@@ -251,10 +291,19 @@ export function CinematicPipeline({
     composer.composer.setPixelRatio(
       Math.min(gl.getPixelRatio(), pixelRatioCap),
     );
-    composer.composer.setSize(size.width, size.height);
+    // Park SwiftShader's offscreen targets at 1x1 when the composer is not
+    // the active render path. Reusing the same composer avoids allocation churn;
+    // a live HIGH world restores viewport size before PlanetPass presentation.
+    composer.composer.setSize(
+      parkComposerTargets ? 1 : size.width,
+      parkComposerTargets ? 1 : size.height,
+    );
+    document.documentElement.dataset.universeWorldComposerTargets =
+      parkComposerTargets ? "parked-1x1" : "viewport";
   }, [
     composer,
     gl,
+    parkComposerTargets,
     pixelRatioCap,
     setDpr,
     size.height,
@@ -271,6 +320,10 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
       delete document.documentElement.dataset.universeWorldImpostorPixels;
       delete document.documentElement.dataset.universeWorldPlanetReleases;
+      delete document.documentElement.dataset.universeWorldRenderPath;
+      delete document.documentElement.dataset.universeWorldComposerTargets;
+      delete document.documentElement.dataset.universeWorldBloom;
+      delete document.documentElement.dataset.universeWorldRecovery;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
       composer.composer.dispose();
@@ -294,7 +347,14 @@ export function CinematicPipeline({
       appliedImpostorPixels.current = desiredImpostorPixels;
     }
 
-    composer.composer.render(delta);
+    if (renderWithComposer) {
+      composer.composer.render(delta);
+    } else {
+      // useFrame priority=1 owns the render step. Software fallback and parked
+      // views draw directly with the same renderer/camera instead of paying an
+      // offscreen RenderPass + OutputPass round trip.
+      gl.render(scene, camera);
+    }
 
     const html = document.documentElement;
     metricFrame.current += 1;
@@ -313,6 +373,9 @@ export function CinematicPipeline({
       delete html.dataset.universeWorldReady;
       delete html.dataset.universeWorldScreenshotReady;
       delete html.dataset.universeWorldImpostorPixels;
+      if (html.dataset.universeWorldRecovery === "warming") {
+        html.dataset.universeWorldRecovery = "idle";
+      }
       return;
     }
 
@@ -341,6 +404,12 @@ export function CinematicPipeline({
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
+      }
+      if (
+        presentationReady &&
+        html.dataset.universeWorldRecovery === "warming"
+      ) {
+        html.dataset.universeWorldRecovery = "ready";
       }
       return;
     }
@@ -387,6 +456,9 @@ export function CinematicPipeline({
         html.dataset.universeWorldScreenshotReady = "true";
       } else {
         delete html.dataset.universeWorldScreenshotReady;
+      }
+      if (html.dataset.universeWorldRecovery === "warming") {
+        html.dataset.universeWorldRecovery = "ready";
       }
     } else {
       delete html.dataset.universeWorldReady;
