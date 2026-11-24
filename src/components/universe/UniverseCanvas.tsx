@@ -1,6 +1,7 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -170,7 +171,10 @@ export function UniverseCanvas({
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
-  const [worldPaintReady, setWorldPaintReady] = useState(false);
+  const [worldPaintState, setWorldPaintState] = useState<{
+    identity: string;
+    ready: boolean;
+  }>({ identity: "", ready: false });
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -185,16 +189,30 @@ export function UniverseCanvas({
     phase === "atmosphere" ||
     phase === "surface";
 
+  const worldPaintIdentity =
+    `${worldPrewarmPlanet?.id ?? "none"}:${quality}`;
+  const worldPaintReady =
+    worldPaintState.identity === worldPaintIdentity &&
+    worldPaintState.ready;
+  const handleWorldPaintReady = useCallback(
+    (ready: boolean) => {
+      // Carry the concrete planet + quality identity with readiness. A late
+      // callback from the previous world can only write its old token; it can
+      // never authorize the newly selected world's System handoff.
+      setWorldPaintState({
+        identity: worldPaintIdentity,
+        ready,
+      });
+    },
+    [worldPaintIdentity],
+  );
+
   useEffect(() => {
-    // Paint readiness belongs to the concrete renderer capability, not only
-    // the planet identity. A quality switch can replace live ProceduralPlanets
-    // with a lightweight/software path (or the reverse) while the same planet
-    // remains selected. Reacquire first paint for camera/readiness consumers;
-    // only the actual System -> Approach boundary is allowed to retain System
-    // presentation as a fallback.
-    setWorldPaintReady(false);
+    // DOM diagnostics are capability-scoped too. The product handoff itself
+    // is already synchronously protected by the keyed state above, so this
+    // effect only clears the stale public diagnostic after an identity change.
     delete document.documentElement.dataset.universeWorldPaintReady;
-  }, [quality, worldPrewarmPlanet?.id]);
+  }, [worldPaintIdentity]);
 
   useEffect(() => {
     if (phase === "system" && systemScaleTargetPlanet) return;
@@ -321,7 +339,7 @@ export function UniverseCanvas({
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
               surfaceFallbackReady={surfaceFallbackReady}
-              onPaintReadyChange={setWorldPaintReady}
+              onPaintReadyChange={handleWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
             />
           )}
