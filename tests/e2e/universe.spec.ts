@@ -957,6 +957,10 @@ test("LOW Surface handoff keeps the globe until retained terrain is actually rea
     { timeout: 60_000 },
   );
   await expect(html).toHaveAttribute(
+    "data-universe-surface-terrain-ready-view",
+    "landing-prestream",
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-surface-renderer",
     "procedural-terrains-fallback",
   );
