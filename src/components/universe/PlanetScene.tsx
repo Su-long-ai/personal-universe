@@ -186,14 +186,14 @@ function LiveSurfaceAnchor({
         .slice(0, 2);
   const rankedContent = useMemo(
     () => rankSurfaceContentAnchors(profile.contentAnchors),
-    [profile.id],
+    [profile.contentAnchors],
   );
   const visibleContent = expanded
     ? rankedContent.slice(0, 6)
     : rankedContent.slice(0, 1);
   const rankedClusters = useMemo(
     () => rankSurfaceContentClusters(profile.contentClusters),
-    [profile.id],
+    [profile.contentClusters],
   );
   const visibleClusters = expanded
     ? rankedClusters.slice(0, 3)
