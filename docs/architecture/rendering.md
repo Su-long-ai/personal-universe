@@ -136,6 +136,13 @@ change. Manual camera movement and resize still refresh terrain normally; a
 stationary Surface no longer repeats identical SwiftShader work every frame.
 Real-GPU fallback keeps the package's normal per-frame update cadence.
 
+The retained Surface scene also consumes the same coordinator phase ref as a
+render-time visibility stop. A Surface -> Atmosphere wheel event mutates that
+ref synchronously; before the next R3F render the fallback group is hidden even
+if React reconciliation is delayed by software WebGL. This prevents one stale
+full terrain render from starving the reconciliation that would otherwise hide
+the scene through the normal `phase` prop.
+
 ## Fallback rules
 
 Fallbacks are product behavior, not hidden test exceptions:
