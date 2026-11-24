@@ -46,6 +46,36 @@ async function shot(
   });
 }
 
+async function dispatchVisualScaleWheel(page: Page, deltaY: number) {
+  await page.locator("main.universe-root").evaluate(
+    (root, value) => {
+      root.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+          deltaY: value,
+        }),
+      );
+    },
+    deltaY,
+  );
+}
+
+async function locateHeroScaleTarget(page: Page) {
+  await page.goto(
+    "/?destination=hero:aurora-01&navigation=locate&freeze=1",
+  );
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "hero:aurora-01",
+    { timeout: 20_000 },
+  );
+  return html;
+}
+
 async function waitForCameraSettled(
   page: Page,
   phase: "approach" | "orbit" | "atmosphere" | "surface" | "returning",
@@ -225,6 +255,110 @@ test("visual: desktop places open", async ({ page }, testInfo) => {
   });
 });
 
+test("visual: desktop Galaxy-System midpoint", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "galaxy-system-midpoint", async () => {
+    const html = await locateHeroScaleTarget(page);
+    await dispatchVisualScaleWheel(page, -96);
+    await dispatchVisualScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "0.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-bridge",
+      "active",
+      { timeout: 10_000 },
+    );
+    await expect
+      .poll(async () =>
+        Number(await html.getAttribute("data-universe-travel-arrival-ratio")),
+      )
+      .toBeGreaterThan(1);
+  });
+});
+
+test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "system-approach-midpoint", async () => {
+    const html = await locateHeroScaleTarget(page);
+    for (let sample = 0; sample < 4; sample += 1) {
+      await dispatchVisualScaleWheel(page, -96);
+    }
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "system",
+      { timeout: 10_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-system-renderer",
+      "yeis-native",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-handoff",
+      /galaxy-system:(?:paint|deadline)/,
+      { timeout: 10_000 },
+    );
+    expect(await page.locator("canvas").count()).toBe(1);
+
+    await dispatchVisualScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "1.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-camera-segment",
+      "system:approach",
+      { timeout: 10_000 },
+    );
+  });
+});
+
+test("visual: desktop Approach-Orbit midpoint", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "approach-orbit-midpoint", async () => {
+    await page.goto(
+      "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "approach");
+    const html = page.locator("html");
+
+    await dispatchVisualScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "2.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-camera-segment",
+      "approach:orbit",
+      { timeout: 10_000 },
+    );
+    await expectReadableWorldFrame(page, "Approach-Orbit midpoint");
+  });
+});
+
+test("visual: desktop Atmosphere-Surface midpoint", async ({ page }, testInfo) => {
+  await visualCase(page, testInfo, DESKTOP, "atmosphere-surface-midpoint", async () => {
+    await page.goto(
+      "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+    );
+    await waitForYeisEngine(page);
+    await waitForCameraSettled(page, "atmosphere");
+    const html = page.locator("html");
+
+    await dispatchVisualScaleWheel(page, -96);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "4.500",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-camera-segment",
+      "atmosphere:surface",
+      { timeout: 10_000 },
+    );
+    await expectReadableWorldFrame(page, "Atmosphere-Surface midpoint");
+  });
+});
+
 test("visual: desktop Personal Signal system", async ({ page }, testInfo) => {
   await visualCase(
     page,
@@ -393,6 +527,83 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
     },
   );
 });
+
+for (const viewport of [TABLET, MOBILE]) {
+  test(
+    `visual: ${viewport.name} System-Approach midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "system-approach-midpoint",
+        async () => {
+          const html = await locateHeroScaleTarget(page);
+          for (let sample = 0; sample < 4; sample += 1) {
+            await dispatchVisualScaleWheel(page, -96);
+          }
+          await expect(html).toHaveAttribute(
+            "data-universe-navigation-phase",
+            "system",
+            { timeout: 10_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-handoff",
+            /galaxy-system:(?:paint|deadline)/,
+            { timeout: 10_000 },
+          );
+          expect(await page.locator("canvas").count()).toBe(1);
+          await dispatchVisualScaleWheel(page, -96);
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "1.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-camera-segment",
+            "system:approach",
+            { timeout: 10_000 },
+          );
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
+
+  test(
+    `visual: ${viewport.name} Atmosphere-Surface midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "atmosphere-surface-midpoint",
+        async () => {
+          await page.goto(
+            "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          await waitForCameraSettled(page, "atmosphere");
+          const html = page.locator("html");
+          await dispatchVisualScaleWheel(page, -96);
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "4.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-camera-segment",
+            "atmosphere:surface",
+            { timeout: 10_000 },
+          );
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} Atmosphere-Surface midpoint`,
+          );
+          await expectCompactNarrowHud(page);
+        },
+      );
+    },
+  );
+}
 
 for (const viewport of [TABLET, MOBILE]) {
   test(`visual: ${viewport.name} galaxy`, async ({ page }, testInfo) => {
