@@ -180,12 +180,12 @@ export function SurfaceTerrain({
                 // window. The runtime streams no more than three chunks per
                 // scheduled update and keeps its clipmap at the minimum supported
                 // resolution.
-                chunkSize: 32,
-                viewRadius: 3,
-                triangleBudget: 35000,
-                maxCreatesPerFrame: 3,
-                streamBudgetMs: 0.6,
-                cacheResolution: 64,
+                chunkSize: SOFTWARE_TERRAIN_CHUNK_SIZE,
+                viewRadius: 2,
+                triangleBudget: 20000,
+                maxCreatesPerFrame: 2,
+                streamBudgetMs: 0.45,
+                cacheResolution: 48,
               }
             : {
                 // LOW-quality hardware fallback can afford a slightly broader
