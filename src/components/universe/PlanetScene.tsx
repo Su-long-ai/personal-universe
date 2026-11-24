@@ -655,19 +655,17 @@ export function PlanetScene({
     }
   });
 
-  if (phase === "surface" && fallbackReason) {
-    // UniverseCanvas owns the longer-lived fallback SurfaceScene. Keeping
-    // that host mounted across phase changes prevents FiniteTerrain.dispose()
-    // from landing on the Surface -> Atmosphere input-critical path.
-    return null;
-  }
+  const fallbackSurfaceOwnsPresentation =
+    phase === "surface" && Boolean(fallbackReason);
 
   return (
     <>
-      {presentationActive ? (
+      {presentationActive && !fallbackSurfaceOwnsPresentation ? (
         <color attach="background" args={["#000106"]} />
       ) : null}
-      <group visible={presentationActive}>
+      <group
+        visible={presentationActive && !fallbackSurfaceOwnsPresentation}
+      >
       <DeepSky />
       <Stars
         radius={78}
