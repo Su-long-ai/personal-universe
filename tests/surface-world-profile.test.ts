@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildSurfaceWorldProfile,
+  nextSurfaceClusterEntryId,
   rankSurfaceContentAnchors,
   rankSurfaceWorldLandmarks,
   rankSurfaceWorldPaths,
@@ -245,6 +246,58 @@ test("focused Surface context remains visible ahead of generic prominence", () =
     ),
     ["focus", "prominent"],
   );
+});
+
+test("cluster navigation cycles every signal in stable priority order", () => {
+  const anchors = [
+    {
+      id: "ambient",
+      entryId: "ambient",
+      title: "Ambient",
+      position: [0, 0] as [number, number],
+      cluster: 2,
+      priority: "ambient" as const,
+    },
+    {
+      id: "primary",
+      entryId: "primary",
+      title: "Primary",
+      position: [1, 0] as [number, number],
+      cluster: 2,
+      priority: "primary" as const,
+    },
+    {
+      id: "secondary",
+      entryId: "secondary",
+      title: "Secondary",
+      position: [2, 0] as [number, number],
+      cluster: 2,
+      priority: "secondary" as const,
+    },
+    {
+      id: "other-cluster",
+      entryId: "other",
+      title: "Other",
+      position: [3, 0] as [number, number],
+      cluster: 3,
+      priority: "primary" as const,
+    },
+  ];
+
+  assert.equal(nextSurfaceClusterEntryId(anchors, 2), "primary");
+  assert.equal(
+    nextSurfaceClusterEntryId(anchors, 2, "primary"),
+    "secondary",
+  );
+  assert.equal(
+    nextSurfaceClusterEntryId(anchors, 2, "secondary"),
+    "ambient",
+  );
+  assert.equal(
+    nextSurfaceClusterEntryId(anchors, 2, "ambient"),
+    "primary",
+  );
+  assert.equal(nextSurfaceClusterEntryId(anchors, 9), null);
 });
 
 test("focused guide paths promote only the associated generated landmark route", () => {
