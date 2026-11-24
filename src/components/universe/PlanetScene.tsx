@@ -877,7 +877,7 @@ export function PlanetScene({
       <Stars
         radius={78}
         depth={30}
-        count={softwareRenderer ? 600 : quality === "low" ? 600 : 1400}
+        count={softwareRenderer ? 600 : 1400}
         factor={1.6}
         saturation={0.16}
         fade
