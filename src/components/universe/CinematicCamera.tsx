@@ -18,6 +18,7 @@ import {
 } from "../../lib/universe/types";
 import {
   WORLD_SCALE_EPSILON,
+  continuousScaleResponse,
   isWorldScalePhase,
   scalePhaseIndex,
 } from "../../lib/universe/continuousScale";
@@ -483,7 +484,7 @@ export function CinematicCamera({
         1,
         Math.max(0, worldScalePosition - 1),
       );
-      const upT = linearUpT * linearUpT * (3 - 2 * linearUpT);
+      const upT = continuousScaleResponse(linearUpT);
       camera.up
         .set(0, 1, 0)
         .applyQuaternion(nativeSystemEntryQuaternion)
@@ -499,7 +500,9 @@ export function CinematicCamera({
       activeSurfaceCameraFrame &&
       worldScalePosition > 4
     ) {
-      const surfaceInfluence = Math.min(1, worldScalePosition - 4);
+      const surfaceInfluence = continuousScaleResponse(
+        Math.min(1, worldScalePosition - 4),
+      );
       camera.up
         .set(0, 1, 0)
         .lerp(
@@ -580,7 +583,7 @@ export function CinematicCamera({
         1,
         Math.max(0, worldScalePosition - 1),
       );
-      const t = linearT * linearT * (3 - 2 * linearT);
+      const t = continuousScaleResponse(linearT);
       const direction = systemDirection
         .lerp(approachDirection, t)
         .normalize();
@@ -709,9 +712,9 @@ export function CinematicCamera({
         lowerIndex === upperIndex
           ? 0
           : clampedPosition - lowerIndex;
-      // Smoothstep keeps velocity continuous at the authored shot anchors
-      // while remaining exactly reversible for the same scale coordinate.
-      const t = linearT * linearT * (3 - 2 * linearT);
+      // Preserve non-zero motion through authored anchors so continuous input
+      // reads as one descent rather than a sequence of eased cinematics.
+      const t = continuousScaleResponse(linearT);
 
       desiredPosition.current.lerpVectors(from.position, to.position, t);
       desiredTarget.current.lerpVectors(from.target, to.target, t);
