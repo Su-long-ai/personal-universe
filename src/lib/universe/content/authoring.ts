@@ -486,12 +486,15 @@ export function normalizeImportedContentBatch(
   input: unknown,
   options: { source?: string } = {},
 ): Record<string, unknown>[] {
-  const items =
-    Array.isArray(input)
-      ? input
-      : isRecord(input) && Array.isArray(input.items)
-        ? input.items
-        : [input];
+  let items: unknown[];
+  if (Array.isArray(input)) {
+    items = input;
+  } else if (isRecord(input) && Array.isArray(input.items)) {
+    rejectUnknownKeys(input, ["items"], "batch envelope");
+    items = input.items;
+  } else {
+    items = [input];
+  }
 
   const normalized = items.map((item, index) => {
     try {
@@ -848,6 +851,7 @@ export function validateUniverseContentCatalog(
 export function validateUniverseContentDestinations(
   entries: readonly UniverseContentEntry[],
   markers: readonly GalaxyMarker[],
+  nativeStarExists: (starId: string) => boolean = () => false,
 ): UniverseContentValidationIssue[] {
   const markerIds = new Set<string>();
   for (const marker of markers) {
@@ -859,7 +863,8 @@ export function validateUniverseContentDestinations(
   for (const entry of entries) {
     if (
       entry.placement === "pinned" &&
-      (!entry.starId || !markerIds.has(entry.starId))
+      (!entry.starId ||
+        (!markerIds.has(entry.starId) && !nativeStarExists(entry.starId)))
     ) {
       issues.push({
         code: "unknown_destination",
@@ -878,10 +883,17 @@ export function validateUniverseContentDestinations(
 export function assertUniverseContentCatalog(
   entries: readonly UniverseContentEntry[],
   markers?: readonly GalaxyMarker[],
+  nativeStarExists?: (starId: string) => boolean,
 ): void {
   const issues = [
     ...validateUniverseContentCatalog(entries),
-    ...(markers ? validateUniverseContentDestinations(entries, markers) : []),
+    ...(markers
+      ? validateUniverseContentDestinations(
+          entries,
+          markers,
+          nativeStarExists,
+        )
+      : []),
   ];
   if (issues.length === 0) return;
   throw new Error(

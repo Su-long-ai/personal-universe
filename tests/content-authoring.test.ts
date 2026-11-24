@@ -222,6 +222,14 @@ test("batch import normalizes deterministically and preserves import provenance"
       ]),
     /duplicate contentId/,
   );
+  assert.throws(
+    () =>
+      normalizeImportedContentBatch({
+        items: [],
+        unexpectedEnvelopeField: true,
+      }),
+    /batch envelope contains unknown field/,
+  );
 });
 
 test("authoring normalization rejects invalid URLs", () => {
@@ -290,6 +298,14 @@ test("pinned destinations are checked against canonical markers", () => {
     validateUniverseContentDestinations([pinned], []).some(
       (issue) => issue.code === "unknown_destination",
     ),
+  );
+  assert.equal(
+    validateUniverseContentDestinations(
+      [pinned],
+      [],
+      (starId) => starId === "c1",
+    ).length,
+    0,
   );
 });
 

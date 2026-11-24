@@ -160,6 +160,14 @@ const portfolio = defineCollection({
   loader: glob({
     base: "./src/content/portfolio",
     pattern: "**/*.{md,mdx,json}",
+    // Keep Astro's framework-level collection identity aligned with the
+    // persisted product identity. The fallback exists only so schema errors
+    // for missing contentId stay readable; valid records always use contentId.
+    generateId: ({ data, entry }) => {
+      const contentId =
+        typeof data.contentId === "string" ? data.contentId.trim() : "";
+      return contentId || entry.replace(/\.(?:md|mdx|json)$/i, "");
+    },
   }),
   schema: portfolioSchema,
 });
