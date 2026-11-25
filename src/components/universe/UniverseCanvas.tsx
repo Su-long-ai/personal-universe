@@ -204,6 +204,7 @@ export function UniverseCanvas({
     generation: number;
     ready: boolean;
   }>({ identity: "", generation: -1, ready: false });
+  const [systemHandoffReleased, setSystemHandoffReleased] = useState(false);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -373,12 +374,53 @@ export function UniverseCanvas({
   const prewarmLiveWorld =
     Boolean(worldPrewarmPlanet) &&
     (phase === "system" || closeWorldPhase);
-  const keepSystemForHandoff =
-    phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
   const handoffTargetPlanetId =
-    keepSystemForHandoff && worldPaintStarted
+    phase === "approach" && Boolean(selectedSystem) && worldPaintStarted
       ? worldPrewarmPlanet?.id ?? null
       : null;
+  const keepSystemForHandoff =
+    phase === "approach" &&
+    Boolean(selectedSystem) &&
+    (!worldPaintReady || !systemHandoffReleased);
+
+  useEffect(() => {
+    if (phase === "approach" && worldPaintStarted) return;
+    setSystemHandoffReleased(false);
+  }, [phase, worldPaintStarted]);
+
+  useEffect(() => {
+    if (
+      phase !== "approach" ||
+      !worldPaintReady ||
+      !handoffTargetPlanetId ||
+      systemHandoffReleased
+    ) {
+      return;
+    }
+
+    // React may batch the first-draw and paint-ready state updates on hosted
+    // R3F. Keep System mounted for two browser frames after the target transfer
+    // becomes concrete so YEIS can actually suppress the duplicated target
+    // before final presentation ownership is released.
+    let firstFrame = window.requestAnimationFrame(() => {
+      firstFrame = 0;
+      secondFrame = window.requestAnimationFrame(() => {
+        secondFrame = 0;
+        setSystemHandoffReleased(true);
+      });
+    });
+    let secondFrame = 0;
+
+    return () => {
+      if (firstFrame) window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [
+    handoffTargetPlanetId,
+    phase,
+    systemHandoffReleased,
+    worldPaintReady,
+  ]);
 
   useEffect(() => {
     const html = document.documentElement;
