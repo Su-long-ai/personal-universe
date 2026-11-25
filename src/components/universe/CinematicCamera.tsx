@@ -135,7 +135,10 @@ const SHOTS: Partial<Record<UniversePhase, CameraShot>> = {
     frameScale: SYSTEM_OVERVIEW_FRAME_SCALE,
   },
   approach: {
-    position: [1.35, 1.15, 13.6],
+    // Keep Approach on the same -Z hemisphere as Orbit, Atmosphere, and
+    // Surface. The old +Z endpoint made the continuous 2 → 3 midpoint cross
+    // the night side even though the planet remained geometrically large.
+    position: [1.35, 1.15, -13.6],
     target: [WORLD[0] - 0.15, WORLD[1] + 0.15, WORLD[2]],
     smoothTime: 1.28,
     maxSpeed: 28,
@@ -434,7 +437,18 @@ export function CinematicCamera({
       // Keep its fit distance as the safety floor, then choose a farther
       // vertical-composition distance with an aspect-aware horizontal cap.
       const aspect = viewportWidth / viewportHeight;
-      const preferredVerticalRadius = Math.min(0.26, 0.36 / frameScale);
+      const baseVerticalRadius = Math.min(0.28, 0.39 / frameScale);
+      // Very wide viewports make a correctly sized planet occupy too little
+      // of the central visual-acceptance region. Preserve the portrait fit
+      // behavior, but let wide screens move modestly closer while the exact
+      // camera-controls fit distance remains the no-clipping floor below.
+      const wideAspectRatio = aspect / (16 / 9);
+      const wideReadabilityBoost = Math.min(
+        1.4,
+        1 + Math.max(0, wideAspectRatio - 1) * 1.2,
+      );
+      const preferredVerticalRadius =
+        baseVerticalRadius * wideReadabilityBoost;
       const horizontalSafeVerticalRadius = Math.max(
         0.16,
         aspect * 0.44,
