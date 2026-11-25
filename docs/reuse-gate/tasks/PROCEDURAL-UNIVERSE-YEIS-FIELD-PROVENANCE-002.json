@@ -1,0 +1,137 @@
+{
+  "schema": 2,
+  "task_id": "PROCEDURAL-UNIVERSE-YEIS-FIELD-PROVENANCE-002",
+  "title": "Preserve field provenance in pinned YEIS population",
+  "scope": {
+    "level": "implementation",
+    "subject": "Correct observed versus inferred field metadata for pinned native catalogue stars and the Solar System without changing physical inputs, identity, navigation, capability, or rendering"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Reuse the existing approved population adapter and pinned YEIS astronomy. The pinned StarCatalog.info computes physical fields from photometry; Universe.starInfo can replace individual fields with measured X-ray binary host overrides. The bridge computes a period from orbital elements for non-simple native orbits, while simple orbits supply an explicit period. Make metadata reflect those sources and prove with actual bundled catalogue/native universe fixtures.",
+  "planned_files": [
+    "src/lib/universe/generation/population.ts",
+    "src/lib/universe/yeis/bridge.ts",
+    "tests/e2e/native-population.spec.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/data/StarCatalog.ts",
+      "finding": "The pinned catalogue derives stellar physical parameters from observed colour and magnitude. The source is already vendored and validated locally; keep values and mark estimates as inferred."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/Universe.ts",
+      "finding": "The pinned Universe overlays measured host fields and owns canonical system generation/cache. Reuse its measurements rather than adding a new data provider or cache."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber remains the adopted rendering lifecycle host. Population provenance is data metadata and does not justify a new renderer, scene graph, or runtime framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse pinned YEIS, its native observed catalogue and explicit host measurement overrides."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the current R3F host unchanged; the adapter is pure population metadata and diagnostics."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Refine field metadata in the existing shared adapter and use the existing pinned native orbital data without recomputing a new source of truth."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "Existing project metadata helpers and the native YEIS cache are sufficient; another cache, schema package, or astronomy library would duplicate authority."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "pinned-yeis-native-population-adapter",
+      "name": "Thin population adapter over pinned MIT YEIS native systems",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current YEIS bridge plus approved population metadata contract",
+      "license": "MIT pinned YEIS plus project adapter",
+      "decision": "reuse",
+      "reason": "Preserves native star/system identity, bounded native caching, reference frames, localization, and renderer ownership while adding only provenance/capability metadata.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "second-native-population-cache",
+      "name": "Parallel project-owned cache and native system graph",
+      "level": "component_asset",
+      "source": "New custom machinery",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Duplicates Universe.system() caching and risks stale localized names plus identity divergence."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Correctly distinguish stellar catalog identities, photometric estimates, and actual field overrides",
+      "importance": "high",
+      "coverage": {
+        "pinned-yeis-native-population-adapter": "full",
+        "second-native-population-cache": "none"
+      },
+      "decision": "Reuse the catalogue and measured-host data already consumed by the existing adapter."
+    },
+    {
+      "capability": "Distinguish reported Solar orbital periods from approximations without changing physical orbits",
+      "importance": "high",
+      "coverage": {
+        "pinned-yeis-native-population-adapter": "full",
+        "second-native-population-cache": "none"
+      },
+      "decision": "Use existing native orbit provenance: explicit simple periods are reported, bridge approximations are inferred."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "pinned-yeis-native-population-adapter"
+    ],
+    "rationale": "The current pinned native graph already provides authoritative identities and explicit measurement overrides. Repair inaccurate labels within the existing adapter and cover the behavior using actual bundled data and the existing browser harness.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a measurement source is not available, stay conservative and mark the existing estimate as inferred; do not add a second catalogue or astronomy model."
+  }
+}
