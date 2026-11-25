@@ -342,11 +342,11 @@ select {
   .universe-hud {
     top: 16px;
     left: 16px;
-    padding: 10px 12px;
+    padding: 8px 12px;
   }
 
   .hud-content {
-    margin-top: 12px;
+    margin-top: 8px;
   }
 
   .hud-status strong {
@@ -355,7 +355,7 @@ select {
   }
 
   .hud-destination {
-    margin: 12px 0;
+    margin: 6px 0;
     padding-left: 10px;
   }
 
@@ -380,7 +380,7 @@ select {
   }
 
   .hud-return {
-    margin-top: 8px;
+    margin-top: 6px;
   }
 }
 
