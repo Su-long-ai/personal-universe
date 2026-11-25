@@ -186,7 +186,12 @@ existing semantic handoff because ProceduralTerrains intentionally owns a
 different local surface frame. A live ProceduralPlanets world instead exposes
 its terrain-derived Surface frame while the coordinate is still inside that
 final segment, allowing the primary path to interpolate all the way to the
-landing frame.
+landing frame. Once that frame becomes active at position > 4, the same live
+planet's subtle idle rotation is locked until reversal reaches <= 4. The
+terrain-derived frame and rendered landing patch therefore keep one transform
+through the whole 4 -> 5 -> 4 interval instead of drifting relative to each
+other; the anchor itself resolves once per activation rather than resampling
+the same static surface every frame.
 
 The product reuses ProceduralPlanets inside that host:
 
@@ -196,21 +201,52 @@ The product reuses ProceduralPlanets inside that host:
 - the System renderer remains mounted across the semantic boundary until the
   close world has participated in two real composer frames, so lazy import or
   shader warmup cannot expose an empty Canvas;
-- one `PlanetPass` is allocated with the stable EffectComposer and is enabled
-  or parked as presentation changes; phase changes do not dispose and recreate
-  the composer/pass pair;
+- on real GPU paths the retained `PlanetPass` and its single
+  `PlanetRenderer` host are provisioned as soon as the System target is locked,
+  while System still owns presentation; this moves synchronous renderer host /
+  ProgramWarmer construction away from the handoff edge without starting
+  target-specific `prepare()` work. Software WebGL keeps that allocation lazy
+  until live presentation so hidden prewarm cannot create expensive hosted-
+  runner resources. The pass is then enabled or parked as presentation changes,
+  and phase changes never dispose/recreate the composer/pass pair;
 - LOW quality always uses the lightweight fallback;
 - AUTO quality falls back on software renderers such as SwiftShader/llvmpipe;
 - HIGH quality explicitly requests the live renderer and is used by the
   release visual acceptance test.
 
+The handoff exposes separate readiness layers instead of collapsing them into
+one boolean:
+
+1. `data-universe-world-scene-ready` means the close-world React/R3F scene is
+   mounted. It is not permission to remove System presentation.
+2. `data-universe-world-capability` identifies the concrete renderer capability
+   selected for the current planet/quality/hardware identity.
+3. `data-universe-world-paint-ready="true"` means that concrete renderer has
+   participated in real visible frames. This is the only renderer signal used
+   by `CinematicCamera` settlement and the System -> Approach presentation
+   handoff.
+4. `data-universe-camera-settled` remains camera-controls' physical arrival
+   signal. It cannot be published for a close-world phase before first paint.
+5. `data-universe-world-ready` and
+   `data-universe-world-screenshot-ready` belong to pipeline convergence and
+   capture acceptance. They may be stricter than first paint and never act as
+   substitutes for it.
+
+Returning to System invalidates first-paint authority even though the same
+Planet/material resources remain warm. Re-entering Approach must therefore
+paint the retained renderer again before System presentation is released.
+Quality or planet identity changes invalidate the same token for the replacement
+renderer, preventing readiness from leaking across capabilities.
+
 Runtime evidence:
 
 - `data-universe-world-renderer`
+- `data-universe-world-capability`
 - `data-universe-world-pipeline`
 - `data-universe-world-ready`
+- `data-universe-world-screenshot-ready`
 - `data-universe-world-scene-ready`
-- `data-universe-world-scene-lifecycle="prewarming|active"`
+- `data-universe-world-scene-lifecycle="prewarming|active|parked"`
 - `data-universe-world-paint-ready="true"`
 - `data-universe-world-pipeline-lifecycle="parked|active"`
 - `data-universe-world-pipeline-allocations`
@@ -233,10 +269,21 @@ disposed with the component. It adds no draw call, downloaded asset, custom
 shader or second planet renderer. Explicit LOW quality intentionally retains
 the older solid lightweight representation.
 
+The software fallback texture is retained per planet for the shared Canvas
+lifetime instead of being keyed to the active quality selector. LOW still uses
+the intentional solid lightweight material, but switching LOW -> AUTO reuses
+the already-generated map rather than rebuilding the DataTexture. HIGH on
+software may keep that tiny map parked underneath the live world so a later
+AUTO fallback can resume without CPU texture generation on the quality-change
+path.
+
 Runtime evidence:
 
 - `data-universe-world-fallback-surface="generated-texture"` identifies the
-  AUTO/software generated-map path.
+  active AUTO/software generated-map path;
+- `data-universe-world-fallback-texture-allocations` counts generated fallback
+  map allocations and remains stable across LOW/AUTO/HIGH switches for one
+  planet.
 
 ## Surface continuity
 
@@ -275,21 +322,51 @@ terrain subsystem, not a second terrain engine. The fallback publishes
 `"infinite-hardware"`.
 
 Task `SURFACE-FALLBACK-LIFETIME-001` still owns the resource lifetime. The
-fallback begins preparing during the inward Atmosphere interval at an
-idle/stable boundary instead of waiting for the Surface boundary. If navigation
-reverses before construction begins, the scheduled prime is cancelled. Once
-created, one retained Infinite World instance is reused; leaving Surface hides
-the same scene and pauses its `terrain.update` call, but does not synchronously
-dispose streamed GPU/chunk resources on the wheel transition path. The retained
-instance is disposed only when its R3F Canvas host is actually destroyed. This remains a bounded one-instance residency tradeoff,
-not a terrain cache and not a second renderer or navigation authority.
+fallback begins real terrain construction and driver preparation during the
+inward Atmosphere interval at the first idle/stable boundary instead of merely
+mounting a dormant component and deferring `createInfiniteTerrain().prepare()`
+until Surface. Once the instance exists, the hidden Atmosphere phase also uses
+the detached landing view for bounded destination-ring streaming, so coordinate
+5 does not have to start camera-centred chunk creation from zero. If navigation
+reverses before construction begins, the scheduled prime is cancelled. The
+idle callback re-checks the navigation coordinator's synchronous `phaseRef`
+both before scheduling construction and again at enable time, so a saturated
+software renderer cannot let a stale Atmosphere effect cross into
+non-interruptible terrain preparation after outward intent. If reversal happens
+after construction has begun, hidden streaming pauses immediately and the same
+instance remains retained/parked for the next inward journey rather than being
+restarted.
+
+At coordinate 5, fallback presentation has an explicit readiness handoff. The
+lightweight close-world globe remains the visible authority while the terrain is
+still deferred/preparing. ProceduralTerrains Infinite World is camera-centred,
+so hidden preparation uses a detached, non-rendered view at the exact fallback
+landing frame rather than the still-visible globe camera. This view has no input
+or tween authority; camera-controls remains the only product camera.
+
+`SurfaceTerrain` publishes ready only after the complete initial radial chunk
+ring exists around that landing view. Only then does the retained terrain become
+the Surface renderer, the product camera begin its fallback local-frame move,
+the close-world scene enter `parked`, and pipeline/screenshot readiness become
+eligible. This keeps navigation coordinate ownership direct while preventing a
+semantic Surface state from exposing either a partially streamed horizon or a
+"ready" ring centred on the previous globe camera.
+
+Once created, one retained Infinite World instance is reused; leaving Surface
+hides the same scene and pauses its `terrain.update` call, but does not
+synchronously dispose streamed GPU/chunk resources on the wheel transition path.
+The retained instance is disposed only when its R3F Canvas host is actually
+destroyed. This remains a bounded one-instance residency tradeoff, not a terrain
+cache and not a second renderer or navigation authority.
 
 Runtime evidence:
 
 - `data-universe-surface-terrain-lifecycle="active"` while fallback Surface is visible;
 - `data-universe-surface-terrain-lifecycle="parked"` after leaving Surface while the Canvas remains alive;
 - `data-universe-surface-terrain-profile="infinite-software|infinite-hardware"` identifies the retained fallback world budget;
-- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` exposes the cancellable prime lifecycle.
+- `data-universe-surface-terrain-allocations` counts actual Infinite World construction attempts so rapid reversals/re-entry can prove the retained instance stayed singular;
+- `data-universe-surface-terrain-ready-view="landing-prestream"` proves the accepted initial ring was streamed around the destination Surface view before presentation took ownership;
+- `data-universe-surface-prewarm="scheduled|cancelled|preparing|ready"` distinguishes an idle prime cancelled before construction from an already-started retained preparation that may finish while parked.
 
 Task `SURFACE-SOFTWARE-VISUAL-PROFILE-001` tested whether the software
 fallback could gain useful visual depth from ProceduralTerrains' existing
@@ -378,11 +455,101 @@ Fallbacks are product behavior, not hidden test exceptions:
 Task `SCALE-RENDERER-CONTINUITY-001` moves the ownership boundary outward
 without adding another renderer: once a planet focus is locked, the existing
 close-world scene may prewarm while System still presents. The System scene
-remains visible until the close world reports real painted frames, and the
-EffectComposer plus PlanetPass are parked rather than rebuilt when presentation
-is inactive. The same Planet/material/LOD identity therefore survives forward
-and reverse travel. LOW/AUTO-software retain the same Surface terrain instance,
-with cancellable Atmosphere-time preparation before the final boundary.
+remains visible until the close world reports real painted frames. The
+EffectComposer is now allocated once for the shared Canvas lifetime instead of
+being keyed to LOW/AUTO/HIGH capability. PlanetPass is provisioned lazily only
+when a live world is first requested, then retained and parked across later
+fallback/quality switches; bloom is likewise retained and toggled rather than
+rebuilt. This keeps AUTO/software cheap before a live request while preventing
+quality changes from reallocating the complete post-processing chain. The live
+ProceduralPlanets world follows the same lifetime rule: its resource identity is
+planet + renderer class, not the current LOW/AUTO/HIGH selector. The package
+marks `chunkRes` and `maxDepth` as structural rebuild keys, so real-GPU
+quality does not blindly toggle those through `Planet.set()`. Warmup freezes
+the first requested live structural tier: a direct HIGH entry constructs 32/6
+immediately with no throwaway AUTO world, while an AUTO entry constructs 24/5.
+An AUTO-first Planet promotes once to 32/6 on its first later HIGH request, and
+that structural tier is never demoted for that Planet. Repeated LOW/AUTO/HIGH
+cycles therefore cannot repeatedly throw away its LOD world.
+Non-structural cloud quality, cloud resolution and split factor still follow
+AUTO/HIGH through the package's live `Planet.set()` API. The last applied
+dynamic profile is tracked per Planet, so a temporary LOW fallback followed by a
+return to the same live quality does not even repeat that update. Software HIGH
+keeps the bounded hosted-runner profile. Switching temporarily to a fallback
+mode hides and parks that same live Planet instead of disposing it, so returning
+to a live capability reuses the warmed world immediately. AUTO keeps its cheaper
+initial structure unless the visitor has explicitly requested HIGH. LOW/AUTO-
+software retain the same Surface terrain instance, with cancellable Atmosphere-
+time preparation before the final boundary. Once a destination has actually
+entered System/close-world ownership, UniverseCanvas also keeps that
+PlanetScene mounted and parked through the reverse Galaxy endpoint while the
+same Galaxy destination remains captured. The target's destination id is the
+retention key: changing/clearing the Galaxy target unmounts the old world and
+releases its GPU resources, so this is one bounded retained world rather than a
+growing cache. Software WebGL never begins construction of a missing live
+Planet while that retained scene is hidden; it only reuses an already-warmed
+instance there. Parked PlanetScene paint polling and live-only pipeline
+diagnostics also stop, and the retained Surface beacon animation pauses when
+Surface is not presenting. Hardware-only Surface rock glTF loading is isolated
+behind the real-GPU decoration subtree, so software fallback never fetches,
+parses or compiles those unused assets.
+
+When a captured destination is actually replaced, the retained pipeline also
+follows ProceduralPlanets' native removal contract: the sole `PlanetRenderer`
+owner calls `release(planet)` before the caller-owned `Planet` is disposed.
+Ordinary scale reversal does not trigger that release because the same world is
+only parked; target replacement does, so renderer-side impostor/cache residency
+cannot accumulate until Canvas teardown.
+
+Runtime evidence:
+
+- `data-universe-world-pipeline-allocations` counts shared composer allocation;
+- `data-universe-world-planet-pass-allocations` counts lazy PlanetPass allocation;
+- `data-universe-world-planet-allocations` counts live Planet construction;
+- `data-universe-world-live-profile` reports the currently active retained
+  dynamic profile (`gpu-auto`, `gpu-high`, or `software-high`);
+- `data-universe-world-live-profile-updates` counts actual dynamic
+  `Planet.set()` profile applications;
+- `data-universe-world-live-structure` reports the retained structural tier;
+- `data-universe-world-structural-promotions` counts one-way AUTO -> HIGH LOD
+  promotions;
+- `data-universe-world-impostor-pixels` reports the retained PlanetRenderer's
+  active impostor threshold. PlanetRenderer is lazy inside PlanetPass, so the
+  pipeline applies the current threshold as soon as the renderer appears and
+  does not credit that creation frame as first-paint evidence.
+
+Live first-paint authority is also renderer-derived rather than a component-age
+heuristic. The retained PlanetPass increments
+`data-universe-world-live-draw-frame` only after an actual PlanetRenderer frame
+reports at least one drawn planet and `pending=0`. PlanetScene snapshots that
+counter when capability/presentation authority changes and exposes two stages.
+The first concrete matched draw publishes
+`data-universe-world-paint-started="true"`; UniverseCanvas then transfers only
+the selected target body's presentation from System to close-world. The pinned
+YEIS path reuses `BodyRenderer.byId` and hides that target `BodyView.group`
+after the ordinary YEIS update, while the prototype fallback simply omits the
+matching keyed `PlanetBody`. The star, orbit context and every other System
+body remain visible. After two consecutive matched draw stamps PlanetScene
+publishes `data-universe-world-paint-ready="true"`, and only then may the whole
+System renderer leave. This removes the duplicate target planet without a fade,
+mask, second renderer or blank ownership gap.
+
+UniverseCanvas keys both paint-started and paint-ready authority by
+`planet id + quality` rather than storing unqualified booleans. The current
+identity is mirrored in a ref, so a callback whose captured identity is already
+stale is discarded before it can mutate parent readiness at all. Old cleanup
+work therefore cannot either authorize a new world or revoke a new world's
+already-earned authority. Runtime diagnostics
+`data-universe-system-handoff-target` and
+`data-universe-system-target-suppressed` make the intermediate ownership stage
+machine-verifiable.
+
+Live pipeline convergence tokens are capability-scoped. Entering any fallback
+mode clears the retained PlanetPass consecutive-stable-frame counter; returning
+to live rendering must earn fresh `pending=0` frames before
+`data-universe-world-ready` / screenshot readiness can be republished. First
+paint remains a separate earlier authority and only requires that the concrete
+`procedural-planets-pass` is installed and has painted consecutive frames.
 
 Large renderer paths are lazy-loaded. The pinned native current-system LOD
 resources now live inside the YEIS Galaxy scene for coordinate 0→1 and are
@@ -395,9 +562,11 @@ Atmosphere → Surface boundary; React keeps the same close-world component and
 the same compositor path alive. The software/LOW Surface fallback is the one
 intentional exception: after its first use, one generic ProceduralTerrains
 instance remains parked under the shared Canvas so Surface → Atmosphere does not
-perform synchronous resource destruction in the input-critical path. Galaxy,
-system and live close-world rendering still do not need to remain resident
-together, and no additional camera or destination authority is introduced.
+perform synchronous resource destruction in the input-critical path. Only one close-world destination is retained at a time. It may coexist parked
+with Galaxy for a captured reverse endpoint and may coexist visibly with System
+for the short two-stage first-paint handoff above, but neither case introduces a
+second Canvas, renderer, camera or destination authority. Clearing/changing the
+captured destination releases the retained close-world resource set.
 
 The product release gate validates both semantic arrival and renderer readiness;
 screenshots remain evidence, not the authority for navigation state.
