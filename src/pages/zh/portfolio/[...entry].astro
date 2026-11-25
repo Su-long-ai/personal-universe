@@ -1,0 +1,8 @@
+---
+import PortfolioPage from "../../../components/portfolio/PortfolioPage.astro";
+import { portfolioStaticPaths, type PortfolioPageProps } from "../../../lib/portfolio/content";
+
+export const getStaticPaths = portfolioStaticPaths;
+type Props = PortfolioPageProps;
+---
+<PortfolioPage {...Astro.props} locale="zh" />

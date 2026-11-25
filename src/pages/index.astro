@@ -1,6 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import UniverseApp from "../components/universe/UniverseApp";
+import PortfolioHomeFallback from "../components/portfolio/PortfolioHomeFallback.astro";
 import type { UniverseContentEntry } from "../lib/universe/content";
 
 const portfolio = await getCollection("portfolio", ({ data }) => !data.draft);
@@ -64,5 +65,6 @@ const socialPreviewUrl = new URL(
   </head>
   <body>
     <UniverseApp client:load contentEntries={contentEntries} />
+    <PortfolioHomeFallback />
   </body>
 </html>

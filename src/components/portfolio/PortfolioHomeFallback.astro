@@ -1,0 +1,66 @@
+---
+import { portfolioPath } from "../../lib/portfolio/paths";
+---
+<!-- This HTML is a sibling of the hydrated 3D island, not its React fallback. -->
+<noscript>
+  <style is:inline>
+    body > astro-island { display: none !important; }
+    #portfolio-home-fallback { display: grid !important; }
+  </style>
+</noscript>
+
+<main id="portfolio-home-fallback">
+  <div class="fallback-inner">
+    <small>PERSONAL UNIVERSE</small>
+    <h1>Explore the work without 3D.</h1>
+    <p>This text edition opens the same authored projects without using the 3D renderer.</p>
+    <p lang="zh-CN">无需 3D 渲染，也可以查看作品。</p>
+    <nav aria-label="Portfolio languages">
+      <a href={portfolioPath("en")}>Browse the portfolio <span aria-hidden="true">→</span></a>
+      <a href={portfolioPath("zh")} lang="zh-CN">查看作品（中文） <span aria-hidden="true">→</span></a>
+    </nav>
+  </div>
+</main>
+
+<style is:global>
+  /* R3F startup failure removes its React tree, not the server-rendered
+     portfolio sibling. Do not create another context just to test WebGL. */
+  body > astro-island:has(> .universe-root) ~ #portfolio-home-fallback {
+    display: none;
+  }
+</style>
+
+<style>
+  #portfolio-home-fallback {
+    box-sizing: border-box;
+    block-size: 100vh;
+    block-size: 100dvh;
+    display: grid;
+    overflow: auto;
+    place-items: safe center;
+    padding: clamp(20px, 6vw, 88px);
+    font: 1rem/1.6 system-ui, sans-serif;
+    color: #edf7ff;
+    background: radial-gradient(ellipse at 85% 12%, #143047 0, transparent 55%), #070d16;
+  }
+  .fallback-inner { inline-size: min(100%, 42rem); }
+  small { color: #8bdae4; letter-spacing: .16em; }
+  h1 {
+    font-size: clamp(2.15rem, 7vw, 4rem);
+    line-height: 1.08;
+    margin: .55em 0 .45em;
+    text-wrap: balance;
+  }
+  p { color: #bacad9; margin: 0 0 .5em; max-inline-size: 40rem; }
+  nav { display: flex; flex-wrap: wrap; gap: .75rem; margin-block-start: 1.7rem; }
+  a {
+    color: #dcfaff;
+    background: #12283a;
+    border: 1px solid #4a7082;
+    border-radius: .25rem;
+    padding: .7rem .9rem;
+    min-block-size: 44px;
+    text-decoration: none;
+  }
+  a:hover, a:focus-visible { border-color: #a2e7ec; text-decoration: underline; }
+</style>
