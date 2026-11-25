@@ -357,6 +357,14 @@ export default function UniverseApp({
       worldScalePositionRef.current = position;
       document.documentElement.dataset.universeScalePosition =
         position.toFixed(3);
+      const activePhase = phaseRef.current;
+      document.documentElement.dataset.universeHandoffState =
+        activePhase === "system" && position > SYSTEM_SCALE_MIN
+          ? "system:approach"
+          : (activePhase === "atmosphere" || activePhase === "surface") &&
+              position > 4
+            ? "atmosphere:surface"
+            : "stable";
       pendingWorldScaleRenderPositionRef.current = position;
       if (immediate) {
         if (worldScaleRenderFrameRef.current !== null) {
@@ -585,12 +593,17 @@ export default function UniverseApp({
               : "transition";
     document.documentElement.dataset.universeRenderAuthority = authority;
 
-    if (phase === "system" && worldScalePosition > SYSTEM_SCALE_MIN) {
+    const committedPhase = phaseRef.current;
+    const committedPosition = worldScalePositionRef.current;
+    if (
+      committedPhase === "system" &&
+      committedPosition > SYSTEM_SCALE_MIN
+    ) {
       document.documentElement.dataset.universeHandoffState =
         "system:approach";
     } else if (
-      (phase === "atmosphere" || phase === "surface") &&
-      worldScalePosition > 4
+      (committedPhase === "atmosphere" || committedPhase === "surface") &&
+      committedPosition > 4
     ) {
       document.documentElement.dataset.universeHandoffState =
         "atmosphere:surface";
