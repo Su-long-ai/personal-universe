@@ -1,0 +1,227 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-SCALE-DENSITY-V1-001",
+  "title": "Scale-aware discovery density and authored hierarchy",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Make the existing Places/Navigator presentation density scale-aware across Galaxy and System while preserving full Search/filter long-tail access and authored personal hierarchy"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Agent 07 requires discovery density to change with scale and generated/catalog filler not to overwhelm authored content. Personal Universe already has one continuous 0..5 scale coordinate, canonical grouped Places sections, React-derived presentation and YEIS/native navigation. Reuse those authorities: pass the current continuous scale coordinate into Navigator, apply deterministic per-section presentation budgets only to the default empty-query All view, spotlight only high-importance/featured Personal Signals so lower-priority authored items can remain visible under their semantic Projects/Research/etc groups, and leave Search plus explicit Personal/Important/Nearby/Recent filters uncapped by the default density profile. This is DOM/presentation budgeting, not renderer LOD or a second content index.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/beevr-labs/Cosmos",
+      "finding": "Cosmos demonstrates scale-regime and LOD concepts for large browser universes, but replacing Personal Universe discovery/rendering would be disproportionate; reuse the existing continuous scale coordinate as a presentation-density signal."
+    },
+    {
+      "url": "https://react.dev/reference/react/useMemo",
+      "finding": "React memoized derived presentation is sufficient for deterministic section budgets without changing the canonical destination graph or adding persistent state."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing Playwright acceptance can compare Galaxy/System visible row budgets and verify Search/filter paths still expose the long tail."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "cosmos-web-universe",
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain Personal Universe on pinned YEIS and borrow only the scale-regime/LOD principle; do not replace the product with another universe engine."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use existing React derived presentation and the existing continuous scale value; no new reactive or virtualization framework is required at current volume."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep YEIS navigation/catalog resolution intact and budget only the product Places rows rendered by the existing Navigator."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse hosted Playwright to validate scale-aware DOM density and long-tail accessibility through real product surfaces."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-scale-aware-places-budget",
+      "name": "Continuous-scale-derived Places presentation budgets",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing continuous 0..5 scale plus canonical Places sections",
+      "license": "project product layer over pinned MIT YEIS",
+      "decision": "reuse",
+      "reason": "Changes only visible default Places density while keeping one canonical graph, full Search/filter access, navigation identity and renderer ownership.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-derived-density",
+      "name": "React memoized section budgeting",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseNavigator",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Deterministically derives a small visible set from already-loaded sections and avoids extra index/database/state machinery.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "virtualized-discovery-list",
+      "name": "Third-party list virtualization for Navigator",
+      "level": "component_asset",
+      "source": "Generic virtual-list libraries",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "Default Places should not render hundreds of rows in the first place; bounded semantic budgets solve product comprehension and DOM size at lower integration cost."
+    },
+    {
+      "id": "renderer-owned-content-lod",
+      "name": "Renderer-owned discovery LOD/state",
+      "level": "subsystem",
+      "source": "New renderer/discovery coupling",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would violate Agent 07 coordination boundaries by moving discovery policy into renderer/camera ownership and would duplicate the continuous scale coordinator."
+    },
+    {
+      "id": "playwright-density-contract",
+      "name": "Existing hosted Playwright density acceptance",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current release E2E suite",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Can prove Galaxy/System density differences and long-tail Search access without a separate performance or discovery harness.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Galaxy default Places emphasizes major authored/system-level signals with bounded DOM rows",
+      "importance": "high",
+      "coverage": {
+        "existing-scale-aware-places-budget": "full",
+        "react-derived-density": "full",
+        "virtualized-discovery-list": "partial",
+        "renderer-owned-content-lod": "partial",
+        "playwright-density-contract": "partial"
+      },
+      "decision": "Apply low Galaxy limits per semantic section and only spotlight featured/high-importance Personal Signals in the catch-all Personal group."
+    },
+    {
+      "capability": "System scale exposes more body/local destinations without changing canonical identity",
+      "importance": "high",
+      "coverage": {
+        "existing-scale-aware-places-budget": "full",
+        "react-derived-density": "full",
+        "virtualized-discovery-list": "partial",
+        "renderer-owned-content-lod": "partial",
+        "playwright-density-contract": "partial"
+      },
+      "decision": "Interpolate section limits from Galaxy to System using the existing continuous scale coordinate, with a larger body budget at System."
+    },
+    {
+      "capability": "Search and explicit filters retain long-tail discoverability",
+      "importance": "high",
+      "coverage": {
+        "existing-scale-aware-places-budget": "full",
+        "react-derived-density": "full",
+        "virtualized-discovery-list": "full",
+        "renderer-owned-content-lod": "none",
+        "playwright-density-contract": "partial"
+      },
+      "decision": "Apply scale budgets only to empty-query All Places; explicit filters and Search operate on the full canonical candidate set."
+    },
+    {
+      "capability": "Generated/catalog content does not overwhelm authored personal hierarchy",
+      "importance": "high",
+      "coverage": {
+        "existing-scale-aware-places-budget": "full",
+        "react-derived-density": "full",
+        "virtualized-discovery-list": "none",
+        "renderer-owned-content-lod": "partial",
+        "playwright-density-contract": "partial"
+      },
+      "decision": "Reserve authored spotlight capacity and deterministic per-category quotas before generic catalog rows."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-scale-aware-places-budget",
+      "react-derived-density",
+      "playwright-density-contract"
+    ],
+    "rationale": "Use the product's existing continuous scale coordinate solely as a deterministic presentation-density input. Canonical graph, Search, explicit filters, navigation state and renderer/camera ownership remain unchanged.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "virtualized-discovery-list",
+        "reason": "Virtualization optimizes an oversized list but does not solve the product problem of presenting too much generic content by default."
+      },
+      {
+        "candidate_id": "renderer-owned-content-lod",
+        "reason": "Renderer-side policy would couple content discovery to another agent's domain and duplicate scale/navigation authority."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If future catalogs become too large even after semantic quotas, virtualize only the already-ranked visible-result surface; never move canonical identity or ranking ownership into the renderer."
+  }
+}

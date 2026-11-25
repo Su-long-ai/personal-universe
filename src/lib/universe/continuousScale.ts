@@ -5,12 +5,9 @@ import type {
 
 export type ContinuousScaleDirection = "in" | "out";
 
-export const CONTINUOUS_SCALE_WHEEL_THRESHOLD = 72;
-// A single tiny wheel sample is treated as noise if no follow-up arrives
-// promptly. Once two same-direction samples establish a gesture, keep that
-// partial intent alive across short main-thread/render stalls; hosted software
-// WebGL can delay the next delivered input by around a second even when the
-// physical/automation gesture itself is continuous.
+// These windows group delivered samples into diagnostic gesture generations
+// and reversal epochs only. They never gate coordinate movement: every
+// normalized non-jitter sample acts immediately on the current scale position.
 export const CONTINUOUS_SCALE_RESET_MS = 260;
 export const CONTINUOUS_SCALE_ACTIVE_RESET_MS = 2_000;
 

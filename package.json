@@ -33,6 +33,7 @@
     "@react-three/postprocessing": "^2.19.1",
     "@theatre/core": "^0.7.2",
     "@theatre/r3f": "^0.7.2",
+    "@theatre/studio": "^0.7.2",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "astro": "^7.4.13",
