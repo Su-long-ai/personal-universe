@@ -12,6 +12,15 @@ import type { BodyData, OrbitElements } from "../../../vendor/yeis/data/types";
 import type { StarSystem } from "../../../vendor/yeis/core/StarSystem";
 import { AU_KM } from "../../../vendor/yeis/core/constants";
 import { _ } from "../../../vendor/yeis/i18n";
+import {
+  assertSystemPopulation,
+  authoredMarkerPopulation,
+  decorateNativeSystemPopulation,
+  generatedMarkerPopulation,
+  observedPopulationMetadata,
+  POPULATION_GENERATOR_VERSION,
+  POPULATION_SCHEMA_VERSION,
+} from "../generation/population";
 const HERO_SYSTEM_ID = "h-aurora";
 const HERO_PLANET_ID = "aurora-01";
 
@@ -64,6 +73,13 @@ export function buildYeisGalaxyIndex(
     nativeId: "c0",
     position: SUN_VISUAL,
     spectralType: "G",
+    population: observedPopulationMetadata({
+      kind: "marker",
+      stableSeed: "yeis:c0",
+      capability: "system-only",
+      tags: ["native", "solar-system", "observed-host"],
+      observedFields: ["name", "nativeId", "position", "spectralType"],
+    }),
   });
 
   let added = 0;
@@ -83,15 +99,29 @@ export function buildYeisGalaxyIndex(
     if (observedNativeIds.has(nativeId)) continue;
     if (aliases.some((name) => observedNames.has(normalizeName(name)))) continue;
 
+    const seed = `yeis:c${index}`;
+    const spectralType = spectralClass(info.spectral);
     markers.push({
       id: `yeis:c${index}`,
       name: info.name,
-      seed: `yeis:c${index}`,
+      seed,
       source: "catalog",
       engine: "yeis",
       nativeId,
       position: visualPosition(info.position.x, info.position.y, info.position.z),
-      spectralType: spectralClass(info.spectral),
+      spectralType,
+      population: observedPopulationMetadata({
+        kind: "marker",
+        stableSeed: seed,
+        capability: "system-only",
+        tags: [
+          "native",
+          "catalog-star",
+          "generated-system",
+          `spectral:${spectralType}`,
+        ],
+        observedFields: ["name", "nativeId", "position", "spectralType"],
+      }),
     });
     added += 1;
   }
@@ -99,6 +129,10 @@ export function buildYeisGalaxyIndex(
   return {
     seed: "yeis-observation-first-v1",
     markers,
+    population: {
+      schemaVersion: POPULATION_SCHEMA_VERSION,
+      generatorVersion: POPULATION_GENERATOR_VERSION,
+    },
   };
 }
 
@@ -113,16 +147,46 @@ export function markerForYeisStarId(
   const info = runtime.universe.starInfo(starId);
   const position = runtime.universe.starPositionPc(starId);
 
-  return {
+  const seed = `yeis:${starId}`;
+  const source =
+    starId === HERO_SYSTEM_ID
+      ? "hero"
+      : starId.startsWith("c")
+        ? "catalog"
+        : "procedural";
+  const spectralType = spectralClass(
+    info.spectral || info.catalogSpectral || "G",
+  );
+  const marker: GalaxyMarker = {
     id: `yeis:${starId}`,
     name: runtime.universe.starName(starId),
-    seed: `yeis:${starId}`,
-    source: starId.startsWith("c") ? "catalog" : "procedural",
+    seed,
+    source,
     engine: "yeis",
     nativeId: starId,
     position: visualPosition(position.x, position.y, position.z),
-    spectralType: spectralClass(info.spectral || info.catalogSpectral || "G"),
+    spectralType,
+    ...(starId === HERO_SYSTEM_ID ? { heroKey: "home" } : {}),
   };
+
+  marker.population =
+    source === "hero"
+      ? authoredMarkerPopulation(marker)
+      : source === "catalog"
+        ? observedPopulationMetadata({
+            kind: "marker",
+            stableSeed: seed,
+            capability: "system-only",
+            tags: [
+              "native",
+              starId === "c0" ? "solar-system" : "catalog-star",
+              `spectral:${spectralType}`,
+            ],
+            observedFields: ["name", "nativeId", "position", "spectralType"],
+          })
+        : generatedMarkerPopulation(marker);
+
+  return marker;
 }
 
 export function resolveYeisSystem(
@@ -142,7 +206,7 @@ export function resolveYeisSystem(
       mapPlanet(body.data, system, starInfo.massSolar, starId === "c0", index),
     );
 
-  return {
+  const definition: SystemDefinition = {
     id: `yeis-system:${starId}`,
     name:
       marker.source === "hero"
@@ -165,6 +229,18 @@ export function resolveYeisSystem(
     },
     planets,
   };
+
+  const mode =
+    marker.source === "hero"
+      ? "authored"
+      : starId === "c0"
+        ? "observed"
+        : marker.source === "catalog"
+          ? "catalog-generated"
+          : "generated";
+  const populated = decorateNativeSystemPopulation(definition, mode);
+  assertSystemPopulation(populated);
+  return populated;
 }
 
 function mapPlanet(
@@ -226,7 +302,7 @@ function heroMarker(universe: Universe): GalaxyMarker {
   const p = universe.starPositionPc(HERO_SYSTEM_ID);
   const info = universe.starInfo(HERO_SYSTEM_ID);
 
-  return {
+  const marker: GalaxyMarker = {
     id: "hero:aurora:yeis",
     name: "AURORA",
     seed: HERO_SYSTEM_ID,
@@ -237,6 +313,8 @@ function heroMarker(universe: Universe): GalaxyMarker {
     spectralType: spectralClass(info.spectral),
     heroKey: "home",
   };
+  marker.population = authoredMarkerPopulation(marker);
+  return marker;
 }
 
 function buildHipIndex(catalog: StarCatalog): Map<number, number> {
