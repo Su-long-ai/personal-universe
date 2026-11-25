@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "POPULATION-CAPABILITY-DIAGNOSTIC-OWNERSHIP-001",
+  "approved_at": "2026-11-25T19:52:36.927Z",
+  "baseline_commit": "7daa4fe6bdf2ab74e0cdb91e8b79927e5e5a2ae7",
+  "record_path": "docs/reuse-gate/tasks/POPULATION-CAPABILITY-DIAGNOSTIC-OWNERSHIP-001.json",
+  "record_sha256": "1f3ff4206bbcc9e3a9160c8ace70c35dcc91eda077b820a9a21ccb9542c6448d",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Publish selected-world population capability under an independent diagnostic field without changing PlanetScene renderer selection, quality behavior, scene lifecycle or navigation."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "selected_ids": [
+    "existing-react-population-effect",
+    "existing-hero-browser-acceptance"
+  ],
+  "candidate_scores": {
+    "existing-react-population-effect": 57,
+    "existing-hero-browser-acceptance": 56
+  }
+}
