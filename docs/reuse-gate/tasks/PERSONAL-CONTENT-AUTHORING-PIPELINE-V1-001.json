@@ -1,0 +1,134 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-CONTENT-AUTHORING-PIPELINE-V1-001",
+  "title": "Productize stable personal-content authoring, ingestion, migration, and canonical metadata",
+  "scope": {
+    "level": "implementation",
+    "subject": "Astro Content Collections authoring pipeline for stable personal content identity, localization, mapping metadata, migration, validation, and deterministic import"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Keep Astro Content Collections as the canonical repository-backed content source and add only a deterministic project-owned authoring/validation adapter around it. The existing collection already supplies local file loading, Zod validation, typed collection queries, and static build integration, so a CMS would duplicate authority and add administration/auth/runtime surface. The implementation will store stable content IDs explicitly, preserve one bilingual identity, expose destination/discovery/Surface metadata without creating parallel universe models, and use a small Node CLI for scaffolding, JSON batch ingestion, migration, preview, and asset/reference checks.",
+  "planned_files": [
+    "package.json",
+    "src/content.config.ts",
+    "src/content/portfolio/personal-universe.md",
+    "src/content/portfolio/personal-universe.json",
+    "src/lib/universe/content/types.ts",
+    "src/lib/universe/content/authoring.ts",
+    "src/lib/universe/content/index.ts",
+    "src/pages/index.astro",
+    "scripts/content-author.mjs",
+    "tests/content-authoring.test.ts",
+    "docs/architecture/content-layer.md"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro Content Collections already provide repository-local Markdown/MDX/data loading, schema validation, and typed collection queries, covering the canonical source and build integration without a second database."
+    },
+    {
+      "url": "https://keystatic.com/docs/installation-astro",
+      "finding": "Keystatic can add a Git/local editing UI on top of repository content, but it introduces an editor/admin layer that is unnecessary while direct repository authoring remains cheap and deterministic."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "keystatic"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keystatic is a credible complete authoring UI, but it is broader than the current need and would add packages and an admin surface before repository authoring is proven insufficient."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing Astro framework already owns build-time content loading and validation, so the pipeline should stay inside that framework instead of adding another application runtime."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Astro Content Collections cover the canonical content subsystem; only project-specific stable identity, cross-record integrity, mapping metadata, migration, and authoring ergonomics remain."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Astro's existing Zod-backed schema plus Node standard-library file/crypto primitives are sufficient for deterministic scaffolding and validation, so no parser/CLI dependency is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "astro-content-collections-authoring",
+      "name": "Existing Astro Content Collections plus narrow deterministic repository authoring helpers",
+      "level": "subsystem",
+      "registry_id": "astro-content-collections",
+      "source": "Current src/content.config.ts, Astro Content Collections, and repository-local Node tooling",
+      "license": "MIT (Astro) plus project-owned adapter code",
+      "decision": "reuse",
+      "reason": "Preserves the accepted canonical source, schema validation, typed collection loading, static performance, and Git history while requiring only small project-specific helpers for stable identity and integrity.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "keystatic-editor-now",
+      "name": "Keystatic repository-backed authoring CMS",
+      "level": "full_solution",
+      "registry_id": "keystatic",
+      "source": "Keystatic Astro integration",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "It would improve GUI editing but adds editor packages, configuration, and an admin workflow without replacing the existing Astro canonical data model or solving destination/Surface mapping automatically.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "astro-content-collections-authoring"
+    ],
+    "rationale": "Reuse the already-installed Astro Content Collections subsystem and keep authoring as a thin deterministic repository workflow. This minimizes maintenance and runtime surface while still allowing explicit stable IDs, bilingual metadata, deterministic mapping hints, migration/versioning, batch ingestion, asset/reference validation, and future optional editors over the same files.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "keystatic-editor-now",
+        "reason": "The full CMS is broader but loses globally at current scale because it adds packages and an admin/editing surface while canonical validation, repository persistence, and content loading already exist; destination and universe-specific integrity still require the same project adapter."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If direct repository authoring becomes the dominant maintenance cost, add Keystatic later as an editor over the same canonical collection rather than replacing the content source or universe mapping contracts."
+  }
+}

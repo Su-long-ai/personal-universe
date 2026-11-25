@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-YEIS-SECONDARY-WORLDS-001",
+  "approved_at": "2026-11-24T16:22:00.000Z",
+  "baseline_commit": "67a469331f0b3e24853026a5fc2f74abe42740be",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-YEIS-SECONDARY-WORLDS-001.json",
+  "record_sha256": "e4788a18d23d2d13e2d15e1051f6a68c5407e7ae66bb81854d9fb3c49e4ce49f",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "YEIS PlanetDefinition adaptation for existing terrestrial Surface capability"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/yeis/bridge.ts",
+    "tests/yeis-surface-capability.test.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "procedural-planets-shared-surface-capability"
+  ],
+  "candidate_scores": {
+    "procedural-planets-shared-surface-capability": 56.5,
+    "yeis-hero-only-special-case": 24
+  }
+}

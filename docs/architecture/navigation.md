@@ -353,6 +353,13 @@ Manual input is intentionally available only after the visitor reaches a stable
 - right drag and truck/pan remain disabled, so manual exploration cannot drift
   the authoritative destination target away from the selected world/system.
 
+A pointer press alone is not a manual takeover. The product waits until the
+active pointer moves at least 5 CSS pixels before marking the cinematic camera
+as overridden. Mouse clicks and touch taps therefore remain available to canvas
+picking and Surface signals, while the existing camera-controls instance still
+executes the actual drag after intent is clear. The threshold only arbitrates
+selection versus camera intent; it is not a second gesture engine.
+
 The **mouse wheel is no longer a local camera dolly**. It is reserved for the
 continuous-scale coordinator described below, so YEIS, camera-controls and the
 product shell cannot interpret the same wheel event as three different camera
@@ -367,6 +374,27 @@ link stay unchanged.
 If a Guided Journey is active, direct camera takeover stops that Journey
 immediately. This reuses pinned MIT TourPlayer's interruption rule: user camera
 intent wins, and orchestration must not fight the visitor for the same camera.
+
+Surface manual exploration additionally remembers the current
+`camera-controls` position/target as a **presentation endpoint**, scoped to the
+selected world id and the active live/fallback renderer mode. A subsequent
+Surface→Atmosphere wheel sample therefore starts the existing 5→4 scale segment
+from the view the visitor actually reached instead of snapping back to the
+canonical landing shot first. If the visitor reverses and returns to the same
+Surface, that endpoint is restored. Changing world or switching between live
+and fallback rendering invalidates the remembered frame, preventing coordinates
+from one terrain frame from leaking into another. The saved view is not
+navigation state, is not written to the URL, and does not own wheel input.
+
+For the live ProceduralPlanets 4↔5 interval, camera-controls keeps the live
+Surface near-distance bound until the continuous coordinate reaches the
+Atmosphere endpoint. This prevents an explored close view from being clamped
+outward merely because semantic phase changes from Surface to Atmosphere while
+the same 5→4 camera segment is still active. Fallback terrain retains its own
+wider Surface bound and does not inherit live-world coordinates.
+
+Runtime evidence uses
+`data-universe-surface-manual-view="captured|scale-endpoint|restored"`.
 
 ## Continuous wheel scale navigation
 
@@ -578,6 +606,22 @@ valid even when their current product representation stops at Orbit.
 Search, Places, canvas clicks, deep links and Guided Journeys remain direct
 entry paths into the same destinations. Continuous wheel navigation changes
 interaction continuity, not destination identity.
+
+### Surface-local content focus
+
+Stable Surface adds one deliberately local interaction layer over the existing
+destination model. A world-content card, cluster chip or 3D Surface signal may
+focus an existing content entry so its anchor and spatial context are easier to
+read. This does **not** create another destination, URL, camera or navigation
+authority.
+
+The navigation-derived Personal Signal remains the fallback focus. A manual
+Surface focus may survive Surface → Atmosphere → Surface on the same planet so
+local exploration does not reset at the boundary, but any change to the product
+navigation destination clears that local override immediately. The new
+destination therefore regains authority even when both signals live on the same
+world. Surface focus is presentation state only and never mutates the global
+destination identity.
 
 ## Canvas picking
 

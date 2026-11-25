@@ -5,6 +5,7 @@ import type {
   StarDefinition,
   SystemDefinition,
 } from "../types";
+import { surfaceModeForArchetype } from "../surface";
 import { hashSeed, SeededRng } from "./seededRng";
 
 type SpectralTemplate = {
@@ -165,7 +166,7 @@ export function generateSystem(
       orbitalPeriodYears,
       moons: buildMoons(planetSeed, massEarth, planetRng.fork("moons")),
       hasRings,
-      surfaceMode: "none",
+      surfaceMode: surfaceModeForArchetype(archetype),
     });
   }
 
