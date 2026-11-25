@@ -199,7 +199,10 @@ export function SurfaceTerrain({
                 triangleBudget: 20000,
                 maxCreatesPerFrame: 2,
                 streamBudgetMs: 0.45,
-                cacheResolution: 48,
+                // ProceduralTerrains 2.0.5 formally accepts 64..1024.
+                // Use the package minimum so SwiftShader stays bounded without
+                // falling into an invalid configuration before prepare().
+                cacheResolution: 64,
               }
             : {
                 // LOW-quality hardware fallback can afford a slightly broader
