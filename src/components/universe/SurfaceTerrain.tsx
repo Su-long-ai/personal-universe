@@ -439,14 +439,295 @@ export function SurfaceTerrain({
     }
   });
 
+  const pathSegments = useMemo(() => {
+    if (!terrain) return [];
+    const subdivisions = softwareRenderer ? 3 : 6;
+    return profile.paths.flatMap((path) =>
+      Array.from({ length: subdivisions }, (_, index) => {
+        const t0 = index / subdivisions;
+        const t1 = (index + 1) / subdivisions;
+        const x0 = THREE.MathUtils.lerp(path.from[0], path.to[0], t0);
+        const z0 = THREE.MathUtils.lerp(path.from[1], path.to[1], t0);
+        const x1 = THREE.MathUtils.lerp(path.from[0], path.to[0], t1);
+        const z1 = THREE.MathUtils.lerp(path.from[1], path.to[1], t1);
+        const x = (x0 + x1) * 0.5;
+        const z = (z0 + z1) * 0.5;
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        return {
+          id: `${path.id}:${index}`,
+          landmarkId: path.landmarkId,
+          position: [
+            x,
+            (terrain.sampleHeight(x, z) ?? 0) + 0.09,
+            z,
+          ] as [number, number, number],
+          length: Math.hypot(dx, dz),
+          rotationY: Math.atan2(dx, dz),
+          width: path.width,
+        };
+      }),
+    );
+  }, [profile.id, profile.paths, softwareRenderer, terrain]);
+
+  const rankedContent = useMemo(
+    () => rankSurfaceContentAnchors(profile.contentAnchors, focusedEntryId),
+    [focusedEntryId, profile.contentAnchors],
+  );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === focusedEntryId) ?? null;
+  const rankedLandmarks = useMemo(
+    () =>
+      rankSurfaceWorldLandmarks(
+        profile.landmarks,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.landmarks],
+  );
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const rankedClusters = useMemo(
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
+  );
+
+  const visibleLandmarks = softwareRenderer
+    ? rankedLandmarks.slice(0, 3)
+    : rankedLandmarks;
+  const visibleRegions = softwareRenderer
+    ? rankedRegions.slice(0, 2)
+    : rankedRegions;
+  const visibleContent = softwareRenderer
+    ? rankedContent.slice(0, 3)
+    : rankedContent;
+  const visibleClusters = softwareRenderer
+    ? rankedClusters.slice(0, 2)
+    : rankedClusters;
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      active ? visibleContent.length : 0,
+    );
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
+    };
+  }, [active, profile.id, visibleContent.length]);
+
   if (!terrain) return null;
 
   return (
     <>
       <primitive object={terrain.object} />
+
+      {pathSegments.map((segment) => {
+        const focused =
+          segment.landmarkId === focusedAnchor?.landmarkId;
+        return (
+          <mesh
+            key={segment.id}
+            position={segment.position}
+            rotation={[0, segment.rotationY, 0]}
+          >
+            <boxGeometry
+              args={[
+                segment.width * (focused ? 1.3 : 1),
+                0.035,
+                segment.length,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.38 : softwareRenderer ? 0.18 : 0.14}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleClusters.map((cluster) => {
+        const height =
+          (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) +
+          0.08;
+        const focused = focusedAnchor?.cluster === cluster.index;
+        const radius =
+          (cluster.priority === "primary"
+            ? 0.52
+            : cluster.priority === "secondary"
+              ? 0.4
+              : 0.3) * (focused ? 1.18 : 1);
+        return (
+          <mesh
+            key={cluster.id}
+            position={[cluster.center[0], height, cluster.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[radius, radius + 0.045, softwareRenderer ? 14 : 28]}
+            />
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={
+                focused
+                  ? 0.46
+                  : cluster.priority === "primary"
+                    ? 0.34
+                    : cluster.priority === "secondary"
+                      ? 0.22
+                      : 0.14
+              }
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleRegions.map((region) => {
+        const height =
+          (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) +
+          0.12;
+        const focused = region.id === focusedAnchor?.regionId;
+        const focusScale = focused ? 1.12 : 1;
+        return (
+          <mesh
+            key={region.id}
+            position={[region.center[0], height, region.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[
+                Math.max(0.34, region.radius * 0.1) * focusScale,
+                Math.max(0.5, region.radius * 0.14) * focusScale,
+                softwareRenderer ? 12 : 24,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.42 : softwareRenderer ? 0.2 : 0.12}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleLandmarks.map((landmark) => {
+        const focused = landmark.id === focusedAnchor?.landmarkId;
+        const focusScale = focused ? 1.18 : 1;
+        const height =
+          (terrain.sampleHeight(
+            landmark.position[0],
+            landmark.position[1],
+          ) ?? 0) + 0.34 * landmark.scale * focusScale;
+        return (
+          <mesh
+            key={landmark.id}
+            position={[landmark.position[0], height, landmark.position[1]]}
+            scale={[
+              0.32 * landmark.scale * focusScale,
+              0.9 * landmark.scale * focusScale,
+              0.32 * landmark.scale * focusScale,
+            ]}
+          >
+            {landmark.kind === "crater" || landmark.kind === "basin" ? (
+              <torusGeometry
+                args={[0.68, 0.13, 6, softwareRenderer ? 10 : 18]}
+              />
+            ) : landmark.kind === "ridge" ? (
+              <boxGeometry args={[1.1, 0.46, 0.34]} />
+            ) : (
+              <coneGeometry args={[0.55, 1.55, softwareRenderer ? 5 : 8]} />
+            )}
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.84 : 0.38 + landmark.prominence * 0.22}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleContent.map((anchor) => {
+        const focused = anchor.entryId === focusedEntryId;
+        const priorityScale = focused
+          ? 1.38
+          : anchor.priority === "primary"
+            ? 1.25
+            : anchor.priority === "secondary"
+              ? 1
+              : 0.82;
+        const height =
+          (terrain.sampleHeight(anchor.position[0], anchor.position[1]) ?? 0) +
+          0.42 * priorityScale;
+        return (
+          <group
+            key={anchor.id}
+            name={`surface-signal-${anchor.id}`}
+            userData={{ surfaceEntryId: anchor.entryId }}
+            position={[anchor.position[0], height, anchor.position[1]]}
+            scale={priorityScale}
+            onClick={
+              active
+                ? (event) => {
+                    event.stopPropagation();
+                    onFocusEntry(anchor.entryId);
+                  }
+                : undefined
+            }
+          >
+            {active ? (
+              <mesh
+                name={`surface-signal-hit-${anchor.id}`}
+                position={[0, 0.22, 0]}
+              >
+                <sphereGeometry args={[0.3, 8, 6]} />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                />
+              </mesh>
+            ) : null}
+            <mesh>
+              <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  focused || anchor.priority === "primary" ? 0.98 : 0.76
+                }
+              />
+            </mesh>
+            <mesh position={[0, 0.48, 0]}>
+              <octahedronGeometry args={[0.12, 0]} />
+              <meshBasicMaterial
+                color={
+                  focused || anchor.priority === "primary"
+                    ? "#fff0cf"
+                    : "#ffffff"
+                }
+              />
+            </mesh>
+          </group>
+        );
+      })}
+
       {!softwareRenderer ? (
         <Suspense fallback={null}>
-          <SurfaceRocks terrain={terrain} />
+          <SurfaceRocks terrain={terrain} profile={profile} />
         </Suspense>
       ) : null}
     </>
