@@ -291,6 +291,134 @@ async function expectViewportContainedLayout(page: Page, label: string) {
   );
 }
 
+async function expectReadableNarrowSurfaceLayout(
+  page: Page,
+  viewport: Viewport,
+) {
+  const surfaceCopy = page.locator(".surface-copy");
+  await expect(surfaceCopy).toBeVisible();
+  const surfaceBox = await surfaceCopy.boundingBox();
+  expect(surfaceBox, "Surface destination copy should have a layout box").not.toBeNull();
+  expect(surfaceBox!.x).toBeGreaterThanOrEqual(0);
+  expect(surfaceBox!.y).toBeGreaterThanOrEqual(0);
+  expect(surfaceBox!.x + surfaceBox!.width).toBeLessThanOrEqual(
+    viewport.width + 1,
+  );
+  expect(surfaceBox!.y + surfaceBox!.height).toBeLessThanOrEqual(
+    viewport.height + 1,
+  );
+
+  const stack = page.locator(".world-content-stack");
+  if ((await stack.count()) === 0) return;
+
+  await expect(stack).toBeVisible();
+  const stackBox = await stack.boundingBox();
+  expect(stackBox, "Surface content stack should have a layout box").not.toBeNull();
+  expect(stackBox!.x).toBeGreaterThanOrEqual(0);
+  expect(stackBox!.y).toBeGreaterThanOrEqual(0);
+  expect(stackBox!.x + stackBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(stackBox!.y + stackBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const cards = stack.locator(".world-content-card");
+  const surfaceCardBudget = Number(
+    (await stack.getAttribute("data-surface-card-budget")) ?? "0",
+  );
+  if (surfaceCardBudget > 0) {
+    expect(
+      await cards.count(),
+      "Surface DOM card count should stay within the shared stable signal budget",
+    ).toBeLessThanOrEqual(surfaceCardBudget);
+  }
+  if ((await cards.count()) > 0) {
+    await expect(cards.first()).toBeVisible();
+    await expect(cards.first()).toHaveAttribute(
+      "data-surface-priority",
+      /primary|secondary|ambient/,
+    );
+
+    const focusAction = cards.first().locator(".world-content-focus-action");
+    await expect(focusAction).toBeVisible();
+    const focusBox = await focusAction.boundingBox();
+    expect(
+      focusBox,
+      "Surface focus control should have a measurable layout box",
+    ).not.toBeNull();
+    expect(focusBox!.x).toBeGreaterThanOrEqual(stackBox!.x - 1);
+    expect(focusBox!.x + focusBox!.width).toBeLessThanOrEqual(
+      stackBox!.x + stackBox!.width + 1,
+    );
+    if (viewport.width <= 800) {
+      expect(
+        focusBox!.height,
+        "mobile Surface focus action should retain a usable touch height",
+      ).toBeGreaterThanOrEqual(29);
+    }
+  }
+
+  const clusterChips = surfaceCopy.locator(".surface-cluster-chip");
+  const publishedClusterValue = await page
+    .locator("html")
+    .getAttribute("data-universe-surface-content-clusters");
+  if (publishedClusterValue !== null) {
+    const publishedClusterCount = Number(publishedClusterValue);
+    expect(
+      Number.isInteger(publishedClusterCount) && publishedClusterCount >= 0,
+      "Surface cluster diagnostic should publish a valid count",
+    ).toBe(true);
+    expect(
+      await clusterChips.count(),
+      "Surface UI should retain every generated content cluster",
+    ).toBe(publishedClusterCount);
+  }
+  if ((await clusterChips.count()) > 0) {
+    await expect(clusterChips.first()).toBeVisible();
+    const clusterBox = await clusterChips.first().boundingBox();
+    expect(
+      clusterBox,
+      "Surface cluster control should have a measurable layout box",
+    ).not.toBeNull();
+    expect(clusterBox!.x).toBeGreaterThanOrEqual(surfaceBox!.x - 1);
+    expect(clusterBox!.x + clusterBox!.width).toBeLessThanOrEqual(
+      surfaceBox!.x + surfaceBox!.width + 1,
+    );
+    if (viewport.width <= 800) {
+      expect(
+        clusterBox!.height,
+        "mobile Surface cluster chip should retain a usable touch height",
+      ).toBeGreaterThanOrEqual(27);
+    }
+  }
+
+  if (viewport.width <= 800) {
+    expect(
+      stackBox!.y + stackBox!.height,
+      "mobile prioritized Surface cards should end before destination copy begins",
+    ).toBeLessThanOrEqual(surfaceBox!.y + 2);
+    if ((await cards.count()) > 0) {
+      await expect(cards.first().locator("small")).toBeHidden();
+      await expect(
+        cards.first().locator(".world-content-priority"),
+      ).toBeHidden();
+    }
+    if ((await cards.count()) > 2) {
+      await expect(cards.nth(2)).toBeHidden();
+    }
+    if (viewport.height <= 720 && (await cards.count()) > 1) {
+      await expect(cards.nth(1)).toBeHidden();
+    }
+
+    if ((await clusterChips.count()) > 2) {
+      expect(
+        await clusterChips.nth(2).evaluate(
+          (element) => getComputedStyle(element).display !== "none",
+        ),
+        "mobile cluster strip should retain every generated cluster",
+      ).toBe(true);
+    }
+  }
+
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -917,6 +1045,23 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-layout-tier",
+        "transition",
+      );
+      const totalSurfaceSignals = Number(
+        await html.getAttribute("data-universe-surface-content-anchors"),
+      );
+      if (totalSurfaceSignals > 0) {
+        await expect(html).toHaveAttribute(
+          "data-universe-surface-layout-signals",
+          "1",
+        );
+        await expect(html).toHaveAttribute(
+          "data-universe-surface-layout-clusters",
+          "1",
+        );
+      }
       await expectViewportContainedLayout(
         page,
         "HIGH Atmosphere/Surface midpoint",
@@ -1004,6 +1149,7 @@ test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuit
         "HIGH Surface/Atmosphere reverse midpoint",
         { subjectRoiOnly: true },
       );
+
     },
   );
 });
@@ -1191,6 +1337,16 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
         { timeout: 60_000 },
       );
       await expect(html).toHaveAttribute(
+        "data-universe-surface-profile",
+        /^surface:/,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-landmarks",
+        /[1-9][0-9]*/,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
         "data-universe-surface-anchor-ready",
         "true",
         { timeout: 60_000 },
@@ -1205,12 +1361,54 @@ test("visual: desktop Hero surface keeps the live planet renderer @webgl-heavy",
         "true",
         { timeout: 60_000 },
       );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-layout-tier",
+        "full",
+        { timeout: 60_000 },
+      );
       await waitForCameraSettled(page, "surface");
       await expect(html).toHaveAttribute(
         "data-universe-world-screenshot-ready",
         "true",
         { timeout: 30_000 },
       );
+    },
+  );
+});
+
+test("visual: generated secondary Surface is a readable destination @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "generated-secondary-surface-low",
+    async () => {
+      await page.goto(
+        "/?engine=v2&phase=surface&star=proc%3A0&body=personal-universe-v2%3Asystem%3A0%3Aplanet%3A0&freeze=1",
+      );
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute("data-universe-engine", "v2", {
+        timeout: 15_000,
+      });
+      await page.getByLabel("QUALITY").selectOption("low");
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-renderer",
+        "procedural-terrains-fallback",
+        { timeout: 60_000 },
+      );
+      const profile = await html.getAttribute("data-universe-surface-profile");
+      expect(profile).toMatch(/^surface:/);
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-terrain-world",
+        profile!,
+        { timeout: 60_000 },
+      );
+      await expect(page.locator(".surface-world-meta")).toBeVisible();
+      await expect(page.locator(".surface-region-index span").first()).toBeVisible();
+      await waitForCameraSettled(page, "surface");
+      await expectReadableWorldFrame(page, "generated secondary Surface");
     },
   );
 });
@@ -1488,6 +1686,16 @@ for (const viewport of [TABLET, MOBILE]) {
             "generated-gradient",
             { timeout: 60_000 },
           );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-profile",
+            /^surface:/,
+            { timeout: 60_000 },
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-surface-landmarks",
+            /[1-9][0-9]*/,
+            { timeout: 60_000 },
+          );
           await waitForCameraSettled(page, "surface");
           await expectReadableWorldFrame(
             page,
@@ -1498,8 +1706,64 @@ for (const viewport of [TABLET, MOBILE]) {
             page,
             `${viewport.name} AUTO Hero surface`,
           );
+          await expectReadableNarrowSurfaceLayout(page, viewport);
+
         },
       );
     },
   );
 }
+
+
+test("visual: mobile default YEIS secondary Surface @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  test.slow(
+    true,
+    "Hosted software-WebGL mobile secondary Surface capture belongs in the heavy lane",
+  );
+  await visualCase(
+    page,
+    testInfo,
+    MOBILE,
+    "default-yeis-secondary-surface-low",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=c0&body=yeis-planet%3Aearth&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      const html = page.locator("html");
+      await page.getByLabel("QUALITY").selectOption("low");
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-renderer",
+        "procedural-terrains-fallback",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-profile",
+        /^surface:/,
+        { timeout: 60_000 },
+      );
+      const profile = await html.getAttribute(
+        "data-universe-surface-profile",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-terrain-world",
+        profile!,
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-terrain-state",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+      await expectReadableWorldFrame(
+        page,
+        "mobile default YEIS secondary Surface",
+      );
+      await expectCompactNarrowHud(page);
+      await expectReadableNarrowSurfaceLayout(page, MOBILE);
+    },
+  );
+});

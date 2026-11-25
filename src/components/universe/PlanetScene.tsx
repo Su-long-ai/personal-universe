@@ -12,10 +12,21 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
+  SURFACE_STELLAR_LIGHT_DIRECTION,
+  SURFACE_STELLAR_SOURCE_POSITION,
+  buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldPaths,
+  rankSurfaceWorldRegions,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
-const STAR_POSITION: [number, number, number] = [-12.5, 5.5, -18];
 const LIVE_PLANET_RADIUS = 2000;
 const LIVE_WORLD_RADIUS = PLANET_RENDER_RADIUS;
 const FALLBACK_WORLD_RADIUS = PLANET_RENDER_RADIUS * 0.965;
@@ -29,12 +40,21 @@ const SURFACE_WORLD_NORMAL = new THREE.Vector3(
   -0.931211,
 ).normalize();
 const SURFACE_UP = new THREE.Vector3(0, 1, 0);
+const LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
 
 function LiveSurfaceAnchor({
   planet,
+  profile,
+  expanded,
+  surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   onCameraFrame,
 }: {
   planet: Planet;
+  profile: SurfaceWorldProfile;
+  expanded: boolean;
+  surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -58,6 +78,57 @@ function LiveSurfaceAnchor({
   useEffect(() => {
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-planets-live-surface";
+    document.documentElement.dataset.universeSurfaceProfile = profile.id;
+    document.documentElement.dataset.universeSurfaceBiome = profile.biome;
+    document.documentElement.dataset.universeSurfaceLandmarks =
+      String(profile.landmarks.length);
+    document.documentElement.dataset.universeSurfaceContentAnchors =
+      String(profile.contentAnchors.length);
+    document.documentElement.dataset.universeSurfaceContentClusters =
+      String(profile.contentClusters.length);
+    document.documentElement.dataset.universeSurfacePrimarySignals =
+      String(
+        profile.contentAnchors.filter(
+          (anchor) => anchor.priority === "primary",
+        ).length,
+      );
+    const focusedAnchor = profile.contentAnchors.find(
+      (anchor) => anchor.entryId === surfaceFocusEntryId,
+    );
+    if (focusedAnchor) {
+      document.documentElement.dataset.universeSurfaceFocusAnchor =
+        focusedAnchor.id;
+      document.documentElement.dataset.universeSurfaceFocusCluster =
+        String(focusedAnchor.cluster);
+      if (focusedAnchor.regionId) {
+        document.documentElement.dataset.universeSurfaceFocusRegion =
+          focusedAnchor.regionId;
+      } else {
+        delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      }
+      if (focusedAnchor.landmarkId) {
+        document.documentElement.dataset.universeSurfaceFocusLandmark =
+          focusedAnchor.landmarkId;
+        const focusedPath = profile.paths.find(
+          (path) => path.landmarkId === focusedAnchor.landmarkId,
+        );
+        if (focusedPath) {
+          document.documentElement.dataset.universeSurfaceFocusPath =
+            focusedPath.id;
+        } else {
+          delete document.documentElement.dataset.universeSurfaceFocusPath;
+        }
+      } else {
+        delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+        delete document.documentElement.dataset.universeSurfaceFocusPath;
+      }
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      delete document.documentElement.dataset.universeSurfaceFocusCluster;
+      delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+      delete document.documentElement.dataset.universeSurfaceFocusPath;
+    }
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -67,9 +138,20 @@ function LiveSurfaceAnchor({
       }
       delete document.documentElement.dataset.universeSurfaceAnchorReady;
       delete document.documentElement.dataset.universeSurfaceCameraFrame;
+      delete document.documentElement.dataset.universeSurfaceProfile;
+      delete document.documentElement.dataset.universeSurfaceBiome;
+      delete document.documentElement.dataset.universeSurfaceLandmarks;
+      delete document.documentElement.dataset.universeSurfaceContentAnchors;
+      delete document.documentElement.dataset.universeSurfaceContentClusters;
+      delete document.documentElement.dataset.universeSurfacePrimarySignals;
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      delete document.documentElement.dataset.universeSurfaceFocusCluster;
+      delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+      delete document.documentElement.dataset.universeSurfaceFocusPath;
       onCameraFrame(null);
     };
-  }, [onCameraFrame]);
+  }, [onCameraFrame, profile, surfaceFocusEntryId]);
 
   useFrame(() => {
     if (!group.current || cameraFramePublished.current) return;
@@ -135,17 +217,298 @@ function LiveSurfaceAnchor({
     }
   });
 
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutTier = expanded
+      ? "full"
+      : "transition";
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutTier;
+    };
+  }, [expanded]);
+
+  const tangentPoint = (point: [number, number]): [number, number, number] => [
+    (point[0] - profile.landing[0]) * LIVE_SURFACE_LAYOUT_SCALE,
+    0,
+    (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
+  ];
+  const rankedContent = useMemo(
+    () =>
+      rankSurfaceContentAnchors(
+        profile.contentAnchors,
+        surfaceFocusEntryId,
+      ),
+    [profile.contentAnchors, surfaceFocusEntryId],
+  );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === surfaceFocusEntryId) ??
+    null;
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const rankedLandmarks = useMemo(() => {
+    const baseLandmarks = expanded
+      ? profile.landmarks
+      : [...profile.landmarks].sort(
+          (a, b) => b.prominence - a.prominence,
+        );
+    return rankSurfaceWorldLandmarks(
+      baseLandmarks,
+      focusedAnchor?.landmarkId ?? null,
+    );
+  }, [expanded, focusedAnchor?.landmarkId, profile.landmarks]);
+  const rankedPaths = useMemo(
+    () =>
+      rankSurfaceWorldPaths(
+        profile.paths,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.paths],
+  );
+  const visiblePaths = expanded
+    ? rankedPaths.slice(0, 4)
+    : rankedPaths.slice(0, 1);
+  const visibleRegions = expanded ? rankedRegions.slice(0, 4) : [];
+  const visibleLandmarks = expanded
+    ? rankedLandmarks.slice(0, 6)
+    : rankedLandmarks.slice(0, 2);
+  const visibleContent = expanded
+    ? rankedContent.slice(0, SURFACE_CONTENT_SIGNAL_BUDGET.stable)
+    : rankedContent.slice(0, SURFACE_CONTENT_SIGNAL_BUDGET.transition);
+  const rankedClusters = useMemo(
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
+  );
+  const visibleClusters = expanded
+    ? rankedClusters.slice(0, 3)
+    : rankedClusters.slice(0, 1);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutSignals =
+      String(visibleContent.length);
+    document.documentElement.dataset.universeSurfaceLayoutClusters =
+      String(visibleClusters.length);
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      expanded ? visibleContent.length : 0,
+    );
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutSignals;
+      delete document.documentElement.dataset.universeSurfaceLayoutClusters;
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
+    };
+  }, [profile.id, expanded, visibleContent.length, visibleClusters.length]);
+
   return (
     <group ref={group} name="live-surface-anchor">
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
-        <ringGeometry args={[0.035, 0.065, 28]} />
-        <meshBasicMaterial
-          color="#76e6ff"
-          transparent
-          opacity={0.24}
-          depthWrite={false}
-        />
-      </mesh>
+      <group position={[0, -0.024, 0]} name="live-surface-product-layout">
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+          <ringGeometry args={[0.035, 0.065, 28]} />
+          <meshBasicMaterial
+            color={profile.accent}
+            transparent
+            opacity={0.32}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {visiblePaths.map((path) => {
+          const from = tangentPoint(path.from);
+          const to = tangentPoint(path.to);
+          const dx = to[0] - from[0];
+          const dz = to[2] - from[2];
+          const length = Math.hypot(dx, dz);
+          const focused = path.landmarkId === focusedAnchor?.landmarkId;
+          return (
+            <mesh
+              key={path.id}
+              position={[(from[0] + to[0]) * 0.5, 0.004, (from[2] + to[2]) * 0.5]}
+              rotation={[0, Math.atan2(dx, dz), 0]}
+            >
+              <boxGeometry
+                args={[
+                  Math.max(
+                    0.0013,
+                    path.width *
+                      LIVE_SURFACE_LAYOUT_SCALE *
+                      (focused ? 1.35 : 1),
+                  ),
+                  0.0011,
+                  length,
+                ]}
+              />
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={focused ? 0.46 : 0.2}
+                depthWrite={false}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleClusters.map((cluster) => {
+          const point = tangentPoint(cluster.center);
+          const focused = focusedAnchor?.cluster === cluster.index;
+          const radius =
+            (cluster.priority === "primary"
+              ? 0.014
+              : cluster.priority === "secondary"
+                ? 0.011
+                : 0.009) * (focused ? 1.2 : 1);
+          return (
+            <mesh
+              key={cluster.id}
+              position={[point[0], 0.005, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius, radius + 0.0014, 20]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  focused
+                    ? 0.46
+                    : cluster.priority === "primary"
+                      ? 0.34
+                      : cluster.priority === "secondary"
+                        ? 0.22
+                        : 0.14
+                }
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleRegions.map((region) => {
+          const point = tangentPoint(region.center);
+          const focused = region.id === focusedAnchor?.regionId;
+          const radius =
+            Math.max(
+              0.009,
+              region.radius * LIVE_SURFACE_LAYOUT_SCALE * 0.16,
+            ) * (focused ? 1.12 : 1);
+          return (
+            <mesh
+              key={region.id}
+              position={[point[0], 0.0045, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius * 0.68, radius, 20]} />
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={focused ? 0.32 : 0.14}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleLandmarks.map((landmark) => {
+          const point = tangentPoint(landmark.position);
+          const focused = landmark.id === focusedAnchor?.landmarkId;
+          const scale =
+            (0.006 + landmark.scale * 0.0045) * (focused ? 1.16 : 1);
+          return (
+            <mesh
+              key={landmark.id}
+              position={[point[0], 0.006 + scale * 0.7, point[2]]}
+              scale={[scale, scale * 1.9, scale]}
+            >
+              {landmark.kind === "crater" || landmark.kind === "basin" ? (
+                <torusGeometry args={[0.7, 0.14, 5, 12]} />
+              ) : landmark.kind === "ridge" ? (
+                <boxGeometry args={[1.15, 0.4, 0.38]} />
+              ) : (
+                <coneGeometry args={[0.55, 1.4, 6]} />
+              )}
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={
+                  focused
+                    ? 0.84
+                    : 0.36 + landmark.prominence * 0.28
+                }
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleContent.map((anchor) => {
+          const point = tangentPoint(anchor.position);
+          const focused = anchor.entryId === surfaceFocusEntryId;
+          const priorityScale = focused
+            ? 1.38
+            : anchor.priority === "primary"
+              ? 1.25
+              : anchor.priority === "secondary"
+                ? 1
+                : 0.82;
+          return (
+            <group
+              key={anchor.id}
+              name={`surface-signal-${anchor.id}`}
+              userData={{ surfaceEntryId: anchor.entryId }}
+              position={[point[0], 0.009, point[2]]}
+              scale={priorityScale}
+              onClick={
+                expanded
+                  ? (event) => {
+                      event.stopPropagation();
+                      onSurfaceFocusEntry(anchor.entryId);
+                    }
+                  : undefined
+              }
+            >
+              {expanded ? (
+                <mesh
+                  name={`surface-signal-hit-${anchor.id}`}
+                  position={[0, 0.008, 0]}
+                >
+                  <sphereGeometry args={[0.011, 8, 6]} />
+                  <meshBasicMaterial
+                    transparent
+                    opacity={0}
+                    depthWrite={false}
+                  />
+                </mesh>
+              ) : null}
+              <mesh scale={[0.003, 0.011, 0.003]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshBasicMaterial
+                  color={profile.accent}
+                  transparent
+                  opacity={
+                    focused || anchor.priority === "primary" ? 1 : 0.78
+                  }
+                />
+              </mesh>
+              <mesh position={[0, 0.014, 0]}>
+                <octahedronGeometry args={[0.0038, 0]} />
+                <meshBasicMaterial
+                  color={
+                    focused || anchor.priority === "primary"
+                      ? "#fff0cf"
+                      : "#ffffff"
+                  }
+                />
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
     </group>
   );
 }
@@ -484,6 +847,8 @@ export function PlanetScene({
   surfaceFallbackReady = false,
   approachHandoffReady = true,
   paintContextGeneration = 0,
+  surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   onPaintStartedChange,
   onPaintReadyChange,
   onSurfaceCameraFrame,
@@ -497,6 +862,8 @@ export function PlanetScene({
   surfaceFallbackReady?: boolean;
   approachHandoffReady?: boolean;
   paintContextGeneration?: number;
+  surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   onPaintStartedChange?: (started: boolean) => void;
   onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
@@ -504,15 +871,14 @@ export function PlanetScene({
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
-    () =>
-      new THREE.Vector3(
-        STAR_POSITION[0] - PLANET_ANCHOR[0],
-        STAR_POSITION[1] - PLANET_ANCHOR[1],
-        STAR_POSITION[2] - PLANET_ANCHOR[2],
-      ).normalize(),
+    () => new THREE.Vector3(...SURFACE_STELLAR_LIGHT_DIRECTION),
     [],
   );
   const softwareRenderer = isSoftwareRenderer(gl);
+  const surfaceProfile = useMemo(
+    () => buildSurfaceWorldProfile(planet),
+    [planet],
+  );
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const fallbackSurfaceOwnsPresentation =
     phase === "surface" &&
@@ -915,17 +1281,23 @@ export function PlanetScene({
         speed={phase === "surface" ? 0 : 0.08}
       />
 
-      <ambientLight intensity={0.34} />
+      <hemisphereLight
+        args={[
+          surfaceProfile.atmosphere.horizon,
+          surfaceProfile.atmosphere.fog,
+          1.15,
+        ]}
+      />
       <directionalLight
-        // Keep the lightweight fallback on the exact same stellar light axis
-        // as ProceduralPlanets. The old +Z work light only looked correct from
-        // the previous night-side Orbit shot.
+        // Keep the lightweight fallback on the exact same world lighting
+        // contract as stable Surface: stellar axis, intensity and color all
+        // come from the deterministic Surface profile.
         position={[sunDirection.x, sunDirection.y, sunDirection.z]}
-        intensity={3.8}
-        color="#ffe0aa"
+        intensity={surfaceProfile.lighting.sunIntensity * 3.05}
+        color={new THREE.Color(...surfaceProfile.lighting.sunColor)}
       />
 
-      <group position={STAR_POSITION}>
+      <group position={[...SURFACE_STELLAR_SOURCE_POSITION]}>
         <mesh>
           <sphereGeometry args={[1.25, 48, 48]} />
           <meshBasicMaterial toneMapped={false}>
@@ -961,10 +1333,15 @@ export function PlanetScene({
       </group>
 
       {(phase === "surface" || worldScalePosition > 4) &&
+      planet.surfaceMode !== "none" &&
       livePlanet &&
       !fallbackReason ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
+          profile={surfaceProfile}
+          expanded={phase === "surface"}
+          surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={onSurfaceFocusEntry}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}

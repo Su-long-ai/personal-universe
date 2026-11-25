@@ -39,6 +39,13 @@ export type SurfaceCameraFrame = {
   up: [number, number, number];
 };
 
+type SurfaceManualCameraView = {
+  identity: string;
+  renderer: "live" | "fallback";
+  position: [number, number, number];
+  target: [number, number, number];
+};
+
 type CinematicCameraProps = {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
@@ -47,6 +54,7 @@ type CinematicCameraProps = {
   scrollDepth: number;
   reducedMotion: boolean;
   quality: QualityMode;
+  surfaceIdentity: string | null;
   surfaceCameraFrame: SurfaceCameraFrame | null;
   systemScaleFrame: SystemScaleFrame | null;
   galaxyViewState: YeisGalaxyViewState | null;
@@ -83,6 +91,10 @@ const MANUAL_TOUCH = {
   two: CameraControlsImpl.ACTION.TOUCH_DOLLY_ROTATE,
   three: CameraControlsImpl.ACTION.NONE,
 } as const;
+
+const MANUAL_DRAG_THRESHOLD_PX = 5;
+const MANUAL_DRAG_THRESHOLD_SQ =
+  MANUAL_DRAG_THRESHOLD_PX * MANUAL_DRAG_THRESHOLD_PX;
 
 type CameraShot = {
   position: [number, number, number];
@@ -182,6 +194,7 @@ export function CinematicCamera({
   scrollDepth,
   reducedMotion,
   quality,
+  surfaceIdentity,
   surfaceCameraFrame,
   systemScaleFrame,
   galaxyViewState,
@@ -204,6 +217,8 @@ export function CinematicCamera({
     surfaceFallbackRequested && surfaceFallbackReady;
   const currentWorldFrameReady =
     surfaceFallbackRequested ? surfaceFallbackReady : worldFrameReady;
+  const surfaceRendererMode: SurfaceManualCameraView["renderer"] =
+    surfaceFallbackAvailable ? "fallback" : "live";
   const continuousSystemCamera =
     phase === "system" &&
     worldScaleContinuous &&
@@ -227,6 +242,7 @@ export function CinematicCamera({
   const transitionGeneration = useRef(0);
   const transitionWatchdog = useRef<number | null>(null);
   const manualOverride = useRef(false);
+  const surfaceManualView = useRef<SurfaceManualCameraView | null>(null);
   const currentPosition = useRef(new Vector3());
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
@@ -263,6 +279,10 @@ export function CinematicCamera({
 
   const manualCameraEnabled =
     phase === "system" || phase === "orbit" || phase === "surface";
+  const liveSurfaceScaleCamera =
+    !surfaceFallbackAvailable &&
+    worldScaleContinuous &&
+    worldScalePosition > 4 + WORLD_SCALE_EPSILON;
   const manualMinDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 1.28
@@ -274,7 +294,9 @@ export function CinematicCamera({
           ? surfaceFallbackAvailable
             ? 8
             : 0.015
-          : 0.3;
+          : liveSurfaceScaleCamera
+            ? 0.015
+            : 0.3;
   const manualMaxDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 7
@@ -471,6 +493,41 @@ export function CinematicCamera({
     [camera, viewportHeight],
   );
 
+  useEffect(() => {
+    const remembered = surfaceManualView.current;
+    if (
+      !remembered ||
+      (remembered.identity === surfaceIdentity &&
+        remembered.renderer === surfaceRendererMode)
+    ) {
+      return;
+    }
+    surfaceManualView.current = null;
+    delete document.documentElement.dataset.universeSurfaceManualView;
+  }, [surfaceIdentity, surfaceRendererMode]);
+
+  useFrame(() => {
+    if (
+      phase !== "surface" ||
+      !manualOverride.current ||
+      !surfaceIdentity
+    ) {
+      return;
+    }
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    controls.getPosition(currentPosition.current, false);
+    controls.getTarget(currentTarget.current, false);
+    surfaceManualView.current = {
+      identity: surfaceIdentity,
+      renderer: surfaceRendererMode,
+      position: currentPosition.current.toArray() as [number, number, number],
+      target: currentTarget.current.toArray() as [number, number, number],
+    };
+    document.documentElement.dataset.universeSurfaceManualView = "captured";
+  });
+
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
@@ -488,15 +545,62 @@ export function CinematicCamera({
   useEffect(() => {
     if (!manualCameraEnabled) return;
 
-    // Wheel belongs exclusively to the continuous-scale coordinator. Listen
-    // for an actual pointer/touch press instead of camera-controls' generic
-    // controlstart event so a wheel gesture can never be misclassified as a
-    // manual camera takeover and cancel an in-flight scale intent.
+    // Wheel belongs exclusively to the continuous-scale coordinator. A plain
+    // canvas click may select a planet/Surface signal, so pointerdown alone is
+    // not camera intent either. Keep camera-controls as the movement executor,
+    // but only supersede product navigation after the pointer has crossed a
+    // small drag threshold.
     const element = gl.domElement;
-    const handlePointerDown = () => handleUserControlStart();
+    const starts = new Map<number, { x: number; y: number }>();
+    let takeoverStarted = false;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.pointerType === "mouse" &&
+        event.button !== 0 &&
+        event.button !== 1
+      ) {
+        return;
+      }
+      starts.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (takeoverStarted) return;
+      const start = starts.get(event.pointerId);
+      if (!start) return;
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        starts.delete(event.pointerId);
+        return;
+      }
+
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (dx * dx + dy * dy < MANUAL_DRAG_THRESHOLD_SQ) return;
+
+      takeoverStarted = true;
+      handleUserControlStart();
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      starts.delete(event.pointerId);
+      if (starts.size === 0) takeoverStarted = false;
+    };
+
     element.addEventListener("pointerdown", handlePointerDown, true);
-    return () =>
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
+    return () => {
+      starts.clear();
       element.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerup", handlePointerEnd, true);
+      window.removeEventListener("pointercancel", handlePointerEnd, true);
+    };
   }, [gl, handleUserControlStart, manualCameraEnabled]);
 
   useEffect(() => {
@@ -805,10 +909,27 @@ export function CinematicCamera({
               : "approach";
       const lowerPhase = phaseForIndex(lowerIndex);
       const upperPhase = phaseForIndex(upperIndex);
-      const surfaceShot =
+      const rememberedSurfaceView =
+        surfaceManualView.current?.identity === surfaceIdentity &&
+        surfaceManualView.current?.renderer === surfaceRendererMode
+          ? surfaceManualView.current
+          : null;
+      const defaultSurfaceShot =
         activeSurfaceCameraFrame && liveSurfaceShot
           ? liveSurfaceShot
           : SHOTS.surface;
+      const rememberedSurfaceBaseShot =
+        rememberedSurfaceView?.renderer === "fallback"
+          ? FALLBACK_SURFACE_SHOT
+          : defaultSurfaceShot;
+      const surfaceShot =
+        rememberedSurfaceView && rememberedSurfaceBaseShot
+          ? {
+              ...rememberedSurfaceBaseShot,
+              position: rememberedSurfaceView.position,
+              target: rememberedSurfaceView.target,
+            }
+          : defaultSurfaceShot;
       const lowerShot =
         lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
       const upperShot =
@@ -893,6 +1014,13 @@ export function CinematicCamera({
         lowerPhase + ":" + upperPhase;
       document.documentElement.dataset.universeScaleSegment =
         lowerPhase + ":" + upperPhase;
+      if (
+        rememberedSurfaceView &&
+        (lowerPhase === "surface" || upperPhase === "surface")
+      ) {
+        document.documentElement.dataset.universeSurfaceManualView =
+          "scale-endpoint";
+      }
       publishScaleFrameDiagnostics(
         scratchFrameCenter.current.set(...WORLD),
         PLANET_RENDER_RADIUS,
@@ -910,15 +1038,34 @@ export function CinematicCamera({
     delete document.documentElement.dataset.universeScaleCameraSegment;
     delete document.documentElement.dataset.universeScaleSegment;
 
-    const shot =
+    const rememberedSurfaceView =
+      surfaceManualView.current?.identity === surfaceIdentity &&
+      surfaceManualView.current?.renderer === surfaceRendererMode
+        ? surfaceManualView.current
+        : null;
+    const surfaceBaseShot =
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
           : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
-        : SHOTS[phase];
+        : null;
+    const shot =
+      phase === "surface" && rememberedSurfaceView && surfaceBaseShot
+        ? {
+            ...surfaceBaseShot,
+            position: rememberedSurfaceView.position,
+            target: rememberedSurfaceView.target,
+          }
+        : phase === "surface"
+          ? surfaceBaseShot
+          : SHOTS[phase];
     if (!shot) return;
+
+    if (phase === "surface" && rememberedSurfaceView) {
+      document.documentElement.dataset.universeSurfaceManualView = "restored";
+    }
 
     if (phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame) {
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
@@ -1067,6 +1214,8 @@ export function CinematicCamera({
     softwareRenderer,
     surfaceFallback,
     surfaceFallbackAvailable,
+    surfaceIdentity,
+    surfaceRendererMode,
     systemScaleFrame,
     continuousSystemCamera,
     viewportHeight,
@@ -1132,6 +1281,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
       delete document.documentElement.dataset.universeSystemEntryView;
+      delete document.documentElement.dataset.universeSurfaceManualView;
     },
     [],
   );

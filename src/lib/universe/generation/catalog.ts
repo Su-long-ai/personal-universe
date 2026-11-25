@@ -5,6 +5,7 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
+import { surfaceModeForArchetype } from "../surface";
 import {
   observedPopulationMetadata,
   populationCapabilityForArchetype,
@@ -156,8 +157,8 @@ function observedPlanet(
     Math.max(0.12, Math.pow(Math.max(planet.radiusEarth ?? 1, 0.2), 3.1));
   const radiusEarth =
     planet.radiusEarth ?? Math.max(0.25, Math.pow(massEarth, 0.27));
-  const seed = `catalog:${system.hostname}:${planet.name}`;
   const archetype = inferArchetype(equilibriumTempK, massEarth);
+  const seed = `catalog:${system.hostname}:${planet.name}`;
   const observedFields = ["name"];
   const inferredFields = ["archetype", "orbitalPeriodYears", "hasRings"];
   for (const [field, value] of [
@@ -183,7 +184,7 @@ function observedPlanet(
     ),
     moons: [],
     hasRings: false,
-    surfaceMode: "none",
+    surfaceMode: surfaceModeForArchetype(archetype),
     observed: true,
     population: observedPopulationMetadata({
       kind: "world",

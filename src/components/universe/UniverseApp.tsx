@@ -23,6 +23,13 @@ import {
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
+  buildSurfaceWorldProfile,
+  nextSurfaceClusterEntryId,
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+} from "../../lib/universe/surface";
+import {
   attachContentToSystem,
   placeUniverseContent,
   placementsForMarker,
@@ -312,6 +319,185 @@ export default function UniverseApp({
   const selectedSystemRef = useRef<SystemDefinition | null>(null);
   selectedSystemRef.current = selectedSystem;
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
+  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
+    null,
+  );
+  const [surfaceLocalFocusEntryId, setSurfaceLocalFocusEntryId] = useState<
+    string | null
+  >(null);
+  const surfaceNavigationFocusEntryId = useMemo(() => {
+    if (!selectedPlanet || !activeDestinationId?.startsWith("personal:")) {
+      return null;
+    }
+    const entryId = activeDestinationId.slice("personal:".length);
+    return selectedPlanet.content?.some((entry) => entry.id === entryId)
+      ? entryId
+      : null;
+  }, [activeDestinationId, selectedPlanet]);
+  const surfaceFocusEntryId = useMemo(() => {
+    if (
+      surfaceLocalFocusEntryId &&
+      selectedPlanet?.content?.some(
+        (entry) => entry.id === surfaceLocalFocusEntryId,
+      )
+    ) {
+      return surfaceLocalFocusEntryId;
+    }
+    return surfaceNavigationFocusEntryId;
+  }, [
+    selectedPlanet,
+    surfaceLocalFocusEntryId,
+    surfaceNavigationFocusEntryId,
+  ]);
+
+  useEffect(() => {
+    // Local Surface exploration can survive Atmosphere/Surface round trips,
+    // but a new product navigation destination must regain authority even when
+    // it resolves to another signal on the same world.
+    setSurfaceLocalFocusEntryId(null);
+  }, [activeDestinationId, selectedPlanet?.id]);
+
+  useEffect(() => {
+    if (surfaceFocusEntryId) {
+      document.documentElement.dataset.universeSurfaceFocusEntry =
+        surfaceFocusEntryId;
+      document.documentElement.dataset.universeSurfaceFocusSource =
+        surfaceLocalFocusEntryId === surfaceFocusEntryId
+          ? "surface-selection"
+          : "navigation";
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusSource;
+    }
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceFocusEntry ===
+        surfaceFocusEntryId
+      ) {
+        delete document.documentElement.dataset.universeSurfaceFocusEntry;
+        delete document.documentElement.dataset.universeSurfaceFocusSource;
+      }
+    };
+  }, [surfaceFocusEntryId, surfaceLocalFocusEntryId]);
+
+  const surfaceProfile = useMemo(
+    () =>
+      selectedPlanet && selectedPlanet.surfaceMode !== "none"
+        ? buildSurfaceWorldProfile(selectedPlanet)
+        : null,
+    [selectedPlanet],
+  );
+  const surfaceFocusedAnchor = useMemo(
+    () =>
+      surfaceProfile?.contentAnchors.find(
+        (anchor) => anchor.entryId === surfaceFocusEntryId,
+      ) ?? null,
+    [surfaceFocusEntryId, surfaceProfile],
+  );
+  const surfaceContentPresentation = useMemo(() => {
+    if (!surfaceProfile) {
+      return new Map<
+        string,
+        {
+          location: string;
+          cluster: string;
+          priority: "primary" | "secondary" | "ambient";
+        }
+      >();
+    }
+    const landmarkNames = new Map(
+      surfaceProfile.landmarks.map((landmark) => [landmark.id, landmark.name]),
+    );
+    const regionNames = new Map(
+      surfaceProfile.regions.map((region) => [region.id, region.name]),
+    );
+    const clusterLabels = new Map(
+      surfaceProfile.contentClusters.map((cluster) => [
+        cluster.index,
+        cluster.label,
+      ]),
+    );
+    return new Map(
+      surfaceProfile.contentAnchors.map((anchor) => [
+        anchor.entryId,
+        {
+          location:
+            (anchor.landmarkId && landmarkNames.get(anchor.landmarkId)) ||
+            (anchor.regionId && regionNames.get(anchor.regionId)) ||
+            surfaceProfile.biome,
+          cluster:
+            clusterLabels.get(anchor.cluster) ?? surfaceProfile.biome,
+          priority: anchor.priority,
+        },
+      ]),
+    );
+  }, [surfaceProfile]);
+  const worldContentEntries = useMemo(() => {
+    const entries = selectedPlanet?.content ?? [];
+    if (!surfaceProfile) return entries;
+
+    const rank = new Map(
+      rankSurfaceContentAnchors(
+        surfaceProfile.contentAnchors,
+        surfaceFocusEntryId,
+      ).map((anchor, index) => [anchor.entryId, index]),
+    );
+    return [...entries].sort(
+      (a, b) =>
+        (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title),
+    );
+  }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  const visibleWorldContentEntries = useMemo(
+    () =>
+      phase === "surface" && surfaceProfile
+        ? worldContentEntries.slice(
+            0,
+            SURFACE_CONTENT_SIGNAL_BUDGET.stable,
+          )
+        : worldContentEntries,
+    [phase, surfaceProfile, worldContentEntries],
+  );
+  const handleSurfaceFocusEntry = useCallback(
+    (entryId: string) => {
+      if (phaseRef.current !== "surface") return;
+      if (!selectedPlanet?.content?.some((entry) => entry.id === entryId)) {
+        return;
+      }
+      setSurfaceLocalFocusEntryId((current) =>
+        current === entryId ? null : entryId,
+      );
+    },
+    [selectedPlanet],
+  );
+  const handleSurfaceFocusCluster = useCallback(
+    (clusterIndex: number) => {
+      if (phaseRef.current !== "surface" || !surfaceProfile) return;
+      const focusedEntry =
+        surfaceFocusedAnchor?.cluster === clusterIndex
+          ? surfaceFocusEntryId
+          : null;
+      const nextEntryId = nextSurfaceClusterEntryId(
+        surfaceProfile.contentAnchors,
+        clusterIndex,
+        focusedEntry,
+      );
+      if (!nextEntryId) return;
+      if (
+        !selectedPlanet?.content?.some((entry) => entry.id === nextEntryId)
+      ) {
+        return;
+      }
+      setSurfaceLocalFocusEntryId(nextEntryId);
+    },
+    [
+      selectedPlanet,
+      surfaceFocusEntryId,
+      surfaceFocusedAnchor?.cluster,
+      surfaceProfile,
+    ],
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -327,9 +513,6 @@ export default function UniverseApp({
     request: UniverseNavigationCameraRequest;
     reason: string;
   } | null>(null);
-  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
-    null,
-  );
   const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
     null,
   );
@@ -2571,6 +2754,8 @@ export default function UniverseApp({
           onNavigationFailed={handleNavigationFailed}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
+          surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={handleSurfaceFocusEntry}
           systemScaleTargetPlanet={systemScaleTargetPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
@@ -2839,24 +3024,174 @@ export default function UniverseApp({
 
       {phase !== "galaxy" &&
         phase !== "system" &&
-        selectedPlanet?.content?.map((entry) => (
-          <section className="world-content-card" key={entry.id}>
-            <span>
-              {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
-            </span>
-            <strong>{entry.title}</strong>
-            <small>{entry.summary}</small>
-            {entry.tags.length > 0 && (
-              <em>{entry.tags.slice(0, 4).join(" · ")}</em>
-            )}
-          </section>
-        ))}
+        visibleWorldContentEntries.length ? (
+          <div
+            className="world-content-stack"
+            aria-label="World content"
+            data-surface-card-budget={
+              phase === "surface"
+                ? SURFACE_CONTENT_SIGNAL_BUDGET.stable
+                : undefined
+            }
+          >
+            {visibleWorldContentEntries.map((entry) => {
+              const surfacePresentation =
+                phase === "surface"
+                  ? surfaceContentPresentation.get(entry.id)
+                  : undefined;
+              return (
+                <section
+                  className={
+                    "world-content-card" +
+                    (surfaceFocusEntryId === entry.id
+                      ? " is-surface-focus"
+                      : "")
+                  }
+                  data-surface-priority={surfacePresentation?.priority}
+                  data-surface-focus={
+                    surfaceFocusEntryId === entry.id ? "true" : undefined
+                  }
+                  key={entry.id}
+                >
+                  <span>
+                    {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
+                  </span>
+                  {surfaceFocusEntryId === entry.id && (
+                    <em className="world-content-focus-label">
+                      {locale === "zh" ? "当前目标" : "CURRENT TARGET"}
+                    </em>
+                  )}
+                  <strong>{entry.title}</strong>
+                  <small>{entry.summary}</small>
+                  {surfacePresentation && (
+                    <>
+                      <em className="world-content-location">
+                        {locale === "zh" ? "地表位置" : "SURFACE LOCATION"} //{" "}
+                        {surfacePresentation.location}
+                      </em>
+                      <em className="world-content-cluster">
+                        {locale === "zh" ? "区域簇" : "CLUSTER"} //{" "}
+                        {surfacePresentation.cluster}
+                      </em>
+                      <em
+                        className={
+                          "world-content-priority priority-" +
+                          surfacePresentation.priority
+                        }
+                      >
+                        {locale === "zh"
+                          ? surfacePresentation.priority === "primary"
+                            ? "重点信号"
+                            : surfacePresentation.priority === "secondary"
+                              ? "次级信号"
+                              : "环境信号"
+                          : surfacePresentation.priority.toUpperCase() +
+                            " SIGNAL"}
+                      </em>
+                    </>
+                  )}
+                  {surfacePresentation && (
+                    <button
+                      type="button"
+                      className="world-content-focus-action"
+                      data-surface-entry={entry.id}
+                      aria-pressed={surfaceFocusEntryId === entry.id}
+                      onClick={() => handleSurfaceFocusEntry(entry.id)}
+                    >
+                      {surfaceFocusEntryId === entry.id
+                        ? locale === "zh"
+                          ? "已聚焦地表位置"
+                          : "SURFACE SIGNAL FOCUSED"
+                        : locale === "zh"
+                          ? "聚焦地表位置"
+                          : "FOCUS SURFACE SIGNAL"}
+                    </button>
+                  )}
+                  {entry.tags.length > 0 && (
+                    <em className="world-content-tags">
+                      {entry.tags.slice(0, 4).join(" · ")}
+                    </em>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        ) : null}
 
-      {phase === "surface" && selectedPlanet && (
+      {phase === "surface" && selectedPlanet && surfaceProfile && (
         <section className="surface-copy">
-          <span>{text(locale, "heroSurface")}</span>
+          <span>
+            {text(locale, "heroSurface")} // {surfaceProfile.biome.toUpperCase()}
+          </span>
           <strong>{astronomicalName(locale, selectedPlanet.name)}</strong>
           <small>{text(locale, "surfaceDescription")}</small>
+          <div className="surface-world-meta" aria-label="Surface world profile">
+            <b>
+              {surfaceProfile.regions.length}
+              <i>{locale === "zh" ? "区域" : "REGIONS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.landmarks.length}
+              <i>{locale === "zh" ? "地标" : "LANDMARKS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.contentAnchors.length}
+              <i>{locale === "zh" ? "内容点" : "SIGNALS"}</i>
+            </b>
+          </div>
+          <div className="surface-region-index" aria-label="Surface regions">
+            {surfaceProfile.regions.slice(0, 4).map((region) => (
+              <span key={region.id}>{region.name}</span>
+            ))}
+          </div>
+          {surfaceProfile.contentClusters.length > 0 && (
+            <div
+              className="surface-cluster-index"
+              aria-label="Surface signal clusters"
+            >
+              {rankSurfaceContentClusters(
+                surfaceProfile.contentClusters,
+                surfaceFocusedAnchor?.cluster ?? null,
+              ).map((cluster) => {
+                const focusedEntry =
+                  surfaceFocusedAnchor?.cluster === cluster.index
+                    ? surfaceFocusEntryId
+                    : null;
+                const nextEntryId = nextSurfaceClusterEntryId(
+                  surfaceProfile.contentAnchors,
+                  cluster.index,
+                  focusedEntry,
+                );
+                return (
+                  <button
+                    type="button"
+                    className="surface-cluster-chip"
+                    data-priority={cluster.priority}
+                    data-surface-cluster={cluster.index}
+                    data-surface-entry={nextEntryId ?? undefined}
+                    aria-pressed={
+                      surfaceFocusedAnchor?.cluster === cluster.index
+                    }
+                    aria-label={
+                      locale === "zh"
+                        ? `${cluster.label}，${cluster.anchorIds.length} 个信号，点按切换`
+                        : `${cluster.label}, ${cluster.anchorIds.length} signals, tap to cycle`
+                    }
+                    disabled={!nextEntryId}
+                    key={cluster.id}
+                    onClick={() => handleSurfaceFocusCluster(cluster.index)}
+                  >
+                    {cluster.label} · {cluster.anchorIds.length}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <em className="surface-explore-hint">
+            {locale === "zh"
+              ? "点按信号聚焦 · 拖动探索 · 双指调整视角 · 滚轮离开地表"
+              : "TAP SIGNALS TO FOCUS · DRAG TO EXPLORE · PINCH TO FRAME · WHEEL TO DEPART"}
+          </em>
         </section>
       )}
 
