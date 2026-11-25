@@ -5,7 +5,6 @@ import type {
 } from "../../lib/universe/types";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
 import {
-  astronomicalName,
   journeyTitle,
   kindLabel,
   navigationDetail,
@@ -80,6 +79,7 @@ export function UniverseNavigator({
   onNavigate,
   onLocate,
   onStartJourney,
+  navigationTitle,
   locale,
 }: {
   open: boolean;
@@ -103,6 +103,7 @@ export function UniverseNavigator({
     title: string,
     destinations: UniverseNavigationDestination[],
   ) => void;
+  navigationTitle: (id: string, title: string) => string;
   locale: ProductLocale;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -345,7 +346,7 @@ export function UniverseNavigator({
       setPendingAction(null);
       setActionError(
         text(locale, "couldNotOpen", {
-          title: astronomicalName(locale, destination.title),
+          title: navigationTitle(destination.id, destination.title),
         }),
       );
     }
@@ -364,7 +365,7 @@ export function UniverseNavigator({
       setPendingAction(null);
       setActionError(
         text(locale, "couldNotLocate", {
-          title: astronomicalName(locale, destination.title),
+          title: navigationTitle(destination.id, destination.title),
         }),
       );
     }
@@ -579,6 +580,7 @@ export function UniverseNavigator({
                 const index = flatIndex;
                 const isKeyboardActive = index === activeIndex;
                 const isCurrent = result.id === activeDestinationId;
+                const title = navigationTitle(result.id, result.title);
                 const isPendingDestination =
                   result.id === pendingDestinationId;
                 const spatial =
@@ -633,9 +635,7 @@ export function UniverseNavigator({
                         {kindLabel(locale, result.kind)}
                       </span>
                       <span className="navigator-result-main">
-                        <strong>
-                          {astronomicalName(locale, result.title)}
-                        </strong>
+                        <strong>{title}</strong>
                         <small>{navigationDetail(locale, result.detail)}</small>
                       </span>
                       <span className="navigator-open">
@@ -659,7 +659,7 @@ export function UniverseNavigator({
                       className="navigator-locate"
                       onClick={() => void locate(result)}
                       aria-label={text(locale, "locateInGalaxy", {
-                        title: astronomicalName(locale, result.title),
+                        title,
                       })}
                       disabled={pendingAction !== null}
                     >
