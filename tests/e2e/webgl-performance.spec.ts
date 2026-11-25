@@ -229,6 +229,8 @@ async function driveFullScaleRoundTrip(page: Page) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(20);
   }
+  // Split the evidence, not the original 10 s passive System-entry budget.
+  const systemEntryDeadline = performance.now() + 10_000;
   await expect(
     html,
     "Galaxy wheel input must reach the System endpoint",
@@ -239,13 +241,20 @@ async function driveFullScaleRoundTrip(page: Page) {
   );
   // At 1.000, let the native renderer acknowledge the handoff. Extra wheel
   // input cannot advance it and could skip System once the handoff commits.
+  const remainingSystemEntryMs = Math.floor(
+    systemEntryDeadline - performance.now(),
+  );
+  expect(
+    remainingSystemEntryMs,
+    "The System endpoint must leave time for the native handoff within 10 s",
+  ).toBeGreaterThan(0);
   await expect(
     html,
     "The native Galaxy→System handoff must settle",
   ).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
-    { timeout: 20_000 },
+    { timeout: remainingSystemEntryMs },
   );
   // Logical scale reaches System before its renderer has mounted and drawn.
   // Exercise the real System in both warm-up and measured journeys.
