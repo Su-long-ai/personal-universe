@@ -209,6 +209,8 @@ export function UniverseCanvas({
     ready: boolean;
   }>({ identity: "", generation: -1, ready: false });
   const [systemHandoffReleased, setSystemHandoffReleased] = useState(false);
+  const [systemHandoffSuppressedId, setSystemHandoffSuppressedId] =
+    useState<string | null>(null);
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -296,7 +298,7 @@ export function UniverseCanvas({
     worldPaintStartedState.identity === worldPaintIdentity &&
     worldPaintStartedState.generation === worldPaintGeneration &&
     worldPaintStartedState.started;
-  const worldPaintReady =
+  const rawWorldPaintReady =
     closeWorldPhase &&
     worldPaintState.identity === worldPaintIdentity &&
     worldPaintState.generation === worldPaintGeneration &&
@@ -378,10 +380,19 @@ export function UniverseCanvas({
   const prewarmLiveWorld =
     Boolean(worldPrewarmPlanet) &&
     (phase === "system" || closeWorldPhase);
+  const requiresSystemTargetHandoff =
+    phase === "approach" &&
+    Boolean(selectedSystem) &&
+    Boolean(worldPrewarmPlanet);
   const handoffTargetPlanetId =
-    phase === "approach" && Boolean(selectedSystem) && worldPaintStarted
+    requiresSystemTargetHandoff && worldPaintStarted
       ? worldPrewarmPlanet?.id ?? null
       : null;
+  const worldPaintReady =
+    rawWorldPaintReady &&
+    (!requiresSystemTargetHandoff ||
+      (handoffTargetPlanetId !== null &&
+        systemHandoffSuppressedId === handoffTargetPlanetId));
   const keepSystemForHandoff =
     phase === "approach" &&
     Boolean(selectedSystem) &&
@@ -391,6 +402,33 @@ export function UniverseCanvas({
     if (phase === "approach" && worldPaintStarted) return;
     setSystemHandoffReleased(false);
   }, [phase, worldPaintStarted]);
+
+  useEffect(() => {
+    setSystemHandoffSuppressedId((current) => {
+      if (
+        phase === "approach" &&
+        handoffTargetPlanetId &&
+        current === handoffTargetPlanetId
+      ) {
+        return current;
+      }
+      return null;
+    });
+  }, [handoffTargetPlanetId, phase]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (worldPaintReady) {
+      html.dataset.universeWorldPaintReady = "true";
+    } else {
+      delete html.dataset.universeWorldPaintReady;
+    }
+    return () => {
+      if (html.dataset.universeWorldPaintReady === "true") {
+        delete html.dataset.universeWorldPaintReady;
+      }
+    };
+  }, [worldPaintGeneration, worldPaintReady]);
 
   useEffect(() => {
     if (
@@ -520,6 +558,7 @@ export function UniverseCanvas({
                 onScaleFocus={onScaleFocusPlanet}
                 scaleTargetPlanet={systemScaleTargetPlanet}
                 handoffTargetPlanetId={handoffTargetPlanetId}
+                onHandoffTargetSuppressed={setSystemHandoffSuppressedId}
                 onScaleFrame={setSystemScaleFrame}
               />
             }
@@ -530,6 +569,7 @@ export function UniverseCanvas({
               onScaleFocus={onScaleFocusPlanet}
               scaleTargetPlanet={systemScaleTargetPlanet}
               handoffTargetPlanetId={handoffTargetPlanetId}
+              onHandoffTargetSuppressed={setSystemHandoffSuppressedId}
               onScaleFrame={setSystemScaleFrame}
               quality={quality}
             />
@@ -541,6 +581,7 @@ export function UniverseCanvas({
             onScaleFocus={onScaleFocusPlanet}
             scaleTargetPlanet={systemScaleTargetPlanet}
             handoffTargetPlanetId={handoffTargetPlanetId}
+            onHandoffTargetSuppressed={setSystemHandoffSuppressedId}
             onScaleFrame={setSystemScaleFrame}
           />
         )
