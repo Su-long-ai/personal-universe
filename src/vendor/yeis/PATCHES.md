@@ -113,4 +113,3 @@ listed below before release.
    - System retargeting and rendering algorithms are unchanged. The adaptation
      only makes ownership deterministic so repeated Galaxy/System mounts do not
      depend on host scene traversal or deferred garbage collection.
-
