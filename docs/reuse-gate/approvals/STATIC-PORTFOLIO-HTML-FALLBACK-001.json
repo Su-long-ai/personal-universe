@@ -1,0 +1,42 @@
+{
+  "schema": 3,
+  "task_id": "STATIC-PORTFOLIO-HTML-FALLBACK-001",
+  "approved_at": "2026-11-25T16:47:22.351Z",
+  "baseline_commit": "0431941c033bf932e951ed350ac4b53919ca2b02",
+  "record_path": "docs/reuse-gate/tasks/STATIC-PORTFOLIO-HTML-FALLBACK-001.json",
+  "record_sha256": "6a4ec2f2f9e7db3a13de6caf72b263a076ed58ce47e5e279ebb4e17d820f04f9",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-base-url": "ebdc55c69abbc1db2612243fb329c538a480a83af0c06dfcb9d2623d20153b98",
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Use existing Astro content and static pages to give the authored Personal Universe work an index/detail, plain navigation from the HUD, and a non-WebGL / no-JavaScript homepage fallback, with no changes to galaxy, camera or renderer ownership."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/pages/index.astro",
+    "src/pages/portfolio/[...entry].astro",
+    "src/pages/zh/portfolio/[...entry].astro",
+    "src/components/portfolio/PortfolioHomeFallback.astro",
+    "src/components/portfolio/PortfolioPage.astro",
+    "src/components/universe/UniverseHud.tsx",
+    "src/lib/portfolio/paths.ts",
+    "src/lib/portfolio/content.ts",
+    "tests/e2e/portfolio.spec.ts",
+    "docs/architecture/portfolio-fallback.md"
+  ],
+  "selected_ids": [
+    "astro-static-collection-pages",
+    "astro-pages-base",
+    "playwright-fallback-validation"
+  ],
+  "candidate_scores": {
+    "astro-cactus-site": 32,
+    "astro-static-collection-pages": 57,
+    "astro-pages-base": 57,
+    "playwright-fallback-validation": 57
+  }
+}
