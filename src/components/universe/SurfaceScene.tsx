@@ -187,6 +187,7 @@ export function SurfaceScene({
     return texture;
   }, [profile?.id, softwareRenderer]);
   const surfaceGroupRef = useRef<THREE.Group>(null);
+  const surfacePaintReadyReported = useRef(false);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainWorldId, setTerrainWorldId] = useState<string | null>(null);
@@ -250,6 +251,33 @@ export function SurfaceScene({
     group.visible =
       presentationActive && phaseRef.current === "surface";
   }, -100);
+
+  useFrame(() => {
+    const group = surfaceGroupRef.current;
+    const painted = Boolean(
+      group?.visible &&
+      presentationActive &&
+      phaseRef.current === "surface",
+    );
+    if (surfacePaintReadyReported.current === painted) return;
+    surfacePaintReadyReported.current = painted;
+    if (painted) {
+      // CinematicPipeline renders at priority 1. This callback runs afterwards,
+      // so the token proves that one real Surface presentation frame has
+      // already reached the renderer; terrain preparation alone is not paint.
+      document.documentElement.dataset.universeSurfacePaintReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeSurfacePaintReady;
+    }
+  }, 2);
+
+  useEffect(
+    () => () => {
+      surfacePaintReadyReported.current = false;
+      delete document.documentElement.dataset.universeSurfacePaintReady;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!prepare || !profile) {

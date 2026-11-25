@@ -101,7 +101,8 @@ export function CinematicPipeline({
     useLiveWorld ||
     (prewarmLiveWorld && !softwareRenderer && !fallbackReason);
   const stableFrames = useRef(0);
-  const metricFrame = useRef(0);
+  const metricElapsed = useRef(0);
+  const metricSample = useRef(0);
   const liveDrawFrames = useRef(0);
   const appliedImpostorPixels = useRef<number | null>(null);
   const reportedImpostorPixels = useRef<number | null>(null);
@@ -131,6 +132,46 @@ export function CinematicPipeline({
     : high
       ? 1.75
       : 1;
+
+  const publishWebglMetrics = useCallback(() => {
+    const html = document.documentElement;
+    publishDatasetMetric(
+      html,
+      "universeWebglGeometries",
+      String(gl.info.memory.geometries),
+    );
+    publishDatasetMetric(
+      html,
+      "universeWebglTextures",
+      String(gl.info.memory.textures),
+    );
+    publishDatasetMetric(
+      html,
+      "universeWebglPrograms",
+      String(gl.info.programs?.length ?? 0),
+    );
+    publishDatasetMetric(
+      html,
+      "universeWebglCalls",
+      String(gl.info.render.calls),
+    );
+    publishDatasetMetric(
+      html,
+      "universeWebglTriangles",
+      String(gl.info.render.triangles),
+    );
+    publishDatasetMetric(
+      html,
+      "universeWorldLiveDrawFrame",
+      String(liveDrawFrames.current),
+    );
+    metricSample.current += 1;
+    publishDatasetMetric(
+      html,
+      "universeWebglMetricSample",
+      String(metricSample.current),
+    );
+  }, [gl]);
 
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
@@ -227,6 +268,7 @@ export function CinematicPipeline({
     if (retainedPass) retainedPass.enabled = useLiveWorld;
     document.documentElement.dataset.universeWorldPipelineLifecycle =
       useLiveWorld ? "active" : "parked";
+    publishWebglMetrics();
   }, [
     camera,
     composer,
@@ -236,6 +278,7 @@ export function CinematicPipeline({
     softwareRenderer,
     prewarmLiveWorld,
     provisionLiveWorld,
+    publishWebglMetrics,
     useLiveWorld,
   ]);
 
@@ -410,6 +453,7 @@ export function CinematicPipeline({
       delete document.documentElement.dataset.universeWorldComposerTargets;
       delete document.documentElement.dataset.universeWorldBloom;
       delete document.documentElement.dataset.universeWorldRecovery;
+      delete document.documentElement.dataset.universeWebglMetricSample;
       planetPassRef.current?.dispose();
       planetPassRef.current = null;
       composer.composer.dispose();
@@ -451,39 +495,10 @@ export function CinematicPipeline({
     }
 
     const html = document.documentElement;
-    metricFrame.current += 1;
-    if (metricFrame.current >= 30) {
-      metricFrame.current = 0;
-      publishDatasetMetric(
-        html,
-        "universeWebglGeometries",
-        String(gl.info.memory.geometries),
-      );
-      publishDatasetMetric(
-        html,
-        "universeWebglTextures",
-        String(gl.info.memory.textures),
-      );
-      publishDatasetMetric(
-        html,
-        "universeWebglPrograms",
-        String(gl.info.programs?.length ?? 0),
-      );
-      publishDatasetMetric(
-        html,
-        "universeWebglCalls",
-        String(gl.info.render.calls),
-      );
-      publishDatasetMetric(
-        html,
-        "universeWebglTriangles",
-        String(gl.info.render.triangles),
-      );
-      publishDatasetMetric(
-        html,
-        "universeWorldLiveDrawFrame",
-        String(liveDrawFrames.current),
-      );
+    metricElapsed.current += delta;
+    if (metricElapsed.current >= 0.5) {
+      metricElapsed.current %= 0.5;
+      publishWebglMetrics();
     }
 
     if (!liveWorld) {
@@ -513,7 +528,8 @@ export function CinematicPipeline({
       const surfaceFallback =
         html.dataset.universeNavigationPhase === "surface";
       const presentationReady = surfaceFallback
-        ? html.dataset.universeSurfaceTerrainState === "ready"
+        ? html.dataset.universeSurfaceTerrainState === "ready" &&
+          html.dataset.universeSurfacePaintReady === "true"
         : html.dataset.universeWorldPaintReady === "true";
       publishWorldReadyEvidence(presentationReady);
       publishScreenshotReadyEvidence(presentationReady && cameraReady);
