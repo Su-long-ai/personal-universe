@@ -88,7 +88,7 @@ jobs:
       - name: Preserve deployable Pages build
         uses: actions/upload-artifact@v4
         with:
-          name: pages-preview-dist-${{ github.run_id }}
+          name: pages-preview-dist-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
           if-no-files-found: error
           retention-days: 7
@@ -110,6 +110,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: dist
 
   deploy:
@@ -123,6 +124,8 @@ jobs:
       - name: Deploy Pages artifact
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
       - name: Verify live homepage and YEIS catalogue
         shell: bash
@@ -157,7 +160,18 @@ jobs:
         run: npm ci
 
       - name: Install pinned Playwright test runner
-        run: npm install --no-save --package-lock=false @playwright/test@${PLAYWRIGHT_VERSION}
+        shell: bash
+        run: |
+          playwright_prefix="${RUNNER_TEMP}/playwright-runner-${PLAYWRIGHT_VERSION}"
+          rm -rf "$playwright_prefix"
+          npm install --prefix "$playwright_prefix" --no-save --package-lock=false \
+            "@playwright/test@${PLAYWRIGHT_VERSION}"
+          mkdir -p node_modules/@playwright
+          rm -rf node_modules/@playwright/test node_modules/playwright node_modules/playwright-core
+          ln -s "$playwright_prefix/node_modules/@playwright/test" node_modules/@playwright/test
+          ln -s "$playwright_prefix/node_modules/playwright" node_modules/playwright
+          ln -s "$playwright_prefix/node_modules/playwright-core" node_modules/playwright-core
+          echo "$playwright_prefix/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright Chromium
         id: playwright-cache
@@ -168,11 +182,11 @@ jobs:
 
       - name: Install Playwright Chromium and host dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: playwright install --with-deps chromium
 
       - name: Verify cached Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install chromium
+        run: playwright install chromium
 
       - name: Verify browser tooling did not mutate lockfiles
         run: git diff --exit-code -- package.json package-lock.json
@@ -188,6 +202,7 @@ jobs:
           const base = `${process.env.PAGE_URL.replace(/\/$/, "")}/`;
           const origin = new URL(base).origin;
           const pageErrors = [];
+          const consoleErrors = [];
           const criticalFailures = [];
 
           const browser = await chromium.launch({
@@ -207,6 +222,11 @@ jobs:
             page.on("pageerror", (error) => {
               pageErrors.push(error.message);
             });
+            page.on("console", (message) => {
+              if (message.type() === "error") {
+                consoleErrors.push(message.text());
+              }
+            });
             page.on("requestfailed", (request) => {
               const url = new URL(request.url());
               if (url.origin !== origin) return;
@@ -214,6 +234,9 @@ jobs:
               if (
                 path.includes("/_astro/") ||
                 path.includes("/vendor/yeis/") ||
+                path.includes("/textures/") ||
+                path.includes("/audio/") ||
+                path.includes("/nebulae/") ||
                 path.endsWith("/stars.bin")
               ) {
                 criticalFailures.push(
@@ -228,7 +251,9 @@ jobs:
             });
 
             await page.waitForFunction(
-              () => document.documentElement.dataset.universeEngine === "yeis",
+              () =>
+                document.documentElement.dataset.universeEngine === "yeis" &&
+                document.documentElement.dataset.yeisNativeGalaxy === "ready",
               undefined,
               { timeout: 30_000 },
             );
@@ -252,7 +277,7 @@ jobs:
               box.x + box.width * 0.5,
               box.y + box.height * 0.5,
             );
-            await page.mouse.wheel(0, -120);
+            await page.mouse.wheel(0, -96);
 
             await page.waitForFunction(
               () => {
@@ -280,7 +305,81 @@ jobs:
               );
             }
 
-            await page.mouse.wheel(0, 120);
+            // Preserve the frame that proves real deployed intermediate scale
+            // movement. The remaining acceptance uses DOM/runtime state so the
+            // smoke does not add redundant SwiftShader framebuffer reads.
+            await page.screenshot({ path: "pages-live-smoke.png" });
+
+            // Cross the real Galaxy -> System renderer boundary with the same
+            // physical wheel path used by the product. Four -96 samples are
+            // the release contract for the native Galaxy scale interval.
+            for (let sample = 1; sample < 4; sample += 1) {
+              await page.mouse.wheel(0, -96);
+              await page.waitForTimeout(80);
+            }
+
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
+                return (
+                  data.universeNavigationPhase === "system" &&
+                  data.universeSystemRenderer === "yeis-native" &&
+                  data.universeSystemReady === "true" &&
+                  Number.isFinite(position) &&
+                  Math.abs(position - 1) < 0.001
+                );
+              },
+              undefined,
+              { timeout: 20_000 },
+            );
+
+            const systemCanvasCount = await page.locator("canvas").count();
+            if (systemCanvasCount !== 1) {
+              throw new Error(
+                `Expected one canvas after live Galaxy->System handoff, found ${systemCanvasCount}`,
+              );
+            }
+
+            // Reverse on the very next physical wheel sample. This must cross
+            // back into the native Galaxy interval immediately rather than
+            // waiting for a semantic dwell or a stale renderer settlement.
+            await page.mouse.wheel(0, 96);
+            await page.waitForFunction(
+              () => {
+                const data = document.documentElement.dataset;
+                const position = Number(data.universeScalePosition);
+                return (
+                  data.universeNavigationPhase === "galaxy" &&
+                  data.universeScaleDirection === "out" &&
+                  Number.isFinite(position) &&
+                  position > 0 &&
+                  position < 1 &&
+                  data.universeGalaxyScaleBridge === "active"
+                );
+              },
+              undefined,
+              { timeout: 10_000 },
+            );
+
+            const reversePosition = await page.evaluate(() =>
+              Number(document.documentElement.dataset.universeScalePosition),
+            );
+            if (!(reversePosition > 0 && reversePosition < 1)) {
+              throw new Error(
+                `Expected immediate System->Galaxy reverse midpoint, got ${reversePosition}`,
+              );
+            }
+
+            for (let sample = 0; sample < 6; sample += 1) {
+              const position = await page.evaluate(() =>
+                Number(document.documentElement.dataset.universeScalePosition),
+              );
+              if (Number.isFinite(position) && position <= 0.001) break;
+              await page.mouse.wheel(0, 96);
+              await page.waitForTimeout(80);
+            }
+
             await page.waitForFunction(
               () => {
                 const data = document.documentElement.dataset;
@@ -296,11 +395,22 @@ jobs:
               { timeout: 10_000 },
             );
 
-            await page.waitForTimeout(500);
+            await page.waitForTimeout(250);
 
+            const finalCanvasCount = await page.locator("canvas").count();
+            if (finalCanvasCount !== 1) {
+              throw new Error(
+                `Expected one canvas after live scale reversal, found ${finalCanvasCount}`,
+              );
+            }
             if (pageErrors.length) {
               throw new Error(
                 `Live browser page errors: ${pageErrors.join(" | ")}`,
+              );
+            }
+            if (consoleErrors.length) {
+              throw new Error(
+                `Live browser console errors: ${consoleErrors.join(" | ")}`,
               );
             }
             if (criticalFailures.length) {
@@ -314,8 +424,18 @@ jobs:
           NODE
 
           {
-            echo "- Live Chromium YEIS boot: PASS"
+            echo "- Live Chromium YEIS native Galaxy ready: PASS"
             echo "- Live single-Canvas probe: PASS"
-            echo "- Live direct Galaxy scale midpoint + reversal probe: PASS"
-            echo "- Live critical asset/browser error probe: PASS"
+            echo "- Live Galaxy midpoint + Galaxy→System handoff + immediate reverse probe: PASS"
+            echo "- Live midpoint screenshot evidence: PASS"
+            echo "- Live critical asset/browser/console error probe: PASS"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload live Pages browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-live-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: pages-live-smoke.png
+          if-no-files-found: warn
+          retention-days: 14
