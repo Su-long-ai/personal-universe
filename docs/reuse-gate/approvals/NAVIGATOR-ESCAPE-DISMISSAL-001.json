@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "NAVIGATOR-ESCAPE-DISMISSAL-001",
+  "approved_at": "2026-11-25T17:13:47.598Z",
+  "baseline_commit": "87bda9cfb746894dc4eb04b89a7f613b7b6b63a0",
+  "record_path": "docs/reuse-gate/tasks/NAVIGATOR-ESCAPE-DISMISSAL-001.json",
+  "record_sha256": "f795eea11f977846a93ace897596bf72f04f7987792c9f5bb04cc4af46c01a29",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Make the current Navigator own one Escape handler for the mounted modal; retain localized dialog labels, pointer dismissal, combobox navigation and the rest of the 3D UI. Validate early Escape and descendant focus separately from the portfolio route."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "tests/e2e/portfolio.spec.ts"
+  ],
+  "selected_ids": [
+    "mounted-native-keyboard",
+    "playwright-keyboard-regression"
+  ],
+  "candidate_scores": {
+    "radix-dialog": 43,
+    "mounted-native-keyboard": 57,
+    "playwright-keyboard-regression": 57
+  }
+}
