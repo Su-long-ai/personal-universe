@@ -11,6 +11,13 @@ import { useGLTF } from "@react-three/drei";
 import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
+import {
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer } from "./CinematicPipeline";
 import { FALLBACK_SURFACE_CAMERA_FRAME } from "./CinematicCamera";
 
@@ -18,13 +25,7 @@ const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
 const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
-
-const ROCKS = [
-  { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
-  { x: 11.0, z: 2.6, scale: 2.8, ry: 2.0, tilt: -0.06 },
-  { x: -9.8, z: -13.5, scale: 2.8, ry: 2.6, tilt: 0.03 },
-  { x: 9.6, z: -18.0, scale: 3.3, ry: 0.9, tilt: -0.04 },
-] as const;
+let surfaceTerrainInstanceSequence = 0;
 
 function terrainErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return null;
@@ -44,31 +45,37 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
-function SurfaceRocks({ terrain }: { terrain: FiniteTerrain }) {
-  // Keep decorative glTF work behind the real-GPU branch. In particular,
-  // SwiftShader/software fallback must not fetch, parse, cache or compile a
-  // model that its visual profile never renders.
+function SurfaceRocks({
+  terrain,
+  profile,
+}: {
+  terrain: FiniteTerrain;
+  profile: SurfaceWorldProfile;
+}) {
+  // This component is mounted only on the real-GPU branch. Keeping useGLTF
+  // here ensures software fallback never fetches/parses hardware-only assets.
   const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const rockInstances = useMemo(
     () =>
-      ROCKS.map((placement, index) => {
+      profile.landmarks.slice(0, 4).map((landmark, index) => {
         const object = seededClone(boulder.scene, index);
         const localHeight =
-          terrain.sampleHeight(placement.x, placement.z) ?? 0;
+          terrain.sampleHeight(landmark.position[0], landmark.position[1]) ?? 0;
+        const scale = 1.45 + landmark.scale * 1.55;
         object.position.set(
-          placement.x,
-          TERRAIN_Y + localHeight - placement.scale * 0.52,
-          placement.z,
+          landmark.position[0],
+          TERRAIN_Y + localHeight - scale * 0.52,
+          landmark.position[1],
         );
         object.rotation.set(
-          placement.tilt,
-          placement.ry,
-          placement.tilt * 0.4,
+          landmark.prominence * 0.08,
+          landmark.prominence * Math.PI * 1.7,
+          -landmark.prominence * 0.04,
         );
-        object.scale.setScalar(placement.scale);
+        object.scale.setScalar(scale);
         return object;
       }),
-    [boulder.scene, terrain],
+    [boulder.scene, profile.id, profile.landmarks, terrain],
   );
 
   useEffect(() => {
@@ -106,12 +113,18 @@ export function SurfaceTerrain({
   active,
   presenting,
   phaseRef,
+  profile,
+  focusedEntryId,
+  onFocusEntry,
   onAnchorHeight,
 }: {
   prepare: boolean;
   active: boolean;
   presenting: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
+  profile: SurfaceWorldProfile;
+  focusedEntryId: string | null;
+  onFocusEntry: (entryId: string) => void;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
@@ -166,6 +179,7 @@ export function SurfaceTerrain({
 
     void (async () => {
       const html = document.documentElement;
+      const instanceId = ++surfaceTerrainInstanceSequence;
       html.dataset.universeSurfaceTerrainAllocations = String(
         Number(html.dataset.universeSurfaceTerrainAllocations ?? "0") + 1,
       );
@@ -199,22 +213,22 @@ export function SurfaceTerrain({
               },
           source: {
             kind: "noise",
-            seed: 73021,
+            seed: profile.terrain.noiseSeed,
             // The pinned ProceduralTerrains shader specializes its octave
             // count at compile time. Driver compilation itself cannot be
             // interrupted, so use the package's formal lower-complexity
             // configuration on software WebGL instead of starting the
             // seven-octave shader and trying to cancel it later.
             octaves: softwareRenderer ? 2 : 7,
-            scale: 0.025,
-            ridge: 0.7,
-            warp: 0.3,
-            persistence: 0.54,
-            lacunarity: 2.08,
+            scale: profile.terrain.scale,
+            ridge: profile.terrain.ridge,
+            warp: profile.terrain.warp,
+            persistence: profile.terrain.persistence,
+            lacunarity: profile.terrain.lacunarity,
             edgeFalloffMode: "mountains",
           },
-          heightScale: 34,
-          seaLevel: -20,
+          heightScale: profile.terrain.heightScale,
+          seaLevel: profile.terrain.seaLevel,
           quality: softwareRenderer
             ? {
                 lodSegments: [16, 8, 4, 2],
@@ -238,34 +252,20 @@ export function SurfaceTerrain({
             terrainTriplanar: !softwareRenderer,
           },
           style: {
-            paletteSaturation: 0.7,
-            paletteContrast: 1.16,
-            paletteTint: [0.72, 0.82, 0.9],
-            sunColor: [1.0, 0.69, 0.42],
-            sunIntensity: 1.45,
-            skyAmbient: [0.07, 0.13, 0.2],
-            groundBounce: [0.04, 0.075, 0.08],
+            paletteSaturation: profile.terrain.saturation,
+            paletteContrast: profile.terrain.contrast,
+            paletteTint: profile.terrain.tint,
+            sunColor: profile.lighting.sunColor,
+            sunIntensity: profile.lighting.sunIntensity,
+            skyAmbient: profile.lighting.skyAmbient,
+            groundBounce: profile.lighting.groundBounce,
           },
           lighting: {
-            sunAzimuth: 145,
-            sunElevation: 14,
-            fogDensity: 0.0025,
+            sunAzimuth: profile.lighting.sunAzimuth,
+            sunElevation: profile.lighting.sunElevation,
+            fogDensity: profile.atmosphere.fogDensity,
           },
-          palette: {
-            sand: [0.19, 0.2, 0.18],
-            dune: [0.16, 0.17, 0.16],
-            dryGrass: [0.12, 0.16, 0.13],
-            grass: [0.055, 0.12, 0.1],
-            forest: [0.025, 0.075, 0.065],
-            jungle: [0.02, 0.07, 0.065],
-            swamp: [0.025, 0.065, 0.07],
-            tundra: [0.19, 0.22, 0.23],
-            redRock: [0.26, 0.2, 0.18],
-            redRock2: [0.18, 0.16, 0.16],
-            rock: [0.13, 0.15, 0.16],
-            rockHi: [0.26, 0.29, 0.31],
-            snow: [0.62, 0.69, 0.73],
-          },
+          palette: profile.terrain.palette,
         },
       });
 
@@ -285,6 +285,9 @@ export function SurfaceTerrain({
       softwareStreamAccumulator.current = 0;
       document.documentElement.dataset.universeSurfaceTerrainProfile =
         softwareRenderer ? "infinite-software" : "infinite-hardware";
+      document.documentElement.dataset.universeSurfaceTerrainWorld = profile.id;
+      document.documentElement.dataset.universeSurfaceTerrainInstance =
+        `${profile.id}:${instanceId}`;
       setTerrain(instance);
     })().catch((error) => {
       const code = terrainErrorCode(error);
@@ -306,6 +309,8 @@ export function SurfaceTerrain({
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
       delete document.documentElement.dataset.universeSurfaceTerrainReadyView;
+      delete document.documentElement.dataset.universeSurfaceTerrainWorld;
+      delete document.documentElement.dataset.universeSurfaceTerrainInstance;
     };
   }, [
     activated,
@@ -313,6 +318,7 @@ export function SurfaceTerrain({
     gl,
     landingStreamCamera,
     onAnchorHeight,
+    profile.id,
     softwareRenderer,
   ]);
 
@@ -425,19 +431,303 @@ export function SurfaceTerrain({
         terrainReadyPublished.current = true;
         document.documentElement.dataset.universeSurfaceTerrainReadyView =
           presenting ? "product-camera" : "landing-prestream";
-        onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
+        onAnchorHeight?.(
+          (terrain.sampleHeight(profile.landing[0], profile.landing[1]) ?? 0) +
+            0.75,
+        );
       }
     }
   });
+
+  const pathSegments = useMemo(() => {
+    if (!terrain) return [];
+    const subdivisions = softwareRenderer ? 3 : 6;
+    return profile.paths.flatMap((path) =>
+      Array.from({ length: subdivisions }, (_, index) => {
+        const t0 = index / subdivisions;
+        const t1 = (index + 1) / subdivisions;
+        const x0 = THREE.MathUtils.lerp(path.from[0], path.to[0], t0);
+        const z0 = THREE.MathUtils.lerp(path.from[1], path.to[1], t0);
+        const x1 = THREE.MathUtils.lerp(path.from[0], path.to[0], t1);
+        const z1 = THREE.MathUtils.lerp(path.from[1], path.to[1], t1);
+        const x = (x0 + x1) * 0.5;
+        const z = (z0 + z1) * 0.5;
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        return {
+          id: `${path.id}:${index}`,
+          landmarkId: path.landmarkId,
+          position: [
+            x,
+            (terrain.sampleHeight(x, z) ?? 0) + 0.09,
+            z,
+          ] as [number, number, number],
+          length: Math.hypot(dx, dz),
+          rotationY: Math.atan2(dx, dz),
+          width: path.width,
+        };
+      }),
+    );
+  }, [profile.id, profile.paths, softwareRenderer, terrain]);
+
+  const rankedContent = useMemo(
+    () => rankSurfaceContentAnchors(profile.contentAnchors, focusedEntryId),
+    [focusedEntryId, profile.contentAnchors],
+  );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === focusedEntryId) ?? null;
+  const rankedLandmarks = useMemo(
+    () =>
+      rankSurfaceWorldLandmarks(
+        profile.landmarks,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.landmarks],
+  );
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const rankedClusters = useMemo(
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
+  );
+
+  const visibleLandmarks = softwareRenderer
+    ? rankedLandmarks.slice(0, 3)
+    : rankedLandmarks;
+  const visibleRegions = softwareRenderer
+    ? rankedRegions.slice(0, 2)
+    : rankedRegions;
+  const visibleContent = softwareRenderer
+    ? rankedContent.slice(0, 3)
+    : rankedContent;
+  const visibleClusters = softwareRenderer
+    ? rankedClusters.slice(0, 2)
+    : rankedClusters;
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      active ? visibleContent.length : 0,
+    );
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
+    };
+  }, [active, profile.id, visibleContent.length]);
 
   if (!terrain) return null;
 
   return (
     <>
       <primitive object={terrain.object} />
+
+      {pathSegments.map((segment) => {
+        const focused =
+          segment.landmarkId === focusedAnchor?.landmarkId;
+        return (
+          <mesh
+            key={segment.id}
+            position={segment.position}
+            rotation={[0, segment.rotationY, 0]}
+          >
+            <boxGeometry
+              args={[
+                segment.width * (focused ? 1.3 : 1),
+                0.035,
+                segment.length,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.38 : softwareRenderer ? 0.18 : 0.14}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleClusters.map((cluster) => {
+        const height =
+          (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) +
+          0.08;
+        const focused = focusedAnchor?.cluster === cluster.index;
+        const radius =
+          (cluster.priority === "primary"
+            ? 0.52
+            : cluster.priority === "secondary"
+              ? 0.4
+              : 0.3) * (focused ? 1.18 : 1);
+        return (
+          <mesh
+            key={cluster.id}
+            position={[cluster.center[0], height, cluster.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[radius, radius + 0.045, softwareRenderer ? 14 : 28]}
+            />
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={
+                focused
+                  ? 0.46
+                  : cluster.priority === "primary"
+                    ? 0.34
+                    : cluster.priority === "secondary"
+                      ? 0.22
+                      : 0.14
+              }
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleRegions.map((region) => {
+        const height =
+          (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) +
+          0.12;
+        const focused = region.id === focusedAnchor?.regionId;
+        const focusScale = focused ? 1.12 : 1;
+        return (
+          <mesh
+            key={region.id}
+            position={[region.center[0], height, region.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[
+                Math.max(0.34, region.radius * 0.1) * focusScale,
+                Math.max(0.5, region.radius * 0.14) * focusScale,
+                softwareRenderer ? 12 : 24,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.42 : softwareRenderer ? 0.2 : 0.12}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleLandmarks.map((landmark) => {
+        const focused = landmark.id === focusedAnchor?.landmarkId;
+        const focusScale = focused ? 1.18 : 1;
+        const height =
+          (terrain.sampleHeight(
+            landmark.position[0],
+            landmark.position[1],
+          ) ?? 0) + 0.34 * landmark.scale * focusScale;
+        return (
+          <mesh
+            key={landmark.id}
+            position={[landmark.position[0], height, landmark.position[1]]}
+            scale={[
+              0.32 * landmark.scale * focusScale,
+              0.9 * landmark.scale * focusScale,
+              0.32 * landmark.scale * focusScale,
+            ]}
+          >
+            {landmark.kind === "crater" || landmark.kind === "basin" ? (
+              <torusGeometry
+                args={[0.68, 0.13, 6, softwareRenderer ? 10 : 18]}
+              />
+            ) : landmark.kind === "ridge" ? (
+              <boxGeometry args={[1.1, 0.46, 0.34]} />
+            ) : (
+              <coneGeometry args={[0.55, 1.55, softwareRenderer ? 5 : 8]} />
+            )}
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={focused ? 0.84 : 0.38 + landmark.prominence * 0.22}
+            />
+          </mesh>
+        );
+      })}
+
+      {visibleContent.map((anchor) => {
+        const focused = anchor.entryId === focusedEntryId;
+        const priorityScale = focused
+          ? 1.38
+          : anchor.priority === "primary"
+            ? 1.25
+            : anchor.priority === "secondary"
+              ? 1
+              : 0.82;
+        const height =
+          (terrain.sampleHeight(anchor.position[0], anchor.position[1]) ?? 0) +
+          0.42 * priorityScale;
+        return (
+          <group
+            key={anchor.id}
+            name={`surface-signal-${anchor.id}`}
+            userData={{ surfaceEntryId: anchor.entryId }}
+            position={[anchor.position[0], height, anchor.position[1]]}
+            scale={priorityScale}
+            onClick={
+              active
+                ? (event) => {
+                    event.stopPropagation();
+                    onFocusEntry(anchor.entryId);
+                  }
+                : undefined
+            }
+          >
+            {active ? (
+              <mesh
+                name={`surface-signal-hit-${anchor.id}`}
+                position={[0, 0.22, 0]}
+              >
+                <sphereGeometry args={[0.3, 8, 6]} />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                />
+              </mesh>
+            ) : null}
+            <mesh>
+              <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  focused || anchor.priority === "primary" ? 0.98 : 0.76
+                }
+              />
+            </mesh>
+            <mesh position={[0, 0.48, 0]}>
+              <octahedronGeometry args={[0.12, 0]} />
+              <meshBasicMaterial
+                color={
+                  focused || anchor.priority === "primary"
+                    ? "#fff0cf"
+                    : "#ffffff"
+                }
+              />
+            </mesh>
+          </group>
+        );
+      })}
+
       {!softwareRenderer ? (
         <Suspense fallback={null}>
-          <SurfaceRocks terrain={terrain} />
+          <SurfaceRocks terrain={terrain} profile={profile} />
         </Suspense>
       ) : null}
     </>

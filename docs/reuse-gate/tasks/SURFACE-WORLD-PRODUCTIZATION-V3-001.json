@@ -1,0 +1,235 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-WORLD-PRODUCTIZATION-V3-001",
+  "title": "Productize deterministic reusable Surface worlds and secondary-world archetypes",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Deterministic Surface world profiles, spatial content layout, primary/filler world reuse, and scalable fallback rendering inside the existing Personal Universe world stack"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Productize Surface as a reusable destination without introducing a second world application: keep ProceduralPlanets as the primary same-world terrain/atmosphere runtime, keep ProceduralTerrains Infinite World as the bounded low/software fallback, keep Astro Content Collections and the existing destination/content model as the content source, and add only a narrow deterministic world-profile/layout adapter driven by each planet's stable seed. The adapter will derive biome/atmosphere/lighting/fallback styling plus landmarks, regions, paths and clustered content anchors so secondary worlds require no hand authoring while the hero world can add richer overrides.",
+  "planned_files": [
+    "src/lib/universe/surface/**",
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/systemGenerator.ts",
+    "src/lib/universe/generation/catalog.ts",
+    "src/components/universe/SurfaceScene.tsx",
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "tests/surface-world-profile.test.ts",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "ProceduralPlanets exposes camera-inside-atmosphere rendering plus surface point/radius queries, so product landmarks and content anchors can remain attached to the same live globe instead of requiring another terrain engine."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/exploration.md",
+      "finding": "The exploration design keeps one Planet/PlanetRenderer from astronomical approach into near-surface viewing, matching the product requirement for clean 4-to-5 landing and reverse departure continuity."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralTerrains/blob/6293268/docs/large-worlds.md",
+      "finding": "ProceduralTerrains Infinite World provides camera-centred terrain streaming with explicit chunk, triangle and frame-time budgets, making it suitable for retained low/software fallback without a finite board edge."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro Content Collections already provide the typed content source and loaders, so Surface spatialization should adapt the existing destination/content model rather than introduce a second CMS or Surface-specific content store."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "The adopted ProceduralPlanets world renderer already spans atmosphere and near-surface terrain, so the Surface product layer should extend that same world rather than replace it with a separate full solution."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing React Three Fiber Canvas remains the single renderer/camera lifecycle host for live planets, fallback terrain and product content anchors."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets",
+        "procedural-terrains",
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Reuse ProceduralPlanets for the primary globe, ProceduralTerrains Infinite World for fallback coverage, and Astro Content Collections for content; only deterministic profile and placement glue is missing."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing camera-controls authority for limited Surface exploration and reverse departure rather than adding another pointer or touch navigation component."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "procedural-planets-surface-runtime",
+      "name": "Existing ProceduralPlanets same-world Surface runtime",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Installed ProceduralPlanets 0.5.1 with existing PlanetScene/PlanetPass integration",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It already owns spherical terrain LOD, atmosphere, near-surface precision and surface queries, so it provides the highest-value primary renderer and preserves landing/reverse continuity.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "procedural-terrains-profiled-fallback",
+      "name": "Existing ProceduralTerrains Infinite World fallback with per-world profile",
+      "level": "subsystem",
+      "registry_id": "procedural-terrains",
+      "source": "Installed procedural-terrains/infinite runtime already hosted by SurfaceTerrain",
+      "license": "MIT",
+      "decision": "partial",
+      "reason": "It is already the approved fallback path and can consume deterministic seed/style inputs, but it remains a fallback rather than the primary globe renderer.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4.5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "astro-content-one-model",
+      "name": "Existing Astro content and destination model spatialized onto Surface",
+      "level": "subsystem",
+      "registry_id": "astro-content-collections",
+      "source": "Current UniverseContentEntry and destination placement pipeline",
+      "license": "MIT (Astro)",
+      "decision": "reuse",
+      "reason": "Keeps authored and filler worlds on one typed content model while a deterministic adapter derives districts, paths, landmarks and clustered anchors from stable planet identity.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "independent-surface-app",
+      "name": "Build a separate Surface app, terrain renderer and Surface-only content store",
+      "level": "full_solution",
+      "source": "New project-owned application/runtime",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Would duplicate terrain, renderer, navigation and content authorities, break reverse travel continuity, and make secondary-world automation harder to keep reproducible.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 3,
+        "customization_fit": 5,
+        "maturity": 1.5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "One continuous planet from atmosphere through stable Surface and reverse departure",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-surface-runtime": "full",
+        "procedural-terrains-profiled-fallback": "partial",
+        "independent-surface-app": "none"
+      },
+      "decision": "Keep ProceduralPlanets mounted as the normal Surface renderer and use the Infinite fallback only when the live globe is intentionally unavailable."
+    },
+    {
+      "capability": "Deterministic secondary worlds with stable biome, atmosphere, lighting, density and fallback appearance",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-surface-runtime": "partial",
+        "procedural-terrains-profiled-fallback": "partial",
+        "astro-content-one-model": "partial",
+        "independent-surface-app": "full"
+      },
+      "decision": "Add a small seed-driven profile adapter over the adopted renderers and content model instead of a second world runtime."
+    },
+    {
+      "capability": "Reusable landmarks, regions, paths and clustered content without a game-only UI",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-surface-runtime": "partial",
+        "astro-content-one-model": "full",
+        "independent-surface-app": "full"
+      },
+      "decision": "Spatialize the existing content model into deterministic anchors and lightweight world-local structures while keeping content understandable as normal destinations."
+    },
+    {
+      "capability": "Readable low/software rendering with bounded work and no finite board edge",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-surface-runtime": "partial",
+        "procedural-terrains-profiled-fallback": "full",
+        "independent-surface-app": "partial"
+      },
+      "decision": "Retain the approved camera-centred ProceduralTerrains Infinite fallback and feed it the same deterministic world profile with stricter budgets."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "procedural-planets-surface-runtime",
+      "procedural-terrains-profiled-fallback",
+      "astro-content-one-model"
+    ],
+    "rationale": "Reuse the existing live planet, infinite fallback and typed content/destination layers as the product foundation. Implement only the missing deterministic world-profile and spatial-layout adapter so every planet can regenerate the same terrain/biome/lighting/content composition from stable identity, while hero worlds can layer curated overrides without creating another renderer or CMS.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "independent-surface-app",
+        "reason": "A separate app could maximize local visual freedom, but loses globally by duplicating renderer, camera, terrain and content ownership and by turning Surface into a dead-end scene switch."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If a world cannot use the live ProceduralPlanets path on the selected hardware tier, render the same deterministic profile through the existing ProceduralTerrains Infinite fallback; do not add a third terrain renderer."
+  }
+}

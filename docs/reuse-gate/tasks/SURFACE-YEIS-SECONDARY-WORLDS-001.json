@@ -1,0 +1,159 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-YEIS-SECONDARY-WORLDS-001",
+  "title": "Expose landable YEIS terrestrial secondary worlds through the shared Surface product model",
+  "scope": {
+    "level": "implementation",
+    "subject": "YEIS PlanetDefinition adaptation for existing terrestrial Surface capability"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The default YEIS bridge already derives each native body's terrestrial or gas archetype, but currently hard-codes every non-hero body to surfaceMode=none. Reuse the adopted ProceduralPlanets terrestrial Surface runtime through the existing shared surfaceModeForArchetype adapter. This changes only bridge capability metadata; ProceduralPlanets, SurfaceWorldProfile, continuous-scale navigation, destination/content authority and fallback rendering remain unchanged.",
+  "planned_files": [
+    "src/lib/universe/yeis/bridge.ts",
+    "tests/yeis-surface-capability.test.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/exploration.md",
+      "finding": "The adopted renderer supports near-surface terrestrial exploration on the same live Planet, so native YEIS terrestrial bodies can reuse the existing Surface path rather than require a second renderer."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets/blob/v0.5.1/docs/embedding.md",
+      "finding": "Surface point and radius queries are renderer capabilities independent of hero identity; the product bridge only needs to expose landability metadata for compatible terrestrial bodies."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "The adopted ProceduralPlanets world renderer already supplies the full terrestrial close-world and Surface runtime."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing React Three Fiber Canvas remains the shared renderer lifecycle host for hero and secondary worlds."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "The missing behavior is only YEIS PlanetDefinition capability metadata; no new Surface subsystem is required."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "The existing camera-controls authority remains shared for hero and secondary-world Surface exploration and departure."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "procedural-planets-shared-surface-capability",
+      "name": "ProceduralPlanets terrestrial Surface capability via shared adapter",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Installed ProceduralPlanets 0.5.1 through existing surfaceModeForArchetype adapter",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It already supplies the terrestrial Surface renderer and the product has one archetype-to-landability adapter, so reusing that adapter in YEIS prevents engine-specific capability drift.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "yeis-hero-only-special-case",
+      "name": "Keep YEIS hero-only hard-coded Surface mode",
+      "level": "component_asset",
+      "source": "Current YEIS bridge behavior",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "It blocks automatic secondary-world productization on the default engine and duplicates a capability decision already owned by the Surface model.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 5,
+        "customization_fit": 1,
+        "maturity": 2
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Default YEIS terrestrial secondary worlds can traverse Orbit to Atmosphere to Surface",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-shared-surface-capability": "full",
+        "yeis-hero-only-special-case": "none"
+      },
+      "decision": "Use the shared archetype capability mapping in the existing YEIS bridge."
+    },
+    {
+      "capability": "Gas and ice giants never receive a fake ground layer",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-shared-surface-capability": "full",
+        "yeis-hero-only-special-case": "full"
+      },
+      "decision": "Retain the existing non-landable giant rule through the shared mapper."
+    },
+    {
+      "capability": "No duplicate renderer, navigation or content authority",
+      "importance": "high",
+      "coverage": {
+        "procedural-planets-shared-surface-capability": "full",
+        "yeis-hero-only-special-case": "full"
+      },
+      "decision": "Change only PlanetDefinition metadata in the existing bridge."
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "procedural-planets-shared-surface-capability"
+    ],
+    "rationale": "Reuse the single terrestrial Surface capability already provided by ProceduralPlanets and exposed through the shared archetype mapper. The YEIS bridge already has all required body data and archetype inference, so the correct product change is metadata adaptation plus tests rather than new rendering infrastructure.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "yeis-hero-only-special-case",
+        "reason": "Keeping the special case is locally smaller but globally defeats automatic secondary-world Surface productization and creates two conflicting landability rules."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the native body is a gas or ice giant, surfaceMode remains none and the existing orbit/scan experience remains authoritative."
+  }
+}
