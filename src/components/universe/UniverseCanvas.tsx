@@ -247,6 +247,10 @@ export function UniverseCanvas({
     generation: number;
     ready: boolean;
   }>({ identity: "", generation: -1, ready: false });
+  const [systemTargetSuppression, setSystemTargetSuppression] = useState<{
+    planetId: string | null;
+    generation: number;
+  }>({ planetId: null, generation: -1 });
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -410,12 +414,37 @@ export function UniverseCanvas({
   const prewarmLiveWorld =
     Boolean(worldPrewarmPlanet) &&
     (phase === "system" || closeWorldPhase);
-  const keepSystemForHandoff =
-    phase === "approach" && Boolean(selectedSystem) && !worldPaintReady;
   const handoffTargetPlanetId =
-    keepSystemForHandoff && worldPaintStarted
+    phase === "approach" && worldPaintStarted
       ? worldPrewarmPlanet?.id ?? null
       : null;
+  const systemTargetSuppressed =
+    Boolean(handoffTargetPlanetId) &&
+    systemTargetSuppression.planetId === handoffTargetPlanetId &&
+    systemTargetSuppression.generation === worldPaintGeneration;
+  const keepSystemForHandoff =
+    phase === "approach" &&
+    Boolean(selectedSystem) &&
+    (
+      !worldPaintReady ||
+      (Boolean(handoffTargetPlanetId) && !systemTargetSuppressed)
+    );
+  const handleSystemTargetSuppressed = useCallback(
+    (planetId: string) => {
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
+      setSystemTargetSuppression({
+        planetId,
+        generation: worldPaintGeneration,
+      });
+    },
+    [worldPaintAuthorityKey, worldPaintGeneration],
+  );
 
   useEffect(() => {
     const html = document.documentElement;
@@ -465,10 +494,11 @@ export function UniverseCanvas({
           galaxyViewState={
             yeisViewStateSnapshot ?? yeisViewStateRef.current
           }
-          // Camera settlement can retry from the first concrete draw.
-          // System ownership handoff remains stricter and still waits for
-          // worldPaintReady (two matched presented frames).
-          worldFrameReady={worldPaintStarted}
+          // Settlement belongs to the same current-generation full-paint
+          // authority as the renderer handoff. A first concrete draw starts
+          // target suppression, but it must not publish a settled camera before
+          // the matched world has completed its second presented frame.
+          worldFrameReady={worldPaintReady}
           surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
@@ -518,6 +548,7 @@ export function UniverseCanvas({
                 onScaleFocus={onScaleFocusPlanet}
                 scaleTargetPlanet={systemScaleTargetPlanet}
                 handoffTargetPlanetId={handoffTargetPlanetId}
+                onHandoffTargetSuppressed={handleSystemTargetSuppressed}
                 onScaleFrame={setSystemScaleFrame}
               />
             }
@@ -528,6 +559,7 @@ export function UniverseCanvas({
               onScaleFocus={onScaleFocusPlanet}
               scaleTargetPlanet={systemScaleTargetPlanet}
               handoffTargetPlanetId={handoffTargetPlanetId}
+              onHandoffTargetSuppressed={handleSystemTargetSuppressed}
               onScaleFrame={setSystemScaleFrame}
               quality={quality}
             />
@@ -539,6 +571,7 @@ export function UniverseCanvas({
             onScaleFocus={onScaleFocusPlanet}
             scaleTargetPlanet={systemScaleTargetPlanet}
             handoffTargetPlanetId={handoffTargetPlanetId}
+            onHandoffTargetSuppressed={handleSystemTargetSuppressed}
             onScaleFrame={setSystemScaleFrame}
           />
         )
@@ -565,6 +598,9 @@ export function UniverseCanvas({
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
               surfaceFallbackReady={surfaceFallbackReady}
+              approachHandoffReady={
+                phase !== "approach" || systemTargetSuppressed
+              }
               paintContextGeneration={webglContextGeneration}
               onPaintStartedChange={handleWorldPaintStarted}
               onPaintReadyChange={handleWorldPaintReady}

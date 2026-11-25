@@ -482,6 +482,7 @@ export function PlanetScene({
   worldScalePosition,
   presentationActive = true,
   surfaceFallbackReady = false,
+  approachHandoffReady = true,
   paintContextGeneration = 0,
   onPaintStartedChange,
   onPaintReadyChange,
@@ -494,6 +495,7 @@ export function PlanetScene({
   worldScalePosition: number;
   presentationActive?: boolean;
   surfaceFallbackReady?: boolean;
+  approachHandoffReady?: boolean;
   paintContextGeneration?: number;
   onPaintStartedChange?: (started: boolean) => void;
   onPaintReadyChange?: (ready: boolean) => void;
@@ -887,7 +889,10 @@ export function PlanetScene({
       if (paintedFrames.current >= 1) {
         publishPaintStarted(true);
       }
-      if (paintedFrames.current >= 2) {
+      if (
+        paintedFrames.current >= 2 &&
+        (phase !== "approach" || approachHandoffReady)
+      ) {
         publishPaintReady(true);
       }
     }

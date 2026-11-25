@@ -225,6 +225,7 @@ export function YeisSystemScene({
   onScaleFocus,
   scaleTargetPlanet,
   handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
   quality,
 }: {
@@ -233,6 +234,7 @@ export function YeisSystemScene({
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
 }) {
@@ -247,6 +249,7 @@ export function YeisSystemScene({
   const focusProjectionRef = useRef(new THREE.Vector3());
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
+  const suppressedHandoffIdRef = useRef<string | null>(null);
   const handoffNativeId = useMemo(() => {
     if (!handoffTargetPlanetId) return null;
     const target = system.planets.find(
@@ -377,6 +380,7 @@ export function YeisSystemScene({
       focusFillRef.current.clear();
       if (scaleFrameIdRef.current !== null) onScaleFrame?.(null);
       scaleFrameIdRef.current = null;
+      suppressedHandoffIdRef.current = null;
       if (created) disposeResources(created);
     };
   }, [gl, starId]);
@@ -489,9 +493,15 @@ export function YeisSystemScene({
       // stage, so only the duplicated target disc transfers ownership; star,
       // orbits and every other System body remain visible until final paint.
       handoffView.group.visible = false;
+      const suppressedId = handoffTargetPlanetId ?? handoffNativeId;
       document.documentElement.dataset.universeSystemTargetSuppressed =
-        handoffTargetPlanetId ?? handoffNativeId;
+        suppressedId;
+      if (suppressedHandoffIdRef.current !== suppressedId) {
+        suppressedHandoffIdRef.current = suppressedId;
+        onHandoffTargetSuppressed?.(suppressedId);
+      }
     } else {
+      suppressedHandoffIdRef.current = null;
       delete document.documentElement.dataset.universeSystemTargetSuppressed;
     }
 
@@ -526,6 +536,7 @@ export function YeisSystemScene({
         onScaleFocus={onScaleFocus}
         scaleTargetPlanet={scaleTargetPlanet}
         handoffTargetPlanetId={handoffTargetPlanetId}
+        onHandoffTargetSuppressed={onHandoffTargetSuppressed}
         onScaleFrame={onScaleFrame}
       />
     );

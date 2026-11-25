@@ -120,6 +120,7 @@ export function SystemScene({
   onScaleFocus,
   scaleTargetPlanet,
   handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
 }: {
   system: SystemDefinition;
@@ -127,6 +128,7 @@ export function SystemScene({
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -144,6 +146,7 @@ export function SystemScene({
     const html = document.documentElement;
     if (handoffTargetPlanetId) {
       html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+      onHandoffTargetSuppressed?.(handoffTargetPlanetId);
     } else {
       delete html.dataset.universeSystemTargetSuppressed;
     }
@@ -155,7 +158,7 @@ export function SystemScene({
         delete html.dataset.universeSystemTargetSuppressed;
       }
     };
-  }, [handoffTargetPlanetId]);
+  }, [handoffTargetPlanetId, onHandoffTargetSuppressed]);
 
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
