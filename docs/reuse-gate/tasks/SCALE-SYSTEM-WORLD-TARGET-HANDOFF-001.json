@@ -1,0 +1,149 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-SYSTEM-WORLD-TARGET-HANDOFF-001",
+  "title": "Reuse YEIS target visibility for duplicate-free System to World handoff",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the pinned YEIS BodyRenderer target index and existing React scene composition to suppress only the System target body after the first matched close-world draw while preserving the rest of System until final paint handoff"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The single-Canvas handoff already retains System until the close world has painted, but that means the target body can overlap the matched close-world planet during the validation frame. The pinned YEIS BodyRenderer already exposes body views by native id, and the fallback SystemScene already renders planets as individually keyed components. Reuse those existing target-level ownership points: publish a first-concrete-draw stage from PlanetScene, pass the selected handoff planet id through UniverseCanvas, hide only that native YEIS body (and its product target overlay) or fallback PlanetBody, then remove the whole System after the existing consecutive-paint readiness gate. No fade, mask, second renderer, vendor fork, or new transition globe is needed.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The pinned MIT YEIS snapshot is the accepted System renderer authority; Personal Universe already vendors its BodyRenderer and keeps a by-id BodyView index, so target-level visibility can be reused without replacing or modifying the renderer stack."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber keeps all scene objects in the same Canvas and ordered frame loop, allowing the close-world draw stage to drive ordinary React/R3F visibility ownership without adding a second render pass or animation engine."
+    },
+    {
+      "url": "https://react.dev/reference/react/useRef",
+      "finding": "A ref can retain the current handoff identity without causing render churn, which lets stale paint callbacks be rejected while React props carry the current target visibility decision into System renderers."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the accepted pinned YEIS System plus existing close-world stack; the missing behavior is target-level ownership during the handoff frame, not a new transition solution."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use the existing single R3F scene graph and ordered frame loop so System context and close-world ownership change inside one renderer."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Reuse YEIS BodyRenderer.byId and the existing fallback keyed PlanetBody nodes to suppress exactly the target planet while leaving System context intact."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Use current React props and refs to carry the first-draw and target-id ownership tokens; no new component framework or transition primitive is required."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-target-visibility-reuse",
+      "name": "Pinned YEIS BodyRenderer target-level visibility",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Pinned YEIS BodyRenderer.byId and existing System renderer integration",
+      "license": "MIT pinned snapshot",
+      "decision": "reuse",
+      "reason": "It already owns every native System body and exposes the exact target view needed to remove only the duplicate body without disturbing the rest of the System renderer.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-handoff-token-reuse",
+      "name": "Existing React/R3F handoff token propagation",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseCanvas and PlanetScene callback/prop flow",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Existing state, refs and props already carry renderer readiness and can add a first-draw target id without another lifecycle manager or render authority.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "transition-fade-mask",
+      "name": "Dedicated fade or masking transition",
+      "level": "component_asset",
+      "source": "New custom transition layer",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "A mask would hide duplicate ownership rather than remove it, add another timing dependency, and violate the renderer-continuity requirement to solve the real handoff.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-target-visibility-reuse",
+      "react-handoff-token-reuse"
+    ],
+    "rationale": "Use the already accepted YEIS body index and existing React/R3F readiness flow to transfer only target-body visibility after the first concrete close-world draw. Keep the rest of System visible until the existing final paint gate, then unmount System normally. This removes duplicate target presentation without a fade, second renderer, vendor change, or new camera authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If a native body id cannot be resolved, preserve the existing System handoff rather than hiding unrelated System content; the close-world paint gate remains authoritative."
+  }
+}
