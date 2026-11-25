@@ -288,18 +288,20 @@ export function UniverseCanvas({
   // parked and does no presentation work. Ordinary Surface -> Galaxy reversal
   // may clear the active scale target, which must not destroy reusable world
   // resources.
-  const retainedWorldParkedInGalaxy =
-    phase === "galaxy" && Boolean(retainedWorldRenderer);
+  const retainedWorldParkedWithoutTarget =
+    (phase === "galaxy" || phase === "system") &&
+    !worldPrewarmPlanet &&
+    Boolean(retainedWorldRenderer);
   const worldRendererPlanet =
     worldPrewarmPlanet ??
-    (retainedWorldParkedInGalaxy
+    (retainedWorldParkedWithoutTarget
       ? retainedWorldRenderer?.planet ?? null
       : null);
   const keepWorldRendererMounted = Boolean(
     worldRendererPlanet &&
       (phase === "system" ||
         closeWorldPhase ||
-        retainedWorldParkedInGalaxy),
+        retainedWorldParkedWithoutTarget),
   );
 
   // Readiness follows the concrete retained renderer identity. Activation
