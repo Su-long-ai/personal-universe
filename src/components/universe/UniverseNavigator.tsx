@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   GalaxyMarker,
   SystemDefinition,
@@ -65,6 +65,21 @@ function discoveryDensityMode(
   return "world";
 }
 
+// Escape belongs to the open modal, not to the combobox. Register it with
+// the mounted dialog before paint, including while focus is still on its opener.
+function NavigatorKeyboardDismissal({ onClose }: { onClose: () => void }) {
+  useLayoutEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+  return null;
+}
+
 export function UniverseNavigator({
   open,
   markers,
@@ -106,7 +121,6 @@ export function UniverseNavigator({
   navigationTitle: (id: string, title: string) => string;
   locale: ProductLocale;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef(new Map<number, HTMLDivElement>());
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
@@ -224,7 +238,6 @@ export function UniverseNavigator({
     if (debugQuery) {
       setQuery(debugQuery);
     }
-    window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => {
       delete document.documentElement.dataset.universeNavigator;
       delete document.documentElement.dataset.universeNavigatorResults;
@@ -386,6 +399,7 @@ export function UniverseNavigator({
         aria-modal="true"
         aria-label={text(locale, "universeNavigator")}
       >
+        <NavigatorKeyboardDismissal onClose={onClose} />
         <header className="navigator-header">
           <div>
             <span>{text(locale, "navigationKicker")}</span>
@@ -403,16 +417,10 @@ export function UniverseNavigator({
         <div className="navigator-input-wrap">
           <span aria-hidden="true">⌕</span>
           <input
-            ref={inputRef}
+            autoFocus
             value={query}
             onChange={(event) => updateQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                onClose();
-                return;
-              }
-
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
                 if (results.length === 0) return;
