@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -34,6 +35,14 @@ function rendererLabel(gl: THREE.WebGLRenderer) {
     // Privacy-hardened browsers may intentionally hide unmasked renderer data.
   }
   return String(context.getParameter(context.RENDERER) ?? "");
+}
+
+function publishDatasetMetric(
+  html: HTMLElement,
+  key: string,
+  value: string,
+) {
+  if (html.dataset[key] !== value) html.dataset[key] = value;
 }
 
 export function isSoftwareRenderer(gl: THREE.WebGLRenderer) {
@@ -73,6 +82,10 @@ export function CinematicPipeline({
   const { gl, scene, camera, size, setDpr } = useThree();
   const high = quality !== "low";
   const highQuality = quality === "high";
+  const rendererIdentity = useMemo(
+    () => rendererLabel(gl).slice(0, 240) || "unknown",
+    [gl],
+  );
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
   const useLiveWorld = liveWorld && !fallbackReason;
@@ -89,15 +102,45 @@ export function CinematicPipeline({
     (prewarmLiveWorld && !softwareRenderer && !fallbackReason);
   const stableFrames = useRef(0);
   const metricFrame = useRef(0);
+  const liveDrawFrames = useRef(0);
   const appliedImpostorPixels = useRef<number | null>(null);
-  const pixelRatioCap = softwareRenderer ? 1 : high ? 1.75 : 1;
+  const reportedImpostorPixels = useRef<number | null>(null);
+  const reportedWorldReadyEvidence = useRef<boolean | null>(null);
+  const reportedScreenshotReadyEvidence = useRef<boolean | null>(null);
+  const publishWorldReadyEvidence = useCallback((ready: boolean) => {
+    if (reportedWorldReadyEvidence.current === ready) return;
+    reportedWorldReadyEvidence.current = ready;
+    if (ready) {
+      document.documentElement.dataset.universeWorldReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldReady;
+    }
+  }, []);
+  const publishScreenshotReadyEvidence = useCallback((ready: boolean) => {
+    if (reportedScreenshotReadyEvidence.current === ready) return;
+    reportedScreenshotReadyEvidence.current = ready;
+    if (ready) {
+      document.documentElement.dataset.universeWorldScreenshotReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldScreenshotReady;
+    }
+  }, []);
+  const softwarePixelRatio = highQuality ? 0.75 : 0.7;
+  const pixelRatioCap = softwareRenderer
+    ? softwarePixelRatio
+    : high
+      ? 1.75
+      : 1;
 
   const composer = useMemo(() => {
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = 1.0;
     gl.outputColorSpace = THREE.SRGBColorSpace;
 
-    const next = new EffectComposer(gl);
+    const initialTarget = softwareRenderer
+      ? new THREE.WebGLRenderTarget(1, 1)
+      : undefined;
+    const next = new EffectComposer(gl, initialTarget);
     next.addPass(new RenderPass(scene, camera));
 
     // Keep the composer topology stable across product quality changes.
@@ -125,6 +168,22 @@ export function CinematicPipeline({
 
   const planetPassRef = useRef<PlanetPass | null>(null);
   const [planetPass, setPlanetPass] = useState<PlanetPass | null>(null);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    publishDatasetMetric(html, "universeWebglRenderer", rendererIdentity);
+    publishDatasetMetric(
+      html,
+      "universeWebglSoftware",
+      softwareRenderer ? "true" : "false",
+    );
+    return () => {
+      if (html.dataset.universeWebglRenderer === rendererIdentity) {
+        delete html.dataset.universeWebglRenderer;
+      }
+      delete html.dataset.universeWebglSoftware;
+    };
+  }, [rendererIdentity, softwareRenderer]);
 
   useEffect(() => {
     if (provisionLiveWorld && !planetPassRef.current) {
@@ -204,8 +263,8 @@ export function CinematicPipeline({
     const html = document.documentElement;
     const invalidateRecovery = (state: "lost" | "warming") => {
       stableFrames.current = 0;
-      delete html.dataset.universeWorldReady;
-      delete html.dataset.universeWorldScreenshotReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
       html.dataset.universeWorldRecovery = state;
     };
     const onContextLost = () => invalidateRecovery("lost");
@@ -218,7 +277,7 @@ export function CinematicPipeline({
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       delete html.dataset.universeWorldRecovery;
     };
-  }, [gl]);
+  }, [gl, publishScreenshotReadyEvidence, publishWorldReadyEvidence]);
 
   useEffect(() => {
     if (composer.bloomPass) {
@@ -243,33 +302,38 @@ export function CinematicPipeline({
   useEffect(() => {
     if (!liveWorld) {
       delete document.documentElement.dataset.universeWorldPipeline;
-      delete document.documentElement.dataset.universeWorldReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
       return;
     }
 
     if (fallbackReason) {
       const mode = `fallback-${fallbackReason}`;
       document.documentElement.dataset.universeWorldPipeline = mode;
-      delete document.documentElement.dataset.universeWorldReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
       return () => {
         if (
           document.documentElement.dataset.universeWorldPipeline === mode
         ) {
           delete document.documentElement.dataset.universeWorldPipeline;
         }
-        delete document.documentElement.dataset.universeWorldReady;
+        publishWorldReadyEvidence(false);
+        publishScreenshotReadyEvidence(false);
       };
     }
 
     if (!planetPass) {
       delete document.documentElement.dataset.universeWorldPipeline;
-      delete document.documentElement.dataset.universeWorldReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
       return;
     }
 
     document.documentElement.dataset.universeWorldPipeline =
       "procedural-planets-pass";
-    delete document.documentElement.dataset.universeWorldReady;
+    publishWorldReadyEvidence(false);
+    publishScreenshotReadyEvidence(false);
     return () => {
       if (
         document.documentElement.dataset.universeWorldPipeline ===
@@ -277,19 +341,36 @@ export function CinematicPipeline({
       ) {
         delete document.documentElement.dataset.universeWorldPipeline;
       }
-      delete document.documentElement.dataset.universeWorldReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
     };
-  }, [planetPass, fallbackReason, liveWorld]);
+  }, [
+    fallbackReason,
+    liveWorld,
+    planetPass,
+    publishScreenshotReadyEvidence,
+    publishWorldReadyEvidence,
+  ]);
 
   useEffect(() => {
     // R3F owns the renderer DPR. On software WebGL, cap the actual canvas
     // backing store as well as the EffectComposer targets; otherwise a
     // 1440x900 screenshot can become a multi-million-pixel SwiftShader render.
-    if (softwareRenderer && gl.getPixelRatio() > 1) {
-      setDpr(1);
+    if (
+      softwareRenderer &&
+      Math.abs(gl.getPixelRatio() - softwarePixelRatio) > 0.01
+    ) {
+      setDpr(softwarePixelRatio);
     }
     composer.composer.setPixelRatio(
-      Math.min(gl.getPixelRatio(), pixelRatioCap),
+      softwareRenderer
+        ? softwarePixelRatio
+        : Math.min(gl.getPixelRatio(), pixelRatioCap),
+    );
+    publishDatasetMetric(
+      document.documentElement,
+      "universeWebglPixelRatio",
+      String(pixelRatioCap),
     );
     // Park SwiftShader's offscreen targets at 1x1 when the composer is not
     // the active render path. Reusing the same composer avoids allocation churn;
@@ -309,12 +390,17 @@ export function CinematicPipeline({
     size.height,
     size.width,
     softwareRenderer,
+    softwarePixelRatio,
   ]);
 
   useEffect(() => {
     return () => {
       stableFrames.current = 0;
+      liveDrawFrames.current = 0;
       appliedImpostorPixels.current = null;
+      reportedImpostorPixels.current = null;
+      reportedWorldReadyEvidence.current = null;
+      reportedScreenshotReadyEvidence.current = null;
       delete document.documentElement.dataset.universeWorldReady;
       delete document.documentElement.dataset.universeWorldScreenshotReady;
       delete document.documentElement.dataset.universeWorldPipelineLifecycle;
@@ -345,6 +431,14 @@ export function CinematicPipeline({
         impostorPixels: desiredImpostorPixels,
       });
       appliedImpostorPixels.current = desiredImpostorPixels;
+      if (reportedImpostorPixels.current !== desiredImpostorPixels) {
+        reportedImpostorPixels.current = desiredImpostorPixels;
+        publishDatasetMetric(
+          document.documentElement,
+          "universeWorldImpostorPixels",
+          String(desiredImpostorPixels),
+        );
+      }
     }
 
     if (renderWithComposer) {
@@ -360,18 +454,43 @@ export function CinematicPipeline({
     metricFrame.current += 1;
     if (metricFrame.current >= 30) {
       metricFrame.current = 0;
-      html.dataset.universeWebglGeometries = String(gl.info.memory.geometries);
-      html.dataset.universeWebglTextures = String(gl.info.memory.textures);
-      html.dataset.universeWebglPrograms = String(gl.info.programs?.length ?? 0);
-      html.dataset.universeWebglCalls = String(gl.info.render.calls);
-      html.dataset.universeWebglTriangles = String(gl.info.render.triangles);
-      html.dataset.universeWebglSoftware = softwareRenderer ? "true" : "false";
+      publishDatasetMetric(
+        html,
+        "universeWebglGeometries",
+        String(gl.info.memory.geometries),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglTextures",
+        String(gl.info.memory.textures),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglPrograms",
+        String(gl.info.programs?.length ?? 0),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglCalls",
+        String(gl.info.render.calls),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWebglTriangles",
+        String(gl.info.render.triangles),
+      );
+      publishDatasetMetric(
+        html,
+        "universeWorldLiveDrawFrame",
+        String(liveDrawFrames.current),
+      );
     }
 
     if (!liveWorld) {
       stableFrames.current = 0;
-      delete html.dataset.universeWorldReady;
-      delete html.dataset.universeWorldScreenshotReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
+      reportedImpostorPixels.current = null;
       delete html.dataset.universeWorldImpostorPixels;
       if (html.dataset.universeWorldRecovery === "warming") {
         html.dataset.universeWorldRecovery = "idle";
@@ -384,6 +503,7 @@ export function CinematicPipeline({
       html.dataset.universeCameraSettled === "surface";
 
     if (fallbackReason) {
+      reportedImpostorPixels.current = null;
       delete html.dataset.universeWorldImpostorPixels;
       // A retained live PlanetPass may have been fully converged before a
       // quality/capability fallback. Do not carry that convergence token back
@@ -395,16 +515,8 @@ export function CinematicPipeline({
       const presentationReady = surfaceFallback
         ? html.dataset.universeSurfaceTerrainState === "ready"
         : html.dataset.universeWorldPaintReady === "true";
-      if (presentationReady) {
-        html.dataset.universeWorldReady = "true";
-      } else {
-        delete html.dataset.universeWorldReady;
-      }
-      if (presentationReady && cameraReady) {
-        html.dataset.universeWorldScreenshotReady = "true";
-      } else {
-        delete html.dataset.universeWorldScreenshotReady;
-      }
+      publishWorldReadyEvidence(presentationReady);
+      publishScreenshotReadyEvidence(presentationReady && cameraReady);
       if (
         presentationReady &&
         html.dataset.universeWorldRecovery === "warming"
@@ -428,9 +540,16 @@ export function CinematicPipeline({
       } else {
         rendererProfileReady = true;
       }
-      html.dataset.universeWorldImpostorPixels =
-        String(desiredImpostorPixels);
+      if (reportedImpostorPixels.current !== desiredImpostorPixels) {
+        reportedImpostorPixels.current = desiredImpostorPixels;
+        publishDatasetMetric(
+          html,
+          "universeWorldImpostorPixels",
+          String(desiredImpostorPixels),
+        );
+      }
     } else {
+      reportedImpostorPixels.current = null;
       delete html.dataset.universeWorldImpostorPixels;
     }
 
@@ -440,29 +559,21 @@ export function CinematicPipeline({
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
     );
-    if (frameReady) {
-      html.dataset.universeWorldLiveDrawFrame = String(
-        Number(html.dataset.universeWorldLiveDrawFrame ?? "0") + 1,
-      );
-    }
+    if (frameReady) liveDrawFrames.current += 1;
     stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
 
     // A single pending=0 sample is not enough: moving the near-surface camera
     // can immediately enqueue another LOD generation pass. Require consecutive
     // settled frames before consumers are allowed to capture the canvas.
     if (stableFrames.current >= 3) {
-      html.dataset.universeWorldReady = "true";
-      if (cameraReady) {
-        html.dataset.universeWorldScreenshotReady = "true";
-      } else {
-        delete html.dataset.universeWorldScreenshotReady;
-      }
+      publishWorldReadyEvidence(true);
+      publishScreenshotReadyEvidence(cameraReady);
       if (html.dataset.universeWorldRecovery === "warming") {
         html.dataset.universeWorldRecovery = "ready";
       }
     } else {
-      delete html.dataset.universeWorldReady;
-      delete html.dataset.universeWorldScreenshotReady;
+      publishWorldReadyEvidence(false);
+      publishScreenshotReadyEvidence(false);
     }
   }, 1);
 

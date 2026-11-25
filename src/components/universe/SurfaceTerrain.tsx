@@ -135,7 +135,13 @@ export function SurfaceTerrain({
   const lastProjection = useRef(new THREE.Matrix4());
   const currentCameraPosition = useRef(new THREE.Vector3());
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
-  const lastSoftwareChunk = useRef<{ x: number; z: number } | null>(null);
+  const lastSoftwareChunkX = useRef<number | null>(null);
+  const lastSoftwareChunkZ = useRef<number | null>(null);
+  const productTerrainUpdateOptions = useMemo(() => ({ camera }), [camera]);
+  const landingTerrainUpdateOptions = useMemo(
+    () => ({ camera: landingStreamCamera }),
+    [landingStreamCamera],
+  );
 
   useEffect(() => {
     if (softwareRenderer) return;
@@ -391,11 +397,11 @@ export function SurfaceTerrain({
       const currentChunkZ = Math.floor(
         currentCameraPosition.current.z / SOFTWARE_TERRAIN_CHUNK_SIZE,
       );
-      const previousChunk = lastSoftwareChunk.current;
       const chunkChanged =
-        previousChunk === null ||
-        previousChunk.x !== currentChunkX ||
-        previousChunk.z !== currentChunkZ;
+        lastSoftwareChunkX.current === null ||
+        lastSoftwareChunkZ.current === null ||
+        lastSoftwareChunkX.current !== currentChunkX ||
+        lastSoftwareChunkZ.current !== currentChunkZ;
       const positionChanged =
         !terrainViewInitialized.current ||
         currentCameraPosition.current.distanceToSquared(
@@ -416,7 +422,8 @@ export function SurfaceTerrain({
         lastCameraPosition.current.copy(currentCameraPosition.current);
         lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
         lastProjection.current.copy(streamCamera.projectionMatrix);
-        lastSoftwareChunk.current = { x: currentChunkX, z: currentChunkZ };
+        lastSoftwareChunkX.current = currentChunkX;
+        lastSoftwareChunkZ.current = currentChunkZ;
         const requestedUpdates = chunkChanged
           ? terrainViewInitialized.current
             ? SOFTWARE_STREAM_REBASE_UPDATES
@@ -437,7 +444,12 @@ export function SurfaceTerrain({
       softwareStreamUpdates.current -= 1;
     }
 
-    terrain.update(delta, { camera: streamCamera });
+    terrain.update(
+      delta,
+      presenting
+        ? productTerrainUpdateOptions
+        : landingTerrainUpdateOptions,
+    );
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };

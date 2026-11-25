@@ -128,9 +128,11 @@ function LiveSurfaceAnchor({
       });
       cameraFramePublished.current = true;
       document.documentElement.dataset.universeSurfaceCameraFrame = "ready";
+      // The anchor remains valid until this retained live-surface component
+      // unmounts. Publish the evidence once with the camera frame instead of
+      // mutating the document dataset on every render frame.
+      document.documentElement.dataset.universeSurfaceAnchorReady = "true";
     }
-
-    document.documentElement.dataset.universeSurfaceAnchorReady = "true";
   });
 
   return (
