@@ -434,15 +434,18 @@ function liveQuality(
   }
 
   // HIGH remains a live ProceduralPlanets renderer under SwiftShader, but
-  // software rasterizers get a conservative terrain budget so hosted Linux
-  // can reach a stable landing frame without starving browser teardown.
+  // software rasterizers need a bounded close-world quadtree. Depth 5 makes
+  // one delivered 4 -> 5 wheel sample and one framebuffer read monopolize the
+  // hosted browser for tens of seconds even after the landing patch is stable.
+  // Keep the live Planet + PlanetPass contract while capping terrain detail at
+  // the already-proven software-safe depth; real GPU HIGH remains unchanged.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
       chunkRes: 16,
-      maxDepth: 5,
-      splitFactor: 2.3,
+      maxDepth: 4,
+      splitFactor: 2.1,
     } as const;
   }
 
@@ -635,9 +638,11 @@ export function PlanetScene({
   }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
-    if (livePlanet && phase !== "surface") {
+    // The Surface camera frame starts being sampled as soon as the continuous
+    // scale enters 4 -> 5. Lock the live world at that same boundary so the
+    // chosen landing patch cannot rotate underneath a fixed camera frame and
+    // near-surface ProceduralPlanets LOD work can actually converge.
+    if (livePlanet && phase !== "surface" && worldScalePosition <= 4) {
       livePlanet.rotation.y += delta * 0.014;
     }
 

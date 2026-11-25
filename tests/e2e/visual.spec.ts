@@ -19,6 +19,20 @@ const DESKTOP: Viewport = {
   width: 1440,
   height: 900,
 };
+// HIGH ProceduralPlanets transition evidence uses a smaller desktop viewport
+// that stays above the product's 900px responsive breakpoint. This keeps the
+// same desktop composition contract while bounding SwiftShader's framebuffer
+// workload; normal DESKTOP/WQHD/ULTRAWIDE cases still own the layout matrix.
+const HIGH_TRANSITION_DESKTOP: Viewport = {
+  name: "desktop-high-960x600",
+  width: 960,
+  height: 600,
+};
+const WQHD: Viewport = {
+  name: "wqhd-2560x1440",
+  width: 2560,
+  height: 1440,
+};
 const TABLET: Viewport = {
   name: "tablet-834x1194",
   width: 834,
@@ -102,21 +116,49 @@ async function waitForCameraSettled(
   );
 }
 
-async function expectReadableWorldFrame(page: Page, label: string) {
-  // Camera settlement means the concrete renderer has painted. Screenshot
-  // acceptance is deliberately stricter: wait for the existing pipeline
-  // signal that combines stable renderer work with the camera-ready state.
+type ReadableWorldFrameOptions = {
+  subjectRoiOnly?: boolean;
+};
+
+async function expectReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
+  // Stable endpoint screenshots deliberately wait for the renderer's
+  // quiescent-pipeline signal.
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-world-screenshot-ready",
     "true",
     { timeout: 60_000 },
   );
 
-  // Capture the final viewport once and let visualCase reuse the exact same
-  // framebuffer read for the artifact. Hosted SwiftShader can spend tens of
-  // seconds on one screenshot, so a second identical read would make the
-  // acceptance itself stall the renderer it is measuring.
-  const png = await page.screenshot();
+  await captureReadableWorldFrame(page, label, options);
+}
+
+async function captureReadableWorldFrame(
+  page: Page,
+  label: string,
+  options: ReadableWorldFrameOptions = {},
+) {
+  // Capture once and let visualCase reuse the exact same framebuffer read for
+  // the artifact. HIGH transition acceptance only needs the same central ROI
+  // that this probe measures; asking SwiftShader to read the surrounding
+  // black-space/HUD pixels first can dominate the entire test budget without
+  // adding visual evidence.
+  const viewport = page.viewportSize();
+  const subjectClip =
+    options.subjectRoiOnly && viewport
+      ? {
+          x: Math.floor(viewport.width * 0.2),
+          y: Math.floor(viewport.height * 0.2),
+          width: Math.max(1, Math.floor(viewport.width * 0.6)),
+          height: Math.max(1, Math.floor(viewport.height * 0.6)),
+        }
+      : undefined;
+  const png = await page.screenshot(
+    subjectClip ? { clip: subjectClip } : undefined,
+  );
   pendingReadableWorldFrame.set(page, png);
   const image = sharp(png);
   const metadata = await image.metadata();
@@ -132,10 +174,10 @@ async function expectReadableWorldFrame(page: Page, label: string) {
   // Keep this probe off the browser main thread: decoding a PNG with
   // createImageBitmap can block hosted SwiftShader long enough to distort the
   // renderer acceptance that the probe is supposed to observe.
-  const left = Math.floor(width * 0.2);
-  const top = Math.floor(height * 0.2);
-  const roiWidth = Math.max(1, Math.floor(width * 0.6));
-  const roiHeight = Math.max(1, Math.floor(height * 0.6));
+  const left = subjectClip ? 0 : Math.floor(width * 0.2);
+  const top = subjectClip ? 0 : Math.floor(height * 0.2);
+  const roiWidth = subjectClip ? width : Math.max(1, Math.floor(width * 0.6));
+  const roiHeight = subjectClip ? height : Math.max(1, Math.floor(height * 0.6));
   const { data, info } = await image
     .extract({
       left,
@@ -196,6 +238,60 @@ async function expectCompactNarrowHud(page: Page) {
   ).toBeLessThan(310);
 }
 
+async function expectViewportContainedLayout(page: Page, label: string) {
+  const layout = await page.evaluate(() => {
+    const hud = document.querySelector<HTMLElement>(".universe-hud");
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas");
+    const hudRect = hud?.getBoundingClientRect() ?? null;
+    const canvasRect = canvas?.getBoundingClientRect() ?? null;
+    return {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+      hud: hudRect
+        ? {
+            left: hudRect.left,
+            top: hudRect.top,
+            right: hudRect.right,
+            bottom: hudRect.bottom,
+          }
+        : null,
+      canvas: canvasRect
+        ? {
+            left: canvasRect.left,
+            top: canvasRect.top,
+            right: canvasRect.right,
+            bottom: canvasRect.bottom,
+            width: canvasRect.width,
+            height: canvasRect.height,
+          }
+        : null,
+    };
+  });
+
+  expect(layout.hud, `${label} HUD should be laid out`).not.toBeNull();
+  expect(layout.canvas, `${label} canvas should be laid out`).not.toBeNull();
+  expect(
+    layout.scrollWidth,
+    `${label} should not create horizontal viewport overflow`,
+  ).toBeLessThanOrEqual(layout.width + 2);
+  expect(layout.hud!.left, `${label} HUD should stay on-screen`).toBeGreaterThanOrEqual(-2);
+  expect(layout.hud!.top, `${label} HUD should stay on-screen`).toBeGreaterThanOrEqual(-2);
+  expect(layout.hud!.right, `${label} HUD should stay on-screen`).toBeLessThanOrEqual(
+    layout.width + 2,
+  );
+  expect(layout.hud!.bottom, `${label} HUD should stay on-screen`).toBeLessThanOrEqual(
+    layout.height + 2,
+  );
+  expect(layout.canvas!.width, `${label} canvas should cover the viewport`).toBeGreaterThanOrEqual(
+    layout.width - 2,
+  );
+  expect(layout.canvas!.height, `${label} canvas should cover the viewport`).toBeGreaterThanOrEqual(
+    layout.height - 2,
+  );
+}
+
 async function personalTarget(page: Page) {
   await page.goto("/?freeze=1");
   await waitForYeis(page);
@@ -248,6 +344,24 @@ async function visualCase(
       (await html.getAttribute("data-universe-webgl-triangles")) ?? "0",
     ),
   };
+  const continuity = {
+    phase: await html.getAttribute("data-universe-navigation-phase"),
+    position: Number(
+      (await html.getAttribute("data-universe-scale-position")) ?? "NaN",
+    ),
+    segment: await html.getAttribute("data-universe-scale-camera-segment"),
+    direction: await html.getAttribute("data-universe-scale-direction"),
+    authority: await html.getAttribute("data-universe-render-authority"),
+    handoff: await html.getAttribute("data-universe-handoff-state"),
+    queued: await html.getAttribute("data-universe-scale-queued"),
+    projectedRadius: Number(
+      (await html.getAttribute("data-universe-projected-radius")) ?? "NaN",
+    ),
+    worldRenderer: await html.getAttribute("data-universe-world-renderer"),
+    worldPipeline: await html.getAttribute("data-universe-world-pipeline"),
+    worldReady: await html.getAttribute("data-universe-world-ready"),
+    canvasCount: await page.locator("canvas").count(),
+  };
 
   await testInfo.attach("visual-metrics.json", {
     body: Buffer.from(
@@ -256,6 +370,7 @@ async function visualCase(
           viewport: viewport.name,
           case: name,
           elapsedMs: Date.now() - startedAt,
+          continuity,
           webgl,
         },
         null,
@@ -332,6 +447,48 @@ test("visual: desktop Galaxy-System midpoint", async ({ page }, testInfo) => {
   });
 });
 
+
+test("visual: desktop Galaxy-System reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "galaxy-system-reverse-midpoint",
+    async () => {
+      const html = await locateHeroScaleTarget(page);
+      for (let sample = 0; sample < 4; sample += 1) {
+        await dispatchVisualScaleWheel(page, -96);
+      }
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "system",
+        { timeout: 10_000 },
+      );
+      expect(await page.locator("canvas").count()).toBe(1);
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "0.750",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "galaxy",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-galaxy-scale-bridge",
+        "active",
+      );
+      expect(await page.locator("canvas").count()).toBe(1);
+    },
+  );
+});
+
 test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "system-approach-midpoint", async () => {
     const html = await locateHeroScaleTarget(page);
@@ -368,6 +525,65 @@ test("visual: desktop System-Approach midpoint", async ({ page }, testInfo) => {
   });
 });
 
+test("visual: desktop Approach-System reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "approach-system-reverse-midpoint",
+    async () => {
+      await page.goto(
+        "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "approach");
+      const html = page.locator("html");
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "1.667",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "system",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "system:approach",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-system-renderer",
+        "yeis-native",
+        { timeout: 15_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-system-ready",
+        "true",
+        { timeout: 15_000 },
+      );
+      await expect
+        .poll(
+          async () =>
+            Number(await html.getAttribute("data-universe-projected-radius")),
+          { timeout: 10_000 },
+        )
+        .toBeGreaterThan(0);
+      expect(await page.locator("canvas").count()).toBe(1);
+      await expectViewportContainedLayout(
+        page,
+        "desktop Approach-System reverse midpoint",
+      );
+    },
+  );
+});
+
 test("visual: desktop Approach-Orbit midpoint", async ({ page }, testInfo) => {
   await visualCase(page, testInfo, DESKTOP, "approach-orbit-midpoint", async () => {
     await page.goto(
@@ -389,6 +605,160 @@ test("visual: desktop Approach-Orbit midpoint", async ({ page }, testInfo) => {
     );
     await expectReadableWorldFrame(page, "Approach-Orbit midpoint");
   });
+});
+
+test("visual: desktop Orbit-Approach reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "orbit-approach-reverse-midpoint",
+    async () => {
+      await page.goto(
+        "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "orbit");
+      const html = page.locator("html");
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "2.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "approach",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "approach:orbit",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      expect(await page.locator("canvas").count()).toBe(1);
+      await expectViewportContainedLayout(
+        page,
+        "desktop Orbit-Approach reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "desktop Orbit-Approach reverse midpoint",
+      );
+    },
+  );
+});
+
+for (const viewport of [DESKTOP, WQHD]) {
+  test(
+    `visual: ${viewport.name} Orbit-Atmosphere midpoint`,
+    async ({ page }, testInfo) => {
+      await visualCase(
+        page,
+        testInfo,
+        viewport,
+        "orbit-atmosphere-midpoint",
+        async () => {
+          await page.goto(
+            "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+          );
+          await waitForYeisEngine(page);
+          await waitForCameraSettled(page, "orbit");
+          const html = page.locator("html");
+
+          await dispatchVisualScaleWheel(page, -96);
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-position",
+            "3.500",
+          );
+          await expect(html).toHaveAttribute(
+            "data-universe-scale-camera-segment",
+            "orbit:atmosphere",
+            { timeout: 10_000 },
+          );
+          await expect
+            .poll(
+              async () =>
+                Number(await html.getAttribute("data-universe-projected-radius")),
+              { timeout: 10_000 },
+            )
+            .toBeGreaterThan(0);
+
+          const projectedRadius = Number(
+            await html.getAttribute("data-universe-projected-radius"),
+          );
+          const normalizedRadius = projectedRadius / viewport.height;
+          expect(
+            normalizedRadius,
+            `${viewport.name} Orbit-Atmosphere target should remain visibly framed`,
+          ).toBeGreaterThan(0.12);
+          expect(
+            normalizedRadius,
+            `${viewport.name} Orbit-Atmosphere target should not clip vertically`,
+          ).toBeLessThan(0.7);
+          expect(await page.locator("canvas").count()).toBe(1);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Orbit-Atmosphere midpoint`,
+          );
+          await expectReadableWorldFrame(
+            page,
+            `${viewport.name} Orbit-Atmosphere midpoint`,
+          );
+        },
+      );
+    },
+  );
+}
+
+
+test("visual: desktop Atmosphere-Orbit reverse midpoint", async ({ page }, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "atmosphere-orbit-reverse-midpoint",
+    async () => {
+      await page.goto(
+        "/?phase=atmosphere&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "atmosphere");
+      const html = page.locator("html");
+
+      await dispatchVisualScaleWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "3.500",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "orbit",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "orbit:atmosphere",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-direction",
+        "out",
+      );
+      await expectViewportContainedLayout(
+        page,
+        "desktop Atmosphere-Orbit reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "desktop Atmosphere-Orbit reverse midpoint",
+      );
+    },
+  );
 });
 
 test("visual: desktop Atmosphere-Surface midpoint", async ({ page }, testInfo) => {
@@ -520,7 +890,7 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
   await visualCase(
     page,
     testInfo,
-    DESKTOP,
+    HIGH_TRANSITION_DESKTOP,
     "atmosphere-surface-midpoint-live",
     async () => {
       await page.goto(
@@ -553,7 +923,93 @@ test("visual: desktop Atmosphere to Surface midpoint keeps live spatial motion @
         "data-universe-render-authority",
         "world",
       );
-      await expectReadableWorldFrame(page, "HIGH Atmosphere/Surface midpoint");
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Atmosphere/Surface midpoint",
+        { subjectRoiOnly: true },
+      );
+    },
+  );
+});
+
+test("visual: desktop Surface to Atmosphere reverse keeps live spatial continuity @webgl-heavy", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    HIGH_TRANSITION_DESKTOP,
+    "surface-atmosphere-reverse-live",
+    async () => {
+      await page.goto(
+        "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("high");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-live",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-anchor-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-frame",
+        "ready",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-surface-camera-applied",
+        "true",
+        { timeout: 60_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 60_000 },
+      );
+      await waitForCameraSettled(page, "surface");
+
+      await dispatchVisualWheel(page, 96);
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-position",
+        "4.600",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-navigation-phase",
+        "atmosphere",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-scale-camera-segment",
+        "atmosphere:surface",
+        { timeout: 10_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-handoff-state",
+        "atmosphere:surface",
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-render-authority",
+        "world",
+      );
+      await expectViewportContainedLayout(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+      );
+      await expectReadableWorldFrame(
+        page,
+        "HIGH Surface/Atmosphere reverse midpoint",
+        { subjectRoiOnly: true },
+      );
     },
   );
 });
@@ -576,6 +1032,10 @@ test("visual: ultrawide close-world composition", async ({ page }, testInfo) => 
       "approach:orbit",
     );
     await expectReadableWorldFrame(page, "ultrawide Approach/Orbit midpoint");
+    await expectViewportContainedLayout(
+      page,
+      "ultrawide Approach/Orbit midpoint",
+    );
   });
 });
 
@@ -651,6 +1111,51 @@ test("visual: desktop Hero world high-quality live renderer", async ({
         "generated-texture",
       );
       await expectReadableWorldFrame(page, "HIGH Hero orbit");
+    },
+  );
+});
+
+
+test("visual: desktop Hero world low-quality fallback renderer", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    DESKTOP,
+    "hero-world-low-fallback",
+    async () => {
+      await page.goto(
+        "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await page.getByLabel("QUALITY").selectOption("low");
+      const html = page.locator("html");
+      await expect(html).toHaveAttribute(
+        "data-universe-world-renderer",
+        "procedural-planets-fallback-low-quality",
+        { timeout: 30_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-pipeline",
+        "fallback-low-quality",
+        { timeout: 30_000 },
+      );
+      await expect(html).toHaveAttribute(
+        "data-universe-world-ready",
+        "true",
+        { timeout: 30_000 },
+      );
+      await expect(html).not.toHaveAttribute(
+        "data-universe-world-fallback-surface",
+        "generated-texture",
+      );
+      await waitForCameraSettled(page, "orbit");
+      await expectViewportContainedLayout(
+        page,
+        "desktop LOW Hero orbit",
+      );
+      await expectReadableWorldFrame(page, "LOW Hero orbit");
     },
   );
 });
@@ -752,6 +1257,10 @@ for (const viewport of [TABLET, MOBILE]) {
             { timeout: 10_000 },
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} System-Approach midpoint`,
+          );
         },
       );
     },
@@ -787,11 +1296,47 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} Atmosphere-Surface midpoint`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Atmosphere-Surface midpoint`,
+          );
         },
       );
     },
   );
 }
+
+
+test("visual: mobile portrait keeps HUD and canvas contained through close-world scale", async ({
+  page,
+}, testInfo) => {
+  await visualCase(
+    page,
+    testInfo,
+    MOBILE,
+    "layout-close-world-contained",
+    async () => {
+      await page.goto(
+        "/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1",
+      );
+      await waitForYeisEngine(page);
+      await waitForCameraSettled(page, "orbit");
+      await expectCompactNarrowHud(page);
+      await expectViewportContainedLayout(page, "mobile Orbit layout");
+
+      await dispatchVisualScaleWheel(page, -96);
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-universe-scale-position",
+        "3.500",
+      );
+      await expectCompactNarrowHud(page);
+      await expectViewportContainedLayout(
+        page,
+        "mobile Orbit-Atmosphere midpoint layout",
+      );
+    },
+  );
+});
 
 for (const viewport of [TABLET, MOBILE]) {
   test(`visual: ${viewport.name} galaxy`, async ({ page }, testInfo) => {
@@ -799,6 +1344,7 @@ for (const viewport of [TABLET, MOBILE]) {
       await page.goto("/?freeze=1");
       await waitForYeis(page);
       await expect(page.locator(".universe-hud")).toBeVisible();
+      await expectViewportContainedLayout(page, `${viewport.name} Galaxy`);
     });
   });
 
@@ -868,6 +1414,10 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} Approach/Orbit midpoint`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} Approach/Orbit midpoint`,
+          );
         },
       );
     },
@@ -950,6 +1500,10 @@ for (const viewport of [TABLET, MOBILE]) {
             `${viewport.name} AUTO Hero surface`,
           );
           await expectCompactNarrowHud(page);
+          await expectViewportContainedLayout(
+            page,
+            `${viewport.name} AUTO Hero surface`,
+          );
         },
       );
     },
