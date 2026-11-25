@@ -627,7 +627,7 @@ export function UniverseCanvas({
             phase={phase}
             phaseRef={phaseRef}
             quality={quality}
-            planet={selectedPlanet}
+            planet={worldRendererPlanet}
             surfaceFocusEntryId={surfaceFocusEntryId}
             onSurfaceFocusEntry={onSurfaceFocusEntry}
             ready={surfaceFallbackReady}
