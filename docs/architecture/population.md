@@ -41,6 +41,12 @@ worlds may be `surface-capable`. Explicit authored hero worlds may be
 change the existing `surfaceMode`; it is the stable contract Surface can
 consume.
 
+The selected world's population capability is exposed as
+`data-universe-world-population-capability` alongside its population provenance.
+`data-universe-world-capability` is independently owned by the active renderer
+and can change with quality or hardware while the population capability stays
+the same. Neither diagnostic selects a renderer.
+
 ## Determinism and rarity
 
 The existing Helios-derived `SeededRng` and `hashSeed` remain the generation

@@ -1111,10 +1111,10 @@ export default function UniverseApp({
     if (worldPopulation) {
       root.dataset.universeWorldPopulationProvenance =
         worldPopulation.provenance;
-      root.dataset.universeWorldCapability = worldPopulation.capability;
+      root.dataset.universeWorldPopulationCapability = worldPopulation.capability;
     } else {
       delete root.dataset.universeWorldPopulationProvenance;
-      delete root.dataset.universeWorldCapability;
+      delete root.dataset.universeWorldPopulationCapability;
     }
   }, [selectedPlanet, selectedSystem]);
 
