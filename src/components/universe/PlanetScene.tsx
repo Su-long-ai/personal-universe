@@ -1033,7 +1033,16 @@ export function PlanetScene({
       Number(html.dataset.universeWorldPlanetAllocations ?? "0") + 1,
     );
     return nextPlanet;
-  }, [liveProvisioned, planet, softwareRenderer, sunDirection]);
+  }, [
+    liveProvisioned,
+    planet.id,
+    planet.archetype,
+    planet.hasRings,
+    planet.seed,
+    planet.name,
+    softwareRenderer,
+    sunDirection,
+  ]);
 
   useEffect(() => {
     return () => {

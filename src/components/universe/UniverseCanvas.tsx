@@ -276,6 +276,16 @@ export function UniverseCanvas({
   } | null>(null);
 
   useEffect(() => {
+    const requestedDestinationId = navigationRequest?.destinationId;
+    if (!requestedDestinationId) return;
+    setRetainedWorldRenderer((current) =>
+      current && current.destinationId !== requestedDestinationId
+        ? null
+        : current,
+    );
+  }, [navigationRequest?.destinationId]);
+
+  useEffect(() => {
     if (!worldPrewarmPlanet || (phase !== "system" && !closeWorldPhase)) {
       return;
     }
