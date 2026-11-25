@@ -118,6 +118,7 @@ export type YeisGalaxyScaleBridgeState = {
 };
 
 export type YeisSignalHover = {
+  entryId: string;
   title: string;
   kind: string;
   clientX: number;
@@ -912,6 +913,7 @@ export function YeisGalaxyScene({
           document.documentElement.dataset.personalSignalHover =
             best.placement.entry.id;
           signalHoverRef.current({
+            entryId: best.placement.entry.id,
             title: best.placement.entry.title,
             kind: best.placement.entry.kind,
             clientX: event.clientX,

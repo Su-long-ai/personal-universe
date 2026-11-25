@@ -29,6 +29,9 @@ intentional Personal Universe host adaptations:
      exposed localized source labels leaking through the earlier identity shim.
    - Vendors only `locales/en/data.json` and `locales/en/ui.json`; the host
      initializes `en` before constructing the YEIS universe.
+   - Adds an optional host-only opt-out of the standalone document language
+     write. The host keeps its existing Chinese/English page locale while
+     native astronomy still loads the pinned English dictionary.
    - Translation lookup and source keys remain pinned upstream behavior;
      Personal Universe does not maintain a parallel body-name translation table.
 

@@ -9,6 +9,7 @@ import {
 import { UniverseCanvas } from "./UniverseCanvas";
 import { UniverseHud } from "./UniverseHud";
 import { UniverseNavigator } from "./UniverseNavigator";
+import type { YeisSignalHover } from "./YeisGalaxyScene";
 import type {
   GalaxyMarker,
   PlanetDefinition,
@@ -31,6 +32,7 @@ import {
 } from "../../lib/universe/surface";
 import {
   attachContentToSystem,
+  localizeUniverseContent,
   placeUniverseContent,
   placementsForMarker,
   type UniverseContentEntry,
@@ -561,6 +563,27 @@ export default function UniverseApp({
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
   const [locale, setLocale] = useState<ProductLocale>("en");
+  // Locale is a display projection; placements, routes, and selected
+  // entities keep their canonical entries and identities.
+  const localizedContent = useMemo(
+    () =>
+      new Map(
+        contentEntries.map((entry) => [
+          entry.id,
+          localizeUniverseContent(entry, locale),
+        ]),
+      ),
+    [contentEntries, locale],
+  );
+  const navigationTitle = useCallback(
+    (id: string, title: string) => {
+      if (id.startsWith("personal:")) {
+        return localizedContent.get(id.slice("personal:".length))?.title ?? title;
+      }
+      return astronomicalName(locale, title);
+    },
+    [locale, localizedContent],
+  );
   const [scrollDepth, setScrollDepth] = useState(0);
   const [navigatorOpen, setNavigatorOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] =
@@ -615,13 +638,9 @@ export default function UniverseApp({
     });
   }, [activeDestinationId, recentHistoryReady]);
 
-  const [signalHover, setSignalHover] = useState<{
-    title: string;
-    kind: string;
-    clientX: number;
-    clientY: number;
-  } | null>(null);
+  const [signalHover, setSignalHover] = useState<YeisSignalHover>(null);
   const [journey, setJourney] = useState<UniverseJourneyState | null>(null);
+  const journeyDestination = journey?.destinations[journey.index];
   const [cameraSettledPhase, setCameraSettledPhase] =
     useState<UniversePhase | null>(null);
   const cameraSettledPhaseRef = useRef<UniversePhase | null>(null);
@@ -3001,7 +3020,10 @@ export default function UniverseApp({
             <span>
               {text(locale, "personalSignal")} · {kindLabel(locale, signalHover.kind)}
             </span>
-            <strong>{signalHover.title}</strong>
+            <strong>
+              {localizedContent.get(signalHover.entryId)?.title ??
+                signalHover.title}
+            </strong>
           </aside>
         )}
 
@@ -3053,7 +3075,8 @@ export default function UniverseApp({
               {journey.index + 1} / {journey.destinations.length}
             </small>
             <strong>
-              {journey.destinations[journey.index]?.title}
+              {journeyDestination &&
+                navigationTitle(journeyDestination.id, journeyDestination.title)}
             </strong>
           </div>
           <div className="journey-progress" aria-hidden="true">
@@ -3149,6 +3172,7 @@ export default function UniverseApp({
         onNavigate={handleNavigateDestination}
         onLocate={handleLocateDestination}
         onStartJourney={handleStartJourney}
+        navigationTitle={navigationTitle}
         locale={locale}
       />
 
@@ -3162,7 +3186,12 @@ export default function UniverseApp({
         >
           <div className="navigation-failure-copy">
             <span>{text(locale, "routeInterrupted")}</span>
-            <strong>{navigationFailure.request.title}</strong>
+            <strong>
+              {navigationTitle(
+                navigationFailure.request.destinationId,
+                navigationFailure.request.title,
+              )}
+            </strong>
             <small>
               {text(locale, "routeFailure")}
             </small>
@@ -3190,7 +3219,10 @@ export default function UniverseApp({
               : navigationRequest.mode === "travel"
                 ? text(locale, "navigating")
                 : text(locale, "locating")} //{" "}
-          {astronomicalName(locale, navigationRequest.title)}
+          {navigationTitle(
+            navigationRequest.destinationId,
+            navigationRequest.title,
+          )}
         </div>
       )}
 
@@ -3225,15 +3257,18 @@ export default function UniverseApp({
                   } detected; ${text(locale, "linkedWorldHighlighted")}`
               : " " + text(locale, "selectPlanet")}
           </small>
-          {selectedSystem.content?.map((entry) => (
-            <div className="content-signal-card" key={entry.id}>
-              <span>
-                {text(locale, "contentSignal")} // {kindLabel(locale, entry.kind)}
-              </span>
-              <b>{entry.title}</b>
-              <small>{entry.summary}</small>
-            </div>
-          ))}
+          {selectedSystem.content?.map((entry) => {
+            const copy = localizedContent.get(entry.id) ?? entry;
+            return (
+              <div className="content-signal-card" key={entry.id}>
+                <span>
+                  {text(locale, "contentSignal")} // {kindLabel(locale, entry.kind)}
+                </span>
+                <b>{copy.title}</b>
+                <small>{copy.summary}</small>
+              </div>
+            );
+          })}
         </section>
       )}
 
@@ -3250,6 +3285,7 @@ export default function UniverseApp({
             }
           >
             {visibleWorldContentEntries.map((entry) => {
+              const copy = localizedContent.get(entry.id) ?? entry;
               const surfacePresentation =
                 phase === "surface"
                   ? surfaceContentPresentation.get(entry.id)
@@ -3276,8 +3312,8 @@ export default function UniverseApp({
                       {locale === "zh" ? "当前目标" : "CURRENT TARGET"}
                     </em>
                   )}
-                  <strong>{entry.title}</strong>
-                  <small>{entry.summary}</small>
+                  <strong>{copy.title}</strong>
+                  <small>{copy.summary}</small>
                   {surfacePresentation && (
                     <>
                       <em className="world-content-location">
