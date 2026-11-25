@@ -4,6 +4,24 @@ import {
   continuousScaleResponseDistance,
 } from "../../src/lib/universe/continuousScale";
 import {
+  catalogMarkers,
+  catalogMetadata,
+  catalogSystem,
+} from "../../src/lib/universe/generation/catalog";
+import { generateProceduralMarkers } from "../../src/lib/universe/generation/galaxyGenerator";
+import {
+  decorateAuthoredSystem,
+  decorateGeneratedSystem,
+  PopulationSystemCache,
+  POPULATION_GENERATOR_VERSION,
+  POPULATION_SCHEMA_VERSION,
+  populationRarityForSeed,
+  systemPopulationFingerprint,
+  validateSystemPopulation,
+} from "../../src/lib/universe/generation/population";
+import { createHeroSystem } from "../../src/lib/universe/generation/heroOverrides";
+import { generateSystem } from "../../src/lib/universe/generation/systemGenerator";
+import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
@@ -4576,6 +4594,183 @@ test("Chinese and English switch in place and persist", async ({
       name: "A living map of observed and imagined worlds.",
     }),
   ).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("population generation is deterministic and stable under unrelated expansion", () => {
+  const compact = generateProceduralMarkers("population-stability", 64);
+  const expanded = generateProceduralMarkers("population-stability", 220);
+
+  expect(expanded.slice(0, compact.length)).toEqual(compact);
+  for (const marker of compact) {
+    expect(marker.population?.schemaVersion).toBe(POPULATION_SCHEMA_VERSION);
+    expect(marker.population?.generatorVersion).toBe(
+      POPULATION_GENERATOR_VERSION,
+    );
+    expect(marker.population?.provenance).toBe("generated");
+    expect(marker.name).toBe(marker.name.normalize("NFKC"));
+    expect(marker.name).not.toMatch(/[\u0000-\u001f\u007f]/);
+  }
+
+  const first = decorateGeneratedSystem(
+    generateSystem(
+      "population:stable-system",
+      [3.25, -0.4, 8.75],
+      "STABLE PRIMARY",
+    ),
+  );
+  const before = systemPopulationFingerprint(first);
+
+  // Materializing unrelated objects must not consume or reseed this system.
+  for (let index = 0; index < 40; index += 1) {
+    decorateGeneratedSystem(
+      generateSystem(
+        `population:unrelated:${index}`,
+        [index * 0.1, 0, -index * 0.2],
+      ),
+    );
+  }
+
+  const second = decorateGeneratedSystem(
+    generateSystem(
+      "population:stable-system",
+      [3.25, -0.4, 8.75],
+      "STABLE PRIMARY",
+    ),
+  );
+  expect(systemPopulationFingerprint(second)).toBe(before);
+  expect(second).toEqual(first);
+  expect(validateSystemPopulation(second)).toEqual([]);
+});
+
+test("population invariants keep giants orbit-only and authored slots reserved", () => {
+  let giantWorlds = 0;
+  let surfaceCapableWorlds = 0;
+  for (let systemIndex = 0; systemIndex < 160; systemIndex += 1) {
+    const system = decorateGeneratedSystem(
+      generateSystem(
+        `population:stress:${systemIndex}`,
+        [systemIndex * 0.01, 0, systemIndex * -0.015],
+      ),
+    );
+    expect(validateSystemPopulation(system)).toEqual([]);
+
+    for (const planet of system.planets) {
+      if (
+        planet.archetype === "gas_giant" ||
+        planet.archetype === "ice_giant"
+      ) {
+        giantWorlds += 1;
+        expect(planet.population?.capability).toBe("orbit-only");
+        expect(planet.surfaceMode).toBe("none");
+      } else {
+        surfaceCapableWorlds += 1;
+        expect(planet.population?.capability).toBe("surface-capable");
+      }
+    }
+  }
+  expect(giantWorlds).toBeGreaterThan(0);
+  expect(surfaceCapableWorlds).toBeGreaterThan(giantWorlds);
+
+  const hero = decorateAuthoredSystem(createHeroSystem());
+  expect(validateSystemPopulation(hero)).toEqual([]);
+  expect(hero.population?.provenance).toBe("authored");
+  expect(
+    hero.planets.every(
+      (planet) => planet.population?.reservedForAuthored === true,
+    ),
+  ).toBeTruthy();
+  const authoredWorld = hero.planets.find((planet) => planet.heroKey === "home");
+  expect(authoredWorld?.population?.provenance).toBe("authored");
+  expect(authoredWorld?.population?.capability).toBe("authored-surface");
+});
+
+test("observed population keeps catalog provenance and indexed identity", () => {
+  const metadata = catalogMetadata();
+  expect(metadata.indexedCount).toBe(metadata.count);
+  expect(metadata.count).toBeGreaterThan(0);
+
+  const markers = catalogMarkers(Math.min(24, metadata.count));
+  expect(markers.length).toBeGreaterThan(0);
+  for (const marker of markers) {
+    expect(marker.population?.provenance).toMatch(/^(observed|hybrid)$/);
+    expect(marker.population?.observedFields).toContain("hostname");
+    const system = catalogSystem(marker);
+    expect(system).not.toBeNull();
+    expect(validateSystemPopulation(system!)).toEqual([]);
+    expect(system!.catalogId).toBe(marker.catalogId);
+    expect(system!.population?.provenance).toMatch(/^(observed|hybrid)$/);
+    for (const planet of system!.planets) {
+      expect(planet.observed).toBeTruthy();
+      expect(planet.population?.provenance).toMatch(/^(observed|hybrid)$/);
+      expect(planet.population?.observedFields).toContain("name");
+      expect(planet.population?.inferredFields).toContain("archetype");
+    }
+  }
+});
+
+test("population rarity and focused-system materialization stay bounded", () => {
+  let rare = 0;
+  let uncommon = 0;
+  const sampleCount = 4096;
+  for (let index = 0; index < sampleCount; index += 1) {
+    const { rarity } = populationRarityForSeed(
+      `population:rarity-sample:${index}`,
+    );
+    if (rarity === "rare") rare += 1;
+    if (rarity === "uncommon") uncommon += 1;
+  }
+  expect(rare / sampleCount).toBeGreaterThan(0.01);
+  expect(rare / sampleCount).toBeLessThan(0.05);
+  expect((rare + uncommon) / sampleCount).toBeGreaterThan(0.08);
+  expect((rare + uncommon) / sampleCount).toBeLessThan(0.16);
+
+  const cache = new PopulationSystemCache<{ id: number }>(8);
+  for (let index = 0; index < 96; index += 1) {
+    cache.set(`system:${index}`, { id: index });
+  }
+  let stats = cache.stats();
+  expect(stats.size).toBe(8);
+  expect(stats.capacity).toBe(8);
+  expect(stats.evictions).toBe(88);
+  expect(cache.get("system:95")).toEqual({ id: 95 });
+  expect(cache.get("system:95")).toEqual({ id: 95 });
+  expect(cache.get("system:0")).toBeUndefined();
+  stats = cache.stats();
+  expect(stats.size).toBe(8);
+  expect(stats.hits).toBe(2);
+  expect(stats.misses).toBe(1);
+});
+
+test("generated system deep link preserves canonical identity across reload", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?engine=v2&phase=system&star=proc%3A0&freeze=1");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-engine", "v2");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  const systemName = page.locator(".system-copy strong");
+  await expect(systemName).toBeVisible();
+  const firstName = (await systemName.textContent())?.trim();
+  expect(firstName).toBeTruthy();
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("star")).toBe("proc:0");
+
+  await page.reload();
+  await expect(html).toHaveAttribute("data-universe-engine", "v2");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  await expect(systemName).toHaveText(firstName!);
+  expect(new URL(page.url()).searchParams.get("star")).toBe("proc:0");
 
   await runtime.assertClean(testInfo);
 });
