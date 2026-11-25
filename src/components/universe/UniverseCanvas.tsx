@@ -249,7 +249,9 @@ export function UniverseCanvas({
   const retainedWorldParkedInGalaxy =
     phase === "galaxy" && Boolean(retainedWorldRenderer);
   const retainedWorldPlanet =
-    retainedWorldRenderer?.planet.id === worldPrewarmPlanet?.id
+    retainedWorldRenderer &&
+    worldPrewarmPlanet &&
+    retainedWorldRenderer.planet.id === worldPrewarmPlanet.id
       ? retainedWorldRenderer.planet
       : null;
   const worldRendererPlanet =
