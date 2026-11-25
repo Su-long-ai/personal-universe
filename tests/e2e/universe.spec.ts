@@ -5463,9 +5463,41 @@ test("default YEIS hero keeps authored system and surface capability metadata", 
     "data-universe-world-population-provenance",
     "authored",
   );
+  const quality = page.getByLabel("QUALITY");
+  await expect(html).toHaveAttribute("data-universe-webgl-software", /^(true|false)$/);
+  const software = await html.getAttribute("data-universe-webgl-software");
+  const autoRendererCapability =
+    software === "true" ? "fallback-software-renderer" : "procedural-planets-live";
+
+  await quality.selectOption("low");
   await expect(html).toHaveAttribute(
     "data-universe-world-capability",
+    "fallback-low-quality",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-population-capability",
     "authored-surface",
+  );
+
+  await quality.selectOption("auto");
+  await expect(html).toHaveAttribute(
+    "data-universe-world-capability",
+    autoRendererCapability,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-world-population-capability",
+    "authored-surface",
+  );
+
+  await page.getByRole("button", { name: "← RETURN TO SYSTEM" }).click();
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "system");
+  await expect(html).not.toHaveAttribute(
+    "data-universe-world-population-capability",
+    /.+/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-world-population-provenance",
+    /.+/,
   );
   await runtime.assertClean(testInfo);
 });

@@ -229,10 +229,23 @@ async function driveFullScaleRoundTrip(page: Page) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(20);
   }
-  await expect(html).toHaveAttribute(
+  await expect(
+    html,
+    "Galaxy wheel input must reach the System endpoint",
+  ).toHaveAttribute(
+    "data-universe-scale-position",
+    "1.000",
+    { timeout: 10_000 },
+  );
+  // At 1.000, let the native renderer acknowledge the handoff. Extra wheel
+  // input cannot advance it and could skip System once the handoff commits.
+  await expect(
+    html,
+    "The native Galaxy→System handoff must settle",
+  ).toHaveAttribute(
     "data-universe-navigation-phase",
     "system",
-    { timeout: 10_000 },
+    { timeout: 20_000 },
   );
   // Logical scale reaches System before its renderer has mounted and drawn.
   // Exercise the real System in both warm-up and measured journeys.
@@ -384,6 +397,36 @@ async function attachMetrics(
 ) {
   await testInfo.attach(name, {
     body: JSON.stringify(metrics, null, 2),
+    contentType: "application/json",
+  });
+}
+
+async function attachFullJourneyFailure(
+  page: Page,
+  testInfo: TestInfo,
+  cycle: number,
+) {
+  const snapshot = await page.locator("html").evaluate(
+    () => {
+      const data = document.documentElement.dataset;
+      return {
+        phase: data.universeNavigationPhase ?? null,
+        position: data.universeScalePosition ?? null,
+        galaxyAppliedPosition: data.universeGalaxyScaleAppliedPosition ?? null,
+        handoff: data.universeScaleHandoff ?? null,
+        blocked: data.universeScaleBlocked ?? null,
+        systemReady: data.universeSystemReady ?? null,
+        surfaceReady: data.universeWorldScreenshotReady ?? null,
+        pipelineLifecycle: data.universeWorldPipelineLifecycle ?? null,
+        metricSample: data.universeWebglMetricSample ?? null,
+        programs: data.universeWebglPrograms ?? null,
+      };
+    },
+    undefined,
+    { timeout: 1_000 },
+  );
+  await testInfo.attach(`webgl-cycle-${cycle}-stalled.json`, {
+    body: JSON.stringify(snapshot, null, 2),
     contentType: "application/json",
   });
 }
@@ -674,6 +717,10 @@ test("retained Surface fallback recovers and parks without resource growth @webg
 test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", async ({
   page,
 }, testInfo) => {
+  // Hosted SwiftShader can return to Galaxy on journey four just as the
+  // shared 75 s test budget expires. Retain bounded stages and resource limits;
+  // give this four-journey acceptance time to sample the last rendered frame.
+  test.setTimeout(150_000);
   await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
   await waitForYeis(page);
 
@@ -686,13 +733,30 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
 
   const cycles: WebglMetrics[] = [];
   for (let cycle = 1; cycle <= 4; cycle += 1) {
-    await driveFullScaleRoundTrip(page);
-    // "Parked" describes the world pipeline, not the active Galaxy renderer.
-    // Compare fresh Galaxy frames after the native scene has returned, not a
-    // synchronous parking snapshot taken before that scene mounts or draws.
-    await waitForYeis(page);
-    await waitForNextWebglMetric(page, await readWebglMetricSample(page));
-    const settled = await readWebglMetrics(page);
+    const settled = await test.step(
+      `Full scale journey ${cycle} of 4`,
+      async () => {
+        try {
+          await driveFullScaleRoundTrip(page);
+          // "Parked" describes the world pipeline, not the active Galaxy
+          // renderer. A parking snapshot does not prove a new Galaxy frame.
+          return await test.step(
+            "Sample a fresh native Galaxy frame",
+            async () => {
+              await waitForYeis(page);
+              await waitForNextWebglMetric(page, await readWebglMetricSample(page));
+              return readWebglMetrics(page);
+            },
+          );
+        } catch (error) {
+          // Keep the original failure if the timed-out page cannot be inspected.
+          await attachFullJourneyFailure(page, testInfo, cycle).catch(
+            () => undefined,
+          );
+          throw error;
+        }
+      },
+    );
     cycles.push(settled);
     await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, settled);
   }
