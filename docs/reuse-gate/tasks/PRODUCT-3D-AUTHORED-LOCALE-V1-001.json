@@ -1,0 +1,46 @@
+{
+  "schema": 2,
+  "task_id": "PRODUCT-3D-AUTHORED-LOCALE-V1-001",
+  "title": "Use the canonical authored locale in the native 3D presentation",
+  "scope": {
+    "level": "implementation",
+    "subject": "Compose the existing product locale with canonical authored copy in native 3D UI, and prevent the embedded YEIS dictionary from owning host document.lang"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "After the combined release added bilingual authored content and an existing locale-specific English fallback helper, the native 3D views still present canonical base copy. Reuse that projection over the existing React locale state at the display boundary. Keep native YEIS's pinned English dictionary and astronomical data intact; allow the host to opt out of the dictionary's page-wide lang mutation rather than repairing the race after boot. The static Astro routes, authored contract, camera and search identities are outside scope.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/lib/universe/yeis/index.ts",
+    "src/vendor/yeis/i18n/index.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "tests/e2e/locale.spec.ts"
+  ],
+  "sources": [
+    {"url":"https://github.com/Su-long-ai/personal-universe/blob/463785453417611876861120744199433facd662/src/lib/universe/content/authoring.ts","finding":"The integrated authoring adapter already implements per-field requested-locale, English override, and base-copy fallback; 3D should consume it without duplicating the contract."},
+    {"url":"https://github.com/Su-long-ai/personal-universe/blob/463785453417611876861120744199433facd662/src/lib/universe/locale.ts","finding":"The product already owns the locale preference, browser detection and document language."},
+    {"url":"https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/i18n/index.ts","finding":"Pinned MIT YEIS uses the i18n dictionary for its own astronomy strings; the only host conflict is the standalone document.lang side effect."},
+    {"url":"https://www.i18next.com/","finding":"A general i18n subsystem exists in the registry but cannot add any missing semantic source for this boundary and would duplicate the current runtimes."}
+  ],
+  "search_ladder":[
+    {"level":"full_solution","status":"found","registry_refs":["your-eyes-in-space-mit-e520568"],"source_refs":[2],"conclusion":"Retain the integrated native renderer and matching English astronomical data rather than changing engines or reintroducing translated astronomy tables."},
+    {"level":"framework_engine","status":"found","registry_refs":["react-core-hooks"],"source_refs":[1],"conclusion":"Existing React locale state is the correct editor for render-only display. A derived lookup does not replace selected entities, remount the canvas or re-run the native initialization."},
+    {"level":"subsystem","status":"found","registry_refs":["astro-content-collections","i18next"],"source_refs":[0,3],"conclusion":"Use current Astro authoring projection and product preference. A generic runtime neither owns the authored data nor resolves the composition bug."},
+    {"level":"component_asset","status":"found","registry_refs":["your-eyes-in-space-mit-e520568"],"source_refs":[0,2],"conclusion":"Reuse the field-level authoring fallback, and preserve the pinned dictionary load with one opt-out at its host-owned document language boundary."}
+  ],
+  "candidates":[
+    {"id":"existing-authoring-projection","name":"Project canonical authored-copy projection + existing product locale","level":"subsystem","registry_id":"astro-content-collections","source":"Existing Astro collection and localizeUniverseContent adapter","license":"MIT Astro plus repository-owned adapter","decision":"reuse","reason":"One per-field source for static and runtime rendering. Localizing display values leaves canonical placements, IDs, targets, search ranking and camera state intact.","evaluation":{"coverage":5,"integration_cost":1,"license_fit":5,"maintenance_health":5,"performance_fit":5,"customization_fit":5,"maturity":5}},
+    {"id":"embedded-pinned-dictionary","name":"Pinned YEIS dictionary plus a host-language opt-out","level":"component_asset","registry_id":"your-eyes-in-space-mit-e520568","source":"Existing pinned MIT translation runtime","license":"MIT e520568 boundary","decision":"partial","reason":"Avoids asynchronous document.lang writes or restore-after-load races while retaining upstream's standalone default and astronomy dictionary.","evaluation":{"coverage":5,"integration_cost":1,"license_fit":5,"maintenance_health":5,"performance_fit":5,"customization_fit":5,"maturity":5}},
+    {"id":"additional-i18n-runtime","name":"Install a parallel generic translation runtime","level":"subsystem","registry_id":"i18next","source":"i18next","license":"MIT","decision":"reject","reason":"Adds a third locale authority, duplicate dictionaries and dependencies; cannot preserve the authoring contract better than consuming it directly.","evaluation":{"coverage":3,"integration_cost":4,"license_fit":5,"maintenance_health":5,"performance_fit":3,"customization_fit":4,"maturity":5}}
+  ],
+  "decision":{
+    "mode":"partial",
+    "selected_ids":["existing-authoring-projection","embedded-pinned-dictionary"],
+    "rationale":"Derive human-readable authored copy in existing React views. Keep the document under product locale authority, native astronomical data under the existing embedded YEIS English dictionary, and all spatial identities and route state unchanged.",
+    "higher_level_tradeoffs":[{"candidate_id":"additional-i18n-runtime","reason":"More resources and duplicate fallback/persistence ownership would not repair the existing composition boundary."}],
+    "score_overrides":[],
+    "fallback":"If more consumers are added, pass the same semantic IDs and reuse the existing authoring projection; do not add a second content record, locale route, or browser-language repair loop."
+  }
+}
