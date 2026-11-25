@@ -262,6 +262,105 @@ Runtime evidence:
 - the existing `data-universe-world-renderer="procedural-planets-live"`
 - the existing `data-universe-world-pipeline="procedural-planets-pass"`
 
+### Surface world product model
+
+Task `SURFACE-WORLD-PRODUCTIZATION-V3-001` adds one semantic Surface model
+above the existing renderer choices. `buildSurfaceWorldProfile(planet)` is a
+pure deterministic adapter over `PlanetDefinition`: the stable planet seed,
+archetype, hero identity and already-attached content entries derive the biome,
+atmosphere, light, terrain parameters, landing point, regions, paths, landmarks
+and content anchors. It is product/layout state only; it is not another terrain,
+camera, navigation or content authority.
+
+The same profile is consumed by both renderer adapters:
+
+- the primary ProceduralPlanets path keeps the existing live planet and projects
+  the generated product geography into the landing tangent frame returned by
+  `Planet.getSurfacePoint()`;
+- the ProceduralTerrains Infinite fallback consumes the same terrain seed,
+  palette, lighting, landing point and product layout while retaining its
+  camera-centred world transform;
+- Astro Content Collections and the existing planet `content` array remain the
+  only authored content source. Surface content anchors spatialize those entries
+  by stable placement key instead of copying them into a Surface-only CMS.
+
+Hero worlds set `authored=true` and receive denser geography through the same
+model. Generated and observed terrestrial archetypes automatically expose
+`surface-terrain` and can therefore become complete Surface destinations
+without per-world scene authoring. Task `SURFACE-YEIS-SECONDARY-WORLDS-001`
+applies the same archetype capability rule inside the default YEIS bridge:
+native terrestrial secondary bodies are ordinary Surface destinations too,
+while gas and ice giants remain orbit-only. The bridge does not introduce a
+YEIS-specific terrain or content model; it only exposes capability metadata to
+the same downstream Surface product layer. Gas and ice giants retain
+`surfaceMode="none"`; even a forced deep link must not invent a ground layer.
+
+The product UI reads this same profile to show biome, region, landmark and
+content-location context. Multiple world-content cards are laid out as one
+bounded readable stack rather than competing absolute overlays, so Surface
+remains a page-like destination instead of a game HUD or a separate application.
+
+Content hierarchy is also derived from the existing content model rather than
+authored again for Surface. Featured or high-importance entries become
+`primary` signals, normal active entries become `secondary`, and low-weight
+entries remain `ambient`. Stable content placement keys still own coordinates;
+priority changes presentation order and emphasis without changing an entry's
+terrain anchor. Deterministic clusters group those anchors into reusable
+region-level presentation units. Both ProceduralPlanets and ProceduralTerrains
+consume the same ranked anchors and clusters.
+
+When the active YEIS destination is a Personal Signal, the existing
+`personal:<entryId>` destination remains the single focus authority.
+`UniverseApp` derives the matching Surface entry from the selected planet and
+publishes `data-universe-surface-focus-entry` throughout the close-world
+journey. Surface renderers translate that identity to the existing deterministic
+anchor and publish `data-universe-surface-focus-anchor`; they do not create a
+second navigation target. Focus temporarily outranks display importance so the
+requested signal and its cluster remain visible during 4→5, while the underlying
+anchor priority and coordinates stay unchanged. The world-content stack uses
+the same ordering from Approach onward, including narrow layouts that only keep
+the first two Surface cards.
+
+This shared hierarchy is scale-aware. During the live Atmosphere→Surface
+interval the tangent overlay exposes only the highest-ranked signal and cluster,
+then expands at Surface without changing their coordinates. The bounded
+software fallback keeps the top-ranked signals rather than an arbitrary id
+slice. On narrow Surface layouts the product UI shows the first two ranked cards
+and keeps the destination copy below them; no fake content is generated for a
+secondary world whose existing content array is empty.
+
+Pointer/touch exploration continues to reuse the one `camera-controls`
+authority. Its wheel action remains disabled, so wheel/trackpad scale input
+continues to belong exclusively to the continuous-scale coordinator and can
+leave Surface immediately. When pointer/touch exploration has changed the
+Surface camera, the same controller's current position/target is retained as a
+world- and renderer-scoped Surface endpoint. Reverse 5→4 scale motion and a
+same-world return therefore use the explored frame without introducing another
+camera store or another interpolation loop. Renderer-mode or world identity
+changes invalidate the retained endpoint.
+
+Runtime evidence is shared across live and fallback paths:
+
+- `data-universe-surface-profile="surface:…"` identifies the deterministic
+  semantic world;
+- `data-universe-surface-biome` publishes the selected world archetype style;
+- `data-universe-surface-landmarks` and
+  `data-universe-surface-content-anchors` expose generated layout density;
+- `data-universe-surface-content-clusters` and
+  `data-universe-surface-primary-signals` expose the shared semantic hierarchy;
+- live Surface additionally publishes
+  `data-universe-surface-layout-tier="transition|full"`,
+  `data-universe-surface-layout-signals`, and
+  `data-universe-surface-layout-clusters` so the 4→5 content handoff can be
+  validated independently of camera settlement;
+- fallback additionally publishes
+  `data-universe-surface-terrain-instance` as the retained terrain identity;
+  repeated 4.6↔5 reversals must preserve that identity while lifecycle changes
+  only between `parked` and `active`;
+- fallback additionally publishes
+  `data-universe-surface-terrain-world="<same profile id>"`, proving the
+  terrain adapter and product layout are using the same world identity.
+
 If live rendering is intentionally disabled by LOW quality or an AUTO software
 renderer, the existing ProceduralTerrains subsystem remains the fallback inside
 the same near-surface product frame. Task `SURFACE-INFINITE-FALLBACK-001`
@@ -410,3 +509,20 @@ origin and reuses the legacy fallback camera shot. It is not parented, rotated
 or scaled onto the live globe. The primary high-quality path remains the
 continuous ProceduralPlanets globe; the fallback prioritizes correctness and
 availability over pretending to share the live globe frame.
+
+### Surface spatial-focus budget
+
+Both the live ProceduralPlanets tangent layout and the retained
+ProceduralTerrains fallback consume the same deterministic
+`SurfaceWorldProfile`. When a content signal is focused, render-budget ranking
+promotes only the associated signal, cluster, region and landmark; unrelated
+generated ordering is left intact. This matters most on software/LOW tiers,
+where only a bounded subset of landmarks and regions is drawn.
+
+The focused objects are presentation cues, not a new renderer authority. When
+a focused signal is attached to a generated landmark that already belongs to
+the bounded path network, that existing path is promoted/highlighted as part of
+the same context; focus never synthesizes extra roads or increases geometry
+density. 3D signal clicks and the equivalent DOM card/cluster controls feed the
+same local Surface focus callback, while the existing CinematicCamera and
+destination coordinator retain camera and navigation ownership.

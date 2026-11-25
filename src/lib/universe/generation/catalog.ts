@@ -5,6 +5,7 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
+import { surfaceModeForArchetype } from "../surface";
 import {
   observedPopulationMetadata,
   populationCapabilityForArchetype,
@@ -183,7 +184,7 @@ function observedPlanet(
     ),
     moons: [],
     hasRings: false,
-    surfaceMode: "none",
+    surfaceMode: surfaceModeForArchetype(archetype),
     observed: true,
     population: observedPopulationMetadata({
       kind: "world",
