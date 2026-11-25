@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "PROCEDURAL-UNIVERSE-YEIS-POPULATION-V1-001",
+  "approved_at": "2026-11-24T18:52:30.000Z",
+  "baseline_commit": "364e0af5a4cbdaea5b04d9d45d214fae11a3d879",
+  "record_path": "docs/reuse-gate/tasks/PROCEDURAL-UNIVERSE-YEIS-POPULATION-V1-001.json",
+  "record_sha256": "43088df1db489b2faf1f321cb350d705ccfe11cd4fbdb4f815e3a0716999afe5",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Adapt the existing pinned MIT YEIS native galaxy and system materialization into the approved Personal Universe population metadata contract with stable provenance and world capability, while preserving native IDs, native Universe caching, localization, renderer ownership, and canonical navigation identity"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/generation/population.ts",
+    "src/lib/universe/yeis/bridge.ts",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "selected_ids": [
+    "pinned-yeis-native-population-adapter"
+  ],
+  "candidate_scores": {
+    "pinned-yeis-native-population-adapter": 57,
+    "second-native-population-cache": null
+  }
+}

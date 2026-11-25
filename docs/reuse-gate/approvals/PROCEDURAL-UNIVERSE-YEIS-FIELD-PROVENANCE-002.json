@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "PROCEDURAL-UNIVERSE-YEIS-FIELD-PROVENANCE-002",
+  "approved_at": "2026-11-25T15:47:50.463Z",
+  "baseline_commit": "7525dd706a70e88636412a6639f52521b83dd4a0",
+  "record_path": "docs/reuse-gate/tasks/PROCEDURAL-UNIVERSE-YEIS-FIELD-PROVENANCE-002.json",
+  "record_sha256": "152ea4dae5100d623a19168da6f887c32f553aa9ef79c155cdd8ff9c07c3188a",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Correct observed versus inferred field metadata for pinned native catalogue stars and the Solar System without changing physical inputs, identity, navigation, capability, or rendering"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/generation/population.ts",
+    "src/lib/universe/yeis/bridge.ts",
+    "tests/e2e/native-population.spec.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "selected_ids": [
+    "pinned-yeis-native-population-adapter"
+  ],
+  "candidate_scores": {
+    "pinned-yeis-native-population-adapter": 57,
+    "second-native-population-cache": null
+  }
+}
