@@ -39,6 +39,13 @@ export type SurfaceCameraFrame = {
   up: [number, number, number];
 };
 
+type SurfaceManualCameraView = {
+  identity: string;
+  renderer: "live" | "fallback";
+  position: [number, number, number];
+  target: [number, number, number];
+};
+
 type CinematicCameraProps = {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
@@ -47,10 +54,12 @@ type CinematicCameraProps = {
   scrollDepth: number;
   reducedMotion: boolean;
   quality: QualityMode;
+  surfaceIdentity: string | null;
   surfaceCameraFrame: SurfaceCameraFrame | null;
   systemScaleFrame: SystemScaleFrame | null;
   galaxyViewState: YeisGalaxyViewState | null;
   worldFrameReady: boolean;
+  surfaceFallbackReady: boolean;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -83,6 +92,10 @@ const MANUAL_TOUCH = {
   three: CameraControlsImpl.ACTION.NONE,
 } as const;
 
+const MANUAL_DRAG_THRESHOLD_PX = 5;
+const MANUAL_DRAG_THRESHOLD_SQ =
+  MANUAL_DRAG_THRESHOLD_PX * MANUAL_DRAG_THRESHOLD_PX;
+
 type CameraShot = {
   position: [number, number, number];
   target: [number, number, number];
@@ -95,9 +108,13 @@ type CameraShot = {
   transition?: boolean;
 };
 
-const FALLBACK_SURFACE_SHOT: CameraShot = {
+export const FALLBACK_SURFACE_CAMERA_FRAME = {
   position: [0.5, 22.0, 18.0] as [number, number, number],
   target: [0, 8.0, -16.0] as [number, number, number],
+} as const;
+
+const FALLBACK_SURFACE_SHOT: CameraShot = {
+  ...FALLBACK_SURFACE_CAMERA_FRAME,
   smoothTime: 0.38,
   maxSpeed: 24,
   positionTolerance: 0.14,
@@ -177,10 +194,12 @@ export function CinematicCamera({
   scrollDepth,
   reducedMotion,
   quality,
+  surfaceIdentity,
   surfaceCameraFrame,
   systemScaleFrame,
   galaxyViewState,
   worldFrameReady,
+  surfaceFallbackReady,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -192,8 +211,14 @@ export function CinematicCamera({
   const surfaceFallbackAvailable = Boolean(
     liveWorldFallbackReason(gl, quality),
   );
-  const surfaceFallback =
+  const surfaceFallbackRequested =
     phase === "surface" && surfaceFallbackAvailable;
+  const surfaceFallback =
+    surfaceFallbackRequested && surfaceFallbackReady;
+  const currentWorldFrameReady =
+    surfaceFallbackRequested ? surfaceFallbackReady : worldFrameReady;
+  const surfaceRendererMode: SurfaceManualCameraView["renderer"] =
+    surfaceFallbackAvailable ? "fallback" : "live";
   const continuousSystemCamera =
     phase === "system" &&
     worldScaleContinuous &&
@@ -217,6 +242,7 @@ export function CinematicCamera({
   const transitionGeneration = useRef(0);
   const transitionWatchdog = useRef<number | null>(null);
   const manualOverride = useRef(false);
+  const surfaceManualView = useRef<SurfaceManualCameraView | null>(null);
   const currentPosition = useRef(new Vector3());
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
@@ -240,8 +266,8 @@ export function CinematicCamera({
   const scratchNativeQuaternion = useRef(new Quaternion());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
-  const worldFrameReadyRef = useRef(worldFrameReady);
-  worldFrameReadyRef.current = worldFrameReady;
+  const worldFrameReadyRef = useRef(currentWorldFrameReady);
+  worldFrameReadyRef.current = currentWorldFrameReady;
 
   const handleControlsRef = useCallback(
     (controls: CameraControlsApi | null) => {
@@ -253,6 +279,10 @@ export function CinematicCamera({
 
   const manualCameraEnabled =
     phase === "system" || phase === "orbit" || phase === "surface";
+  const liveSurfaceScaleCamera =
+    !surfaceFallbackAvailable &&
+    worldScaleContinuous &&
+    worldScalePosition > 4 + WORLD_SCALE_EPSILON;
   const manualMinDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 1.28
@@ -261,17 +291,19 @@ export function CinematicCamera({
           ? 1e-8
           : 5
         : phase === "surface"
-          ? surfaceFallback
+          ? surfaceFallbackAvailable
             ? 8
             : 0.015
-          : 0.3;
+          : liveSurfaceScaleCamera
+            ? 0.015
+            : 0.3;
   const manualMaxDistance =
     phase === "orbit"
       ? PLANET_RENDER_RADIUS * 7
       : phase === "system"
         ? 55
         : phase === "surface"
-          ? surfaceFallback
+          ? surfaceFallbackAvailable
             ? 65
             : 1.4
           : 65;
@@ -369,15 +401,64 @@ export function CinematicCamera({
   );
 
   useEffect(() => {
-    if (!worldFrameReady) return;
+    if (!currentWorldFrameReady) return;
 
-    // Renderer readiness can become true before a throttled camera transition
-    // first reaches publishSettled() and writes the diagnostic awaiting marker.
-    // Treat readiness itself as the retry signal. publishIfReached() already
-    // guards transition generation, phase ownership, manual takeover,
-    // continuous-scale boundaries and position/target tolerances.
+    // Renderer readiness can win the race before publishSettled() writes the
+    // diagnostic awaiting marker. Readiness is the retry edge; publishIfReached
+    // already guards generation, phase ownership, manual takeover, scale
+    // boundaries and camera position/target tolerances.
     publishIfReached();
-  }, [publishIfReached, worldFrameReady]);
+  }, [currentWorldFrameReady, publishIfReached]);
+
+  const framedWorldDistance = useCallback(
+    (
+      controls: CameraControlsApi,
+      radius: number,
+      frameScale: number,
+    ) => {
+      const fitDistance = controls.getDistanceToFitSphere(radius);
+      if (
+        !(camera instanceof PerspectiveCamera) ||
+        viewportWidth <= 0 ||
+        viewportHeight <= 0
+      ) {
+        return fitDistance * frameScale;
+      }
+
+      // camera-controls correctly treats the narrow screen dimension as the
+      // hard no-clipping constraint. A constant multiplier on that distance,
+      // however, makes portrait worlds look much smaller than ultrawide worlds.
+      // Keep its fit distance as the safety floor, then choose a farther
+      // vertical-composition distance with an aspect-aware horizontal cap.
+      const aspect = viewportWidth / viewportHeight;
+      const preferredVerticalRadius = Math.min(0.26, 0.36 / frameScale);
+      const horizontalSafeVerticalRadius = Math.max(
+        0.16,
+        aspect * 0.44,
+      );
+      const targetVerticalRadius = Math.max(
+        0.16,
+        Math.min(
+          preferredVerticalRadius,
+          horizontalSafeVerticalRadius,
+        ),
+      );
+      const verticalFov = (camera.fov * Math.PI) / 180;
+      const verticalDistance =
+        Math.max(radius, 1e-8) /
+        Math.max(
+          2 *
+            targetVerticalRadius *
+            Math.tan(verticalFov / 2),
+          1e-8,
+        );
+
+      // Preserve a small safety margin over camera-controls' exact fit even
+      // when an unusually narrow viewport makes the horizontal constraint win.
+      return Math.max(fitDistance * 1.04, verticalDistance);
+    },
+    [camera, viewportHeight, viewportWidth],
+  );
 
   const publishScaleFrameDiagnostics = useCallback(
     (center: Vector3, radius: number) => {
@@ -411,6 +492,41 @@ export function CinematicCamera({
     [camera, viewportHeight],
   );
 
+  useEffect(() => {
+    const remembered = surfaceManualView.current;
+    if (
+      !remembered ||
+      (remembered.identity === surfaceIdentity &&
+        remembered.renderer === surfaceRendererMode)
+    ) {
+      return;
+    }
+    surfaceManualView.current = null;
+    delete document.documentElement.dataset.universeSurfaceManualView;
+  }, [surfaceIdentity, surfaceRendererMode]);
+
+  useFrame(() => {
+    if (
+      phase !== "surface" ||
+      !manualOverride.current ||
+      !surfaceIdentity
+    ) {
+      return;
+    }
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    controls.getPosition(currentPosition.current, false);
+    controls.getTarget(currentTarget.current, false);
+    surfaceManualView.current = {
+      identity: surfaceIdentity,
+      renderer: surfaceRendererMode,
+      position: currentPosition.current.toArray() as [number, number, number],
+      target: currentTarget.current.toArray() as [number, number, number],
+    };
+    document.documentElement.dataset.universeSurfaceManualView = "captured";
+  });
+
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
@@ -428,15 +544,62 @@ export function CinematicCamera({
   useEffect(() => {
     if (!manualCameraEnabled) return;
 
-    // Wheel belongs exclusively to the continuous-scale coordinator. Listen
-    // for an actual pointer/touch press instead of camera-controls' generic
-    // controlstart event so a wheel gesture can never be misclassified as a
-    // manual camera takeover and cancel an in-flight scale intent.
+    // Wheel belongs exclusively to the continuous-scale coordinator. A plain
+    // canvas click may select a planet/Surface signal, so pointerdown alone is
+    // not camera intent either. Keep camera-controls as the movement executor,
+    // but only supersede product navigation after the pointer has crossed a
+    // small drag threshold.
     const element = gl.domElement;
-    const handlePointerDown = () => handleUserControlStart();
+    const starts = new Map<number, { x: number; y: number }>();
+    let takeoverStarted = false;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.pointerType === "mouse" &&
+        event.button !== 0 &&
+        event.button !== 1
+      ) {
+        return;
+      }
+      starts.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (takeoverStarted) return;
+      const start = starts.get(event.pointerId);
+      if (!start) return;
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        starts.delete(event.pointerId);
+        return;
+      }
+
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (dx * dx + dy * dy < MANUAL_DRAG_THRESHOLD_SQ) return;
+
+      takeoverStarted = true;
+      handleUserControlStart();
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      starts.delete(event.pointerId);
+      if (starts.size === 0) takeoverStarted = false;
+    };
+
     element.addEventListener("pointerdown", handlePointerDown, true);
-    return () =>
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
+    return () => {
+      starts.clear();
       element.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerup", handlePointerEnd, true);
+      window.removeEventListener("pointercancel", handlePointerEnd, true);
+    };
   }, [gl, handleUserControlStart, manualCameraEnabled]);
 
   useEffect(() => {
@@ -658,9 +821,11 @@ export function CinematicCamera({
       );
       const endpointDistance = Math.max(
         1e-8,
-        controls.getDistanceToFitSphere(
+        framedWorldDistance(
+          controls,
           Math.max(systemScaleFrame.radius, 1e-8),
-        ) * (approachShot.frameScale ?? 1),
+          approachShot.frameScale ?? 1,
+        ),
       );
       const distance = Math.exp(
         Math.log(startDistance) * (1 - t) +
@@ -743,10 +908,27 @@ export function CinematicCamera({
               : "approach";
       const lowerPhase = phaseForIndex(lowerIndex);
       const upperPhase = phaseForIndex(upperIndex);
-      const surfaceShot =
+      const rememberedSurfaceView =
+        surfaceManualView.current?.identity === surfaceIdentity &&
+        surfaceManualView.current?.renderer === surfaceRendererMode
+          ? surfaceManualView.current
+          : null;
+      const defaultSurfaceShot =
         activeSurfaceCameraFrame && liveSurfaceShot
           ? liveSurfaceShot
           : SHOTS.surface;
+      const rememberedSurfaceBaseShot =
+        rememberedSurfaceView?.renderer === "fallback"
+          ? FALLBACK_SURFACE_SHOT
+          : defaultSurfaceShot;
+      const surfaceShot =
+        rememberedSurfaceView && rememberedSurfaceBaseShot
+          ? {
+              ...rememberedSurfaceBaseShot,
+              position: rememberedSurfaceView.position,
+              target: rememberedSurfaceView.target,
+            }
+          : defaultSurfaceShot;
       const lowerShot =
         lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
       const upperShot =
@@ -758,10 +940,11 @@ export function CinematicCamera({
         ...lowerShot.position,
       );
       if (lowerShot.frameScale) {
-        const distance =
-          controls.getDistanceToFitSphere(
-            lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          ) * lowerShot.frameScale;
+        const distance = framedWorldDistance(
+          controls,
+          lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          lowerShot.frameScale,
+        );
         fromPosition
           .sub(fromTarget)
           .normalize()
@@ -772,10 +955,11 @@ export function CinematicCamera({
       const toTarget = scratchToTarget.current.set(...upperShot.target);
       const toPosition = scratchToPosition.current.set(...upperShot.position);
       if (upperShot.frameScale) {
-        const distance =
-          controls.getDistanceToFitSphere(
-            upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          ) * upperShot.frameScale;
+        const distance = framedWorldDistance(
+          controls,
+          upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
+          upperShot.frameScale,
+        );
         toPosition
           .sub(toTarget)
           .normalize()
@@ -829,6 +1013,13 @@ export function CinematicCamera({
         lowerPhase + ":" + upperPhase;
       document.documentElement.dataset.universeScaleSegment =
         lowerPhase + ":" + upperPhase;
+      if (
+        rememberedSurfaceView &&
+        (lowerPhase === "surface" || upperPhase === "surface")
+      ) {
+        document.documentElement.dataset.universeSurfaceManualView =
+          "scale-endpoint";
+      }
       publishScaleFrameDiagnostics(
         scratchFrameCenter.current.set(...WORLD),
         PLANET_RENDER_RADIUS,
@@ -846,15 +1037,34 @@ export function CinematicCamera({
     delete document.documentElement.dataset.universeScaleCameraSegment;
     delete document.documentElement.dataset.universeScaleSegment;
 
-    const shot =
+    const rememberedSurfaceView =
+      surfaceManualView.current?.identity === surfaceIdentity &&
+      surfaceManualView.current?.renderer === surfaceRendererMode
+        ? surfaceManualView.current
+        : null;
+    const surfaceBaseShot =
       phase === "surface"
         ? surfaceFallback
           ? FALLBACK_SURFACE_SHOT
           : activeSurfaceCameraFrame
             ? liveSurfaceShot
             : null
-        : SHOTS[phase];
+        : null;
+    const shot =
+      phase === "surface" && rememberedSurfaceView && surfaceBaseShot
+        ? {
+            ...surfaceBaseShot,
+            position: rememberedSurfaceView.position,
+            target: rememberedSurfaceView.target,
+          }
+        : phase === "surface"
+          ? surfaceBaseShot
+          : SHOTS[phase];
     if (!shot) return;
+
+    if (phase === "surface" && rememberedSurfaceView) {
+      document.documentElement.dataset.universeSurfaceManualView = "restored";
+    }
 
     if (phase === "surface" && !surfaceFallback && activeSurfaceCameraFrame) {
       document.documentElement.dataset.universeSurfaceCameraApplied = "true";
@@ -871,10 +1081,11 @@ export function CinematicCamera({
     desiredTargetTolerance.current = shot.targetTolerance;
 
     if (shot.frameScale) {
+      const fitRadius = shot.fitRadius ?? PLANET_RENDER_RADIUS;
       const distance =
-        controls.getDistanceToFitSphere(
-          shot.fitRadius ?? PLANET_RENDER_RADIUS,
-        ) * shot.frameScale;
+        phase === "approach" || phase === "orbit"
+          ? framedWorldDistance(controls, fitRadius, shot.frameScale)
+          : controls.getDistanceToFitSphere(fitRadius) * shot.frameScale;
       if (phase === "system" && nativeSystemEntryQuaternion) {
         const forward = new Vector3(0, 0, -1)
           .applyQuaternion(nativeSystemEntryQuaternion)
@@ -1002,12 +1213,15 @@ export function CinematicCamera({
     softwareRenderer,
     surfaceFallback,
     surfaceFallbackAvailable,
+    surfaceIdentity,
+    surfaceRendererMode,
     systemScaleFrame,
     continuousSystemCamera,
     viewportHeight,
     viewportWidth,
     worldScaleContinuous,
     worldScalePosition,
+    framedWorldDistance,
     publishIfReached,
     publishScaleFrameDiagnostics,
   ]);
@@ -1066,6 +1280,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
       delete document.documentElement.dataset.universeSystemEntryView;
+      delete document.documentElement.dataset.universeSurfaceManualView;
     },
     [],
   );

@@ -119,12 +119,16 @@ export function SystemScene({
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string | null) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -137,6 +141,31 @@ export function SystemScene({
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      // Prototype System hides the target declaratively in this same commit.
+      // Publish the acknowledgement only after commit so close-world paint
+      // authority cannot outrun the actual duplicate-target removal.
+      html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+      onHandoffTargetSuppressed?.(handoffTargetPlanetId);
+    } else {
+      delete html.dataset.universeSystemTargetSuppressed;
+      onHandoffTargetSuppressed?.(null);
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemTargetSuppressed ===
+        handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemTargetSuppressed;
+      }
+      if (handoffTargetPlanetId) {
+        onHandoffTargetSuppressed?.(null);
+      }
+    };
+  }, [handoffTargetPlanetId, onHandoffTargetSuppressed]);
 
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
@@ -249,14 +278,16 @@ export function SystemScene({
           />
         </mesh>
 
-        {system.planets.map((planet, index) => (
-          <PlanetBody
-            key={planet.id}
-            planet={planet}
-            index={index}
-            onSelect={onSelectPlanet}
-          />
-        ))}
+        {system.planets.map((planet, index) =>
+          planet.id === handoffTargetPlanetId ? null : (
+            <PlanetBody
+              key={planet.id}
+              planet={planet}
+              index={index}
+              onSelect={onSelectPlanet}
+            />
+          ),
+        )}
       </group>
     </>
   );

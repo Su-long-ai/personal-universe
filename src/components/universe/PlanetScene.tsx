@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
@@ -12,6 +12,15 @@ import {
   type QualityMode,
 } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import {
+  buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldPaths,
+  rankSurfaceWorldRegions,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
@@ -29,12 +38,21 @@ const SURFACE_WORLD_NORMAL = new THREE.Vector3(
   -0.931211,
 ).normalize();
 const SURFACE_UP = new THREE.Vector3(0, 1, 0);
+const LIVE_SURFACE_LAYOUT_SCALE = 0.0085;
 
 function LiveSurfaceAnchor({
   planet,
+  profile,
+  expanded,
+  surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   onCameraFrame,
 }: {
   planet: Planet;
+  profile: SurfaceWorldProfile;
+  expanded: boolean;
+  surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   onCameraFrame: (frame: SurfaceCameraFrame | null) => void;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -58,6 +76,57 @@ function LiveSurfaceAnchor({
   useEffect(() => {
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-planets-live-surface";
+    document.documentElement.dataset.universeSurfaceProfile = profile.id;
+    document.documentElement.dataset.universeSurfaceBiome = profile.biome;
+    document.documentElement.dataset.universeSurfaceLandmarks =
+      String(profile.landmarks.length);
+    document.documentElement.dataset.universeSurfaceContentAnchors =
+      String(profile.contentAnchors.length);
+    document.documentElement.dataset.universeSurfaceContentClusters =
+      String(profile.contentClusters.length);
+    document.documentElement.dataset.universeSurfacePrimarySignals =
+      String(
+        profile.contentAnchors.filter(
+          (anchor) => anchor.priority === "primary",
+        ).length,
+      );
+    const focusedAnchor = profile.contentAnchors.find(
+      (anchor) => anchor.entryId === surfaceFocusEntryId,
+    );
+    if (focusedAnchor) {
+      document.documentElement.dataset.universeSurfaceFocusAnchor =
+        focusedAnchor.id;
+      document.documentElement.dataset.universeSurfaceFocusCluster =
+        String(focusedAnchor.cluster);
+      if (focusedAnchor.regionId) {
+        document.documentElement.dataset.universeSurfaceFocusRegion =
+          focusedAnchor.regionId;
+      } else {
+        delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      }
+      if (focusedAnchor.landmarkId) {
+        document.documentElement.dataset.universeSurfaceFocusLandmark =
+          focusedAnchor.landmarkId;
+        const focusedPath = profile.paths.find(
+          (path) => path.landmarkId === focusedAnchor.landmarkId,
+        );
+        if (focusedPath) {
+          document.documentElement.dataset.universeSurfaceFocusPath =
+            focusedPath.id;
+        } else {
+          delete document.documentElement.dataset.universeSurfaceFocusPath;
+        }
+      } else {
+        delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+        delete document.documentElement.dataset.universeSurfaceFocusPath;
+      }
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      delete document.documentElement.dataset.universeSurfaceFocusCluster;
+      delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+      delete document.documentElement.dataset.universeSurfaceFocusPath;
+    }
     return () => {
       if (
         document.documentElement.dataset.universeSurfaceRenderer ===
@@ -67,13 +136,28 @@ function LiveSurfaceAnchor({
       }
       delete document.documentElement.dataset.universeSurfaceAnchorReady;
       delete document.documentElement.dataset.universeSurfaceCameraFrame;
+      delete document.documentElement.dataset.universeSurfaceProfile;
+      delete document.documentElement.dataset.universeSurfaceBiome;
+      delete document.documentElement.dataset.universeSurfaceLandmarks;
+      delete document.documentElement.dataset.universeSurfaceContentAnchors;
+      delete document.documentElement.dataset.universeSurfaceContentClusters;
+      delete document.documentElement.dataset.universeSurfacePrimarySignals;
+      delete document.documentElement.dataset.universeSurfaceFocusAnchor;
+      delete document.documentElement.dataset.universeSurfaceFocusCluster;
+      delete document.documentElement.dataset.universeSurfaceFocusRegion;
+      delete document.documentElement.dataset.universeSurfaceFocusLandmark;
+      delete document.documentElement.dataset.universeSurfaceFocusPath;
       onCameraFrame(null);
     };
-  }, [onCameraFrame]);
+  }, [onCameraFrame, profile, surfaceFocusEntryId]);
 
   useFrame(() => {
-    if (!group.current) return;
+    if (!group.current || cameraFramePublished.current) return;
 
+    // PlanetScene locks rotation for the whole final 4->5 interval. The
+    // terrain-derived landing frame is therefore stable and only needs to be
+    // resolved once per anchor activation; crossing back to <=4 unmounts this
+    // anchor and a later inward pass resolves a fresh frame.
     planet.updateWorldMatrix(true, false);
     planet.getWorldPosition(scratch.center);
     planet.getWorldQuaternion(scratch.worldQuaternion);
@@ -129,17 +213,298 @@ function LiveSurfaceAnchor({
     document.documentElement.dataset.universeSurfaceAnchorReady = "true";
   });
 
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutTier = expanded
+      ? "full"
+      : "transition";
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutTier;
+    };
+  }, [expanded]);
+
+  const tangentPoint = (point: [number, number]): [number, number, number] => [
+    (point[0] - profile.landing[0]) * LIVE_SURFACE_LAYOUT_SCALE,
+    0,
+    (point[1] - profile.landing[1]) * LIVE_SURFACE_LAYOUT_SCALE,
+  ];
+  const rankedContent = useMemo(
+    () =>
+      rankSurfaceContentAnchors(
+        profile.contentAnchors,
+        surfaceFocusEntryId,
+      ),
+    [profile.contentAnchors, surfaceFocusEntryId],
+  );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === surfaceFocusEntryId) ??
+    null;
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const rankedLandmarks = useMemo(() => {
+    const baseLandmarks = expanded
+      ? profile.landmarks
+      : [...profile.landmarks].sort(
+          (a, b) => b.prominence - a.prominence,
+        );
+    return rankSurfaceWorldLandmarks(
+      baseLandmarks,
+      focusedAnchor?.landmarkId ?? null,
+    );
+  }, [expanded, focusedAnchor?.landmarkId, profile.landmarks]);
+  const rankedPaths = useMemo(
+    () =>
+      rankSurfaceWorldPaths(
+        profile.paths,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.paths],
+  );
+  const visiblePaths = expanded
+    ? rankedPaths.slice(0, 4)
+    : rankedPaths.slice(0, 1);
+  const visibleRegions = expanded ? rankedRegions.slice(0, 4) : [];
+  const visibleLandmarks = expanded
+    ? rankedLandmarks.slice(0, 6)
+    : rankedLandmarks.slice(0, 2);
+  const visibleContent = expanded
+    ? rankedContent.slice(0, 6)
+    : rankedContent.slice(0, 1);
+  const rankedClusters = useMemo(
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
+  );
+  const visibleClusters = expanded
+    ? rankedClusters.slice(0, 3)
+    : rankedClusters.slice(0, 1);
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceLayoutSignals =
+      String(visibleContent.length);
+    document.documentElement.dataset.universeSurfaceLayoutClusters =
+      String(visibleClusters.length);
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      expanded ? visibleContent.length : 0,
+    );
+    return () => {
+      delete document.documentElement.dataset.universeSurfaceLayoutSignals;
+      delete document.documentElement.dataset.universeSurfaceLayoutClusters;
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
+    };
+  }, [profile.id, expanded, visibleContent.length, visibleClusters.length]);
+
   return (
     <group ref={group} name="live-surface-anchor">
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
-        <ringGeometry args={[0.035, 0.065, 28]} />
-        <meshBasicMaterial
-          color="#76e6ff"
-          transparent
-          opacity={0.24}
-          depthWrite={false}
-        />
-      </mesh>
+      <group position={[0, -0.024, 0]} name="live-surface-product-layout">
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+          <ringGeometry args={[0.035, 0.065, 28]} />
+          <meshBasicMaterial
+            color={profile.accent}
+            transparent
+            opacity={0.32}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {visiblePaths.map((path) => {
+          const from = tangentPoint(path.from);
+          const to = tangentPoint(path.to);
+          const dx = to[0] - from[0];
+          const dz = to[2] - from[2];
+          const length = Math.hypot(dx, dz);
+          const focused = path.landmarkId === focusedAnchor?.landmarkId;
+          return (
+            <mesh
+              key={path.id}
+              position={[(from[0] + to[0]) * 0.5, 0.004, (from[2] + to[2]) * 0.5]}
+              rotation={[0, Math.atan2(dx, dz), 0]}
+            >
+              <boxGeometry
+                args={[
+                  Math.max(
+                    0.0013,
+                    path.width *
+                      LIVE_SURFACE_LAYOUT_SCALE *
+                      (focused ? 1.35 : 1),
+                  ),
+                  0.0011,
+                  length,
+                ]}
+              />
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={focused ? 0.46 : 0.2}
+                depthWrite={false}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleClusters.map((cluster) => {
+          const point = tangentPoint(cluster.center);
+          const focused = focusedAnchor?.cluster === cluster.index;
+          const radius =
+            (cluster.priority === "primary"
+              ? 0.014
+              : cluster.priority === "secondary"
+                ? 0.011
+                : 0.009) * (focused ? 1.2 : 1);
+          return (
+            <mesh
+              key={cluster.id}
+              position={[point[0], 0.005, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius, radius + 0.0014, 20]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  focused
+                    ? 0.46
+                    : cluster.priority === "primary"
+                      ? 0.34
+                      : cluster.priority === "secondary"
+                        ? 0.22
+                        : 0.14
+                }
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleRegions.map((region) => {
+          const point = tangentPoint(region.center);
+          const focused = region.id === focusedAnchor?.regionId;
+          const radius =
+            Math.max(
+              0.009,
+              region.radius * LIVE_SURFACE_LAYOUT_SCALE * 0.16,
+            ) * (focused ? 1.12 : 1);
+          return (
+            <mesh
+              key={region.id}
+              position={[point[0], 0.0045, point[2]]}
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <ringGeometry args={[radius * 0.68, radius, 20]} />
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={focused ? 0.32 : 0.14}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleLandmarks.map((landmark) => {
+          const point = tangentPoint(landmark.position);
+          const focused = landmark.id === focusedAnchor?.landmarkId;
+          const scale =
+            (0.006 + landmark.scale * 0.0045) * (focused ? 1.16 : 1);
+          return (
+            <mesh
+              key={landmark.id}
+              position={[point[0], 0.006 + scale * 0.7, point[2]]}
+              scale={[scale, scale * 1.9, scale]}
+            >
+              {landmark.kind === "crater" || landmark.kind === "basin" ? (
+                <torusGeometry args={[0.7, 0.14, 5, 12]} />
+              ) : landmark.kind === "ridge" ? (
+                <boxGeometry args={[1.15, 0.4, 0.38]} />
+              ) : (
+                <coneGeometry args={[0.55, 1.4, 6]} />
+              )}
+              <meshBasicMaterial
+                color={focused ? "#fff0cf" : profile.accent}
+                transparent
+                opacity={
+                  focused
+                    ? 0.84
+                    : 0.36 + landmark.prominence * 0.28
+                }
+              />
+            </mesh>
+          );
+        })}
+
+        {visibleContent.map((anchor) => {
+          const point = tangentPoint(anchor.position);
+          const focused = anchor.entryId === surfaceFocusEntryId;
+          const priorityScale = focused
+            ? 1.38
+            : anchor.priority === "primary"
+              ? 1.25
+              : anchor.priority === "secondary"
+                ? 1
+                : 0.82;
+          return (
+            <group
+              key={anchor.id}
+              name={`surface-signal-${anchor.id}`}
+              userData={{ surfaceEntryId: anchor.entryId }}
+              position={[point[0], 0.009, point[2]]}
+              scale={priorityScale}
+              onClick={
+                expanded
+                  ? (event) => {
+                      event.stopPropagation();
+                      onSurfaceFocusEntry(anchor.entryId);
+                    }
+                  : undefined
+              }
+            >
+              {expanded ? (
+                <mesh
+                  name={`surface-signal-hit-${anchor.id}`}
+                  position={[0, 0.008, 0]}
+                >
+                  <sphereGeometry args={[0.011, 8, 6]} />
+                  <meshBasicMaterial
+                    transparent
+                    opacity={0}
+                    depthWrite={false}
+                  />
+                </mesh>
+              ) : null}
+              <mesh scale={[0.003, 0.011, 0.003]}>
+                <cylinderGeometry args={[1, 1, 1, 6]} />
+                <meshBasicMaterial
+                  color={profile.accent}
+                  transparent
+                  opacity={
+                    focused || anchor.priority === "primary" ? 1 : 0.78
+                  }
+                />
+              </mesh>
+              <mesh position={[0, 0.014, 0]}>
+                <octahedronGeometry args={[0.0038, 0]} />
+                <meshBasicMaterial
+                  color={
+                    focused || anchor.priority === "primary"
+                      ? "#fff0cf"
+                      : "#ffffff"
+                  }
+                />
+              </mesh>
+            </group>
+          );
+        })}
+      </group>
     </group>
   );
 }
@@ -419,49 +784,51 @@ function DeepSky() {
   );
 }
 
-function liveQuality(
-  quality: QualityMode,
+type LiveQualityMode = Exclude<QualityMode, "low">;
+
+function liveStructuralQuality(
+  quality: LiveQualityMode,
   softwareRenderer: boolean,
 ) {
-  if (quality === "low") {
+  if (softwareRenderer) {
     return {
-      cloudQuality: 32,
-      cloudResolution: 0.35,
       chunkRes: 16,
       maxDepth: 4,
-      splitFactor: 2.1,
     } as const;
   }
 
-  // HIGH remains a live ProceduralPlanets renderer under SwiftShader, but
-  // software rasterizers get a conservative terrain budget so hosted Linux
-  // can reach a stable landing frame without starving browser teardown.
+  return quality === "high"
+    ? ({ chunkRes: 32, maxDepth: 6 } as const)
+    : ({ chunkRes: 24, maxDepth: 5 } as const);
+}
+
+function liveDynamicQuality(
+  quality: LiveQualityMode,
+  softwareRenderer: boolean,
+) {
+  // chunkRes/maxDepth are deliberately excluded: ProceduralPlanets marks them
+  // as REBUILD_KEYS and Planet.set() would rebuild every LOD chunk. Structural
+  // quality is monotonic (AUTO -> HIGH at most once) while these non-structural
+  // knobs may follow the active live profile without replacing the Planet.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
-      chunkRes: 16,
-      maxDepth: 5,
-      splitFactor: 2.3,
+      splitFactor: 2.1,
     } as const;
   }
 
-  if (quality === "high") {
-    return {
-      cloudQuality: 72,
-      cloudResolution: 0.6,
-      chunkRes: 32,
-      maxDepth: 6,
-      splitFactor: 2.7,
-    } as const;
-  }
-  return {
-    cloudQuality: 56,
-    cloudResolution: 0.5,
-    chunkRes: 24,
-    maxDepth: 5,
-    splitFactor: 2.4,
-  } as const;
+  return quality === "high"
+    ? ({
+        cloudQuality: 72,
+        cloudResolution: 0.6,
+        splitFactor: 2.7,
+      } as const)
+    : ({
+        cloudQuality: 56,
+        cloudResolution: 0.5,
+        splitFactor: 2.4,
+      } as const);
 }
 
 export function PlanetScene({
@@ -470,16 +837,26 @@ export function PlanetScene({
   phase,
   worldScalePosition,
   presentationActive = true,
-  onPaintReady,
+  surfaceFocusEntryId,
+  onSurfaceFocusEntry,
+  surfaceFallbackReady = false,
+  onPaintStartedChange,
+  onPaintReadyChange,
   onSurfaceCameraFrame,
+  onBeforeLivePlanetDispose,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
   phase: UniversePhase;
   worldScalePosition: number;
   presentationActive?: boolean;
-  onPaintReady?: () => void;
+  surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
+  surfaceFallbackReady?: boolean;
+  onPaintStartedChange?: (started: boolean) => void;
+  onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
+  onBeforeLivePlanetDispose?: (planet: Planet) => void;
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
@@ -492,31 +869,83 @@ export function PlanetScene({
     [],
   );
   const softwareRenderer = isSoftwareRenderer(gl);
-  const fallbackReason = liveWorldFallbackReason(gl, quality);
-  const fallbackSurfaceTexture = useMemo(
-    () =>
-      fallbackReason === "software-renderer"
-        ? createFallbackSurfaceTexture(planet)
-        : null,
-    [fallbackReason, planet.archetype, planet.seed],
+  const surfaceProfile = useMemo(
+    () => buildSurfaceWorldProfile(planet),
+    [planet],
   );
-  const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
+  const fallbackReason = liveWorldFallbackReason(gl, quality);
+  const fallbackSurfaceOwnsPresentation =
+    phase === "surface" &&
+    Boolean(fallbackReason) &&
+    surfaceFallbackReady;
+  const worldPresentationActive =
+    presentationActive && !fallbackSurfaceOwnsPresentation;
+  const fallbackSurfaceTexture = useMemo(() => {
+    if (!softwareRenderer) return null;
+    const texture = createFallbackSurfaceTexture(planet);
+    const html = document.documentElement;
+    html.dataset.universeWorldFallbackTextureAllocations = String(
+      Number(html.dataset.universeWorldFallbackTextureAllocations ?? "0") + 1,
+    );
+    return texture;
+  }, [softwareRenderer, planet.archetype, planet.seed]);
+  const fallbackSurfaceMap =
+    fallbackReason === "software-renderer"
+      ? fallbackSurfaceTexture
+      : null;
+  const liveKey = `${planet.id}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
-  const liveEnabled = warmedKey === liveKey && !fallbackReason;
+  const initialLiveStructureTier = useRef<"auto" | "high" | "software">(
+    softwareRenderer ? "software" : "auto",
+  );
+  const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
+  const paintStartedReported = useRef(false);
   const paintReported = useRef(false);
+  const lastLiveDrawFrame = useRef(0);
+  const appliedLiveProfile = useRef<{
+    planet: Planet;
+    key: "gpu-auto" | "gpu-high" | "software-high";
+  } | null>(null);
+  const liveStructure = useRef<{
+    planet: Planet;
+    tier: "auto" | "high" | "software";
+  } | null>(null);
+  const onPaintStartedChangeRef = useRef(onPaintStartedChange);
+  onPaintStartedChangeRef.current = onPaintStartedChange;
+  const onPaintReadyChangeRef = useRef(onPaintReadyChange);
+  onPaintReadyChangeRef.current = onPaintReadyChange;
+
+  const publishPaintStarted = useCallback((started: boolean) => {
+    if (paintStartedReported.current === started) return;
+    paintStartedReported.current = started;
+    if (started) {
+      document.documentElement.dataset.universeWorldPaintStarted = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldPaintStarted;
+    }
+    onPaintStartedChangeRef.current?.(started);
+  }, []);
+
+  const publishPaintReady = useCallback((ready: boolean) => {
+    if (paintReported.current === ready) return;
+    paintReported.current = ready;
+    // This is renderer-local readiness only. UniverseCanvas publishes the
+    // product paint-ready authority after any System target transfer has
+    // actually been acknowledged by the active System renderer.
+    onPaintReadyChangeRef.current?.(ready);
+  }, []);
 
   useEffect(() => {
-    if (fallbackReason) return;
+    if (fallbackReason || warmedKey === liveKey) return;
 
-    // Hidden System prewarm is useful on a real GPU, where constructing the
-    // live ProceduralPlanets world can happen without stalling the scale
-    // gesture. On software WebGL, doing that same heavy construction while
-    // the visitor is still inside System blocks input. Keep the lightweight
-    // scene/pipeline mounted there, then start the live world only once the
-    // close-world presentation becomes active; UniverseCanvas retains the
-    // matched System frame until this world has painted.
-    if (softwareRenderer && phase === "system" && !presentationActive) {
+    // Hidden prewarm is useful on a real GPU, where constructing the live
+    // ProceduralPlanets world can happen without stalling the scale gesture.
+    // On software WebGL, never begin a new heavy Planet while presentation is
+    // hidden (System prewarm or a parked Galaxy target). An already-warmed
+    // instance exits above via warmedKey and remains retained; a missing one
+    // starts only when the close-world presentation actually asks for it.
+    if (softwareRenderer && !presentationActive) {
       return;
     }
 
@@ -529,7 +958,13 @@ export function PlanetScene({
     const idleWindow = window as IdleWindow;
 
     const enableLive = () => {
-      if (!cancelled) setWarmedKey(liveKey);
+      if (cancelled) return;
+      initialLiveStructureTier.current = softwareRenderer
+        ? "software"
+        : quality === "high"
+          ? "high"
+          : "auto";
+      setWarmedKey(liveKey);
     };
 
     firstFrame = window.requestAnimationFrame(() => {
@@ -563,26 +998,99 @@ export function PlanetScene({
     liveKey,
     phase,
     presentationActive,
+    quality,
     softwareRenderer,
+    warmedKey,
   ]);
 
   const livePlanet = useMemo(() => {
-    if (!liveEnabled) return null;
-    return new Planet({
+    if (!liveProvisioned) return null;
+    const initialTier = initialLiveStructureTier.current;
+    const initialMode: LiveQualityMode =
+      initialTier === "high" ? "high" : "auto";
+    const nextPlanet = new Planet({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      ...liveQuality(quality, softwareRenderer),
+      // Construct directly at the quality that actually triggered warmup.
+      // Direct HIGH therefore avoids an AUTO -> HIGH structural rebuild,
+      // while an AUTO-first world can still promote exactly once later.
+      ...liveStructuralQuality(initialMode, softwareRenderer),
+      ...liveDynamicQuality(initialMode, softwareRenderer),
     });
-  }, [liveEnabled, planet, quality, softwareRenderer, sunDirection]);
+    const html = document.documentElement;
+    html.dataset.universeWorldPlanetAllocations = String(
+      Number(html.dataset.universeWorldPlanetAllocations ?? "0") + 1,
+    );
+    return nextPlanet;
+  }, [liveProvisioned, planet, softwareRenderer, sunDirection]);
 
   useEffect(() => {
     return () => {
+      if (livePlanet) onBeforeLivePlanetDispose?.(livePlanet);
       livePlanet?.dispose();
     };
-  }, [livePlanet]);
+  }, [livePlanet, onBeforeLivePlanetDispose]);
+
+  useEffect(() => {
+    if (!livePlanet || fallbackReason) {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
+      return;
+    }
+
+    const liveMode = quality === "high" ? "high" : "auto";
+    const profileKey = softwareRenderer
+      ? "software-high"
+      : (`gpu-${liveMode}` as "gpu-auto" | "gpu-high");
+    const applied = appliedLiveProfile.current;
+
+    const currentStructure = liveStructure.current;
+    if (currentStructure?.planet !== livePlanet) {
+      liveStructure.current = {
+        planet: livePlanet,
+        tier: initialLiveStructureTier.current,
+      };
+    }
+
+    if (
+      !softwareRenderer &&
+      liveMode === "high" &&
+      liveStructure.current?.tier !== "high"
+    ) {
+      // The package marks chunkRes/maxDepth as structural rebuild keys. Promote
+      // once, then never demote this Planet, so repeated quality toggles cannot
+      // keep throwing away and recreating the LOD world.
+      livePlanet.set(liveStructuralQuality("high", false));
+      liveStructure.current = { planet: livePlanet, tier: "high" };
+      const html = document.documentElement;
+      html.dataset.universeWorldStructuralPromotions = String(
+        Number(html.dataset.universeWorldStructuralPromotions ?? "0") + 1,
+      );
+    }
+
+    if (applied?.planet !== livePlanet || applied.key !== profileKey) {
+      livePlanet.set(liveDynamicQuality(liveMode, softwareRenderer));
+      appliedLiveProfile.current = {
+        planet: livePlanet,
+        key: profileKey,
+      };
+      const html = document.documentElement;
+      html.dataset.universeWorldLiveProfileUpdates = String(
+        Number(html.dataset.universeWorldLiveProfileUpdates ?? "0") + 1,
+      );
+    }
+    document.documentElement.dataset.universeWorldLiveProfile = profileKey;
+    document.documentElement.dataset.universeWorldLiveStructure =
+      liveStructure.current?.tier ?? "auto";
+
+    return () => {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
+    };
+  }, [fallbackReason, livePlanet, quality, softwareRenderer]);
 
   useEffect(
     () => () => {
@@ -594,31 +1102,69 @@ export function PlanetScene({
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
+      worldPresentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
     return () => {
+      publishPaintStarted(false);
+      publishPaintReady(false);
       delete document.documentElement.dataset.universeWorldSceneReady;
       delete document.documentElement.dataset.universeWorldSceneLifecycle;
+      delete document.documentElement.dataset.universeWorldCapability;
     };
-  }, []);
+  }, [publishPaintReady, publishPaintStarted]);
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
-    if (!presentationActive) {
-      paintedFrames.current = 0;
-      paintReported.current = false;
-      delete document.documentElement.dataset.universeWorldPaintReady;
-    }
-  }, [presentationActive]);
+      worldPresentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
+  }, [phase, presentationActive, worldPresentationActive]);
 
   useEffect(() => {
-    const mode = livePlanet
-      ? "procedural-planets-live"
-      : fallbackReason
-        ? `procedural-planets-fallback-${fallbackReason}`
+    const capability = fallbackReason
+      ? `fallback-${fallbackReason}`
+      : "procedural-planets-live";
+    document.documentElement.dataset.universeWorldCapability = capability;
+
+    // First-paint readiness is valid only for the currently visible renderer
+    // identity. Hiding the world for the System endpoint, changing quality, or
+    // selecting another planet invalidates the old paint even if the retained
+    // resource instance can be reused underneath.
+    paintedFrames.current = 0;
+    lastLiveDrawFrame.current = Number(
+      document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+    );
+    publishPaintStarted(false);
+    publishPaintReady(false);
+
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldCapability === capability
+      ) {
+        delete document.documentElement.dataset.universeWorldCapability;
+      }
+    };
+  }, [
+    fallbackReason,
+    liveKey,
+    worldPresentationActive,
+    publishPaintReady,
+    publishPaintStarted,
+  ]);
+
+  useEffect(() => {
+    const mode = fallbackReason
+      ? `procedural-planets-fallback-${fallbackReason}`
+      : livePlanet
+        ? "procedural-planets-live"
         : "procedural-planets-warmup";
     document.documentElement.dataset.universeWorldRenderer = mode;
-    if (fallbackSurfaceTexture) {
+    if (fallbackSurfaceMap) {
       document.documentElement.dataset.universeWorldFallbackSurface =
         "generated-texture";
     } else {
@@ -632,42 +1178,85 @@ export function PlanetScene({
       }
       delete document.documentElement.dataset.universeWorldFallbackSurface;
     };
-  }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
+  }, [fallbackReason, fallbackSurfaceMap, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
-    if (livePlanet && phase !== "surface") {
+    // Freeze the live planet for the entire final Atmosphere->Surface
+    // interval, not only after the semantic Surface boundary. LiveSurfaceAnchor
+    // publishes one terrain-derived landing frame as soon as position > 4; if
+    // the body kept rotating after that publication, the rendered patch would
+    // drift away from the camera frame during the remainder of 4->5. Reversal
+    // below/equal 4 resumes rotation from the exact frozen orientation.
+    if (
+      worldPresentationActive &&
+      livePlanet &&
+      !fallbackReason &&
+      phase !== "surface" &&
+      worldScalePosition <= 4
+    ) {
       livePlanet.rotation.y += delta * 0.014;
     }
 
+    // Retained worlds stay mounted through System/Galaxy so their resources
+    // survive reversal, but a parked renderer has no paint authority. Avoid
+    // polling pipeline/profile DOM state on every hidden frame.
+    if (!worldPresentationActive) return;
+
+    const expectedLiveProfile = softwareRenderer
+      ? "software-high"
+      : quality === "high"
+        ? "gpu-high"
+        : "gpu-auto";
+    const concreteRendererReady =
+      Boolean(fallbackReason) ||
+      (Boolean(livePlanet) &&
+        document.documentElement.dataset.universeWorldPipeline ===
+          "procedural-planets-pass" &&
+        document.documentElement.dataset.universeWorldLiveProfile ===
+          expectedLiveProfile);
+
     if (
-      presentationActive &&
+      worldPresentationActive &&
       !paintReported.current &&
-      (Boolean(fallbackReason) || Boolean(livePlanet))
+      concreteRendererReady
     ) {
-      paintedFrames.current += 1;
+      if (fallbackReason) {
+        // The lightweight fallback is part of the ordinary R3F render, so two
+        // presented frames are enough to hand off from System.
+        paintedFrames.current += 1;
+      } else {
+        // Live authority comes only from PlanetRenderer itself. The pipeline
+        // publishes this counter after a frame where a planet was actually
+        // drawn and no shader/program work remained pending. Because this
+        // component runs before the priority-1 pipeline frame, seeing a new
+        // stamp here proves the previous browser frame really contained the
+        // matched live world.
+        const liveDrawFrame = Number(
+          document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+        );
+        if (liveDrawFrame > lastLiveDrawFrame.current) {
+          lastLiveDrawFrame.current = liveDrawFrame;
+          paintedFrames.current += 1;
+        } else {
+          paintedFrames.current = 0;
+        }
+      }
+
+      if (paintedFrames.current >= 1) {
+        publishPaintStarted(true);
+      }
       if (paintedFrames.current >= 2) {
-        paintReported.current = true;
-        document.documentElement.dataset.universeWorldPaintReady = "true";
-        onPaintReady?.();
+        publishPaintReady(true);
       }
     }
   });
 
-  if (phase === "surface" && fallbackReason) {
-    // UniverseCanvas owns the longer-lived fallback SurfaceScene. Keeping
-    // that host mounted across phase changes prevents FiniteTerrain.dispose()
-    // from landing on the Surface -> Atmosphere input-critical path.
-    return null;
-  }
-
   return (
     <>
-      {presentationActive ? (
+      {worldPresentationActive ? (
         <color attach="background" args={["#000106"]} />
       ) : null}
-      <group visible={presentationActive}>
+      <group visible={worldPresentationActive}>
       <DeepSky />
       <Stars
         radius={78}
@@ -706,11 +1295,11 @@ export function PlanetScene({
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
             color={
-              fallbackSurfaceTexture
+              fallbackSurfaceMap
                 ? "#ffffff"
                 : fallbackColor(planet.archetype)
             }
-            map={fallbackSurfaceTexture}
+            map={fallbackSurfaceMap}
             roughness={0.82}
             metalness={0.02}
           />
@@ -718,14 +1307,22 @@ export function PlanetScene({
         {livePlanet ? (
           <primitive
             object={livePlanet}
+            visible={!fallbackReason}
             scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
           />
         ) : null}
       </group>
 
-      {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
+      {(phase === "surface" || worldScalePosition > 4) &&
+      planet.surfaceMode !== "none" &&
+      livePlanet &&
+      !fallbackReason ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
+          profile={surfaceProfile}
+          expanded={phase === "surface"}
+          surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={onSurfaceFocusEntry}
           onCameraFrame={onSurfaceCameraFrame}
         />
       ) : null}

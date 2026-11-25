@@ -23,6 +23,11 @@ import {
 } from "../../lib/universe/generation";
 import { useAmbientAudio } from "../../lib/universe/useAmbientAudio";
 import {
+  buildSurfaceWorldProfile,
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+} from "../../lib/universe/surface";
+import {
   attachContentToSystem,
   placeUniverseContent,
   placementsForMarker,
@@ -31,7 +36,6 @@ import {
 import {
   CONTINUOUS_SCALE_ACTIVE_RESET_MS,
   CONTINUOUS_SCALE_RESET_MS,
-  CONTINUOUS_SCALE_WHEEL_THRESHOLD,
   GALAXY_SCALE_MIN,
   SYSTEM_SCALE_MIN,
   WORLD_SCALE_EPSILON,
@@ -39,14 +43,12 @@ import {
   applyGalaxyScaleWheel,
   applySystemScaleWheel,
   applyWorldScaleWheel,
-  continuousScaleDelta,
   continuousScaleDirection,
   continuousScaleInputResponseDelta,
   continuousScaleResponseDistance,
   normalizeWheelDelta,
   galaxyScaleSegmentProgress,
   isWorldScalePhase,
-  nextWorldScalePhase,
   scalePhaseIndex,
   scalePositionForPhase,
   systemScaleSegmentProgress,
@@ -208,10 +210,12 @@ function cameraTargetLabel(
 function scheduleScaleRendererHandoff({
   label,
   isCurrent,
+  isRendererReady,
   commit,
 }: {
   label: string;
   isCurrent: () => boolean;
+  isRendererReady?: () => boolean;
   commit: () => void;
 }) {
   let completed = false;
@@ -219,27 +223,61 @@ function scheduleScaleRendererHandoff({
   let secondFrame = 0;
   let deadline = 0;
 
+  const clearScheduledWork = () => {
+    if (firstFrame) {
+      window.cancelAnimationFrame(firstFrame);
+      firstFrame = 0;
+    }
+    if (secondFrame) {
+      window.cancelAnimationFrame(secondFrame);
+      secondFrame = 0;
+    }
+    if (deadline) {
+      window.clearTimeout(deadline);
+      deadline = 0;
+    }
+  };
+
   const finish = (source: "paint" | "deadline") => {
     if (completed) return;
-    completed = true;
-    if (firstFrame) window.cancelAnimationFrame(firstFrame);
-    if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    if (deadline) window.clearTimeout(deadline);
+    if (!isCurrent()) {
+      completed = true;
+      clearScheduledWork();
+      return;
+    }
 
-    if (!isCurrent()) return;
+    if (isRendererReady && !isRendererReady()) {
+      clearScheduledWork();
+      document.documentElement.dataset.universeScaleHandoff =
+        label + ":awaiting-renderer";
+      secondFrame = window.requestAnimationFrame(() => {
+        secondFrame = 0;
+        finish("paint");
+      });
+      return;
+    }
+
+    completed = true;
+    clearScheduledWork();
     document.documentElement.dataset.universeScaleHandoff =
       label + ":" + source;
     commit();
   };
 
-  // Two rAF callbacks preserve one real endpoint paint on a healthy renderer.
-  // Hosted/software WebGL can stop delivering rAF while the browser still
-  // accepts wheel events, so do not let that presentation preference become
-  // an input lock. The matched endpoints are already composition-equivalent.
+  // Two frames preserve a real endpoint paint. Boundaries without an explicit
+  // renderer-ready signal may still use the deadline; native boundaries that
+  // do expose one can only commit after that authority has applied the endpoint.
   firstFrame = window.requestAnimationFrame(() => {
-    secondFrame = window.requestAnimationFrame(() => finish("paint"));
+    firstFrame = 0;
+    secondFrame = window.requestAnimationFrame(() => {
+      secondFrame = 0;
+      finish("paint");
+    });
   });
-  deadline = window.setTimeout(() => finish("deadline"), 64);
+  deadline = window.setTimeout(() => {
+    deadline = 0;
+    finish("deadline");
+  }, 64);
 }
 
 function scaleSystemDestinationForMarker(
@@ -273,6 +311,162 @@ export default function UniverseApp({
   const selectedSystemRef = useRef<SystemDefinition | null>(null);
   selectedSystemRef.current = selectedSystem;
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetDefinition | null>(null);
+  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
+    null,
+  );
+  const [surfaceLocalFocusEntryId, setSurfaceLocalFocusEntryId] = useState<
+    string | null
+  >(null);
+  const surfaceNavigationFocusEntryId = useMemo(() => {
+    if (!selectedPlanet || !activeDestinationId?.startsWith("personal:")) {
+      return null;
+    }
+    const entryId = activeDestinationId.slice("personal:".length);
+    return selectedPlanet.content?.some((entry) => entry.id === entryId)
+      ? entryId
+      : null;
+  }, [activeDestinationId, selectedPlanet]);
+  const surfaceFocusEntryId = useMemo(() => {
+    if (
+      surfaceLocalFocusEntryId &&
+      selectedPlanet?.content?.some(
+        (entry) => entry.id === surfaceLocalFocusEntryId,
+      )
+    ) {
+      return surfaceLocalFocusEntryId;
+    }
+    return surfaceNavigationFocusEntryId;
+  }, [
+    selectedPlanet,
+    surfaceLocalFocusEntryId,
+    surfaceNavigationFocusEntryId,
+  ]);
+
+  useEffect(() => {
+    // Local Surface exploration can survive Atmosphere/Surface round trips,
+    // but a new product navigation destination must regain authority even when
+    // it resolves to another signal on the same world.
+    setSurfaceLocalFocusEntryId(null);
+  }, [activeDestinationId, selectedPlanet?.id]);
+
+  useEffect(() => {
+    if (surfaceFocusEntryId) {
+      document.documentElement.dataset.universeSurfaceFocusEntry =
+        surfaceFocusEntryId;
+      document.documentElement.dataset.universeSurfaceFocusSource =
+        surfaceLocalFocusEntryId === surfaceFocusEntryId
+          ? "surface-selection"
+          : "navigation";
+    } else {
+      delete document.documentElement.dataset.universeSurfaceFocusEntry;
+      delete document.documentElement.dataset.universeSurfaceFocusSource;
+    }
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceFocusEntry ===
+        surfaceFocusEntryId
+      ) {
+        delete document.documentElement.dataset.universeSurfaceFocusEntry;
+        delete document.documentElement.dataset.universeSurfaceFocusSource;
+      }
+    };
+  }, [surfaceFocusEntryId, surfaceLocalFocusEntryId]);
+
+  const surfaceProfile = useMemo(
+    () =>
+      selectedPlanet && selectedPlanet.surfaceMode !== "none"
+        ? buildSurfaceWorldProfile(selectedPlanet)
+        : null,
+    [selectedPlanet],
+  );
+  const surfaceFocusedAnchor = useMemo(
+    () =>
+      surfaceProfile?.contentAnchors.find(
+        (anchor) => anchor.entryId === surfaceFocusEntryId,
+      ) ?? null,
+    [surfaceFocusEntryId, surfaceProfile],
+  );
+  const surfaceContentPresentation = useMemo(() => {
+    if (!surfaceProfile) {
+      return new Map<
+        string,
+        {
+          location: string;
+          cluster: string;
+          priority: "primary" | "secondary" | "ambient";
+        }
+      >();
+    }
+    const landmarkNames = new Map(
+      surfaceProfile.landmarks.map((landmark) => [landmark.id, landmark.name]),
+    );
+    const regionNames = new Map(
+      surfaceProfile.regions.map((region) => [region.id, region.name]),
+    );
+    const clusterLabels = new Map(
+      surfaceProfile.contentClusters.map((cluster) => [
+        cluster.index,
+        cluster.label,
+      ]),
+    );
+    return new Map(
+      surfaceProfile.contentAnchors.map((anchor) => [
+        anchor.entryId,
+        {
+          location:
+            (anchor.landmarkId && landmarkNames.get(anchor.landmarkId)) ||
+            (anchor.regionId && regionNames.get(anchor.regionId)) ||
+            surfaceProfile.biome,
+          cluster:
+            clusterLabels.get(anchor.cluster) ?? surfaceProfile.biome,
+          priority: anchor.priority,
+        },
+      ]),
+    );
+  }, [surfaceProfile]);
+  const worldContentEntries = useMemo(() => {
+    const entries = selectedPlanet?.content ?? [];
+    if (!surfaceProfile) return entries;
+
+    const rank = new Map(
+      rankSurfaceContentAnchors(
+        surfaceProfile.contentAnchors,
+        surfaceFocusEntryId,
+      ).map((anchor, index) => [anchor.entryId, index]),
+    );
+    return [...entries].sort(
+      (a, b) =>
+        (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title),
+    );
+  }, [selectedPlanet, surfaceFocusEntryId, surfaceProfile]);
+  const surfaceClusterLeadEntries = useMemo(() => {
+    const leads = new Map<number, string>();
+    if (!surfaceProfile) return leads;
+
+    for (const anchor of rankSurfaceContentAnchors(
+      surfaceProfile.contentAnchors,
+      surfaceFocusEntryId,
+    )) {
+      if (!leads.has(anchor.cluster)) {
+        leads.set(anchor.cluster, anchor.entryId);
+      }
+    }
+    return leads;
+  }, [surfaceFocusEntryId, surfaceProfile]);
+  const handleSurfaceFocusEntry = useCallback(
+    (entryId: string) => {
+      if (phaseRef.current !== "surface") return;
+      if (!selectedPlanet?.content?.some((entry) => entry.id === entryId)) {
+        return;
+      }
+      setSurfaceLocalFocusEntryId((current) =>
+        current === entryId ? null : entryId,
+      );
+    },
+    [selectedPlanet],
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [muted, setMuted] = useState(false);
   const [quality, setQuality] = useState<QualityMode>("auto");
@@ -288,9 +482,6 @@ export default function UniverseApp({
     request: UniverseNavigationCameraRequest;
     reason: string;
   } | null>(null);
-  const [activeDestinationId, setActiveDestinationId] = useState<string | null>(
-    null,
-  );
   const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
     null,
   );
@@ -338,21 +529,14 @@ export default function UniverseApp({
   const lockedSystemScaleFocusRef = useRef<PlanetDefinition | null>(null);
   const preferredSystemScaleDestinationRef =
     useRef<UniverseNavigationDestination | null>(null);
-  const pendingScaleEnterSystemRef =
-    useRef<UniverseNavigationDestination | null>(null);
   const galaxySoftFocusAvailableRef = useRef(true);
-  const pendingWorldScaleStepsRef = useRef(0);
   const continuousScaleIntentEpochRef = useRef(0);
-  const worldScaleBoundaryLockedRef = useRef(false);
-  const worldScaleBoundaryUnlockFrameRef = useRef<number | null>(null);
   const scaleWheelRef = useRef<{
-    accumulated: number;
     direction: ContinuousScaleDirection | null;
     lastAt: number;
     samples: number;
     gesture: number;
   }>({
-    accumulated: 0,
     direction: null,
     lastAt: 0,
     samples: 0,
@@ -367,6 +551,14 @@ export default function UniverseApp({
       worldScalePositionRef.current = position;
       document.documentElement.dataset.universeScalePosition =
         position.toFixed(3);
+      const activePhase = phaseRef.current;
+      document.documentElement.dataset.universeHandoffState =
+        activePhase === "system" && position > SYSTEM_SCALE_MIN
+          ? "system:approach"
+          : (activePhase === "atmosphere" || activePhase === "surface") &&
+              position > 4
+            ? "atmosphere:surface"
+            : "stable";
       pendingWorldScaleRenderPositionRef.current = position;
       if (immediate) {
         if (worldScaleRenderFrameRef.current !== null) {
@@ -406,15 +598,6 @@ export default function UniverseApp({
       options: { preserveGalaxyScaleBridge?: boolean } = {},
     ) => {
       continuousScaleIntentEpochRef.current += 1;
-      const queuedWorldSteps = pendingWorldScaleStepsRef.current;
-      if (queuedWorldSteps !== 0) {
-        document.documentElement.dataset.universeScaleCancelledQueue =
-          "world:" +
-          (queuedWorldSteps > 0 ? "+" : "") +
-          String(queuedWorldSteps);
-      }
-      pendingWorldScaleStepsRef.current = 0;
-      pendingScaleEnterSystemRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
       lockedSystemScaleFocusRef.current = null;
       if (!options.preserveGalaxyScaleBridge) {
@@ -424,7 +607,6 @@ export default function UniverseApp({
       }
 
       const wheel = scaleWheelRef.current;
-      wheel.accumulated = 0;
       wheel.direction = null;
       wheel.lastAt = 0;
       wheel.samples = 0;
@@ -605,12 +787,17 @@ export default function UniverseApp({
               : "transition";
     document.documentElement.dataset.universeRenderAuthority = authority;
 
-    if (phase === "system" && worldScalePosition > SYSTEM_SCALE_MIN) {
+    const committedPhase = phaseRef.current;
+    const committedPosition = worldScalePositionRef.current;
+    if (
+      committedPhase === "system" &&
+      committedPosition > SYSTEM_SCALE_MIN
+    ) {
       document.documentElement.dataset.universeHandoffState =
         "system:approach";
     } else if (
-      (phase === "atmosphere" || phase === "surface") &&
-      worldScalePosition > 4
+      (committedPhase === "atmosphere" || committedPhase === "surface") &&
+      committedPosition > 4
     ) {
       document.documentElement.dataset.universeHandoffState =
         "atmosphere:surface";
@@ -1785,16 +1972,6 @@ export default function UniverseApp({
           setWorldScaleContinuous(false);
         }
       }
-      worldScaleBoundaryLockedRef.current = true;
-      if (worldScaleBoundaryUnlockFrameRef.current !== null) {
-        window.cancelAnimationFrame(worldScaleBoundaryUnlockFrameRef.current);
-      }
-      worldScaleBoundaryUnlockFrameRef.current = window.requestAnimationFrame(
-        () => {
-          worldScaleBoundaryLockedRef.current = false;
-          worldScaleBoundaryUnlockFrameRef.current = null;
-        },
-      );
       cameraSettledPhaseRef.current = null;
       setCameraSettledPhase(null);
       // The navigation coordinator owns invalidation of the previous phase's
@@ -1839,91 +2016,6 @@ export default function UniverseApp({
     },
     [galaxy.markers, selectedPlanet, selectedSystem],
   );
-
-  useEffect(() => {
-    if (
-      pendingWorldScaleStepsRef.current === 0 ||
-      cameraSettledPhase !== phase ||
-      !selectedPlanet ||
-      phase === "galaxy" ||
-      phase === "system" ||
-      phase === "returning"
-    ) {
-      return;
-    }
-
-    const queued = pendingWorldScaleStepsRef.current;
-    const direction: ContinuousScaleDirection = queued > 0 ? "in" : "out";
-    const nextPhase = nextWorldScalePhase(
-      phase,
-      direction,
-      selectedPlanet.surfaceMode,
-    );
-
-    if (!nextPhase) {
-      pendingWorldScaleStepsRef.current = 0;
-      delete document.documentElement.dataset.universeScaleQueued;
-      document.documentElement.dataset.universeScaleBlocked =
-        direction === "in" && phase !== "surface"
-          ? "no-surface"
-          : direction === "in"
-            ? "surface-limit"
-            : "system-limit";
-      return;
-    }
-
-    pendingWorldScaleStepsRef.current += direction === "in" ? -1 : 1;
-    const remaining = pendingWorldScaleStepsRef.current;
-    if (remaining === 0) {
-      delete document.documentElement.dataset.universeScaleQueued;
-    } else {
-      document.documentElement.dataset.universeScaleQueued =
-        "world:" + (remaining > 0 ? "+" : "") + String(remaining);
-    }
-
-    const sourcePhase = phase;
-    const intentEpoch = continuousScaleIntentEpochRef.current;
-    const frame = window.requestAnimationFrame(() => {
-      if (
-        continuousScaleIntentEpochRef.current !== intentEpoch ||
-        phaseRef.current !== sourcePhase
-      ) {
-        return;
-      }
-      setWorldScalePhase(nextPhase);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [
-    cameraSettledPhase,
-    phase,
-    selectedPlanet,
-    setWorldScalePhase,
-  ]);
-
-  useEffect(() => {
-    if (phase !== "system" || pendingWorldScaleStepsRef.current >= 0) return;
-
-    pendingWorldScaleStepsRef.current += 1;
-    const remaining = pendingWorldScaleStepsRef.current;
-    if (remaining === 0) {
-      delete document.documentElement.dataset.universeScaleQueued;
-    } else {
-      document.documentElement.dataset.universeScaleQueued =
-        "world:" + String(remaining);
-    }
-
-    const intentEpoch = continuousScaleIntentEpochRef.current;
-    const frame = window.requestAnimationFrame(() => {
-      if (
-        continuousScaleIntentEpochRef.current !== intentEpoch ||
-        phaseRef.current !== "system"
-      ) {
-        return;
-      }
-      handleReturn();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [handleReturn, phase]);
 
   const beginGalaxyScaleTravel = useCallback(
     (destination: UniverseNavigationDestination) => {
@@ -1991,15 +2083,6 @@ export default function UniverseApp({
     [galaxy.markers, handleNavigateDestination],
   );
 
-  const enterScaleFocusedSystem = useCallback(
-    async (focus: UniverseNavigationDestination) => {
-      preferredSystemScaleDestinationRef.current = focus;
-      const marker = await navigationMarker(focus, galaxy.markers);
-      await handleNavigateDestination(scaleSystemDestinationForMarker(marker));
-    },
-    [galaxy.markers, handleNavigateDestination],
-  );
-
   const commitGalaxyScaleFocusedSystem = useCallback(
     async (focus: UniverseNavigationDestination) => {
       const marker = await navigationMarker(focus, galaxy.markers);
@@ -2057,22 +2140,6 @@ export default function UniverseApp({
     [ensurePlaying, galaxy.markers, resolveMarker],
   );
 
-  useEffect(() => {
-    const queued = pendingScaleEnterSystemRef.current;
-    if (!queued || phase !== "galaxy") return;
-    if (activeDestinationId !== queued.id) return;
-    if (pendingDestinationId === queued.id) return;
-
-    pendingScaleEnterSystemRef.current = null;
-    delete document.documentElement.dataset.universeScaleQueued;
-    void enterScaleFocusedSystem(queued);
-  }, [
-    activeDestinationId,
-    enterScaleFocusedSystem,
-    pendingDestinationId,
-    phase,
-  ]);
-
   const handleContinuousScaleWheel = useCallback(
     (event: ReactWheelEvent<HTMLElement>) => {
       if (navigatorOpen || navigationFailure) return;
@@ -2097,7 +2164,6 @@ export default function UniverseApp({
       );
       const direction = continuousScaleDirection(normalizedDelta);
       if (!direction) return;
-      const settledPhase = cameraSettledPhaseRef.current;
 
       const now = performance.now();
       const wheel = scaleWheelRef.current;
@@ -2112,13 +2178,10 @@ export default function UniverseApp({
         wheel.direction !== null && now - wheel.lastAt > resetWindow;
       if (wheel.direction === null || directionChanged || gestureExpired) {
         wheel.gesture += 1;
-        wheel.accumulated = 0;
         wheel.samples = 0;
         wheel.direction = direction;
         if (directionChanged) {
           continuousScaleIntentEpochRef.current += 1;
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
           document.documentElement.dataset.universeScaleReversal = String(
             wheel.gesture,
           );
@@ -2148,10 +2211,9 @@ export default function UniverseApp({
         continuousScaleResponseDistance(responseSourcePosition).toFixed(2);
 
       // Manual scale intent owns navigation immediately, even before a small
-      // trackpad delta crosses the currentPhase threshold. This stops Journey
+      // trackpad delta crosses a semantic phase boundary. This stops Journey
       // auto-advance without clearing the current camera-settled contract.
       handleContinuousScaleIntentStart();
-      delete document.documentElement.dataset.universeScaleCancelledQueue;
 
       if (currentPhase === "galaxy") {
         const currentPosition = Math.min(
@@ -2240,8 +2302,6 @@ export default function UniverseApp({
 
             continuousScaleIntentEpochRef.current += 1;
             const intentEpoch = continuousScaleIntentEpochRef.current;
-            pendingScaleEnterSystemRef.current = null;
-            pendingWorldScaleStepsRef.current = 0;
             setNavigationRequest(null);
             setPendingDestinationId(null);
             setPendingDestinationMode(null);
@@ -2281,6 +2341,17 @@ export default function UniverseApp({
                   phaseRef.current === "galaxy" &&
                   worldScalePositionRef.current >=
                     SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
+                isRendererReady: () => {
+                  const appliedPosition = Number(
+                    document.documentElement.dataset
+                      .universeGalaxyScaleAppliedPosition,
+                  );
+                  return (
+                    Number.isFinite(appliedPosition) &&
+                    appliedPosition >=
+                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+                  );
+                },
                 commit: () => {
                   void commitGalaxyScaleFocusedSystem(focus);
                 },
@@ -2340,7 +2411,6 @@ export default function UniverseApp({
           return;
         }
 
-        pendingWorldScaleStepsRef.current = 0;
         delete document.documentElement.dataset.universeScaleQueued;
         delete document.documentElement.dataset.universeScaleBlocked;
 
@@ -2535,177 +2605,36 @@ export default function UniverseApp({
         return;
       }
 
-      const worldTransitionUnsettled =
-        currentPhase !== "galaxy" &&
-        currentPhase !== "system" &&
-        currentPhase !== "returning" &&
-        (settledPhase !== currentPhase ||
-          worldScaleBoundaryLockedRef.current);
-
-      // Do not discard committed wheel samples merely because the previous
-      // phase settled quickly. On SwiftShader a 220ms time cooldown caused
-      // distinct wheel events in one sustained gesture to disappear. The
-      // threshold already limits each browser event to at most one boundary,
-      // while unsettled phases serialize extra steps through the existing
-      // queue.
-      if (wheel.samples === 1) {
-        lockedGalaxyScaleFocusRef.current = null;
-        lockedSystemScaleFocusRef.current = null;
+      // World phases are owned exclusively by the continuous 2→5 coordinate
+      // above. If the semantic phase exists without its planet authority,
+      // there is nothing safe to execute for this delivered sample: report the
+      // invalid state and stop. Never cache the sample for later phase stepping.
+      if (isWorldScalePhase(currentPhase)) {
+        document.documentElement.dataset.universeScaleBlocked =
+          "no-world-focus";
+        delete document.documentElement.dataset.universeScaleQueued;
+        return;
       }
 
-      wheel.lastAt = now;
-      wheel.samples = Math.min(8, wheel.samples + 1);
-      wheel.accumulated += Math.abs(continuousScaleDelta(normalizedDelta));
+      // Scale samples never enter a second threshold or fallback state
+      // machine. The direct 0→5 coordinate consumed every executable sample
+      // above; only navigation beyond that coordinate remains here.
       document.documentElement.dataset.universeScaleDirection = direction;
-      document.documentElement.dataset.universeScaleProgress = String(
-        Math.min(
-          1,
-          wheel.accumulated / CONTINUOUS_SCALE_WHEEL_THRESHOLD,
-        ).toFixed(3),
-      );
-
-      if (wheel.accumulated < CONTINUOUS_SCALE_WHEEL_THRESHOLD) return;
-
-      wheel.accumulated = 0;
       document.documentElement.dataset.universeScaleProgress = "0";
       document.documentElement.dataset.universeScaleIndex = String(
         scalePhaseIndex(currentPhase),
       );
       delete document.documentElement.dataset.universeScaleBlocked;
 
-      if (worldTransitionUnsettled) {
-        if (directionChanged && selectedPlanet) {
-          pendingWorldScaleStepsRef.current = 0;
-          delete document.documentElement.dataset.universeScaleQueued;
-          const reversePhase = nextWorldScalePhase(
-            currentPhase,
-            direction,
-            selectedPlanet.surfaceMode,
-          );
-          if (reversePhase) {
-            setWorldScalePhase(reversePhase);
-          }
-          return;
-        }
-
-        const step = direction === "in" ? 1 : -1;
-        pendingWorldScaleStepsRef.current = Math.max(
-          -6,
-          Math.min(6, pendingWorldScaleStepsRef.current + step),
-        );
-        const queued = pendingWorldScaleStepsRef.current;
-        document.documentElement.dataset.universeScaleQueued =
-          "world:" + (queued > 0 ? "+" : "") + String(queued);
-        return;
-      }
-
-      if (direction === "in") {
-        if (currentPhase === "galaxy") {
-          const centerFocus =
-            lockedGalaxyScaleFocusRef.current ??
-            galaxyScaleFocusRef.current;
-          const focus =
-            centerFocus ??
-            (galaxySoftFocusAvailableRef.current
-              ? defaultGalaxyScaleFocus
-              : null);
-          if (!focus) {
-            document.documentElement.dataset.universeScaleBlocked =
-              "no-galaxy-focus";
-            return;
-          }
-          if (galaxySoftFocusAvailableRef.current) {
-            galaxySoftFocusAvailableRef.current = false;
-            document.documentElement.dataset.universeScaleSoftFocus =
-              centerFocus ? "consumed-center" : "consumed-fallback";
-          }
-          lockedGalaxyScaleFocusRef.current = focus;
-
-          // A located destination is only orientation state. Even when it is
-          // already active, inward scale must still perform the native YEIS
-          // star→system approach before product System takes visual authority.
-          if (activeDestinationId === focus.id) {
-            pendingScaleEnterSystemRef.current = focus;
-            document.documentElement.dataset.universeScaleQueued =
-              "enter-system:" + focus.id;
-            beginGalaxyScaleTravel(focus);
-            return;
-          }
-
-          if (pendingDestinationId === focus.id) {
-            pendingScaleEnterSystemRef.current = focus;
-            document.documentElement.dataset.universeScaleQueued =
-              "enter-system:" + focus.id;
-            return;
-          }
-
-          pendingScaleEnterSystemRef.current = focus;
-          document.documentElement.dataset.universeScaleQueued =
-            "enter-system:" + focus.id;
-          beginGalaxyScaleTravel(focus);
-          return;
-        }
-
-        if (currentPhase === "system") {
-          const preferred = preferredSystemScaleDestinationRef.current;
-          let preferredPlanet: PlanetDefinition | null = null;
-          if (preferred?.target.kind === "body") {
-            preferredPlanet =
-              selectedSystem?.planets.find(
-                (candidate) =>
-                  candidate.id === preferred.target.bodyId ||
-                  nativePlanetId(candidate) === preferred.target.bodyId,
-              ) ?? null;
-          } else if (preferred?.target.kind === "observed-body") {
-            preferredPlanet =
-              selectedSystem?.planets.find(
-                (candidate) =>
-                  candidate.id === preferred.target.bodyId ||
-                  nativePlanetId(candidate) === preferred.target.bodyId,
-              ) ?? null;
-          } else if (preferred?.target.kind === "content") {
-            preferredPlanet =
-              selectedSystem?.planets.find((candidate) =>
-                candidate.content?.some(
-                  (entry) => entry.id === preferred.target.entryId,
-                ),
-              ) ?? null;
-          }
-          const planet =
-            preferredPlanet ??
-            lockedSystemScaleFocusRef.current ??
-            systemScaleFocusRef.current;
-          if (!planet || !selectedSystem) {
-            document.documentElement.dataset.universeScaleBlocked =
-              "no-planet-focus";
-            return;
-          }
-          // This legacy threshold branch is retained only as a defensive
-          // fallback. Normal System wheel input is consumed by the continuous
-          // 1→2 scale segment above before reaching this point.
-          lockedSystemScaleFocusRef.current = planet;
-          setSystemScaleTargetPlanet(planet);
-          return;
-        }
-
-        if (selectedPlanet) {
-          const nextPhase = nextWorldScalePhase(
-            currentPhase,
-            "in",
-            selectedPlanet.surfaceMode,
-          );
-          if (nextPhase) {
-            setWorldScalePhase(nextPhase);
-          } else {
-            document.documentElement.dataset.universeScaleBlocked =
-              currentPhase === "surface" ? "surface-limit" : "no-surface";
-          }
-        }
-        return;
-      }
-
       if (currentPhase === "galaxy") {
-        pendingScaleEnterSystemRef.current = null;
+        // All valid inward Galaxy scale was consumed by the native direct path
+        // above. Reaching here means outward intent at the coordinate-0 limit
+        // (or an outward non-native navigation target).
+        if (direction === "in") {
+          document.documentElement.dataset.universeScaleBlocked =
+            "no-galaxy-focus";
+          return;
+        }
         delete document.documentElement.dataset.universeScaleQueued;
         if (
           activeDestinationId === "galaxy:0" &&
@@ -2726,20 +2655,21 @@ export default function UniverseApp({
       }
 
       if (currentPhase === "system") {
+        // A valid System with an active system/planet focus was consumed by the
+        // direct 1→2 path above. Do not synthesize an alternate inward path.
+        if (direction === "in") {
+          document.documentElement.dataset.universeScaleBlocked =
+            "no-planet-focus";
+          return;
+        }
         preferredSystemScaleDestinationRef.current = null;
         delete document.documentElement.dataset.universeScalePreferred;
         handleReturn();
         return;
       }
 
-      if (selectedPlanet) {
-        const nextPhase = nextWorldScalePhase(
-          currentPhase,
-          "out",
-          selectedPlanet.surfaceMode,
-        );
-        if (nextPhase) setWorldScalePhase(nextPhase);
-      }
+      // returning is navigation-owned; world phases without selectedPlanet
+      // already returned above.
     },
     [
       activeDestinationId,
@@ -2749,7 +2679,6 @@ export default function UniverseApp({
       commitGalaxyScaleFocusedSystem,
       contentPlacements,
       defaultGalaxyScaleFocus,
-      enterScaleFocusedSystem,
       galaxy.markers,
       galaxyScaleTarget,
       handleContinuousScaleIntentStart,
@@ -2794,6 +2723,8 @@ export default function UniverseApp({
           onNavigationFailed={handleNavigationFailed}
           selectedSystem={selectedSystem}
           selectedPlanet={selectedPlanet}
+          surfaceFocusEntryId={surfaceFocusEntryId}
+          onSurfaceFocusEntry={handleSurfaceFocusEntry}
           systemScaleTargetPlanet={systemScaleTargetPlanet}
           onSelectSystem={handleSelectSystem}
           onNavigateDestination={handleNavigateDestination}
@@ -3062,24 +2993,157 @@ export default function UniverseApp({
 
       {phase !== "galaxy" &&
         phase !== "system" &&
-        selectedPlanet?.content?.map((entry) => (
-          <section className="world-content-card" key={entry.id}>
-            <span>
-              {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
-            </span>
-            <strong>{entry.title}</strong>
-            <small>{entry.summary}</small>
-            {entry.tags.length > 0 && (
-              <em>{entry.tags.slice(0, 4).join(" · ")}</em>
-            )}
-          </section>
-        ))}
+        worldContentEntries.length ? (
+          <div className="world-content-stack" aria-label="World content">
+            {worldContentEntries.map((entry) => {
+              const surfacePresentation =
+                phase === "surface"
+                  ? surfaceContentPresentation.get(entry.id)
+                  : undefined;
+              return (
+                <section
+                  className={
+                    "world-content-card" +
+                    (surfaceFocusEntryId === entry.id
+                      ? " is-surface-focus"
+                      : "")
+                  }
+                  data-surface-priority={surfacePresentation?.priority}
+                  data-surface-focus={
+                    surfaceFocusEntryId === entry.id ? "true" : undefined
+                  }
+                  key={entry.id}
+                >
+                  <span>
+                    {text(locale, "worldSignal")} // {kindLabel(locale, entry.kind)}
+                  </span>
+                  {surfaceFocusEntryId === entry.id && (
+                    <em className="world-content-focus-label">
+                      {locale === "zh" ? "当前目标" : "CURRENT TARGET"}
+                    </em>
+                  )}
+                  <strong>{entry.title}</strong>
+                  <small>{entry.summary}</small>
+                  {surfacePresentation && (
+                    <>
+                      <em className="world-content-location">
+                        {locale === "zh" ? "地表位置" : "SURFACE LOCATION"} //{" "}
+                        {surfacePresentation.location}
+                      </em>
+                      <em className="world-content-cluster">
+                        {locale === "zh" ? "区域簇" : "CLUSTER"} //{" "}
+                        {surfacePresentation.cluster}
+                      </em>
+                      <em
+                        className={
+                          "world-content-priority priority-" +
+                          surfacePresentation.priority
+                        }
+                      >
+                        {locale === "zh"
+                          ? surfacePresentation.priority === "primary"
+                            ? "重点信号"
+                            : surfacePresentation.priority === "secondary"
+                              ? "次级信号"
+                              : "环境信号"
+                          : surfacePresentation.priority.toUpperCase() +
+                            " SIGNAL"}
+                      </em>
+                    </>
+                  )}
+                  {surfacePresentation && (
+                    <button
+                      type="button"
+                      className="world-content-focus-action"
+                      data-surface-entry={entry.id}
+                      aria-pressed={surfaceFocusEntryId === entry.id}
+                      onClick={() => handleSurfaceFocusEntry(entry.id)}
+                    >
+                      {surfaceFocusEntryId === entry.id
+                        ? locale === "zh"
+                          ? "已聚焦地表位置"
+                          : "SURFACE SIGNAL FOCUSED"
+                        : locale === "zh"
+                          ? "聚焦地表位置"
+                          : "FOCUS SURFACE SIGNAL"}
+                    </button>
+                  )}
+                  {entry.tags.length > 0 && (
+                    <em className="world-content-tags">
+                      {entry.tags.slice(0, 4).join(" · ")}
+                    </em>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        ) : null}
 
-      {phase === "surface" && selectedPlanet && (
+      {phase === "surface" && selectedPlanet && surfaceProfile && (
         <section className="surface-copy">
-          <span>{text(locale, "heroSurface")}</span>
+          <span>
+            {text(locale, "heroSurface")} // {surfaceProfile.biome.toUpperCase()}
+          </span>
           <strong>{astronomicalName(locale, selectedPlanet.name)}</strong>
           <small>{text(locale, "surfaceDescription")}</small>
+          <div className="surface-world-meta" aria-label="Surface world profile">
+            <b>
+              {surfaceProfile.regions.length}
+              <i>{locale === "zh" ? "区域" : "REGIONS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.landmarks.length}
+              <i>{locale === "zh" ? "地标" : "LANDMARKS"}</i>
+            </b>
+            <b>
+              {surfaceProfile.contentAnchors.length}
+              <i>{locale === "zh" ? "内容点" : "SIGNALS"}</i>
+            </b>
+          </div>
+          <div className="surface-region-index" aria-label="Surface regions">
+            {surfaceProfile.regions.slice(0, 4).map((region) => (
+              <span key={region.id}>{region.name}</span>
+            ))}
+          </div>
+          {surfaceProfile.contentClusters.length > 0 && (
+            <div
+              className="surface-cluster-index"
+              aria-label="Surface signal clusters"
+            >
+              {rankSurfaceContentClusters(
+                surfaceProfile.contentClusters,
+                surfaceFocusedAnchor?.cluster ?? null,
+              )
+                .slice(0, 3)
+                .map((cluster) => {
+                  const entryId = surfaceClusterLeadEntries.get(cluster.index);
+                  return (
+                    <button
+                      type="button"
+                      className="surface-cluster-chip"
+                      data-priority={cluster.priority}
+                      data-surface-cluster={cluster.index}
+                      data-surface-entry={entryId}
+                      aria-pressed={
+                        surfaceFocusedAnchor?.cluster === cluster.index
+                      }
+                      disabled={!entryId}
+                      key={cluster.id}
+                      onClick={() => {
+                        if (entryId) handleSurfaceFocusEntry(entryId);
+                      }}
+                    >
+                      {cluster.label} · {cluster.anchorIds.length}
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+          <em className="surface-explore-hint">
+            {locale === "zh"
+              ? "点按信号聚焦 · 拖动探索 · 双指调整视角 · 滚轮离开地表"
+              : "TAP SIGNALS TO FOCUS · DRAG TO EXPLORE · PINCH TO FRAME · WHEEL TO DEPART"}
+          </em>
         </section>
       )}
 

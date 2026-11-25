@@ -1,0 +1,48 @@
+{
+  "schema": 3,
+  "task_id": "SURFACE-WORLD-PRODUCTIZATION-V3-001",
+  "approved_at": "2026-11-24T16:15:00.000Z",
+  "baseline_commit": "5cf490c9dec889a9873cd6b6bdbb29d82e09b31c",
+  "record_path": "docs/reuse-gate/tasks/SURFACE-WORLD-PRODUCTIZATION-V3-001.json",
+  "record_sha256": "04d72b37ebab3f37e786cde2ff3cdea88076871854aa4c1f443944d65e7902f6",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d",
+    "procedural-planets": "89375023207e4015c8b1cf8517f56896df606ba06cf75ee07d571829b3f5b6ec",
+    "procedural-terrains": "6d70921a24c090b3bf5e8d515c8853dde75e96a97c82dccca547bf8d9a07603f",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Deterministic Surface world profiles, spatial content layout, primary/filler world reuse, and scalable fallback rendering inside the existing Personal Universe world stack"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/surface/**",
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/systemGenerator.ts",
+    "src/lib/universe/generation/catalog.ts",
+    "src/components/universe/SurfaceScene.tsx",
+    "src/components/universe/SurfaceTerrain.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "tests/surface-world-profile.test.ts",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/visual.spec.ts",
+    "docs/architecture/rendering.md"
+  ],
+  "selected_ids": [
+    "procedural-planets-surface-runtime",
+    "procedural-terrains-profiled-fallback",
+    "astro-content-one-model"
+  ],
+  "candidate_scores": {
+    "procedural-planets-surface-runtime": 52,
+    "procedural-terrains-profiled-fallback": 47.5,
+    "astro-content-one-model": 55,
+    "independent-surface-app": 29.5
+  }
+}
