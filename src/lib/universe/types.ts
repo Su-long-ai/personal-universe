@@ -15,6 +15,43 @@ export const SYSTEM_OVERVIEW_RADIUS = 7;
 export type StarSource = "procedural" | "catalog" | "hero";
 export type UniverseEngine = "v2" | "yeis";
 export type PlanetSurfaceMode = "none" | "surface-terrain" | "custom";
+
+export type PopulationObjectKind =
+  | "marker"
+  | "system"
+  | "star"
+  | "world"
+  | "moon";
+export type PopulationProvenance =
+  | "observed"
+  | "inferred"
+  | "generated"
+  | "authored"
+  | "hybrid";
+export type PopulationCapability =
+  | "system-only"
+  | "orbit-only"
+  | "surface-capable"
+  | "authored-surface"
+  | "fallback-only";
+export type PopulationRarity = "common" | "uncommon" | "rare";
+
+export interface PopulationMetadata {
+  schemaVersion: number;
+  generatorVersion: string;
+  kind: PopulationObjectKind;
+  provenance: PopulationProvenance;
+  stableSeed: string;
+  parentId?: string;
+  capability: PopulationCapability;
+  rarity?: PopulationRarity;
+  rarityScore?: number;
+  tags: string[];
+  generatedName?: boolean;
+  reservedForAuthored?: boolean;
+  observedFields?: string[];
+  inferredFields?: string[];
+}
 export type PlanetArchetype =
   | "rocky"
   | "temperate"
@@ -34,6 +71,7 @@ export interface MoonDefinition {
   seed: string;
   radiusEarth: number;
   orbitRadius: number;
+  population?: PopulationMetadata;
 }
 
 export interface PlanetDefinition {
@@ -51,6 +89,7 @@ export interface PlanetDefinition {
   surfaceMode: PlanetSurfaceMode;
   heroKey?: string;
   observed?: boolean;
+  population?: PopulationMetadata;
   content?: UniverseContentEntry[];
 }
 
@@ -64,6 +103,7 @@ export interface StarDefinition {
   massSolar: number;
   radiusSolar: number;
   luminositySolar: number;
+  population?: PopulationMetadata;
 }
 
 export interface SystemDefinition {
@@ -76,6 +116,7 @@ export interface SystemDefinition {
   planets: PlanetDefinition[];
   heroKey?: string;
   catalogId?: string;
+  population?: PopulationMetadata;
   content?: UniverseContentEntry[];
 }
 
@@ -100,11 +141,16 @@ export interface GalaxyMarker {
   heroKey?: string;
   catalogId?: string;
   catalogIdentity?: CatalogIdentity;
+  population?: PopulationMetadata;
 }
 
 export interface GalaxyIndex {
   seed: string;
   markers: GalaxyMarker[];
+  population?: {
+    schemaVersion: number;
+    generatorVersion: string;
+  };
 }
 
 export interface GalaxyPointCloud {

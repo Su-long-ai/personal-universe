@@ -1,10 +1,14 @@
-import snapshot from "../../../data/exoplanet-hosts.json";
+import snapshot from "../../../data/exoplanet-hosts.json" with { type: "json" };
 import type {
   GalaxyMarker,
   PlanetArchetype,
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
+import {
+  observedPopulationMetadata,
+  populationCapabilityForArchetype,
+} from "./population";
 import { hashSeed } from "./seededRng";
 
 type CatalogPlanet = {
@@ -39,6 +43,14 @@ type CatalogSnapshot = {
 };
 
 const catalog = snapshot as CatalogSnapshot;
+const catalogByHostname = new Map<string, CatalogSystem>();
+for (const system of catalog.systems) {
+  if (catalogByHostname.has(system.hostname)) {
+    throw new Error(`Duplicate observed catalog hostname: ${system.hostname}`);
+  }
+  catalogByHostname.set(system.hostname, system);
+}
+
 const SUN_GALAXY_POSITION: [number, number, number] = [18, 0.05, -4];
 const LOCAL_PC_SCALE = 0.075;
 const J2000_OBLIQUITY_RAD = (23.439291 * Math.PI) / 180;
@@ -131,6 +143,7 @@ function observedPlanet(
   system: CatalogSystem,
   planet: CatalogPlanet,
   index: number,
+  parentSystemId: string,
 ): PlanetDefinition {
   const orbitAU = planet.orbitAU ?? 0.35 + index * 0.55;
   const luminosity = luminosityFromStar(system);
@@ -144,12 +157,23 @@ function observedPlanet(
   const radiusEarth =
     planet.radiusEarth ?? Math.max(0.25, Math.pow(massEarth, 0.27));
   const seed = `catalog:${system.hostname}:${planet.name}`;
+  const archetype = inferArchetype(equilibriumTempK, massEarth);
+  const observedFields = ["name"];
+  const inferredFields = ["archetype", "orbitalPeriodYears", "hasRings"];
+  for (const [field, value] of [
+    ["orbitAU", planet.orbitAU],
+    ["radiusEarth", planet.radiusEarth],
+    ["massEarth", planet.massEarth],
+    ["equilibriumTempK", planet.equilibriumTempK],
+  ] as const) {
+    (value === null ? inferredFields : observedFields).push(field);
+  }
 
   return {
     id: seed,
     name: planet.name,
     seed,
-    archetype: inferArchetype(equilibriumTempK, massEarth),
+    archetype,
     radiusEarth,
     massEarth,
     equilibriumTempK,
@@ -161,34 +185,71 @@ function observedPlanet(
     hasRings: false,
     surfaceMode: "none",
     observed: true,
+    population: observedPopulationMetadata({
+      kind: "world",
+      stableSeed: seed,
+      parentId: parentSystemId,
+      capability: populationCapabilityForArchetype(archetype),
+      tags: [
+        "catalog",
+        "exoplanet",
+        `archetype:${archetype}`,
+        `capability:${populationCapabilityForArchetype(archetype)}`,
+      ],
+      observedFields,
+      inferredFields,
+    }),
   };
 }
 
 export function catalogMarkers(limit = 18): GalaxyMarker[] {
-  return catalog.systems.slice(0, limit).map((system) => ({
+  return catalog.systems.slice(0, limit).map((system) => {
+    const seed = `catalog:${system.hostname}`;
+    const spectralType = inferSpectralType(system);
+    return {
     id: `catalog:${slug(system.hostname)}`,
     name: system.hostname,
-    seed: `catalog:${system.hostname}`,
+    seed,
     source: "catalog",
     position: visualPosition(system),
     physicalPositionPc: physicalScenePosition(system),
-    spectralType: inferSpectralType(system),
+    spectralType,
     catalogId: system.hostname,
+    population: observedPopulationMetadata({
+      kind: "marker",
+      stableSeed: seed,
+      capability: "system-only",
+      tags: ["catalog", "observed-host", `spectral:${spectralType}`],
+      observedFields: ["hostname", "raDeg", "decDeg", "distancePc"],
+      inferredFields: system.spectralType ? [] : ["spectralType"],
+    }),
     catalogIdentity: {
       ...(system.hip ? { hip: system.hip } : {}),
       ...(system.hipName ? { hipName: system.hipName } : {}),
       ...(system.hdName ? { hdName: system.hdName } : {}),
       ...(system.gaiaDr3Id ? { gaiaDr3Id: system.gaiaDr3Id } : {}),
     },
-  }));
+  };
+  });
 }
 
 export function catalogSystem(marker: GalaxyMarker): SystemDefinition | null {
   if (!marker.catalogId) return null;
-  const system = catalog.systems.find((item) => item.hostname === marker.catalogId);
+  const system = catalogByHostname.get(marker.catalogId);
   if (!system) return null;
 
   const luminositySolar = luminosityFromStar(system);
+  const starObservedFields = ["name"];
+  const starInferredFields = ["luminositySolar"];
+  for (const [field, value] of [
+    ["spectralType", system.spectralType],
+    ["temperatureK", system.temperatureK],
+    ["massSolar", system.massSolar],
+    ["radiusSolar", system.radiusSolar],
+  ] as const) {
+    (value === null ? starInferredFields : starObservedFields).push(field);
+  }
+
   return {
     id: marker.id,
     name: `${system.hostname} System`,
@@ -196,6 +257,13 @@ export function catalogSystem(marker: GalaxyMarker): SystemDefinition | null {
     source: "catalog",
     galaxyPosition: marker.position,
     catalogId: system.hostname,
+    population: observedPopulationMetadata({
+      kind: "system",
+      stableSeed: marker.seed,
+      capability: "system-only",
+      tags: ["catalog", "observed-system"],
+      observedFields: ["hostname", "raDeg", "decDeg", "distancePc"],
+    }),
     star: {
       id: `${marker.id}:star`,
       name: system.hostname,
@@ -206,9 +274,18 @@ export function catalogSystem(marker: GalaxyMarker): SystemDefinition | null {
       massSolar: system.massSolar ?? 1,
       radiusSolar: system.radiusSolar ?? 1,
       luminositySolar,
+      population: observedPopulationMetadata({
+        kind: "star",
+        stableSeed: `${marker.seed}:star`,
+        parentId: marker.id,
+        capability: "system-only",
+        tags: ["catalog", "observed-star", `spectral:${inferSpectralType(system)}`],
+        observedFields: starObservedFields,
+        inferredFields: starInferredFields,
+      }),
     },
     planets: system.planets.map((planet, index) =>
-      observedPlanet(system, planet, index),
+      observedPlanet(system, planet, index, marker.id),
     ),
   };
 }
@@ -217,6 +294,7 @@ export function catalogMetadata() {
   return {
     generatedAt: catalog.generatedAt,
     count: catalog.systems.length,
+    indexedCount: catalogByHostname.size,
     checksum: hashSeed(JSON.stringify(catalog.systems.map((item) => item.hostname))),
   };
 }

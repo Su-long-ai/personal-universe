@@ -1,0 +1,41 @@
+{
+  "schema": 3,
+  "task_id": "PROCEDURAL-UNIVERSE-POPULATION-V1-002",
+  "approved_at": "2026-11-24T18:38:30.000Z",
+  "baseline_commit": "92dcd88867d00e67e89f01918847495d219dadc6",
+  "record_path": "docs/reuse-gate/tasks/PROCEDURAL-UNIVERSE-POPULATION-V1-002.json",
+  "record_sha256": "adce158149407461336dc9b657f0c013a4f20ebcebcd69715e2080ae05862cbb",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "helios-procedural-system": "ab2a4ce34b88b6cee35feb3a145e2906ca1cdb2d2f92f50e7e0aed603d23a1bb",
+    "nasa-exoplanet-archive": "e21b78fc38ba7d3b7b1e49d8e8531b5afb51f66bc62e16bdb7cacbcc70d6bb45",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Extend the existing seeded Personal Universe generation layer with one versioned population metadata contract, observed/generated provenance, world capability, bounded lazy system materialization, catalog indexing, and deterministic invariants without adding a second generator or database"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/population.ts",
+    "src/lib/universe/generation/catalog.ts",
+    "src/lib/universe/generation/galaxyGenerator.ts",
+    "src/lib/universe/generation/systemGenerator.ts",
+    "src/lib/universe/generation/index.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "selected_ids": [
+    "pinned-yeis-population-identity",
+    "existing-helios-seeded-generation",
+    "existing-nasa-observed-catalog"
+  ],
+  "candidate_scores": {
+    "pinned-yeis-population-identity": 45,
+    "existing-helios-seeded-generation": 54.5,
+    "existing-nasa-observed-catalog": 54.5,
+    "new-heavy-astrophysics-population-engine": null
+  }
+}
