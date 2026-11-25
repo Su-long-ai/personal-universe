@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -11,6 +12,7 @@ import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
 import { isSoftwareRenderer } from "./CinematicPipeline";
+import { FALLBACK_SURFACE_CAMERA_FRAME } from "./CinematicCamera";
 
 const TERRAIN_Y = 0;
 const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
@@ -42,20 +44,81 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
+function SurfaceRocks({ terrain }: { terrain: FiniteTerrain }) {
+  // Keep decorative glTF work behind the real-GPU branch. In particular,
+  // SwiftShader/software fallback must not fetch, parse, cache or compile a
+  // model that its visual profile never renders.
+  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
+  const rockInstances = useMemo(
+    () =>
+      ROCKS.map((placement, index) => {
+        const object = seededClone(boulder.scene, index);
+        const localHeight =
+          terrain.sampleHeight(placement.x, placement.z) ?? 0;
+        object.position.set(
+          placement.x,
+          TERRAIN_Y + localHeight - placement.scale * 0.52,
+          placement.z,
+        );
+        object.rotation.set(
+          placement.tilt,
+          placement.ry,
+          placement.tilt * 0.4,
+        );
+        object.scale.setScalar(placement.scale);
+        return object;
+      }),
+    [boulder.scene, terrain],
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceDecorations =
+      "hardware-rocks";
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceDecorations ===
+        "hardware-rocks"
+      ) {
+        delete document.documentElement.dataset.universeSurfaceDecorations;
+      }
+      for (const object of rockInstances) {
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            // Geometry/materials remain owned by drei's shared glTF cache.
+            child.castShadow = false;
+          }
+        });
+      }
+    };
+  }, [rockInstances]);
+
+  return (
+    <>
+      {rockInstances.map((object) => (
+        <primitive key={object.name} object={object} />
+      ))}
+    </>
+  );
+}
+
 export function SurfaceTerrain({
+  prepare,
   active,
+  presenting,
   phaseRef,
   onAnchorHeight,
 }: {
+  prepare: boolean;
   active: boolean;
+  presenting: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
-  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
-  const [activated, setActivated] = useState(active);
+  const [activated, setActivated] = useState(prepare || active);
   const softwareRenderer = isSoftwareRenderer(gl);
+  const landingStreamCamera = useMemo(() => camera.clone(false), [camera]);
   const terrainViewInitialized = useRef(false);
   const terrainReadyPublished = useRef(false);
   const softwareStreamUpdates = useRef(0);
@@ -67,8 +130,16 @@ export function SurfaceTerrain({
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
 
   useEffect(() => {
-    if (active) setActivated(true);
-  }, [active]);
+    if (softwareRenderer) return;
+    // Start the shared drei cache fetch while the real-GPU terrain itself is
+    // preparing, so decorations are usually ready before Surface owns the
+    // frame. Software fallback never touches this hardware-only asset.
+    useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");
+  }, [softwareRenderer]);
+
+  useEffect(() => {
+    if (prepare || active) setActivated(true);
+  }, [active, prepare]);
 
   useEffect(() => {
     if (!activated) return;
@@ -77,7 +148,27 @@ export function SurfaceTerrain({
     let instance: FiniteTerrain | null = null;
     const controller = new AbortController();
 
+    // ProceduralTerrains Infinite World streams around the camera supplied to
+    // prepare/update. Prime it at the actual fallback landing frame instead of
+    // the still-visible globe camera, otherwise a "full" ring can be centred on
+    // the wrong world-space region and immediately churn when presentation
+    // hands over.
+    landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+    landingStreamCamera.projectionMatrixInverse.copy(
+      camera.projectionMatrixInverse,
+    );
+    landingStreamCamera.position.set(
+      ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+    );
+    landingStreamCamera.up.set(0, 1, 0);
+    landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+    landingStreamCamera.updateMatrixWorld(true);
+
     void (async () => {
+      const html = document.documentElement;
+      html.dataset.universeSurfaceTerrainAllocations = String(
+        Number(html.dataset.universeSurfaceTerrainAllocations ?? "0") + 1,
+      );
       instance = await createInfiniteTerrain({
         renderer: gl,
         signal: controller.signal,
@@ -178,7 +269,9 @@ export function SurfaceTerrain({
         },
       });
 
-      await instance.prepare(camera, { signal: controller.signal });
+      await instance.prepare(landingStreamCamera, {
+        signal: controller.signal,
+      });
 
       if (cancelled) {
         instance.dispose();
@@ -212,8 +305,16 @@ export function SurfaceTerrain({
       controller.abort();
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
+      delete document.documentElement.dataset.universeSurfaceTerrainReadyView;
     };
-  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
+  }, [
+    activated,
+    camera,
+    gl,
+    landingStreamCamera,
+    onAnchorHeight,
+    softwareRenderer,
+  ]);
 
   useEffect(() => {
     const lifecycle = !activated
@@ -237,9 +338,35 @@ export function SurfaceTerrain({
   }, [active, activated, terrain]);
 
   useFrame((_, delta) => {
-    // `active` is delivered through the R3F reconciler. Read the coordinator
-    // ref first so no *new* Surface work starts after an outward wheel intent.
-    if (!active || phaseRef.current !== "surface" || !terrain) return;
+    // Hidden Atmosphere prewarm is allowed to populate the destination ring,
+    // but only while the coordinator still owns Atmosphere. A reverse to
+    // Orbit pauses streaming immediately; an already-created terrain remains
+    // retained for the next inward journey.
+    const surfaceStreaming =
+      active && phaseRef.current === "surface";
+    const hiddenLandingPrestream =
+      prepare &&
+      !active &&
+      phaseRef.current === "atmosphere" &&
+      !terrainReadyPublished.current;
+    if ((!surfaceStreaming && !hiddenLandingPrestream) || !terrain) return;
+
+    const streamCamera = presenting ? camera : landingStreamCamera;
+    if (!presenting) {
+      // Keep projection identical to the product camera, but use a detached
+      // non-rendered view at the final terrain landing pose. camera-controls
+      // remains the only visible/product camera authority.
+      landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+      landingStreamCamera.projectionMatrixInverse.copy(
+        camera.projectionMatrixInverse,
+      );
+      landingStreamCamera.position.set(
+        ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+      );
+      landingStreamCamera.up.set(0, 1, 0);
+      landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+      landingStreamCamera.updateMatrixWorld(true);
+    }
 
     if (softwareRenderer) {
       // Infinite World needs several bounded updates to populate the initial
@@ -247,9 +374,9 @@ export function SurfaceTerrain({
       // frame forever, so schedule a short warm-up burst, then return to the
       // previous camera-driven policy. Any real manual camera/projection change
       // restarts the bounded burst.
-      camera.updateWorldMatrix(true, false);
-      camera.getWorldPosition(currentCameraPosition.current);
-      camera.getWorldQuaternion(currentCameraQuaternion.current);
+      streamCamera.updateWorldMatrix(true, false);
+      streamCamera.getWorldPosition(currentCameraPosition.current);
+      streamCamera.getWorldQuaternion(currentCameraQuaternion.current);
       const positionChanged =
         !terrainViewInitialized.current ||
         currentCameraPosition.current.distanceToSquared(
@@ -262,12 +389,12 @@ export function SurfaceTerrain({
         ) > 1e-8;
       const projectionChanged =
         !terrainViewInitialized.current ||
-        !camera.projectionMatrix.equals(lastProjection.current);
+        !streamCamera.projectionMatrix.equals(lastProjection.current);
 
       if (positionChanged || rotationChanged || projectionChanged) {
         lastCameraPosition.current.copy(currentCameraPosition.current);
         lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
-        lastProjection.current.copy(camera.projectionMatrix);
+        lastProjection.current.copy(streamCamera.projectionMatrix);
         terrainViewInitialized.current = true;
         softwareStreamUpdates.current = Math.max(
           softwareStreamUpdates.current,
@@ -283,7 +410,7 @@ export function SurfaceTerrain({
       softwareStreamUpdates.current -= 1;
     }
 
-    terrain.update(delta, { camera });
+    terrain.update(delta, { camera: streamCamera });
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };
@@ -296,53 +423,23 @@ export function SurfaceTerrain({
         : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
+        document.documentElement.dataset.universeSurfaceTerrainReadyView =
+          presenting ? "product-camera" : "landing-prestream";
         onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
       }
     }
   });
-
-  const rockInstances = useMemo(() => {
-    // Decorative PBR glTF rocks add first-use shader programs but do not
-    // contribute to terrain identity. Keep them on real GPUs only.
-    if (!terrain || softwareRenderer) return [];
-
-    return ROCKS.map((placement, index) => {
-      const object = seededClone(boulder.scene, index);
-      const localHeight = terrain.sampleHeight(placement.x, placement.z) ?? 0;
-      object.position.set(
-        placement.x,
-        TERRAIN_Y + localHeight - placement.scale * 0.52,
-        placement.z,
-      );
-      object.rotation.set(placement.tilt, placement.ry, placement.tilt * 0.4);
-      object.scale.setScalar(placement.scale);
-      return object;
-    });
-  }, [boulder.scene, softwareRenderer, terrain]);
-
-  useEffect(() => {
-    return () => {
-      for (const object of rockInstances) {
-        object.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            // Geometry/materials belong to the shared glTF cache and are not disposed here.
-            child.castShadow = false;
-          }
-        });
-      }
-    };
-  }, [rockInstances]);
 
   if (!terrain) return null;
 
   return (
     <>
       <primitive object={terrain.object} />
-      {rockInstances.map((object) => (
-        <primitive key={object.name} object={object} />
-      ))}
+      {!softwareRenderer ? (
+        <Suspense fallback={null}>
+          <SurfaceRocks terrain={terrain} />
+        </Suspense>
+      ) : null}
     </>
   );
 }
-
-useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");

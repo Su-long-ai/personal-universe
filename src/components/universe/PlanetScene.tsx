@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Stars, useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
@@ -72,8 +72,12 @@ function LiveSurfaceAnchor({
   }, [onCameraFrame]);
 
   useFrame(() => {
-    if (!group.current) return;
+    if (!group.current || cameraFramePublished.current) return;
 
+    // PlanetScene locks rotation for the whole final 4->5 interval. The
+    // terrain-derived landing frame is therefore stable and only needs to be
+    // resolved once per anchor activation; crossing back to <=4 unmounts this
+    // anchor and a later inward pass resolves a fresh frame.
     planet.updateWorldMatrix(true, false);
     planet.getWorldPosition(scratch.center);
     planet.getWorldQuaternion(scratch.worldQuaternion);
@@ -419,49 +423,51 @@ function DeepSky() {
   );
 }
 
-function liveQuality(
-  quality: QualityMode,
+type LiveQualityMode = Exclude<QualityMode, "low">;
+
+function liveStructuralQuality(
+  quality: LiveQualityMode,
   softwareRenderer: boolean,
 ) {
-  if (quality === "low") {
+  if (softwareRenderer) {
     return {
-      cloudQuality: 32,
-      cloudResolution: 0.35,
       chunkRes: 16,
       maxDepth: 4,
-      splitFactor: 2.1,
     } as const;
   }
 
-  // HIGH remains a live ProceduralPlanets renderer under SwiftShader, but
-  // software rasterizers get a conservative terrain budget so hosted Linux
-  // can reach a stable landing frame without starving browser teardown.
+  return quality === "high"
+    ? ({ chunkRes: 32, maxDepth: 6 } as const)
+    : ({ chunkRes: 24, maxDepth: 5 } as const);
+}
+
+function liveDynamicQuality(
+  quality: LiveQualityMode,
+  softwareRenderer: boolean,
+) {
+  // chunkRes/maxDepth are deliberately excluded: ProceduralPlanets marks them
+  // as REBUILD_KEYS and Planet.set() would rebuild every LOD chunk. Structural
+  // quality is monotonic (AUTO -> HIGH at most once) while these non-structural
+  // knobs may follow the active live profile without replacing the Planet.
   if (softwareRenderer) {
     return {
       cloudQuality: 32,
       cloudResolution: 0.35,
-      chunkRes: 16,
-      maxDepth: 5,
-      splitFactor: 2.3,
+      splitFactor: 2.1,
     } as const;
   }
 
-  if (quality === "high") {
-    return {
-      cloudQuality: 72,
-      cloudResolution: 0.6,
-      chunkRes: 32,
-      maxDepth: 6,
-      splitFactor: 2.7,
-    } as const;
-  }
-  return {
-    cloudQuality: 56,
-    cloudResolution: 0.5,
-    chunkRes: 24,
-    maxDepth: 5,
-    splitFactor: 2.4,
-  } as const;
+  return quality === "high"
+    ? ({
+        cloudQuality: 72,
+        cloudResolution: 0.6,
+        splitFactor: 2.7,
+      } as const)
+    : ({
+        cloudQuality: 56,
+        cloudResolution: 0.5,
+        splitFactor: 2.4,
+      } as const);
 }
 
 export function PlanetScene({
@@ -470,16 +476,22 @@ export function PlanetScene({
   phase,
   worldScalePosition,
   presentationActive = true,
-  onPaintReady,
+  surfaceFallbackReady = false,
+  onPaintStartedChange,
+  onPaintReadyChange,
   onSurfaceCameraFrame,
+  onBeforeLivePlanetDispose,
 }: {
   planet: PlanetDefinition;
   quality: QualityMode;
   phase: UniversePhase;
   worldScalePosition: number;
   presentationActive?: boolean;
-  onPaintReady?: () => void;
+  surfaceFallbackReady?: boolean;
+  onPaintStartedChange?: (started: boolean) => void;
+  onPaintReadyChange?: (ready: boolean) => void;
   onSurfaceCameraFrame: (frame: SurfaceCameraFrame | null) => void;
+  onBeforeLivePlanetDispose?: (planet: Planet) => void;
 }) {
   const { gl } = useThree();
   const sunDirection = useMemo(
@@ -493,30 +505,80 @@ export function PlanetScene({
   );
   const softwareRenderer = isSoftwareRenderer(gl);
   const fallbackReason = liveWorldFallbackReason(gl, quality);
-  const fallbackSurfaceTexture = useMemo(
-    () =>
-      fallbackReason === "software-renderer"
-        ? createFallbackSurfaceTexture(planet)
-        : null,
-    [fallbackReason, planet.archetype, planet.seed],
-  );
-  const liveKey = `${planet.id}:${quality}:${softwareRenderer ? "software" : "gpu"}`;
+  const fallbackSurfaceOwnsPresentation =
+    phase === "surface" &&
+    Boolean(fallbackReason) &&
+    surfaceFallbackReady;
+  const worldPresentationActive =
+    presentationActive && !fallbackSurfaceOwnsPresentation;
+  const fallbackSurfaceTexture = useMemo(() => {
+    if (!softwareRenderer) return null;
+    const texture = createFallbackSurfaceTexture(planet);
+    const html = document.documentElement;
+    html.dataset.universeWorldFallbackTextureAllocations = String(
+      Number(html.dataset.universeWorldFallbackTextureAllocations ?? "0") + 1,
+    );
+    return texture;
+  }, [softwareRenderer, planet.archetype, planet.seed]);
+  const fallbackSurfaceMap =
+    fallbackReason === "software-renderer"
+      ? fallbackSurfaceTexture
+      : null;
+  const liveKey = `${planet.id}:${softwareRenderer ? "software" : "gpu"}`;
   const [warmedKey, setWarmedKey] = useState<string | null>(null);
-  const liveEnabled = warmedKey === liveKey && !fallbackReason;
+  const initialLiveStructureTier = useRef<"auto" | "high" | "software">(
+    softwareRenderer ? "software" : "auto",
+  );
+  const liveProvisioned = warmedKey === liveKey;
   const paintedFrames = useRef(0);
+  const paintStartedReported = useRef(false);
   const paintReported = useRef(false);
+  const lastLiveDrawFrame = useRef(0);
+  const appliedLiveProfile = useRef<{
+    planet: Planet;
+    key: "gpu-auto" | "gpu-high" | "software-high";
+  } | null>(null);
+  const liveStructure = useRef<{
+    planet: Planet;
+    tier: "auto" | "high" | "software";
+  } | null>(null);
+  const onPaintStartedChangeRef = useRef(onPaintStartedChange);
+  onPaintStartedChangeRef.current = onPaintStartedChange;
+  const onPaintReadyChangeRef = useRef(onPaintReadyChange);
+  onPaintReadyChangeRef.current = onPaintReadyChange;
+
+  const publishPaintStarted = useCallback((started: boolean) => {
+    if (paintStartedReported.current === started) return;
+    paintStartedReported.current = started;
+    if (started) {
+      document.documentElement.dataset.universeWorldPaintStarted = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldPaintStarted;
+    }
+    onPaintStartedChangeRef.current?.(started);
+  }, []);
+
+  const publishPaintReady = useCallback((ready: boolean) => {
+    if (paintReported.current === ready) return;
+    paintReported.current = ready;
+    if (ready) {
+      document.documentElement.dataset.universeWorldPaintReady = "true";
+    } else {
+      delete document.documentElement.dataset.universeWorldPaintReady;
+    }
+    onPaintReadyChangeRef.current?.(ready);
+  }, []);
 
   useEffect(() => {
-    if (fallbackReason) return;
+    if (fallbackReason || warmedKey === liveKey) return;
 
-    // Hidden System prewarm is useful on a real GPU, where constructing the
-    // live ProceduralPlanets world can happen without stalling the scale
-    // gesture. On software WebGL, doing that same heavy construction while
-    // the visitor is still inside System blocks input. Keep the lightweight
-    // scene/pipeline mounted there, then start the live world only once the
-    // close-world presentation becomes active; UniverseCanvas retains the
-    // matched System frame until this world has painted.
-    if (softwareRenderer && phase === "system" && !presentationActive) {
+    // Hidden prewarm is useful on a real GPU, where constructing the live
+    // ProceduralPlanets world can happen without stalling the scale gesture.
+    // On software WebGL, never begin a new heavy Planet while presentation is
+    // hidden (System prewarm or a parked Galaxy target). An already-warmed
+    // instance exits above via warmedKey and remains retained; a missing one
+    // starts only when the close-world presentation actually asks for it.
+    if (softwareRenderer && !presentationActive) {
       return;
     }
 
@@ -529,7 +591,13 @@ export function PlanetScene({
     const idleWindow = window as IdleWindow;
 
     const enableLive = () => {
-      if (!cancelled) setWarmedKey(liveKey);
+      if (cancelled) return;
+      initialLiveStructureTier.current = softwareRenderer
+        ? "software"
+        : quality === "high"
+          ? "high"
+          : "auto";
+      setWarmedKey(liveKey);
     };
 
     firstFrame = window.requestAnimationFrame(() => {
@@ -563,26 +631,99 @@ export function PlanetScene({
     liveKey,
     phase,
     presentationActive,
+    quality,
     softwareRenderer,
+    warmedKey,
   ]);
 
   const livePlanet = useMemo(() => {
-    if (!liveEnabled) return null;
-    return new Planet({
+    if (!liveProvisioned) return null;
+    const initialTier = initialLiveStructureTier.current;
+    const initialMode: LiveQualityMode =
+      initialTier === "high" ? "high" : "auto";
+    const nextPlanet = new Planet({
       preset: presetFor(planet),
       seed: hashSeed(planet.seed),
       radius: LIVE_PLANET_RADIUS,
       lightSource: sunDirection,
       name: planet.name,
-      ...liveQuality(quality, softwareRenderer),
+      // Construct directly at the quality that actually triggered warmup.
+      // Direct HIGH therefore avoids an AUTO -> HIGH structural rebuild,
+      // while an AUTO-first world can still promote exactly once later.
+      ...liveStructuralQuality(initialMode, softwareRenderer),
+      ...liveDynamicQuality(initialMode, softwareRenderer),
     });
-  }, [liveEnabled, planet, quality, softwareRenderer, sunDirection]);
+    const html = document.documentElement;
+    html.dataset.universeWorldPlanetAllocations = String(
+      Number(html.dataset.universeWorldPlanetAllocations ?? "0") + 1,
+    );
+    return nextPlanet;
+  }, [liveProvisioned, planet, softwareRenderer, sunDirection]);
 
   useEffect(() => {
     return () => {
+      if (livePlanet) onBeforeLivePlanetDispose?.(livePlanet);
       livePlanet?.dispose();
     };
-  }, [livePlanet]);
+  }, [livePlanet, onBeforeLivePlanetDispose]);
+
+  useEffect(() => {
+    if (!livePlanet || fallbackReason) {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
+      return;
+    }
+
+    const liveMode = quality === "high" ? "high" : "auto";
+    const profileKey = softwareRenderer
+      ? "software-high"
+      : (`gpu-${liveMode}` as "gpu-auto" | "gpu-high");
+    const applied = appliedLiveProfile.current;
+
+    const currentStructure = liveStructure.current;
+    if (currentStructure?.planet !== livePlanet) {
+      liveStructure.current = {
+        planet: livePlanet,
+        tier: initialLiveStructureTier.current,
+      };
+    }
+
+    if (
+      !softwareRenderer &&
+      liveMode === "high" &&
+      liveStructure.current?.tier !== "high"
+    ) {
+      // The package marks chunkRes/maxDepth as structural rebuild keys. Promote
+      // once, then never demote this Planet, so repeated quality toggles cannot
+      // keep throwing away and recreating the LOD world.
+      livePlanet.set(liveStructuralQuality("high", false));
+      liveStructure.current = { planet: livePlanet, tier: "high" };
+      const html = document.documentElement;
+      html.dataset.universeWorldStructuralPromotions = String(
+        Number(html.dataset.universeWorldStructuralPromotions ?? "0") + 1,
+      );
+    }
+
+    if (applied?.planet !== livePlanet || applied.key !== profileKey) {
+      livePlanet.set(liveDynamicQuality(liveMode, softwareRenderer));
+      appliedLiveProfile.current = {
+        planet: livePlanet,
+        key: profileKey,
+      };
+      const html = document.documentElement;
+      html.dataset.universeWorldLiveProfileUpdates = String(
+        Number(html.dataset.universeWorldLiveProfileUpdates ?? "0") + 1,
+      );
+    }
+    document.documentElement.dataset.universeWorldLiveProfile = profileKey;
+    document.documentElement.dataset.universeWorldLiveStructure =
+      liveStructure.current?.tier ?? "auto";
+
+    return () => {
+      delete document.documentElement.dataset.universeWorldLiveProfile;
+      delete document.documentElement.dataset.universeWorldLiveStructure;
+    };
+  }, [fallbackReason, livePlanet, quality, softwareRenderer]);
 
   useEffect(
     () => () => {
@@ -594,31 +735,69 @@ export function PlanetScene({
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneReady = "true";
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
+      worldPresentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
     return () => {
+      publishPaintStarted(false);
+      publishPaintReady(false);
       delete document.documentElement.dataset.universeWorldSceneReady;
       delete document.documentElement.dataset.universeWorldSceneLifecycle;
+      delete document.documentElement.dataset.universeWorldCapability;
     };
-  }, []);
+  }, [publishPaintReady, publishPaintStarted]);
 
   useEffect(() => {
     document.documentElement.dataset.universeWorldSceneLifecycle =
-      presentationActive ? "active" : "prewarming";
-    if (!presentationActive) {
-      paintedFrames.current = 0;
-      paintReported.current = false;
-      delete document.documentElement.dataset.universeWorldPaintReady;
-    }
-  }, [presentationActive]);
+      worldPresentationActive
+        ? "active"
+        : phase === "system"
+          ? "prewarming"
+          : "parked";
+  }, [phase, presentationActive, worldPresentationActive]);
 
   useEffect(() => {
-    const mode = livePlanet
-      ? "procedural-planets-live"
-      : fallbackReason
-        ? `procedural-planets-fallback-${fallbackReason}`
+    const capability = fallbackReason
+      ? `fallback-${fallbackReason}`
+      : "procedural-planets-live";
+    document.documentElement.dataset.universeWorldCapability = capability;
+
+    // First-paint readiness is valid only for the currently visible renderer
+    // identity. Hiding the world for the System endpoint, changing quality, or
+    // selecting another planet invalidates the old paint even if the retained
+    // resource instance can be reused underneath.
+    paintedFrames.current = 0;
+    lastLiveDrawFrame.current = Number(
+      document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+    );
+    publishPaintStarted(false);
+    publishPaintReady(false);
+
+    return () => {
+      if (
+        document.documentElement.dataset.universeWorldCapability === capability
+      ) {
+        delete document.documentElement.dataset.universeWorldCapability;
+      }
+    };
+  }, [
+    fallbackReason,
+    liveKey,
+    worldPresentationActive,
+    publishPaintReady,
+    publishPaintStarted,
+  ]);
+
+  useEffect(() => {
+    const mode = fallbackReason
+      ? `procedural-planets-fallback-${fallbackReason}`
+      : livePlanet
+        ? "procedural-planets-live"
         : "procedural-planets-warmup";
     document.documentElement.dataset.universeWorldRenderer = mode;
-    if (fallbackSurfaceTexture) {
+    if (fallbackSurfaceMap) {
       document.documentElement.dataset.universeWorldFallbackSurface =
         "generated-texture";
     } else {
@@ -632,42 +811,85 @@ export function PlanetScene({
       }
       delete document.documentElement.dataset.universeWorldFallbackSurface;
     };
-  }, [fallbackReason, fallbackSurfaceTexture, livePlanet]);
+  }, [fallbackReason, fallbackSurfaceMap, livePlanet]);
 
   useFrame((_, delta) => {
-    // Once landed, keep the terrain under the visitor fixed. Orbit/approach
-    // retain the subtle planetary rotation.
-    if (livePlanet && phase !== "surface") {
+    // Freeze the live planet for the entire final Atmosphere->Surface
+    // interval, not only after the semantic Surface boundary. LiveSurfaceAnchor
+    // publishes one terrain-derived landing frame as soon as position > 4; if
+    // the body kept rotating after that publication, the rendered patch would
+    // drift away from the camera frame during the remainder of 4->5. Reversal
+    // below/equal 4 resumes rotation from the exact frozen orientation.
+    if (
+      worldPresentationActive &&
+      livePlanet &&
+      !fallbackReason &&
+      phase !== "surface" &&
+      worldScalePosition <= 4
+    ) {
       livePlanet.rotation.y += delta * 0.014;
     }
 
+    // Retained worlds stay mounted through System/Galaxy so their resources
+    // survive reversal, but a parked renderer has no paint authority. Avoid
+    // polling pipeline/profile DOM state on every hidden frame.
+    if (!worldPresentationActive) return;
+
+    const expectedLiveProfile = softwareRenderer
+      ? "software-high"
+      : quality === "high"
+        ? "gpu-high"
+        : "gpu-auto";
+    const concreteRendererReady =
+      Boolean(fallbackReason) ||
+      (Boolean(livePlanet) &&
+        document.documentElement.dataset.universeWorldPipeline ===
+          "procedural-planets-pass" &&
+        document.documentElement.dataset.universeWorldLiveProfile ===
+          expectedLiveProfile);
+
     if (
-      presentationActive &&
+      worldPresentationActive &&
       !paintReported.current &&
-      (Boolean(fallbackReason) || Boolean(livePlanet))
+      concreteRendererReady
     ) {
-      paintedFrames.current += 1;
+      if (fallbackReason) {
+        // The lightweight fallback is part of the ordinary R3F render, so two
+        // presented frames are enough to hand off from System.
+        paintedFrames.current += 1;
+      } else {
+        // Live authority comes only from PlanetRenderer itself. The pipeline
+        // publishes this counter after a frame where a planet was actually
+        // drawn and no shader/program work remained pending. Because this
+        // component runs before the priority-1 pipeline frame, seeing a new
+        // stamp here proves the previous browser frame really contained the
+        // matched live world.
+        const liveDrawFrame = Number(
+          document.documentElement.dataset.universeWorldLiveDrawFrame ?? "0",
+        );
+        if (liveDrawFrame > lastLiveDrawFrame.current) {
+          lastLiveDrawFrame.current = liveDrawFrame;
+          paintedFrames.current += 1;
+        } else {
+          paintedFrames.current = 0;
+        }
+      }
+
+      if (paintedFrames.current >= 1) {
+        publishPaintStarted(true);
+      }
       if (paintedFrames.current >= 2) {
-        paintReported.current = true;
-        document.documentElement.dataset.universeWorldPaintReady = "true";
-        onPaintReady?.();
+        publishPaintReady(true);
       }
     }
   });
 
-  if (phase === "surface" && fallbackReason) {
-    // UniverseCanvas owns the longer-lived fallback SurfaceScene. Keeping
-    // that host mounted across phase changes prevents FiniteTerrain.dispose()
-    // from landing on the Surface -> Atmosphere input-critical path.
-    return null;
-  }
-
   return (
     <>
-      {presentationActive ? (
+      {worldPresentationActive ? (
         <color attach="background" args={["#000106"]} />
       ) : null}
-      <group visible={presentationActive}>
+      <group visible={worldPresentationActive}>
       <DeepSky />
       <Stars
         radius={78}
@@ -706,11 +928,11 @@ export function PlanetScene({
           <sphereGeometry args={[1, 64, 64]} />
           <meshStandardMaterial
             color={
-              fallbackSurfaceTexture
+              fallbackSurfaceMap
                 ? "#ffffff"
                 : fallbackColor(planet.archetype)
             }
-            map={fallbackSurfaceTexture}
+            map={fallbackSurfaceMap}
             roughness={0.82}
             metalness={0.02}
           />
@@ -718,12 +940,15 @@ export function PlanetScene({
         {livePlanet ? (
           <primitive
             object={livePlanet}
+            visible={!fallbackReason}
             scale={LIVE_WORLD_RADIUS / LIVE_PLANET_RADIUS}
           />
         ) : null}
       </group>
 
-      {(phase === "surface" || worldScalePosition > 4) && livePlanet ? (
+      {(phase === "surface" || worldScalePosition > 4) &&
+      livePlanet &&
+      !fallbackReason ? (
         <LiveSurfaceAnchor
           planet={livePlanet}
           onCameraFrame={onSurfaceCameraFrame}

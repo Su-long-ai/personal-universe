@@ -456,6 +456,13 @@ retained YEIS galaxy view. Search, Journey takeover or another higher-priority
 navigation authority freezes the current coordinate instead of draining a
 hidden phase-step queue.
 
+There is no deferred world-step fallback behind the continuous coordinate.
+World-phase wheel samples either execute immediately against the currently
+selected planet or, if that authority is unexpectedly unavailable, publish
+`data-universe-scale-blocked="no-world-focus"` and stop. They are never stored
+until camera settlement, so mixed-sign correction bursts cannot leave stale
+phase work to replay later.
+
 ### Wheel ownership and scale domains
 
 Exactly one layer owns mouse-wheel scale input:
