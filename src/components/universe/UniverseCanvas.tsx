@@ -178,6 +178,13 @@ export function UniverseCanvas({
     useRef<YeisGalaxyScaleBridgeState | null>(null);
   const [surfaceCameraFrame, setSurfaceCameraFrame] =
     useState<SurfaceCameraFrame | null>(null);
+
+  useEffect(() => {
+    if (worldScalePosition > 4) return;
+    setSurfaceCameraFrame(null);
+    delete document.documentElement.dataset.universeSurfaceCameraFrame;
+    delete document.documentElement.dataset.universeSurfaceAnchorReady;
+  }, [worldScalePosition]);
   const [systemScaleFrame, setSystemScaleFrame] =
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
@@ -220,12 +227,14 @@ export function UniverseCanvas({
       return;
     }
     const destinationId = galaxyScaleTarget?.id ?? null;
-    setRetainedWorldRenderer((current) =>
-      current?.planet.id === worldPrewarmPlanet.id &&
-      current.destinationId === destinationId
-        ? current
-        : { planet: worldPrewarmPlanet, destinationId },
-    );
+    setRetainedWorldRenderer((current) => {
+      if (current?.planet.id === worldPrewarmPlanet.id) {
+        return current.destinationId === destinationId
+          ? current
+          : { ...current, destinationId };
+      }
+      return { planet: worldPrewarmPlanet, destinationId };
+    });
   }, [
     closeWorldPhase,
     galaxyScaleTarget?.id,
@@ -239,7 +248,12 @@ export function UniverseCanvas({
   // the same Planet/PlanetRenderer resources even after scaleTarget is cleared.
   const retainedWorldParkedInGalaxy =
     phase === "galaxy" && Boolean(retainedWorldRenderer);
+  const retainedWorldPlanet =
+    retainedWorldRenderer?.planet.id === worldPrewarmPlanet?.id
+      ? retainedWorldRenderer.planet
+      : null;
   const worldRendererPlanet =
+    retainedWorldPlanet ??
     worldPrewarmPlanet ??
     (retainedWorldParkedInGalaxy
       ? retainedWorldRenderer?.planet ?? null
