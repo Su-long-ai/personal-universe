@@ -930,11 +930,9 @@ export function PlanetScene({
   const publishPaintReady = useCallback((ready: boolean) => {
     if (paintReported.current === ready) return;
     paintReported.current = ready;
-    if (ready) {
-      document.documentElement.dataset.universeWorldPaintReady = "true";
-    } else {
-      delete document.documentElement.dataset.universeWorldPaintReady;
-    }
+    // This is renderer-local readiness only. UniverseCanvas publishes the
+    // product paint-ready authority after any System target transfer has
+    // actually been acknowledged by the active System renderer.
     onPaintReadyChangeRef.current?.(ready);
   }, []);
 
