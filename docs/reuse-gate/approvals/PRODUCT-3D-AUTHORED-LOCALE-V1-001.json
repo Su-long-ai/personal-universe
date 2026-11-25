@@ -1,0 +1,38 @@
+{
+  "schema": 3,
+  "task_id": "PRODUCT-3D-AUTHORED-LOCALE-V1-001",
+  "approved_at": "2026-11-25T16:47:28.032Z",
+  "baseline_commit": "93a2f909e7a3087d0aa02c829ae155d080622f30",
+  "record_path": "docs/reuse-gate/tasks/PRODUCT-3D-AUTHORED-LOCALE-V1-001.json",
+  "record_sha256": "bae04ba586ac582ad59f4263767de775da6a2e512d518a976c2396e031645101",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "astro-content-collections": "f25edb31c13a38a9be91f4f93df654ce2b79f46ea7f9ba0264f41897913dcd0d",
+    "i18next": "81c3323127dbc92f864ffcb559d9e101f224adcdc38c35cd7b89fdf37f7bbb7d",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Compose the existing product locale with canonical authored copy in native 3D UI, and prevent the embedded YEIS dictionary from owning host document.lang"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/lib/universe/yeis/index.ts",
+    "src/vendor/yeis/i18n/index.ts",
+    "src/vendor/yeis/PATCHES.md",
+    "tests/e2e/locale.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-authoring-projection",
+    "embedded-pinned-dictionary"
+  ],
+  "candidate_scores": {
+    "existing-authoring-projection": 57,
+    "embedded-pinned-dictionary": 57,
+    "additional-i18n-runtime": 36
+  }
+}
