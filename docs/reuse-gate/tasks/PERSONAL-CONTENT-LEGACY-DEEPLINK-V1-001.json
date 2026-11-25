@@ -1,0 +1,144 @@
+{
+  "schema": 2,
+  "task_id": "PERSONAL-CONTENT-LEGACY-DEEPLINK-V1-001",
+  "title": "Resolve legacy authored content IDs through the existing Personal destination path",
+  "scope": {
+    "level": "implementation",
+    "subject": "Backward-compatible personal content deep-link aliases on the existing canonical placement and YEIS navigation resolver"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Legacy authored IDs should remain aliases of one canonical content identity rather than becoming a second router or destination graph. Reuse the explicit legacyIds stored in the Astro canonical content record, the existing content placement list, the current Personal Universe destination resolver, YEIS native destination identity, and browser URL state. The implementation only teaches placement lookup and personal: deep-link resolution to accept legacy aliases, while the returned destination is always canonicalized back to personal:<contentId>.",
+  "planned_files": [
+    "src/lib/universe/content/placement.ts",
+    "src/lib/universe/yeis/navigation.ts",
+    "tests/content-authoring.test.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro Content Collections remain the canonical validated source for authored metadata, including explicit legacy ID aliases stored on the same content item."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams",
+      "finding": "The existing single-page deep-link contract can continue to serialize one destination query value; alias resolution belongs before canonical destination execution rather than in a second client router."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Pinned MIT YEIS remains the native spatial identity and travel authority, so authored aliases must normalize to the existing Personal destination before native execution."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep the already integrated YEIS-backed navigation product as the spatial authority; legacy authored IDs are only an adapter concern."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "web-url-history-api"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing browser URL query contract instead of introducing a router solely for legacy ID aliases."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Read legacyIds from the same canonical Astro content records so old and new IDs cannot diverge into separate authoring stores."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "No package or fuzzy matcher is needed; exact canonical/legacy reference lookup is a small deterministic adapter over existing placements."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "yeis-existing-personal-destination",
+      "name": "Existing YEIS-backed Personal Universe destination resolver",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current Personal Universe navigation adapter over pinned MIT YEIS",
+      "license": "MIT source at pinned e520568 plus project-owned adapter",
+      "decision": "reuse",
+      "reason": "Retains one native spatial destination authority and lets alias resolution finish before the existing travel/navigation path executes.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 4.5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "native-url-deeplink-contract",
+      "name": "Existing URLSearchParams deep-link contract",
+      "level": "framework_engine",
+      "registry_id": "web-url-history-api",
+      "source": "Browser URL query and History APIs already used by UniverseApp",
+      "license": "Web Platform browser APIs / standards",
+      "decision": "reuse",
+      "reason": "The URL continues to carry one personal destination string; no route layer is required to accept an old authored identifier.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "astro-canonical-legacy-aliases",
+      "name": "Astro canonical content records with explicit legacyIds",
+      "level": "subsystem",
+      "registry_id": "astro-content-collections",
+      "source": "Current portfolio Content Collection and Agent 09 canonical authoring schema",
+      "license": "MIT (Astro) plus project-owned content schema",
+      "decision": "reuse",
+      "reason": "Stores aliases beside the canonical item so migration compatibility is deterministic, validated, and cannot create a parallel identity database.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "yeis-existing-personal-destination",
+      "native-url-deeplink-contract",
+      "astro-canonical-legacy-aliases"
+    ],
+    "rationale": "Resolve legacyIds inside the existing placement lookup, then immediately return the normal canonical Personal destination. This preserves old authored links without creating a second route, content store, destination ID, or YEIS travel path.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If future migrations require many-to-one or retired-link policy beyond exact aliases, extend the canonical migration metadata and keep normalization ahead of the same destination executor."
+  }
+}
