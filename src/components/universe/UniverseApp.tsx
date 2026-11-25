@@ -205,10 +205,12 @@ function cameraTargetLabel(
 function scheduleScaleRendererHandoff({
   label,
   isCurrent,
+  isRendererReady,
   commit,
 }: {
   label: string;
   isCurrent: () => boolean;
+  isRendererReady?: () => boolean;
   commit: () => void;
 }) {
   let completed = false;
@@ -216,27 +218,61 @@ function scheduleScaleRendererHandoff({
   let secondFrame = 0;
   let deadline = 0;
 
+  const clearScheduledWork = () => {
+    if (firstFrame) {
+      window.cancelAnimationFrame(firstFrame);
+      firstFrame = 0;
+    }
+    if (secondFrame) {
+      window.cancelAnimationFrame(secondFrame);
+      secondFrame = 0;
+    }
+    if (deadline) {
+      window.clearTimeout(deadline);
+      deadline = 0;
+    }
+  };
+
   const finish = (source: "paint" | "deadline") => {
     if (completed) return;
-    completed = true;
-    if (firstFrame) window.cancelAnimationFrame(firstFrame);
-    if (secondFrame) window.cancelAnimationFrame(secondFrame);
-    if (deadline) window.clearTimeout(deadline);
+    if (!isCurrent()) {
+      completed = true;
+      clearScheduledWork();
+      return;
+    }
 
-    if (!isCurrent()) return;
+    if (isRendererReady && !isRendererReady()) {
+      clearScheduledWork();
+      document.documentElement.dataset.universeScaleHandoff =
+        label + ":awaiting-renderer";
+      secondFrame = window.requestAnimationFrame(() => {
+        secondFrame = 0;
+        finish("paint");
+      });
+      return;
+    }
+
+    completed = true;
+    clearScheduledWork();
     document.documentElement.dataset.universeScaleHandoff =
       label + ":" + source;
     commit();
   };
 
-  // Two rAF callbacks preserve one real endpoint paint on a healthy renderer.
-  // Hosted/software WebGL can stop delivering rAF while the browser still
-  // accepts wheel events, so do not let that presentation preference become
-  // an input lock. The matched endpoints are already composition-equivalent.
+  // Two frames preserve a real endpoint paint. Boundaries without an explicit
+  // renderer-ready signal may still use the deadline; native boundaries that
+  // do expose one can only commit after that authority has applied the endpoint.
   firstFrame = window.requestAnimationFrame(() => {
-    secondFrame = window.requestAnimationFrame(() => finish("paint"));
+    firstFrame = 0;
+    secondFrame = window.requestAnimationFrame(() => {
+      secondFrame = 0;
+      finish("paint");
+    });
   });
-  deadline = window.setTimeout(() => finish("deadline"), 64);
+  deadline = window.setTimeout(() => {
+    deadline = 0;
+    finish("deadline");
+  }, 64);
 }
 
 function scaleSystemDestinationForMarker(
@@ -2147,6 +2183,17 @@ export default function UniverseApp({
                   phaseRef.current === "galaxy" &&
                   worldScalePositionRef.current >=
                     SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
+                isRendererReady: () => {
+                  const appliedPosition = Number(
+                    document.documentElement.dataset
+                      .universeGalaxyScaleAppliedPosition,
+                  );
+                  return (
+                    Number.isFinite(appliedPosition) &&
+                    appliedPosition >=
+                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+                  );
+                },
                 commit: () => {
                   void commitGalaxyScaleFocusedSystem(focus);
                 },
