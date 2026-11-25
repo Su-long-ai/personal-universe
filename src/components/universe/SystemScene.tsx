@@ -119,12 +119,14 @@ export function SystemScene({
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
   onScaleFrame,
 }: {
   system: SystemDefinition;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -137,6 +139,23 @@ export function SystemScene({
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+    } else {
+      delete html.dataset.universeSystemTargetSuppressed;
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemTargetSuppressed ===
+        handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemTargetSuppressed;
+      }
+    };
+  }, [handoffTargetPlanetId]);
 
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
@@ -249,14 +268,16 @@ export function SystemScene({
           />
         </mesh>
 
-        {system.planets.map((planet, index) => (
-          <PlanetBody
-            key={planet.id}
-            planet={planet}
-            index={index}
-            onSelect={onSelectPlanet}
-          />
-        ))}
+        {system.planets.map((planet, index) =>
+          planet.id === handoffTargetPlanetId ? null : (
+            <PlanetBody
+              key={planet.id}
+              planet={planet}
+              index={index}
+              onSelect={onSelectPlanet}
+            />
+          ),
+        )}
       </group>
     </>
   );

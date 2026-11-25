@@ -245,6 +245,7 @@ export function YeisSystemScene({
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
   onScaleFrame,
   quality,
 }: {
@@ -252,6 +253,7 @@ export function YeisSystemScene({
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
 }) {
@@ -266,6 +268,13 @@ export function YeisSystemScene({
   const focusProjectionRef = useRef(new THREE.Vector3());
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
+  const handoffNativeId = useMemo(() => {
+    if (!handoffTargetPlanetId) return null;
+    const target = system.planets.find(
+      (planet) => planet.id === handoffTargetPlanetId,
+    );
+    return target ? nativePlanetId(target) : null;
+  }, [handoffTargetPlanetId, system.planets]);
 
   useEffect(() => {
     let active = true;
@@ -335,6 +344,7 @@ export function YeisSystemScene({
       delete document.documentElement.dataset.universeSystemRenderer;
       delete document.documentElement.dataset.universeSystemReady;
       delete document.documentElement.dataset.universeSystemFocus;
+      delete document.documentElement.dataset.universeSystemTargetSuppressed;
       focusedIdRef.current = null;
       focusedNativeIdRef.current = null;
       focusFillRef.current.clear();
@@ -448,6 +458,22 @@ export function YeisSystemScene({
         fill: focusFillRef.current,
       },
     );
+
+    const handoffView = handoffNativeId
+      ? resources.bodies.byId.get(handoffNativeId)
+      : null;
+    if (handoffView) {
+      // BodyRenderer.update() owns ordinary visibility and runs first. The
+      // close-world renderer has already produced a matched frame at this
+      // stage, so only the duplicated target disc transfers ownership; star,
+      // orbits and every other System body remain visible until final paint.
+      handoffView.group.visible = false;
+      document.documentElement.dataset.universeSystemTargetSuppressed =
+        handoffTargetPlanetId ?? handoffNativeId;
+    } else {
+      delete document.documentElement.dataset.universeSystemTargetSuppressed;
+    }
+
     resources.points.setPixelRatio(gl.getPixelRatio());
     resources.points.update(
       star.position,
@@ -478,6 +504,7 @@ export function YeisSystemScene({
         onSelectPlanet={onSelectPlanet}
         onScaleFocus={onScaleFocus}
         scaleTargetPlanet={scaleTargetPlanet}
+        handoffTargetPlanetId={handoffTargetPlanetId}
         onScaleFrame={onScaleFrame}
       />
     );
@@ -496,14 +523,16 @@ export function YeisSystemScene({
         speed={0.06}
       />
       <primitive object={resources.scene} />
-      {system.planets.map((planet) => (
-        <ProductPlanetTarget
-          key={planet.id}
-          planet={planet}
-          resources={resources}
-          onSelect={onSelectPlanet}
-        />
-      ))}
+      {system.planets.map((planet) =>
+        planet.id === handoffTargetPlanetId ? null : (
+          <ProductPlanetTarget
+            key={planet.id}
+            planet={planet}
+            resources={resources}
+            onSelect={onSelectPlanet}
+          />
+        ),
+      )}
     </>
   );
 }

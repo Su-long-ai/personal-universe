@@ -28,17 +28,19 @@ function ArrivalBeacon({
   active,
   onToggle,
   height,
+  presenting,
   softwareLite = false,
 }: {
   active: boolean;
   onToggle: () => void;
   height: number;
+  presenting: boolean;
   softwareLite?: boolean;
 }) {
   const beacon = useRef<THREE.Group>(null);
 
   useFrame((state, delta) => {
-    if (softwareLite || !beacon.current) return;
+    if (!presenting || softwareLite || !beacon.current) return;
     beacon.current.rotation.y += delta * 0.12;
     const pulse = 1 + Math.sin(state.clock.elapsedTime * 1.55) * 0.035;
     beacon.current.scale.setScalar(active ? pulse * 1.06 : pulse);
@@ -133,16 +135,21 @@ export function SurfaceScene({
   phaseRef,
   quality,
   hasPlanet,
+  ready,
+  onReadyChange,
 }: {
   anchored?: boolean;
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   quality: QualityMode;
   hasPlanet: boolean;
+  ready: boolean;
+  onReadyChange?: (ready: boolean) => void;
 }) {
   const { gl } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
   const softwareHorizonBackground = useMemo(() => {
+    if (!softwareRenderer) return null;
     // 1x8 vertical gradient stored bottom -> top. It stays near-black at the
     // zenith while lifting only the software horizon band.
     const data = new Uint8Array([
@@ -162,16 +169,17 @@ export function SurfaceScene({
     texture.generateMipmaps = false;
     texture.needsUpdate = true;
     return texture;
-  }, []);
+  }, [softwareRenderer]);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const [beaconActive, setBeaconActive] = useState(false);
   const [anchorHeight, setAnchorHeight] = useState(4.8);
   const [terrainEnabled, setTerrainEnabled] = useState(false);
-  const active =
+  const surfaceRequested =
     anchored &&
     hasPlanet &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
+  const presentationActive = surfaceRequested && ready;
   const prepare =
     anchored &&
     hasPlanet &&
@@ -180,7 +188,7 @@ export function SurfaceScene({
 
   useEffect(
     () => () => {
-      softwareHorizonBackground.dispose();
+      softwareHorizonBackground?.dispose();
     },
     [softwareHorizonBackground],
   );
@@ -188,7 +196,16 @@ export function SurfaceScene({
   const handleAnchorHeight = useCallback((height: number) => {
     setAnchorHeight(height);
     document.documentElement.dataset.universeSurfaceTerrainState = "ready";
-  }, []);
+    document.documentElement.dataset.universeSurfacePrewarm = "ready";
+    onReadyChange?.(true);
+  }, [onReadyChange]);
+
+  useEffect(
+    () => () => {
+      onReadyChange?.(false);
+    },
+    [onReadyChange],
+  );
 
   useFrame(() => {
     const group = surfaceGroupRef.current;
@@ -200,7 +217,8 @@ export function SurfaceScene({
     // Surface group before the next render as soon as that intent leaves
     // Surface. This is presentation-only gating; React phase remains the
     // navigation authority and will reconcile the same visibility normally.
-    group.visible = active && phaseRef.current === "surface";
+    group.visible =
+      presentationActive && phaseRef.current === "surface";
   }, -100);
 
   useEffect(() => {
@@ -210,16 +228,22 @@ export function SurfaceScene({
       // lifecycle="parked". Its active/phaseRef guards pause all update work;
       // actual disposal remains owned by Canvas teardown.
       delete document.documentElement.dataset.universeSurfaceTerrainState;
-      if (!terrainEnabled) {
-        document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
-      }
+      document.documentElement.dataset.universeSurfacePrewarm = ready
+        ? "ready"
+        : terrainEnabled
+          ? "preparing"
+          : "cancelled";
       return;
     }
 
-    // A previously prepared terrain is the retained fallback. Re-entering
-    // Surface must resume it rather than scheduling a second FiniteTerrain.
+    // A previously enabled terrain may still be compiling/streaming its first
+    // usable view. Do not call that "ready" until SurfaceTerrain has reported
+    // its actual anchor/full-coverage frame.
     if (terrainEnabled) {
-      document.documentElement.dataset.universeSurfacePrewarm = "ready";
+      document.documentElement.dataset.universeSurfaceTerrainState =
+        ready ? "ready" : "preparing";
+      document.documentElement.dataset.universeSurfacePrewarm =
+        ready ? "ready" : "preparing";
       return;
     }
 
@@ -229,10 +253,31 @@ export function SurfaceScene({
     document.documentElement.dataset.universeSurfaceTerrainState = "deferred";
     document.documentElement.dataset.universeSurfacePrewarm = "scheduled";
 
+    const coordinatorStillWantsPrime = () =>
+      phaseRef.current === "atmosphere" ||
+      phaseRef.current === "surface";
+    const cancelBeforeConstruction = () => {
+      document.documentElement.dataset.universeSurfacePrewarm = "cancelled";
+      delete document.documentElement.dataset.universeSurfaceTerrainState;
+    };
+
     const timer = window.setTimeout(() => {
       if (cancelled) return;
+      // phaseRef is mutated synchronously by the scale coordinator before
+      // React reconciliation. On a saturated software renderer an outward
+      // wheel can therefore supersede this Atmosphere effect before its
+      // cleanup runs. Never let the stale idle job cross into non-interruptible
+      // ProceduralTerrains preparation after that reversal.
+      if (!coordinatorStillWantsPrime()) {
+        cancelBeforeConstruction();
+        return;
+      }
       const enable = () => {
         if (cancelled) return;
+        if (!coordinatorStillWantsPrime()) {
+          cancelBeforeConstruction();
+          return;
+        }
         document.documentElement.dataset.universeSurfaceTerrainState = "preparing";
         document.documentElement.dataset.universeSurfacePrewarm = "preparing";
         setTerrainEnabled(true);
@@ -242,7 +287,7 @@ export function SurfaceScene({
       } else {
         enable();
       }
-    }, phase === "atmosphere" ? 320 : 0);
+    }, 0);
 
     return () => {
       cancelled = true;
@@ -252,7 +297,7 @@ export function SurfaceScene({
       }
       delete document.documentElement.dataset.universeSurfaceTerrainState;
     };
-  }, [phase, prepare, terrainEnabled]);
+  }, [phase, prepare, ready, terrainEnabled]);
 
   const content = (
     <>
@@ -277,7 +322,9 @@ export function SurfaceScene({
       <Suspense fallback={null}>
         {terrainEnabled ? (
           <SurfaceTerrain
-            active={active}
+            prepare={prepare}
+            active={surfaceRequested}
+            presenting={presentationActive}
             phaseRef={phaseRef}
             onAnchorHeight={handleAnchorHeight}
           />
@@ -289,13 +336,14 @@ export function SurfaceScene({
         active={beaconActive}
         height={anchorHeight}
         onToggle={() => setBeaconActive((value) => !value)}
+        presenting={presentationActive}
         softwareLite={softwareRenderer}
       />
     </>
   );
 
   useEffect(() => {
-    if (!active) return;
+    if (!presentationActive) return;
     document.documentElement.dataset.universeSurfaceRenderer =
       "procedural-terrains-fallback";
     document.documentElement.dataset.universeSurfaceDepthCues = softwareRenderer
@@ -314,16 +362,16 @@ export function SurfaceScene({
       delete document.documentElement.dataset.universeSurfaceDepthCues;
       delete document.documentElement.dataset.universeSurfaceHorizon;
     };
-  }, [active, softwareRenderer]);
+  }, [presentationActive, softwareRenderer]);
 
   return (
     <>
-      {active ? (
+      {presentationActive ? (
         <>
           {softwareRenderer ? (
             <primitive
               attach="background"
-              object={softwareHorizonBackground}
+              object={softwareHorizonBackground!}
             />
           ) : (
             <color attach="background" args={["#030b12"]} />
@@ -333,7 +381,7 @@ export function SurfaceScene({
           ) : null}
         </>
       ) : null}
-      <group ref={surfaceGroupRef} visible={active}>{content}</group>
+      <group ref={surfaceGroupRef} visible={presentationActive}>{content}</group>
     </>
   );
 }
