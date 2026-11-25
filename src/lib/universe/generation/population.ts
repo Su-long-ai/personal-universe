@@ -297,6 +297,19 @@ export type NativeSystemPopulationMode =
   | "catalog-generated"
   | "generated";
 
+const NATIVE_STAR_PHYSICAL_FIELDS = [
+  "spectralType",
+  "temperatureK",
+  "massSolar",
+  "radiusSolar",
+  "luminositySolar",
+] as const;
+
+type NativePopulationFieldSources = {
+  measuredCatalogStarFields?: readonly string[];
+  explicitOrbitPeriodWorldIds?: ReadonlySet<string>;
+};
+
 /**
  * Attach the shared population contract to the lightweight product definition
  * mapped from pinned YEIS. This deliberately does not cache the mapped object:
@@ -306,11 +319,17 @@ export type NativeSystemPopulationMode =
 export function decorateNativeSystemPopulation(
   system: SystemDefinition,
   mode: NativeSystemPopulationMode,
+  sources: NativePopulationFieldSources = {},
 ): SystemDefinition {
   if (mode === "authored") return decorateAuthoredSystem(system);
   if (mode === "generated") return decorateGeneratedSystem(system);
 
   const catalogGenerated = mode === "catalog-generated";
+  const measuredStarFields = catalogGenerated
+    ? NATIVE_STAR_PHYSICAL_FIELDS.filter((field) =>
+        sources.measuredCatalogStarFields?.includes(field),
+      )
+    : NATIVE_STAR_PHYSICAL_FIELDS;
   const systemPopulation = observedPopulationMetadata({
     kind: "system",
     stableSeed: system.seed,
@@ -340,14 +359,10 @@ export function decorateNativeSystemPopulation(
           "observed-star",
           `spectral:${system.star.spectralType}`,
         ],
-        observedFields: [
-          "name",
-          "spectralType",
-          "temperatureK",
-          "massSolar",
-          "radiusSolar",
-          "luminositySolar",
-        ],
+        observedFields: ["name", ...measuredStarFields],
+        inferredFields: NATIVE_STAR_PHYSICAL_FIELDS.filter(
+          (field) => !measuredStarFields.includes(field),
+        ),
       }),
     },
     planets: system.planets.map((planet) => {
@@ -390,6 +405,8 @@ export function decorateNativeSystemPopulation(
         };
       }
 
+      const hasExplicitPeriod =
+        sources.explicitOrbitPeriodWorldIds?.has(planet.id) ?? false;
       return {
         ...planet,
         population: observedPopulationMetadata({
@@ -404,19 +421,20 @@ export function decorateNativeSystemPopulation(
             `archetype:${planet.archetype}`,
             `capability:${capability}`,
           ],
-          // Keep native Solar physical/orbital values observed; product
-          // archetype/capability and equilibrium temperature are derived.
+          // Unit conversions preserve supplied values. A period derived
+          // from semimajor axis and stellar mass is not a supplied value.
           observedFields: [
             "name",
             "radiusEarth",
             "massEarth",
             "orbitAU",
-            "orbitalPeriodYears",
+            ...(hasExplicitPeriod ? ["orbitalPeriodYears"] : []),
           ],
           inferredFields: [
             "archetype",
             "capability",
             "equilibriumTempK",
+            ...(hasExplicitPeriod ? [] : ["orbitalPeriodYears"]),
           ],
         }),
         moons: planet.moons.map((moon) => ({

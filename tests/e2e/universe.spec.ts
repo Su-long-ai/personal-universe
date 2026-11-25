@@ -3402,7 +3402,9 @@ test("native catalogue population remains hybrid without a second identity graph
   );
   expect(validateSystemPopulation(hybrid)).toEqual([]);
   expect(hybrid.population?.provenance).toBe("hybrid");
-  expect(hybrid.star.population?.provenance).toBe("observed");
+  expect(hybrid.star.population?.provenance).toBe("hybrid");
+  expect(hybrid.star.population?.observedFields).toEqual(["name"]);
+  expect(hybrid.star.population?.inferredFields).toContain("temperatureK");
   expect(
     hybrid.planets.every(
       (planet) => planet.population?.provenance === "generated",
@@ -3423,6 +3425,21 @@ test("default YEIS Solar system publishes observed population provenance", async
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
+  // Provenance does not depend on optional third-party Solar imagery. Keep
+  // this focused browser test deterministic when public tile hosts are blocked.
+  const tile = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGMISGoCAAI6ATVu1FmqAAAAAElFTkSuQmCC",
+    "base64",
+  );
+  await page.route(
+    /^https:\/\/(?:trek\.nasa\.gov\/tiles\/|gibs\.earthdata\.nasa\.gov\/wmts\/)/,
+    (route) =>
+      route.fulfill({
+        contentType: "image/png",
+        headers: { "access-control-allow-origin": "*" },
+        body: tile,
+      }),
+  );
   await page.goto("/?phase=system&star=c0&freeze=1");
   await waitForYeisEngine(page);
 

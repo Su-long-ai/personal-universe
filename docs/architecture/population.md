@@ -93,10 +93,13 @@ The default YEIS path uses the same population schema rather than a second
 population graph. The adapter classifies existing native materialization:
 
 - Aurora/hero identity is `authored`;
-- the native Solar System is `observed`, with product archetype/capability
-  recorded as inferred metadata;
+- the native Solar System is `observed`. Product archetype/capability and
+  periods computed from orbital elements are inferred; a period explicitly
+  supplied by the native orbit remains observed;
 - named catalogue-star systems are `hybrid`: catalogue star identity is
-  observed while the pinned YEIS system generator supplies their worlds;
+  observed while the pinned YEIS system generator supplies their worlds.
+  Native photometric estimates are inferred, while explicit measured host
+  overrides retain observed status field by field;
 - procedural native systems remain `generated`.
 
 The adapter does **not** add another native system cache. Pinned YEIS

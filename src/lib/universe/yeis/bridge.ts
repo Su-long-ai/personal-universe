@@ -120,7 +120,8 @@ export function buildYeisGalaxyIndex(
           "generated-system",
           `spectral:${spectralType}`,
         ],
-        observedFields: ["name", "nativeId", "position", "spectralType"],
+        observedFields: ["name", "nativeId", "position"],
+        inferredFields: ["spectralType"],
       }),
     });
     added += 1;
@@ -169,6 +170,10 @@ export function markerForYeisStarId(
     ...(starId === HERO_SYSTEM_ID ? { heroKey: "home" } : {}),
   };
 
+  const spectralTypeIsMeasured =
+    starId === "c0" ||
+    (source === "catalog" &&
+      measuredCatalogStarFields(runtime.universe, starId).includes("spectralType"));
   marker.population =
     source === "hero"
       ? authoredMarkerPopulation(marker)
@@ -182,7 +187,13 @@ export function markerForYeisStarId(
               starId === "c0" ? "solar-system" : "catalog-star",
               `spectral:${spectralType}`,
             ],
-            observedFields: ["name", "nativeId", "position", "spectralType"],
+            observedFields: [
+              "name",
+              "nativeId",
+              "position",
+              ...(spectralTypeIsMeasured ? ["spectralType"] : []),
+            ],
+            inferredFields: spectralTypeIsMeasured ? [] : ["spectralType"],
           })
         : generatedMarkerPopulation(marker);
 
@@ -200,11 +211,28 @@ export function resolveYeisSystem(
   const starInfo = runtime.universe.starInfo(starId);
   system.update(2451545.0, 0);
 
+  const isSolarSystem = starId === "c0";
+  const explicitOrbitPeriodWorldIds = new Set<string>();
   const planets = system.bodies
     .filter((body) => body.data.type === "planet" || body.data.type === "dwarf")
-    .map((body, index) =>
-      mapPlanet(body.data, system, starInfo.massSolar, starId === "c0", index),
-    );
+    .map((body, index) => {
+      const planet = mapPlanet(
+        body.data,
+        system,
+        starInfo.massSolar,
+        isSolarSystem,
+        index,
+      );
+      const orbit = body.data.orbit;
+      if (
+        isSolarSystem &&
+        orbit?.kind === "simple" &&
+        orbit.period / YEAR_DAYS === planet.orbitalPeriodYears
+      ) {
+        explicitOrbitPeriodWorldIds.add(planet.id);
+      }
+      return planet;
+    });
 
   const definition: SystemDefinition = {
     id: `yeis-system:${starId}`,
@@ -233,14 +261,39 @@ export function resolveYeisSystem(
   const mode =
     marker.source === "hero"
       ? "authored"
-      : starId === "c0"
+      : isSolarSystem
         ? "observed"
         : marker.source === "catalog"
           ? "catalog-generated"
           : "generated";
-  const populated = decorateNativeSystemPopulation(definition, mode);
+  const populated = decorateNativeSystemPopulation(definition, mode, {
+    explicitOrbitPeriodWorldIds,
+    measuredCatalogStarFields:
+      mode === "catalog-generated"
+        ? measuredCatalogStarFields(runtime.universe, starId)
+        : undefined,
+  });
   assertSystemPopulation(populated);
   return populated;
+}
+
+function measuredCatalogStarFields(universe: Universe, starId: string): string[] {
+  if (!universe.hasMeasuredInfo(starId)) return [];
+  // The pinned native universe applies the last explicit host override. Read
+  // the same input so partial overrides do not promote other estimates.
+  const override = universe.blackHoles.findLast(
+    ({ systemStarId, entry: { host } }) =>
+      systemStarId === starId && host.kind === "catalog" && Boolean(host.star),
+  )?.entry.host;
+  if (override?.kind !== "catalog" || !override.star) return [];
+  const measurements = override.star;
+  return [
+    ...(measurements.spectral !== undefined ? ["spectralType"] : []),
+    ...(measurements.temperature !== undefined ? ["temperatureK"] : []),
+    ...(measurements.massSolar !== undefined ? ["massSolar"] : []),
+    ...(measurements.radiusSolar !== undefined ? ["radiusSolar"] : []),
+    ...(measurements.luminosity !== undefined ? ["luminositySolar"] : []),
+  ];
 }
 
 function mapPlanet(
