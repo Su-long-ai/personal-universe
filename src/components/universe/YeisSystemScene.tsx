@@ -245,6 +245,8 @@ export function YeisSystemScene({
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
   quality,
 }: {
@@ -252,6 +254,8 @@ export function YeisSystemScene({
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string | null) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
 }) {
@@ -266,6 +270,14 @@ export function YeisSystemScene({
   const focusProjectionRef = useRef(new THREE.Vector3());
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
+  const reportedSuppressedTargetRef = useRef<string | null>(null);
+  const handoffNativeId = useMemo(() => {
+    if (!handoffTargetPlanetId) return null;
+    const target = system.planets.find(
+      (planet) => planet.id === handoffTargetPlanetId,
+    );
+    return target ? nativePlanetId(target) : null;
+  }, [handoffTargetPlanetId, system.planets]);
 
   useEffect(() => {
     let active = true;
@@ -335,6 +347,11 @@ export function YeisSystemScene({
       delete document.documentElement.dataset.universeSystemRenderer;
       delete document.documentElement.dataset.universeSystemReady;
       delete document.documentElement.dataset.universeSystemFocus;
+      delete document.documentElement.dataset.universeSystemTargetSuppressed;
+      if (reportedSuppressedTargetRef.current !== null) {
+        reportedSuppressedTargetRef.current = null;
+        onHandoffTargetSuppressed?.(null);
+      }
       focusedIdRef.current = null;
       focusedNativeIdRef.current = null;
       focusFillRef.current.clear();
@@ -448,6 +465,28 @@ export function YeisSystemScene({
         fill: focusFillRef.current,
       },
     );
+
+    const handoffView = handoffNativeId
+      ? resources.bodies.byId.get(handoffNativeId)
+      : null;
+    const suppressedTargetId = handoffView
+      ? handoffTargetPlanetId ?? handoffNativeId
+      : null;
+    if (handoffView) {
+      // BodyRenderer.update() owns ordinary visibility and runs first. Only
+      // after this concrete YEIS frame hides the duplicated target do we
+      // acknowledge transfer to UniverseCanvas.
+      handoffView.group.visible = false;
+      document.documentElement.dataset.universeSystemTargetSuppressed =
+        suppressedTargetId!;
+    } else {
+      delete document.documentElement.dataset.universeSystemTargetSuppressed;
+    }
+    if (reportedSuppressedTargetRef.current !== suppressedTargetId) {
+      reportedSuppressedTargetRef.current = suppressedTargetId;
+      onHandoffTargetSuppressed?.(suppressedTargetId);
+    }
+
     resources.points.setPixelRatio(gl.getPixelRatio());
     resources.points.update(
       star.position,
@@ -478,6 +517,8 @@ export function YeisSystemScene({
         onSelectPlanet={onSelectPlanet}
         onScaleFocus={onScaleFocus}
         scaleTargetPlanet={scaleTargetPlanet}
+        handoffTargetPlanetId={handoffTargetPlanetId}
+        onHandoffTargetSuppressed={onHandoffTargetSuppressed}
         onScaleFrame={onScaleFrame}
       />
     );
@@ -496,14 +537,16 @@ export function YeisSystemScene({
         speed={0.06}
       />
       <primitive object={resources.scene} />
-      {system.planets.map((planet) => (
-        <ProductPlanetTarget
-          key={planet.id}
-          planet={planet}
-          resources={resources}
-          onSelect={onSelectPlanet}
-        />
-      ))}
+      {system.planets.map((planet) =>
+        planet.id === handoffTargetPlanetId ? null : (
+          <ProductPlanetTarget
+            key={planet.id}
+            planet={planet}
+            resources={resources}
+            onSelect={onSelectPlanet}
+          />
+        ),
+      )}
     </>
   );
 }
