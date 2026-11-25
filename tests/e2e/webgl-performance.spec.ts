@@ -121,7 +121,53 @@ async function forceWebglLossAndRestore(page: Page) {
   });
 }
 
-async function driveGalaxySystemRoundTrip(page: Page) {
+async function trackDreiStarsPrograms(page: Page) {
+  function install() {
+    const gl = WebGL2RenderingContext.prototype;
+    const vertexShaders = new WeakSet<WebGLShader>();
+    const programs = new Set<WebGLProgram>();
+    const originalShaderSource = gl.shaderSource;
+    const originalAttach = gl.attachShader;
+    const originalDelete = gl.deleteProgram;
+
+    // Identify the installed Drei Stars vertex shader, not a specific driver
+    // variant. Its different lighting cache keys can emit identical GLSL.
+    gl.shaderSource = function (shader, source) {
+      if (
+        source.includes("attribute float size;") &&
+        source.includes("sin(time + 100.0)")
+      ) {
+        vertexShaders.add(shader);
+      }
+      originalShaderSource.call(this, shader, source);
+    };
+    gl.attachShader = function (program, shader) {
+      if (vertexShaders.has(shader)) programs.add(program);
+      originalAttach.call(this, program, shader);
+    };
+    gl.deleteProgram = function (program) {
+      if (program) programs.delete(program);
+      originalDelete.call(this, program);
+    };
+
+    Object.defineProperty(window, "__puDreiStarsPrograms", {
+      get: () => programs.size,
+    });
+  }
+
+  await page.addInitScript(install);
+  return () =>
+    page.evaluate(
+      () =>
+        (window as Window & { __puDreiStarsPrograms: number })
+          .__puDreiStarsPrograms,
+    );
+}
+
+async function driveGalaxySystemRoundTrip(
+  page: Page,
+  readStarsPrograms: () => Promise<number>,
+) {
   const html = page.locator("html");
 
   for (let sample = 0; sample < 4; sample += 1) {
@@ -143,6 +189,10 @@ async function driveGalaxySystemRoundTrip(page: Page) {
     { timeout: 15_000 },
   );
 
+  // System's readiness can precede its first Three.js draw. Require a
+  // compiled program so a skipped System render cannot satisfy teardown.
+  await expect.poll(readStarsPrograms).toBeGreaterThan(0);
+
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
@@ -162,6 +212,10 @@ async function driveGalaxySystemRoundTrip(page: Page) {
     "data-universe-scale-position",
     "0.000",
   );
+  await waitForYeis(page);
+  // Unlike a full world journey, Galaxy/System never paints the retained
+  // planet starfield. No Drei Stars program has a live owner after return.
+  await expect.poll(readStarsPrograms).toBe(0);
 }
 
 async function driveFullScaleRoundTrip(page: Page) {
@@ -180,6 +234,10 @@ async function driveFullScaleRoundTrip(page: Page) {
     "system",
     { timeout: 10_000 },
   );
+  // Logical scale reaches System before its renderer has mounted and drawn.
+  // Exercise the real System in both warm-up and measured journeys.
+  await expect(html).toHaveAttribute("data-universe-system-ready", "true");
+  await waitForNextWebglMetric(page, await readWebglMetricSample(page));
 
   for (let sample = 0; sample < 16; sample += 1) {
     if ((await html.getAttribute("data-universe-scale-position")) === "5.000") {
@@ -292,7 +350,6 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
 }
 
 async function settleWebglMetrics(page: Page) {
-  const html = page.locator("html");
   const current = await readWebglMetrics(page);
 
   // Pipeline lifecycle transitions publish a synchronous gl.info snapshot.
@@ -303,17 +360,21 @@ async function settleWebglMetrics(page: Page) {
     return { first: current, second: current };
   }
 
+  await waitForNextWebglMetric(page, current.sample);
+  return { first: current, second: await readWebglMetrics(page) };
+}
+
+async function readWebglMetricSample(page: Page) {
+  const value = await page.locator("html").getAttribute(
+    "data-universe-webgl-metric-sample",
+  );
+  return Number(value ?? -1);
+}
+
+async function waitForNextWebglMetric(page: Page, previousSample: number) {
   await expect
-    .poll(
-      async () =>
-        Number(
-          (await html.getAttribute("data-universe-webgl-metric-sample")) ?? -1,
-        ),
-      { timeout: 20_000 },
-    )
-    .toBeGreaterThan(current.sample);
-  const next = await readWebglMetrics(page);
-  return { first: current, second: next };
+    .poll(() => readWebglMetricSample(page), { timeout: 20_000 })
+    .toBeGreaterThan(previousSample);
 }
 
 async function attachMetrics(
@@ -432,19 +493,21 @@ test("terminal WebGL release permits a fresh BrowserContext @webgl-heavy", async
 test("Galaxy System remounts retire WebGL geometry @webgl-heavy", async ({
   page,
 }, testInfo) => {
+  const readStarsPrograms = await trackDreiStarsPrograms(page);
   await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
   await waitForYeis(page);
+  expect(await readStarsPrograms()).toBe(0);
   await expect(page.locator("html")).toHaveAttribute(
     "data-universe-active-destination",
     "hero:aurora-01",
     { timeout: 20_000 },
   );
 
-  await driveGalaxySystemRoundTrip(page);
+  await driveGalaxySystemRoundTrip(page, readStarsPrograms);
   const first = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-system-cycle-1.json", first);
 
-  await driveGalaxySystemRoundTrip(page);
+  await driveGalaxySystemRoundTrip(page, readStarsPrograms);
   const second = (await settleWebglMetrics(page)).second;
   await attachMetrics(testInfo, "webgl-system-cycle-2.json", second);
 
@@ -624,9 +687,14 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
   const cycles: WebglMetrics[] = [];
   for (let cycle = 1; cycle <= 4; cycle += 1) {
     await driveFullScaleRoundTrip(page);
-    const settled = await settleWebglMetrics(page);
-    cycles.push(settled.second);
-    await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, settled.second);
+    // "Parked" describes the world pipeline, not the active Galaxy renderer.
+    // Compare fresh Galaxy frames after the native scene has returned, not a
+    // synchronous parking snapshot taken before that scene mounts or draws.
+    await waitForYeis(page);
+    await waitForNextWebglMetric(page, await readWebglMetricSample(page));
+    const settled = await readWebglMetrics(page);
+    cycles.push(settled);
+    await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, settled);
   }
   const baseline = cycles[0]!;
 

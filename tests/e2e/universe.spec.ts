@@ -3471,6 +3471,19 @@ test("120Hz-like burst stays reversible across Galaxy System and Approach handof
   );
 
   const inwardTrace: number[] = [];
+  // Keep the original 10 s of readiness waiting across all inward gates.
+  // As before, CDP/selector time used to deliver samples is not time spent
+  // passively waiting for a renderer to take ownership.
+  let inwardReadinessBudget = 10_000;
+  const expectInwardAttribute = async (attribute: string, value: string | RegExp) => {
+    const waitStarted = performance.now();
+    await expect(html).toHaveAttribute(attribute, value, {
+      timeout: Math.max(1, inwardReadinessBudget),
+    });
+    inwardReadinessBudget -= performance.now() - waitStarted;
+  };
+  let enteredSystem = false;
+  let enteredApproach = false;
   for (let sample = 0; sample < 24; sample += 1) {
     await dispatchScaleWheel(page, -96);
     await page.waitForTimeout(8);
@@ -3478,6 +3491,22 @@ test("120Hz-like burst stays reversible across Galaxy System and Approach handof
       await html.getAttribute("data-universe-scale-position"),
     );
     inwardTrace.push(position);
+
+    // Endpoint samples clamp without being replayed into the next owner.
+    // Keep the 8 ms burst cadence on each active segment; do not exhaust
+    // the System samples while Galaxy still owns the matched endpoint.
+    if (!enteredSystem && position === 1) {
+      await expectInwardAttribute("data-universe-navigation-phase", "system");
+      await expectInwardAttribute(
+        "data-universe-galaxy-scale-applied-position",
+        "1.000",
+      );
+      enteredSystem = true;
+    }
+    if (!enteredApproach && position === 2) {
+      await expectInwardAttribute("data-universe-navigation-phase", "approach");
+      enteredApproach = true;
+    }
     if (position >= 2.499) break;
   }
 
@@ -3486,11 +3515,12 @@ test("120Hz-like burst stays reversible across Galaxy System and Approach handof
       inwardTrace[index - 1] - 0.001,
     );
   }
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    /approach|orbit/,
-    { timeout: 10_000 },
-  );
+  expect(enteredSystem, "native endpoint handed off to System").toBe(true);
+  expect(enteredApproach, "System handed off to Approach").toBe(true);
+  expect(inwardTrace.some((position) => position > 0 && position < 1)).toBe(true);
+  expect(inwardTrace.some((position) => position > 1 && position < 2)).toBe(true);
+  expect(inwardTrace.some((position) => position > 2 && position < 3)).toBe(true);
+  await expectInwardAttribute("data-universe-navigation-phase", /approach|orbit/);
   expect(Number(await html.getAttribute("data-universe-scale-position")))
     .toBeGreaterThanOrEqual(2.499);
 

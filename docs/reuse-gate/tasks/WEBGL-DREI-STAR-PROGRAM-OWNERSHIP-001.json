@@ -1,0 +1,163 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-DREI-STAR-PROGRAM-OWNERSHIP-001",
+  "title": "Release Drei starfield shader program references when an owned render scene unmounts",
+  "scope": {
+    "level": "implementation",
+    "subject": "Own the existing Drei Stars material lifecycle and prove the repeated continuous journey retains only live or intentionally parked resources"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Exact candidate f7514a2 GitHub SwiftShader run 45671707266 recorded warmed program counts [20,20,24,24] and [20,20,22,22] on retry, with unchanged geometry, textures, allocation counters and draw counts. Local native WebGL and Three material/program tracing identifies an actual disposed-scene leak: a departed 1800-point System Stars object still owns its compiled program, and another program shared with retained 600-point world stars has an extra departed System material reference. Drei 9.122 uses a primitive with a per-mount StarfieldMaterial. R3F 8.18 explicitly skips primitive disposal. Three 0.185.1 does not release shader program references until material.dispose and includes lighting state among variant keys. Reuse the same Drei component and clean up the specific owned material on unmount; retain the existing frame/renderer authority and warmed program bound.",
+  "planned_files": [
+    "src/components/universe/LifecycleStars.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://drei.docs.pmnd.rs/staging/stars",
+      "finding": "Drei Stars already supplies all starfield geometry, shader and animation; its installed 9.122.0 source creates a per-instance StarfieldMaterial and mounts its material as a primitive."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/objects#disposal",
+      "finding": "R3F disposes ordinary declarative objects, not primitive external objects; request disposal only for the per-instance primitive material omitted by the framework."
+    },
+    {
+      "url": "https://threejs.org/manual/en/how-to-dispose-of-objects.html",
+      "finding": "Three releases shader program references on Material.dispose; a shared program is destroyed only after all its materials are disposed."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/renderers/WebGLRenderer.info",
+      "finding": "The already used WebGLRenderer.info program and memory diagnostics expose the resource counts; preserve actual GPU program bounds and use program reference evidence to detect leaked owners even when cache IDs are shared."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Use the existing Playwright WebGL-heavy suite and observable lifecycle/metric samples rather than fixed waits or a parallel GPU harness."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "The existing project, renderer and user navigation are correct abstractions; replacement would not solve a leaked per-instance material reference."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Retain the R3F host and existing Three WebGLRenderer. Use their documented owner disposal and program metrics, never purge a shared cache."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-three-drei",
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        4
+      ],
+      "conclusion": "Keep Drei Stars shader, geometry, animation and Playwright resource acceptance unchanged except lifecycle and targeted evidence."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-drei"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "Use the existing Stars Points ref to capture one logically owned material at mount and release it during scene unmount. Do not dispose the geometry/cache or parked world materials prematurely."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "owned-drei-stars",
+      "name": "Drei Stars plus documented primitive material disposal",
+      "level": "component_asset",
+      "registry_id": "react-three-drei",
+      "source": "Existing installed Drei Stars and Three Material.dispose",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Restore the missing owner lifecycle without altering appearance, geometry, input, cache keys, shaders or lifecycle of parked renderers.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "current-r3f-metrics",
+      "name": "Existing R3F/Three renderer and WebGL metrics",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing renderer.info and project useFrame telemetry",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Use actual fresh metrics and the existing Playwright suite; keep the current numeric program limit and reject growing reference ownership.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "global-cache-or-custom-stars",
+      "name": "Flush the renderer cache or replace the starfield implementation",
+      "level": "framework_engine",
+      "source": "Renderer reset, package fork, or new custom starfield",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Resetting globally would release valid retained resources and mask the true leak; cloning the Drei shader would be unnecessary maintenance.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "owned-drei-stars",
+      "current-r3f-metrics"
+    ],
+    "rationale": "Keep the installed renderer, component, and shader code; explicitly release the child-owned primitive material at actual unmount, and distinguish program ownership from legitimate finite cache variants using fresh metric evidence. Do not relax the established program limit.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If another code path still creates a nonretiring resource, use observed native program identities and actual material ownership to isolate it; never clear shared renderer cache or widen the quantitative limit."
+  }
+}

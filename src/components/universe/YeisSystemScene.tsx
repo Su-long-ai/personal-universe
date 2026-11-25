@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import {
   SYSTEM_OVERVIEW_RADIUS,
@@ -26,6 +25,7 @@ import {
   SystemScene,
   type SystemScaleFrame,
 } from "./SystemScene";
+import { LifecycleStars } from "./LifecycleStars";
 
 const HIT_RADIUS = 0.34;
 
@@ -545,7 +545,7 @@ export function YeisSystemScene({
   return (
     <>
       <color attach="background" args={["#010208"]} />
-      <Stars
+      <LifecycleStars
         radius={90}
         depth={45}
         count={quality === "low" ? 900 : 1800}
