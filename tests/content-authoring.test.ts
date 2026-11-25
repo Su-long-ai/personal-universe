@@ -10,6 +10,7 @@ import {
   normalizeImportedContentBatch,
   normalizeImportedContentRecord,
   resolveUniverseContentReference,
+  universeContentSearchAliases,
   validateUniverseContentCatalog,
   validateUniverseContentDestinations,
   validateUniverseContentMediaPresence,
@@ -327,6 +328,23 @@ test("Personal Signal metadata is derived from canonical content", () => {
   assert.equal(signal.destinationId, "star:c59669");
   assert.equal(signal.surface?.cluster, "core");
   assert.deepEqual(signal.aliases, ["Signal", "信号"]);
+});
+
+test("Personal destination search aliases combine authored copy with existing tags", () => {
+  const value = entry({
+    title: "Signal",
+    tags: ["engineering", "Shared"],
+    i18n: { zh: { title: "项目标题" } },
+    aliases: { en: ["Shared", "Project Beacon"], zh: ["项目信号"] },
+  });
+
+  const result = universeContentSearchAliases(value);
+  assert.deepEqual(result.slice(0, 2), ["engineering", "Shared"]);
+  assert.deepEqual(
+    [...result].sort(),
+    ["engineering", "Shared", "Signal", "Project Beacon", "项目标题", "项目信号"].sort(),
+  );
+  assert.deepEqual(value.tags, ["engineering", "Shared"]);
 });
 
 test("derived indexes are deterministic across input ordering", () => {

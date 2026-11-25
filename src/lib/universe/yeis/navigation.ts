@@ -4,7 +4,10 @@ import type {
   PlanetDefinition,
   SystemDefinition,
 } from "../types";
-import { placementForContentReference } from "../content";
+import {
+  placementForContentReference,
+  universeContentSearchAliases,
+} from "../content";
 import type {
   UniverseContentKind,
   UniverseContentPlacement,
@@ -541,7 +544,7 @@ export function navigationDestinationForPlacement(
     origin: "personal",
     importance: placement.entry.importance,
     featured: placement.entry.featured,
-    aliases: placement.entry.tags,
+    aliases: universeContentSearchAliases(placement.entry),
     keywords: [
       placement.entry.summary,
       ...placement.entry.tags,

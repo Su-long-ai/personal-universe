@@ -602,6 +602,12 @@ export function universeContentAliases(
   );
 }
 
+export function universeContentSearchAliases(
+  entry: UniverseContentEntry,
+): string[] {
+  return [...new Set([...entry.tags, ...universeContentAliases(entry)])];
+}
+
 export function universeContentReferenceIds(
   entry: UniverseContentEntry,
 ): string[] {
