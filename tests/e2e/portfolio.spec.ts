@@ -15,8 +15,11 @@ test("regular 3D home keeps Search and links to the shareable project and back",
   await expect(page.locator("canvas")).toHaveCount(1);
   await expect(page.locator("#portfolio-home-fallback")).toBeHidden();
   await page.getByRole("button", { name: /SEARCH \/ PLACES/i }).click();
-  await expect(page.getByRole("dialog", { name: "Universe navigator" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  const dialog = page.getByRole("dialog", { name: /universe navigator/i });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close navigator", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".universe-navigator-backdrop")).toHaveCount(0);
 
   await page.getByRole("link", { name: "Portfolio", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Portfolio" })).toBeVisible();
@@ -32,6 +35,54 @@ test("regular 3D home keeps Search and links to the shareable project and back",
   await expect(page.locator("canvas")).toHaveCount(1);
   await runtime.assertClean(testInfo);
 });
+
+test("keyboard cancels the Navigator before the search field can receive focus", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  // Exercise the real key while focus is still on the opener, independent of
+  // browser/runner scheduling of the 3D page's search focus.
+  await page.addInitScript(() => {
+    const focus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (options?: FocusOptions) {
+      if (this.matches(".universe-navigator input")) return;
+      focus.call(this, options);
+    };
+  });
+  await page.goto(path("/?lang=en&freeze=1"));
+  await waitForYeis(page);
+
+  const opener = page.getByRole("button", { name: /SEARCH \/ PLACES/i });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: /universe navigator/i });
+  await expect(dialog).toBeVisible();
+  await expect(opener).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".universe-navigator-backdrop")).toHaveCount(0);
+  await runtime.assertClean(testInfo);
+});
+
+for (const target of ["filter", "result"] as const) {
+  test("keyboard cancels the localized Navigator with a " + target + " focused", async ({ page }, testInfo) => {
+    const runtime = await observeRuntime(page);
+    await page.goto(path("/?lang=zh&freeze=1"));
+    await waitForYeis(page);
+    await page.getByRole("button", { name: /搜索 \/ 地点/ }).click();
+
+    const dialog = page.getByRole("dialog", { name: "宇宙导航" });
+    await expect(dialog.getByRole("combobox", { name: "搜索宇宙" })).toBeFocused();
+    const control = target === "filter"
+      ? dialog.locator(".navigator-filters").getByRole("button", { name: "重要", exact: true })
+      : dialog.locator(".navigator-result-open").first();
+    await expect(control).toBeVisible();
+    await control.focus();
+    await expect(control).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".universe-navigator-backdrop")).toHaveCount(0);
+    await runtime.assertClean(testInfo);
+  });
+}
 
 test("a WebGL initialization failure leaves a browsable native portfolio", async ({ page }) => {
   const initErrors: string[] = [];
