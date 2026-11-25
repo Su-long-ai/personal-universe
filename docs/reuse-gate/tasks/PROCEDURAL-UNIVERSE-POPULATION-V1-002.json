@@ -1,0 +1,210 @@
+{
+  "schema": 2,
+  "task_id": "PROCEDURAL-UNIVERSE-POPULATION-V1-002",
+  "title": "Deterministic observed plus generated population core",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Extend the existing seeded Personal Universe generation layer with one versioned population metadata contract, observed/generated provenance, world capability, bounded lazy system materialization, catalog indexing, and deterministic invariants without adding a second generator or database"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Personal Universe already has the right reusable foundation: a Helios-derived deterministic SeededRng/system generator, an authoritative NASA Exoplanet Archive snapshot adapter, and the pinned MIT YEIS native astronomy identity boundary. The missing product layer is not another astrophysics engine or rendering framework; it is stable versioned population metadata and bounded materialization around those existing primitives. Reuse current generators and observed catalog, make provenance/capability/version explicit, index observed lookup once, cache only focused systems with a fixed bound, and preserve canonical marker/system/planet IDs rather than adding a parallel namespace.",
+  "planned_files": [
+    "src/lib/universe/types.ts",
+    "src/lib/universe/generation/population.ts",
+    "src/lib/universe/generation/catalog.ts",
+    "src/lib/universe/generation/galaxyGenerator.ts",
+    "src/lib/universe/generation/systemGenerator.ts",
+    "src/lib/universe/generation/index.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/dhairyaozaa/procedural-star-system",
+      "finding": "The already-adopted ISC Helios generator supplies the seeded RNG and composable star/planet/moon generation pattern used by the current Personal Universe implementation; extending that deterministic decomposition is lower risk than replacing it."
+    },
+    {
+      "url": "https://exoplanetarchive.ipac.caltech.edu/docs/program_interfaces.html",
+      "finding": "NASA Exoplanet Archive TAP/pscomppars is the project's existing authoritative source for confirmed exoplanet host and planetary parameters. Observed values remain authoritative while missing properties are represented as explicit inferred metadata."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "The verified MIT YEIS commit is the fixed native astronomy identity/reference-frame boundary. Population metadata adapts to that identity instead of copying current AGPL upstream code or creating a second native universe model."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/",
+      "finding": "React Three Fiber is the adopted render lifecycle host, but its scene/frame abstractions do not provide deterministic astronomy population schemas, provenance, catalog indexing, or lazy system materialization; population remains data-layer logic outside the render framework."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Retain pinned YEIS as the native astronomy identity and hierarchy boundary; do not replace the product with a second universe engine."
+    },
+    {
+      "level": "framework_engine",
+      "status": "none",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "The adopted R3F framework owns rendering lifecycle, not population provenance, deterministic catalog generation, indexing, or materialization; no additional framework is justified."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "helios-procedural-system",
+        "nasa-exoplanet-archive"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse the existing Helios-derived deterministic generator for generated structure and the existing NASA snapshot adapter for observed facts, then add only project-specific metadata/index/cache glue."
+    },
+    {
+      "level": "component_asset",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [],
+      "conclusion": "The existing SeededRng/hash helpers and built-in Map are sufficient; another PRNG, cache package, schema runtime, or spatial database would add no value to this bounded core."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "pinned-yeis-population-identity",
+      "name": "Pinned MIT YEIS native astronomy identity boundary",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Verified pinned MIT YEIS commit already integrated in Personal Universe",
+      "license": "MIT source at e520568; bundled catalog assets retain their own notices",
+      "decision": "reuse",
+      "reason": "Keeps generated and observed population aligned with the native star/system identity already used by navigation and rendering instead of creating a second universe hierarchy.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-helios-seeded-generation",
+      "name": "Existing Helios-derived SeededRng and system generator",
+      "level": "subsystem",
+      "registry_id": "helios-procedural-system",
+      "source": "Current src/lib/universe/generation implementation",
+      "license": "ISC upstream pattern plus project code",
+      "decision": "reuse",
+      "reason": "Already provides stable per-seed decomposition for stars, planets and moons; extending metadata around it preserves insertion stability and avoids a replacement generator.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "existing-nasa-observed-catalog",
+      "name": "Existing NASA Exoplanet Archive snapshot adapter",
+      "level": "subsystem",
+      "registry_id": "nasa-exoplanet-archive",
+      "source": "Current exoplanet-hosts snapshot and generation/catalog.ts adapter",
+      "license": "NASA public scientific data / archive terms; attribution retained",
+      "decision": "reuse",
+      "reason": "Preserves observed host and planet facts as authoritative while allowing deterministic inferred fallback fields only where the snapshot lacks values.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4.5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "new-heavy-astrophysics-population-engine",
+      "name": "New custom or third-party full astrophysics population engine",
+      "level": "full_solution",
+      "source": "Potential new dependency/custom subsystem",
+      "license": "Unknown/project dependent",
+      "decision": "reject",
+      "reason": "Would duplicate seeded generation, observed catalog handling and native hierarchy already present, while increasing migration and identity risk without product-value evidence."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Deterministic generated system/world composition with insertion-stable identities",
+      "importance": "high",
+      "coverage": {
+        "existing-helios-seeded-generation": "full",
+        "existing-nasa-observed-catalog": "none",
+        "pinned-yeis-population-identity": "partial",
+        "new-heavy-astrophysics-population-engine": "partial"
+      },
+      "decision": "Keep generation keyed by canonical seed/identity and add explicit generator version metadata instead of changing the seed topology."
+    },
+    {
+      "capability": "Observed facts remain authoritative and distinguishable from inferred/generated fields",
+      "importance": "high",
+      "coverage": {
+        "existing-helios-seeded-generation": "none",
+        "existing-nasa-observed-catalog": "full",
+        "pinned-yeis-population-identity": "partial",
+        "new-heavy-astrophysics-population-engine": "partial"
+      },
+      "decision": "Index and adapt the existing NASA snapshot; never overwrite observed fields with generated values."
+    },
+    {
+      "capability": "Canonical navigation identity remains compatible with native astronomy and deep links",
+      "importance": "high",
+      "coverage": {
+        "existing-helios-seeded-generation": "partial",
+        "existing-nasa-observed-catalog": "partial",
+        "pinned-yeis-population-identity": "full",
+        "new-heavy-astrophysics-population-engine": "none"
+      },
+      "decision": "Attach population metadata to current marker/system/world identities and keep pinned YEIS as the native identity boundary."
+    },
+    {
+      "capability": "Bounded focused-system materialization without universe-wide eager object graphs",
+      "importance": "high",
+      "coverage": {
+        "existing-helios-seeded-generation": "partial",
+        "existing-nasa-observed-catalog": "partial",
+        "pinned-yeis-population-identity": "partial",
+        "new-heavy-astrophysics-population-engine": "partial"
+      },
+      "decision": "Add a small fixed-capacity cache and prebuilt observed lookup index around current resolvers; do not introduce a database."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "pinned-yeis-population-identity",
+      "existing-helios-seeded-generation",
+      "existing-nasa-observed-catalog"
+    ],
+    "rationale": "Preserve the current generation and native identity stack, then add a narrow versioned population contract, capability/provenance derivation, indexed observed lookup and bounded lazy system cache. This covers the product requirements with less migration risk and no new runtime dependency.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If future catalog scale exceeds the bounded in-memory index/cache design, measure actual lookup/materialization cost first and run a new reuse-gate unit for a spatial/index database rather than preemptively replacing the current generator."
+  }
+}
