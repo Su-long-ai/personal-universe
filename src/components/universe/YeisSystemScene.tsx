@@ -246,6 +246,7 @@ export function YeisSystemScene({
   onScaleFocus,
   scaleTargetPlanet,
   handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
   quality,
 }: {
@@ -254,6 +255,7 @@ export function YeisSystemScene({
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string | null) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
   quality: QualityMode;
 }) {
@@ -268,6 +270,7 @@ export function YeisSystemScene({
   const focusProjectionRef = useRef(new THREE.Vector3());
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
+  const reportedSuppressedTargetRef = useRef<string | null>(null);
   const handoffNativeId = useMemo(() => {
     if (!handoffTargetPlanetId) return null;
     const target = system.planets.find(
@@ -345,6 +348,10 @@ export function YeisSystemScene({
       delete document.documentElement.dataset.universeSystemReady;
       delete document.documentElement.dataset.universeSystemFocus;
       delete document.documentElement.dataset.universeSystemTargetSuppressed;
+      if (reportedSuppressedTargetRef.current !== null) {
+        reportedSuppressedTargetRef.current = null;
+        onHandoffTargetSuppressed?.(null);
+      }
       focusedIdRef.current = null;
       focusedNativeIdRef.current = null;
       focusFillRef.current.clear();
@@ -462,16 +469,22 @@ export function YeisSystemScene({
     const handoffView = handoffNativeId
       ? resources.bodies.byId.get(handoffNativeId)
       : null;
+    const suppressedTargetId = handoffView
+      ? handoffTargetPlanetId ?? handoffNativeId
+      : null;
     if (handoffView) {
-      // BodyRenderer.update() owns ordinary visibility and runs first. The
-      // close-world renderer has already produced a matched frame at this
-      // stage, so only the duplicated target disc transfers ownership; star,
-      // orbits and every other System body remain visible until final paint.
+      // BodyRenderer.update() owns ordinary visibility and runs first. Only
+      // after this concrete YEIS frame hides the duplicated target do we
+      // acknowledge transfer to UniverseCanvas.
       handoffView.group.visible = false;
       document.documentElement.dataset.universeSystemTargetSuppressed =
-        handoffTargetPlanetId ?? handoffNativeId;
+        suppressedTargetId!;
     } else {
       delete document.documentElement.dataset.universeSystemTargetSuppressed;
+    }
+    if (reportedSuppressedTargetRef.current !== suppressedTargetId) {
+      reportedSuppressedTargetRef.current = suppressedTargetId;
+      onHandoffTargetSuppressed?.(suppressedTargetId);
     }
 
     resources.points.setPixelRatio(gl.getPixelRatio());
@@ -505,6 +518,7 @@ export function YeisSystemScene({
         onScaleFocus={onScaleFocus}
         scaleTargetPlanet={scaleTargetPlanet}
         handoffTargetPlanetId={handoffTargetPlanetId}
+        onHandoffTargetSuppressed={onHandoffTargetSuppressed}
         onScaleFrame={onScaleFrame}
       />
     );
