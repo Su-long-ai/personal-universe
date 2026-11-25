@@ -559,7 +559,21 @@ export function CinematicPipeline({
       renderer.info.planets > 0 &&
       renderer.info.pending === 0,
     );
-    if (frameReady) liveDrawFrames.current += 1;
+    if (frameReady) {
+      liveDrawFrames.current += 1;
+      // PlanetScene needs two consecutive real renderer draws to transfer
+      // presentation authority. Ordinary WebGL metrics stay throttled to every
+      // 30 frames, but this short-lived authority stamp must advance on each
+      // qualifying draw until the current activation publishes full paint.
+      // Once paint is ready, the hot path falls back to the throttled metric.
+      if (html.dataset.universeWorldPaintReady !== "true") {
+        publishDatasetMetric(
+          html,
+          "universeWorldLiveDrawFrame",
+          String(liveDrawFrames.current),
+        );
+      }
+    }
     stableFrames.current = frameReady ? stableFrames.current + 1 : 0;
 
     // A single pending=0 sample is not enough: moving the near-surface camera

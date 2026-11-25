@@ -532,6 +532,7 @@ export default function UniverseApp({
   cameraSettledPhaseRef.current = cameraSettledPhase;
   const [worldScalePosition, setWorldScalePosition] =
     useState(GALAXY_SCALE_MIN);
+  const [worldScaleRenderRevision, setWorldScaleRenderRevision] = useState(0);
   const worldScalePositionRef = useRef(GALAXY_SCALE_MIN);
   const worldScaleRenderFrameRef = useRef<number | null>(null);
   const pendingWorldScaleRenderPositionRef = useRef<number | null>(null);
@@ -608,6 +609,16 @@ export default function UniverseApp({
         pendingWorldScaleRenderPositionRef.current = null;
         if (pending === null) return;
         setWorldScalePosition(pending);
+        // Only close-world camera ownership needs an equal-value mirror.
+        // Galaxy/System have their own native applied-frame authorities and
+        // must stay off this extra React hot path.
+        if (isWorldScalePhase(phaseRef.current)) {
+          // A mixed-sign burst can return to the last React-visible numeric
+          // position within one frame. React correctly bails out of an equal
+          // numeric state update, but the imperative camera-settled evidence
+          // was still invalidated by the delivered samples.
+          setWorldScaleRenderRevision((revision) => revision + 1);
+        }
       });
     },
     [],
@@ -803,7 +814,7 @@ export default function UniverseApp({
     document.documentElement.dataset.universeScaleReactCommits = String(
       worldScaleRenderCommitCountRef.current,
     );
-  }, [worldScalePosition]);
+  }, [worldScalePosition, worldScaleRenderRevision]);
 
   useEffect(() => {
     const authority =
@@ -2744,6 +2755,7 @@ export default function UniverseApp({
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
           worldScalePositionRef={worldScalePositionRef}
+          worldScaleRenderRevision={worldScaleRenderRevision}
           worldScaleContinuous={worldScaleContinuous}
           galaxyScaleTarget={galaxyScaleTarget}
           engineMode={activeEngine}

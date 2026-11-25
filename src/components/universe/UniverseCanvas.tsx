@@ -146,6 +146,7 @@ export function UniverseCanvas({
   phaseRef,
   worldScalePosition,
   worldScalePositionRef,
+  worldScaleRenderRevision,
   worldScaleContinuous,
   galaxyScaleTarget,
   engineMode,
@@ -176,6 +177,7 @@ export function UniverseCanvas({
   phaseRef: MutableRefObject<UniversePhase>;
   worldScalePosition: number;
   worldScalePositionRef: MutableRefObject<number>;
+  worldScaleRenderRevision: number;
   worldScaleContinuous: boolean;
   galaxyScaleTarget: UniverseNavigationDestination | null;
   engineMode: UniverseEngine;
@@ -489,6 +491,7 @@ export function UniverseCanvas({
           phase={phase}
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
+          worldScaleRenderRevision={worldScaleRenderRevision}
           worldScaleContinuous={worldScaleContinuous}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}

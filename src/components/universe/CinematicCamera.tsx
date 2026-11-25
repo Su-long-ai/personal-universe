@@ -50,6 +50,7 @@ type CinematicCameraProps = {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   worldScalePosition: number;
+  worldScaleRenderRevision: number;
   worldScaleContinuous: boolean;
   scrollDepth: number;
   reducedMotion: boolean;
@@ -190,6 +191,7 @@ export function CinematicCamera({
   phase,
   phaseRef,
   worldScalePosition,
+  worldScaleRenderRevision,
   worldScaleContinuous,
   scrollDepth,
   reducedMotion,
@@ -1222,6 +1224,7 @@ export function CinematicCamera({
     viewportWidth,
     worldScaleContinuous,
     worldScalePosition,
+    worldScaleRenderRevision,
     framedWorldDistance,
     publishIfReached,
     publishScaleFrameDiagnostics,

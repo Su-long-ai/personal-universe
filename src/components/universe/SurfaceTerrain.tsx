@@ -110,6 +110,9 @@ function SurfaceRocks({
 
   return (
     <>
+      {rockInstances.map((object) => (
+        <primitive key={object.name} object={object} />
+      ))}
     </>
   );
 }
@@ -766,10 +769,6 @@ export function SurfaceTerrain({
           </group>
         );
       })}
-      {rockInstances.map((object) => (
-        <primitive key={object.name} object={object} />
-      ))}
-
     </>
   );
 }
