@@ -120,6 +120,7 @@ export function SystemScene({
   onScaleFocus,
   scaleTargetPlanet,
   handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
 }: {
   system: SystemDefinition;
@@ -127,6 +128,7 @@ export function SystemScene({
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string | null) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -143,9 +145,14 @@ export function SystemScene({
   useEffect(() => {
     const html = document.documentElement;
     if (handoffTargetPlanetId) {
+      // Prototype System hides the target declaratively in this same commit.
+      // Publish the acknowledgement only after commit so close-world paint
+      // authority cannot outrun the actual duplicate-target removal.
       html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+      onHandoffTargetSuppressed?.(handoffTargetPlanetId);
     } else {
       delete html.dataset.universeSystemTargetSuppressed;
+      onHandoffTargetSuppressed?.(null);
     }
     return () => {
       if (
@@ -154,8 +161,11 @@ export function SystemScene({
       ) {
         delete html.dataset.universeSystemTargetSuppressed;
       }
+      if (handoffTargetPlanetId) {
+        onHandoffTargetSuppressed?.(null);
+      }
     };
-  }, [handoffTargetPlanetId]);
+  }, [handoffTargetPlanetId, onHandoffTargetSuppressed]);
 
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
