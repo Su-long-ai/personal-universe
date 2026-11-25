@@ -1,3 +1,4 @@
+import { portfolioPath } from "../../lib/portfolio/paths";
 import type {
   PlanetDefinition,
   QualityMode,
@@ -90,7 +91,22 @@ export function UniverseHud({
   return (
     <aside className={`universe-hud ${collapsed ? "is-collapsed" : ""}`}>
       <div className="hud-topline">
-        <span className="hud-mark">PU // 01</span>
+        <a
+          className="hud-mark"
+          href={portfolioPath(locale)}
+          aria-label={locale === "zh" ? "作品集" : "Portfolio"}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4em",
+            minHeight: 28,
+            color: "#b6ecf0",
+            textUnderlineOffset: "0.24em",
+          }}
+        >
+          {collapsed ? "PU" : locale === "zh" ? "作品集" : "Portfolio"}
+          <span aria-hidden="true">→</span>
+        </a>
         <span style={{ display: "flex", gap: 6 }}>
           <button
             className="hud-collapse"

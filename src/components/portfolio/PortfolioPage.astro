@@ -1,0 +1,196 @@
+---
+import { render } from "astro:content";
+import type { ProductLocale } from "../../lib/universe/locale";
+import {
+  PERSONAL_UNIVERSE_ID,
+  personalUniverseCaseStudy,
+  portfolioCopy,
+  portfolioLinks,
+  type PortfolioPageProps,
+} from "../../lib/portfolio/content";
+import { portfolioPath, universePath } from "../../lib/portfolio/paths";
+
+type Props = PortfolioPageProps & { locale: ProductLocale };
+
+const { entry, entries, locale } = Astro.props;
+const isZh = locale === "zh";
+const lang = isZh ? "zh-CN" : "en";
+const alternate = isZh ? "en" : "zh";
+const copy = entry ? portfolioCopy(entry, locale) : undefined;
+const [primaryLink, ...referenceLinks] = entry ? portfolioLinks(entry, locale) : [];
+const isPersonalUniverse = entry?.id === PERSONAL_UNIVERSE_ID;
+const kindNames = isZh
+  ? { project: "项目", experience: "经历", research: "研究", artifact: "作品", note: "笔记" }
+  : { project: "Project", experience: "Experience", research: "Research", artifact: "Artifact", note: "Note" };
+const ui = isZh
+  ? {
+      index: "作品集", intro: "在不打开 3D 的情况下，阅读作品介绍、查看源码和实现记录。",
+      language: "English", navigation: "作品集导航", all: "全部作品",
+      read: "查看详情", open3D: "进入 3D 宇宙", openSignal: "在 3D 星图中查看",
+      references: "作品链接", preview: "Personal Universe 的银河视图和导航界面",
+      empty: "目前没有已发布的作品。",
+    }
+  : {
+      index: "Portfolio", intro: "Read the project notes, browse the source and open the work without launching the 3D universe.",
+      language: "简体中文", navigation: "Portfolio navigation", all: "All work",
+      read: "Read project", open3D: "Explore the 3D universe", openSignal: "Find this work in 3D",
+      references: "Project links", preview: "The Personal Universe galaxy view with its navigation interface",
+      empty: "No published work yet.",
+    };
+
+const title = copy ? copy.title.text + " | " + ui.index : ui.index + " | Personal Universe";
+const description = copy?.summary.text ?? ui.intro;
+const site = Astro.site ?? Astro.url.origin;
+const canonical = new URL(portfolioPath(locale, entry?.id), site);
+const alternateUrl = new URL(portfolioPath(alternate, entry?.id), site);
+const previewImage = import.meta.env.BASE_URL + "social-preview.png";
+// JSON entries expose the plain body in data. Legacy Markdown entries retain
+// their renderable collection body; there is no raw HTML injection here.
+const Content = entry?.body?.trim() && !copy?.body ? (await render(entry)).Content : undefined;
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#09111b" />
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+    <link rel="alternate" hreflang={isZh ? "en" : "zh-CN"} href={alternateUrl.href} />
+    <meta property="og:title" content={title} />
+    <meta property="og:type" content={entry ? "article" : "website"} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    {isPersonalUniverse && <meta property="og:image" content={new URL(previewImage, site).href} />}
+    <title>{title}</title>
+  </head>
+  <body class="portfolio-page">
+    <header class="masthead">
+      <nav class="topbar" aria-label={ui.navigation}>
+        <a class="wordmark" href={portfolioPath(locale)}><span class="brand-dot" aria-hidden="true"></span>PERSONAL UNIVERSE</a>
+        <a class="language" href={portfolioPath(alternate, entry?.id)} hreflang={isZh ? "en" : "zh-CN"} lang={isZh ? "en" : "zh-CN"}>{ui.language}</a>
+      </nav>
+    </header>
+    <main class="reading">
+      {entry && copy ? (
+        <article>
+          <a class="back" href={portfolioPath(locale)}><span aria-hidden="true">←</span> {ui.all}</a>
+          <header class="intro">
+            <p class="eyebrow">{kindNames[entry.data.kind]}</p>
+            <h1 lang={copy.title.lang}>{copy.title.text}</h1>
+            <p class="lede" lang={copy.summary.lang}>{copy.summary.text}</p>
+            <div class="work-actions">
+              {primaryLink &&
+                <a class="button" href={primaryLink.url}>{primaryLink.label} <span aria-hidden="true">→</span></a>}
+              <a class="secondary" href={universePath(locale, entry.id)}>{ui.openSignal} <span aria-hidden="true">→</span></a>
+            </div>
+          </header>
+          {copy.body && <p class="body-copy" lang={copy.body.lang}>{copy.body.text}</p>}
+          {Content && <div class="body-copy" lang="en"><Content /></div>}
+          {isPersonalUniverse &&
+            <div class="case-grid">
+              {personalUniverseCaseStudy[locale].map((part) => (
+                <section><h2>{part.title}</h2><p>{part.text}</p></section>
+              ))}
+            </div>
+          }
+          {referenceLinks.length > 0 &&
+            <section class="references">
+              <h2>{ui.references}</h2>
+              <ul>{referenceLinks.map((link) => <li><a href={link.url}>{link.label} <span aria-hidden="true">→</span></a></li>)}</ul>
+            </section>
+          }
+          {isPersonalUniverse &&
+            <figure>
+              <img src={previewImage} width="1440" height="900" alt={ui.preview} loading="lazy" decoding="async" />
+              <figcaption>{ui.preview}</figcaption>
+            </figure>
+          }
+        </article>
+      ) : (
+        <>
+          <header class="intro">
+            <p class="eyebrow">PERSONAL UNIVERSE</p>
+            <h1>{ui.index}</h1>
+            <p class="lede">{ui.intro}</p>
+            <a class="button" href={universePath(locale)}>{ui.open3D} <span aria-hidden="true">→</span></a>
+          </header>
+          <ul class="project-list">
+            {entries?.map((item) => {
+              const localized = portfolioCopy(item, locale);
+              return (
+                <li>
+                  <article>
+                    <p class="eyebrow">{kindNames[item.data.kind]}</p>
+                    <h2><a href={portfolioPath(locale, item.id)} lang={localized.title.lang}>{localized.title.text}</a></h2>
+                    <p lang={localized.summary.lang}>{localized.summary.text}</p>
+                    <a class="read" href={portfolioPath(locale, item.id)}>{ui.read} <span aria-hidden="true">→</span></a>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
+          {entries?.length === 0 && <p>{ui.empty}</p>}
+        </>
+      )}
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(html) { color-scheme: dark; background: #09111b; }
+  .portfolio-page {
+    --muted: #acbdcc;
+    --accent: #99e4ea;
+    --line: #33485b;
+    min-block-size: 100vh;
+    margin: 0;
+    font: 1rem/1.64 system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #edf6ff;
+    background: radial-gradient(ellipse at 100% 0, #122940 0, transparent 52rem), #09111b;
+  }
+  .portfolio-page *, .portfolio-page *::before { box-sizing: border-box; }
+  .masthead { border-block-end: 1px solid var(--line); }
+  .topbar, .reading { inline-size: min(100% - 2.5rem, 68rem); margin-inline: auto; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: .75rem; min-block-size: 4rem; }
+  a { color: var(--accent); text-underline-offset: .23em; }
+  a:hover { color: #effdff; }
+  a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  .wordmark, .language, .back { display: inline-flex; gap: .6em; align-items: center; min-block-size: 44px; }
+  .wordmark { color: #e8f8ff; font-size: .78rem; font-weight: 650; letter-spacing: .13em; text-decoration: none; }
+  .brand-dot { inline-size: .55rem; block-size: .55rem; flex: none; border: 1px solid var(--accent); border-radius: 50%; box-shadow: 0 0 .85rem #6dcbd27a; }
+  .language { font-size: .96rem; }
+  .reading { padding-block: clamp(2rem, 8vw, 6rem) 5rem; }
+  .reading article { min-inline-size: 0; }
+  .intro { margin-block-end: clamp(2rem, 5vw, 3.3rem); max-inline-size: 53rem; }
+  .eyebrow { color: var(--accent); font-size: .76rem; letter-spacing: .15em; margin: 0 0 .75rem; text-transform: uppercase; }
+  h1 { margin: 0; font-size: clamp(2.8rem, 8vw, 6rem); line-height: 1.05; letter-spacing: -.055em; font-weight: 590; overflow-wrap: anywhere; }
+  h2 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.55rem); line-height: 1.32; }
+  .lede { max-inline-size: 48rem; color: var(--muted); margin: 1.15rem 0 1.45rem; font-size: clamp(1.05rem, 2.2vw, 1.28rem); }
+  .button { display: inline-flex; align-items: center; gap: .75em; padding: .58rem .88rem; min-block-size: 44px; text-decoration: none; border: 1px solid #4c7989; border-radius: .27rem; background: #152e3e; }
+  .button:hover { background: #1b3e51; }
+  .work-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1.15rem; }
+  .secondary { display: inline-flex; align-items: center; gap: .55em; min-block-size: 44px; }
+  .back { margin-block-end: 1.35rem; }
+  .project-list { list-style: none; margin: 0; padding: 0; max-inline-size: 55rem; }
+  .project-list li, .case-grid, .references { border-block-start: 1px solid var(--line); }
+  .project-list li { padding: 1.35rem 0; }
+  .project-list article > p:not(.eyebrow), .case-grid p, .body-copy, figcaption { color: var(--muted); }
+  .project-list h2 a { color: #e7f4ff; }
+  .read, .references a { display: inline-flex; align-items: center; gap: .5em; min-block-size: 44px; }
+  .body-copy { max-inline-size: 48rem; margin: 0 0 1.65rem; }
+  .body-copy :global(p) { margin: 0 0 .8rem; }
+  .case-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem 2.5rem; padding: 1.55rem 0 .6rem; max-inline-size: 55rem; }
+  .case-grid p { margin: .65rem 0 1rem; }
+  .references { max-inline-size: 55rem; padding-block-start: 1.4rem; }
+  .references ul { display: flex; flex-wrap: wrap; gap: 0 1.5rem; margin: .45rem 0 1.7rem; padding: 0; list-style: none; }
+  figure { margin: 2rem 0 0; max-inline-size: 48rem; }
+  figure img { display: block; inline-size: 100%; block-size: auto; border: 1px solid var(--line); }
+  figcaption { font-size: .88rem; margin-block-start: .45rem; }
+  @media (max-width: 35rem) {
+    .topbar, .reading { inline-size: calc(100% - 2rem); }
+    .case-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .wordmark { font-size: .74rem; letter-spacing: .07em; }
+  }
+</style>

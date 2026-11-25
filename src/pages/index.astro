@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { getCollection } from "astro:content";
 import UniverseApp from "../components/universe/UniverseApp";
+import PortfolioHomeFallback from "../components/portfolio/PortfolioHomeFallback.astro";
 import {
   assertUniverseContentCatalog,
   type UniverseContentEntry,
@@ -117,5 +118,6 @@ const socialPreviewUrl = new URL(
   </head>
   <body>
     <UniverseApp client:load contentEntries={visibleContentEntries} />
+    <PortfolioHomeFallback />
   </body>
 </html>
