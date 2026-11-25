@@ -3656,7 +3656,7 @@ test("Personal Signal deep link keeps its Surface focus through product landing 
   );
   await expect(html).toHaveAttribute(
     "data-universe-surface-focus-anchor",
-    /^surface:/,
+    "yeis-planet:s59669-p2:surface:content:personal-universe",
     { timeout: 30_000 },
   );
   await expect(html).toHaveAttribute(
