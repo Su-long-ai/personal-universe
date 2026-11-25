@@ -1,0 +1,41 @@
+{
+  "schema": 3,
+  "task_id": "CONTENT-DISCOVERY-CONTINUITY-V1-001",
+  "approved_at": "2026-11-24T17:46:00.000Z",
+  "baseline_commit": "2c51ef2ec5a02722aa3e6a8cdf46e60019da3478",
+  "record_path": "docs/reuse-gate/tasks/CONTENT-DISCOVERY-CONTINUITY-V1-001.json",
+  "record_sha256": "736eff7d138075f9c156ee5bd3041264edfa9d415158d62c2e1561b03333a78e",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112",
+    "web-url-history-api": "77f33a919f6f3efedd54f6b619b7dda4be7823975a54147bf7f4a55c6d9fd9d8",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "subsystem",
+    "subject": "Add browser-session recent destination continuity, Personal/Important/Nearby/Recent Navigator filters and recent ranking priors over canonical destination IDs without creating a second router, database or navigation state machine"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/lib/universe/locale.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "selected_ids": [
+    "browser-session-canonical-recent",
+    "react-derived-discovery-filters",
+    "playwright-continuity-contract"
+  ],
+  "candidate_scores": {
+    "browser-session-canonical-recent": 57,
+    "react-derived-discovery-filters": 57,
+    "playwright-continuity-contract": 57,
+    "persistent-discovery-database": null,
+    "global-discovery-state-runtime": null
+  }
+}
