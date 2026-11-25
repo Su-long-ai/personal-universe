@@ -1,0 +1,171 @@
+{
+  "schema": 2,
+  "task_id": "LIVE-SURFACE-ANCHOR-EDGE-PUBLICATION-001",
+  "title": "Apply the existing immediate scale publication at the live landing frame edge",
+  "scope": {
+    "level": "implementation",
+    "subject": "Publish the normalized 4-boundary crossing through the existing immediate coordinate path so the real live landing frame can be attached/revoked even when an ordinary within-phase mirror is deferred."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The exact hosted failure progressed to 4.600 with a proven software-HIGH live renderer, but React's scale mirror stayed at the 4.000 commit until after the assertion deadline. The retry trace shows that the awaited renderer and camera frame appeared together with the next mirror commit ~17s later. A 1440x900 deterministic browser control held only the first crossing's deferred input callback: live draw metrics continued 2→13, 4.600 was recorded, but the frame remained absent until the callback was released. PlanetScene already owns the real anchor and camera publication; the product coordinator needs to route its separate activation/revocation edge through the same existing immediate phase-publication path. No second renderer, camera, generation counter, test timeout or viewport change is needed.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45664903597/job/139384719786",
+      "finding": "Exact #183 heavy-lane logs and hashed retry trace: the real live renderer was ready at Orbit; input reported 4.600 before a missed deadline; the real landing and camera frame appeared with the next mirror commit in the failure snapshot."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls",
+      "finding": "The already-delivered camera-controls capabilities handle camera motion, not the product semantic activation of a React-rendered landing anchor. Replacing the camera cannot address the coordinator's delayed host prop."
+    },
+    {
+      "url": "https://react.dev/learn/queueing-a-series-of-state-updates",
+      "finding": "Use the existing event-time state publication at lifecycle boundaries; React still batches state, with no imperative duplicate React renderer and no flushSync."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame",
+      "finding": "requestAnimationFrame is a deferred visual callback. Continue coalescing interior samples while allowing the already-existing non-deferred publisher at lifecycle edges."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks#useframe",
+      "finding": "React Three Fiber keeps the elected render loop. Test the real layout/anchor frame separately from the wheel-event RAF handoff; do not synthesize renderer readiness."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-page#page-evaluate",
+      "finding": "Use the established Playwright browser suite to temporarily hold only callbacks scheduled by one wheel dispatch, not the R3F loop, and assert the real renderer/frame dataset before release."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "The integrated camera system already solves motion along existing world shots. A replacement renderer/camera platform cannot make a missing React prop commit a real landing frame."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "playwright-test"
+      ],
+      "source_refs": [
+        2,
+        4,
+        5
+      ],
+      "conclusion": "Retain the stack and its single render loop. A true live renderer must still publish the own original frame; tests hold only the deferred scale event mirror."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        2,
+        3
+      ],
+      "conclusion": "Reuse the existing coordinator's immediate phase-boundary publisher at the real in-place anchor authority boundary, with next phase calculation shared."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks",
+        "playwright-test"
+      ],
+      "source_refs": [
+        3,
+        4,
+        5
+      ],
+      "conclusion": "Keep ordinary RAF-coalesced scale for non-boundary samples, and verify both revocation/reacquisition while the deferred wheel frame is held."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "replace-camera-sequencer",
+      "name": "Rebuild scale handoff with camera-controls sequence callbacks",
+      "level": "full_solution",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Existing camera-controls v3 integration",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "A second sequencing/activation mechanism would add latency and duplicate the current normalized coordinate and renderer ownership; camera motion is not the held callback.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 3,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "current-immediate-scale-publisher",
+      "name": "Existing React immediate boundary path plus RAF-coalesced interior samples",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "UniverseApp single coordinate and existing publishWorldScalePosition immediate path",
+      "license": "MIT (React) / project-local product code",
+      "decision": "reuse",
+      "reason": "Only crosses a real mount/unmount edge; PlanetScene and R3F keep their true frame ownership; no new authority or synchronization primitive.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-native-live-mirror-acceptance",
+      "name": "Existing Playwright live frame release regression",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Repository WebGL-heavy case using actual SwiftShader renderer",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Accept the same production viewport, position and real camera/renderer evidence with a deterministic hold on only the relevant callback; no retry/timeout changes.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "current-immediate-scale-publisher",
+      "playwright-native-live-mirror-acceptance"
+    ],
+    "rationale": "The landing anchor's side of 4 is a semantic renderer lifecycle edge even while phase is still Atmosphere. Treat it like other immediate boundary changes and leave every real terrain/render readiness assertion in place.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "replace-camera-sequencer",
+        "reason": "Retain camera-controls for camera drawing but rule out another state machine: the trace isolates the input publisher, not general camera capability."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If hosted acceptance still fails after an actual scale commit has reached the landing side, inspect the live draw/anchor readiness chain recorded by the exact host trace; do not alter arbitrary deadlines."
+  }
+}
