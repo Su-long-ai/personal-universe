@@ -105,6 +105,7 @@ function writeRecord(record, dryRun = false) {
   if (existsSync(target)) {
     fail('Content file already exists for "' + record.contentId + '": ' + target);
   }
+  assertAvailableContentReferences([record]);
   const text = JSON.stringify(record, null, 2) + "\n";
   if (!dryRun) {
     mkdirSync(CONTENT_DIR, { recursive: true });
@@ -151,6 +152,25 @@ function loadJsonContentRecords() {
     }
   }
   return { entries, sources, failures, files };
+}
+
+function assertAvailableContentReferences(records) {
+  const { entries, failures } = loadJsonContentRecords();
+  if (failures.length > 0) {
+    fail("Cannot inspect existing content records:\n- " + failures.join("\n- "));
+  }
+
+  const collisions = validateUniverseContentCatalog([
+    ...entries,
+    ...records.map((record) => authoringRecordToUniverseContentEntry(record)),
+  ]).filter((issue) => issue.code === "duplicate_reference");
+
+  if (collisions.length > 0) {
+    fail(
+      "Content references must be unique:\n- " +
+        collisions.map((issue) => issue.message).join("\n- "),
+    );
+  }
 }
 
 const MEDIA_MAX_BYTES = {
@@ -369,6 +389,7 @@ function commandImport(args) {
     }
   }
 
+  assertAvailableContentReferences(normalized);
   const dryRun = hasFlag(args, "dry-run");
   if (dryRun) {
     for (const record of normalized) {

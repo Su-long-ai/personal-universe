@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { performance } from "node:perf_hooks";
+import { spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
   authoringRecordToUniverseContentEntry,
   buildUniverseContentIndex,
@@ -72,6 +83,77 @@ test("duplicate ids and legacy references are rejected", () => {
     entry({ id: "beta", legacyIds: ["alpha"] }),
   ]);
   assert.ok(issues.some((issue) => issue.code === "duplicate_reference"));
+});
+
+test("two records cannot claim the same canonical ID", () => {
+  const original = entry({ id: "stable" });
+  const duplicate = entry({ id: "stable", title: "A second source" });
+  assert.ok(
+    validateUniverseContentCatalog([original, duplicate]).some(
+      (issue) => issue.code === "duplicate_reference" && issue.path === "id",
+    ),
+  );
+});
+
+test("content CLI rejects filename-independent identity collisions before writes", () => {
+  const root = mkdtempSync(join(tmpdir(), "universe-content-id-"));
+  try {
+    writeFileSync(join(root, "package.json"), '{"type":"module"}');
+    for (const path of [
+      "scripts/content-author.mjs",
+      "src/lib/universe/content/authoring.ts",
+    ]) {
+      const target = join(root, path);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(new URL("../" + path, import.meta.url), target);
+    }
+    const portfolio = join(root, "src", "content", "portfolio");
+    mkdirSync(portfolio, { recursive: true });
+    const record = {
+      contentId: "stable",
+      title: "Stable",
+      summary: "Stable project",
+      kind: "project",
+      legacyIds: ["former-id"],
+    };
+    const movedFile = "renamed-source.json";
+    writeFileSync(join(portfolio, movedFile), JSON.stringify(record));
+    writeFileSync(
+      join(root, "batch.json"),
+      JSON.stringify([{ ...record, contentId: "fresh", legacyIds: [] }, record]),
+    );
+
+    const run = (...args: string[]) => spawnSync(
+      process.execPath,
+      ["--experimental-strip-types", "scripts/content-author.mjs", ...args],
+      { cwd: root, encoding: "utf8" },
+    );
+    const rejects = (message: RegExp, ...args: string[]) => {
+      const result = run(...args);
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, message);
+      assert.deepEqual(readdirSync(portfolio), [movedFile]);
+    };
+
+    assert.equal(run("validate").status, 0);
+    for (const flags of [[], ["--dry-run"]]) {
+      rejects(
+        /Content reference "stable" is already owned/,
+        "import", "batch.json", ...flags,
+      );
+    }
+    rejects(
+      /Content reference "former-id" is already owned/,
+      "new", "--id", "former-id", "--title", "Former",
+      "--summary", "Former project", "--kind", "project",
+    );
+    writeFileSync(join(portfolio, "second-source.json"), JSON.stringify(record));
+    const validation = run("validate");
+    assert.equal(validation.status, 1);
+    assert.match(validation.stderr, /Content reference "stable" is already owned/);
+  } finally {
+    rmSync(root, { force: true, recursive: true });
+  }
 });
 
 test("bilingual copy falls back without duplicating identity", () => {

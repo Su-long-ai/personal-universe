@@ -697,10 +697,10 @@ export function validateUniverseContentCatalog(
   entries: readonly UniverseContentEntry[],
 ): UniverseContentValidationIssue[] {
   const issues: UniverseContentValidationIssue[] = [];
-  const referenceOwner = new Map<string, string>();
+  const referenceOwner = new Map<string, { index: number; id: string }>();
   const aliasOwner = new Map<string, string>();
 
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     if (!CONTENT_ID_PATTERN.test(entry.id)) {
       issues.push({
         code: "invalid_id",
@@ -712,20 +712,20 @@ export function validateUniverseContentCatalog(
 
     for (const reference of universeContentReferenceIds(entry)) {
       const previous = referenceOwner.get(reference);
-      if (previous && previous !== entry.id) {
+      if (previous && previous.index !== index) {
         issues.push({
           code: "duplicate_reference",
           entryId: entry.id,
-          path: "legacyIds",
+          path: reference === entry.id ? "id" : "legacyIds",
           message:
             'Content reference "' +
             reference +
             '" is already owned by "' +
-            previous +
+            previous.id +
             '".',
         });
       } else {
-        referenceOwner.set(reference, entry.id);
+        referenceOwner.set(reference, { index, id: entry.id });
       }
     }
 
