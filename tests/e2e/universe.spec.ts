@@ -5774,7 +5774,9 @@ test("Recent destination survives reload and filters canonical Places", async ({
   );
 
   dialog = await openNavigator(page);
-  const recent = dialog.getByRole("button", { name: "RECENT" });
+  const recent = dialog
+    .locator(".navigator-filters")
+    .getByRole("button", { name: "RECENT", exact: true });
   await expect(recent).toBeEnabled();
   await recent.click();
   await expect(html).toHaveAttribute(
@@ -5817,7 +5819,11 @@ test("Places filters derive Personal and Important views from canonical graph", 
   const dialog = await openNavigator(page);
   const html = page.locator("html");
 
-  const personal = dialog.getByRole("button", { name: "PERSONAL" });
+  const filters = dialog.locator(".navigator-filters");
+  const personal = filters.getByRole("button", {
+    name: "PERSONAL",
+    exact: true,
+  });
   await personal.click();
   await expect(html).toHaveAttribute(
     "data-universe-navigator-filter",
@@ -5834,7 +5840,10 @@ test("Places filters derive Personal and Important views from canonical graph", 
     ),
   ).toBe(true);
 
-  const important = dialog.getByRole("button", { name: "IMPORTANT" });
+  const important = filters.getByRole("button", {
+    name: "IMPORTANT",
+    exact: true,
+  });
   await important.click();
   await expect(html).toHaveAttribute(
     "data-universe-navigator-filter",
@@ -5848,9 +5857,7 @@ test("Places filters derive Personal and Important views from canonical graph", 
     ).first(),
   ).toBeVisible();
 
-  const nearby = dialog
-    .locator(".navigator-filters")
-    .getByRole("button", { name: "NEARBY", exact: true });
+  const nearby = filters.getByRole("button", { name: "NEARBY", exact: true });
   await expect(nearby).toBeDisabled();
 
   await runtime.assertClean(testInfo);
