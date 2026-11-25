@@ -4,6 +4,24 @@ import {
   continuousScaleResponseDistance,
 } from "../../src/lib/universe/continuousScale";
 import {
+  catalogMarkers,
+  catalogMetadata,
+  catalogSystem,
+} from "../../src/lib/universe/generation/catalog";
+import { generateProceduralMarkers } from "../../src/lib/universe/generation/galaxyGenerator";
+import {
+  decorateAuthoredSystem,
+  decorateGeneratedSystem,
+  PopulationSystemCache,
+  POPULATION_GENERATOR_VERSION,
+  POPULATION_SCHEMA_VERSION,
+  populationRarityForSeed,
+  systemPopulationFingerprint,
+  validateSystemPopulation,
+} from "../../src/lib/universe/generation/population";
+import { createHeroSystem } from "../../src/lib/universe/generation/heroOverrides";
+import { generateSystem } from "../../src/lib/universe/generation/systemGenerator";
+import {
   observeRuntime,
   positiveDataset,
   waitForYeis,
@@ -2575,14 +2593,21 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     previousRatio = ratio;
   }
 
-  // Gesture lifetime may reset, but the continuous coordinate and captured
-  // path do not. A later tiny sample resumes exactly where the user stopped.
-  await page.waitForTimeout(650);
+  // Cross the full active-gesture reset window. Resetting gesture identity is
+  // diagnostic only: the retained path and continuous coordinate must not
+  // reset, jump, or require a new threshold before the next tiny sample acts.
+  const gestureBeforePause = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  );
+  await page.waitForTimeout(2_100);
   accumulated += 16 / 384;
   await dispatchScaleWheel(page, -16);
   await expect
     .poll(async () => Number(await html.getAttribute("data-universe-scale-position")))
     .toBeCloseTo(accumulated, 2);
+  await expect
+    .poll(async () => Number(await html.getAttribute("data-universe-scale-gesture")))
+    .toBeGreaterThan(gestureBeforePause);
   await expect(html).toHaveAttribute(
     "data-universe-navigation-phase",
     "galaxy",
@@ -3184,6 +3209,183 @@ test("Chinese and English switch in place and persist", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("population generation is deterministic and stable under unrelated expansion", () => {
+  const compact = generateProceduralMarkers("population-stability", 64);
+  const expanded = generateProceduralMarkers("population-stability", 220);
+
+  expect(expanded.slice(0, compact.length)).toEqual(compact);
+  for (const marker of compact) {
+    expect(marker.population?.schemaVersion).toBe(POPULATION_SCHEMA_VERSION);
+    expect(marker.population?.generatorVersion).toBe(
+      POPULATION_GENERATOR_VERSION,
+    );
+    expect(marker.population?.provenance).toBe("generated");
+    expect(marker.name).toBe(marker.name.normalize("NFKC"));
+    expect(marker.name).not.toMatch(/[\u0000-\u001f\u007f]/);
+  }
+
+  const first = decorateGeneratedSystem(
+    generateSystem(
+      "population:stable-system",
+      [3.25, -0.4, 8.75],
+      "STABLE PRIMARY",
+    ),
+  );
+  const before = systemPopulationFingerprint(first);
+
+  // Materializing unrelated objects must not consume or reseed this system.
+  for (let index = 0; index < 40; index += 1) {
+    decorateGeneratedSystem(
+      generateSystem(
+        `population:unrelated:${index}`,
+        [index * 0.1, 0, -index * 0.2],
+      ),
+    );
+  }
+
+  const second = decorateGeneratedSystem(
+    generateSystem(
+      "population:stable-system",
+      [3.25, -0.4, 8.75],
+      "STABLE PRIMARY",
+    ),
+  );
+  expect(systemPopulationFingerprint(second)).toBe(before);
+  expect(second).toEqual(first);
+  expect(validateSystemPopulation(second)).toEqual([]);
+});
+
+test("population invariants keep giants orbit-only and authored slots reserved", () => {
+  let giantWorlds = 0;
+  let surfaceCapableWorlds = 0;
+  for (let systemIndex = 0; systemIndex < 160; systemIndex += 1) {
+    const system = decorateGeneratedSystem(
+      generateSystem(
+        `population:stress:${systemIndex}`,
+        [systemIndex * 0.01, 0, systemIndex * -0.015],
+      ),
+    );
+    expect(validateSystemPopulation(system)).toEqual([]);
+
+    for (const planet of system.planets) {
+      if (
+        planet.archetype === "gas_giant" ||
+        planet.archetype === "ice_giant"
+      ) {
+        giantWorlds += 1;
+        expect(planet.population?.capability).toBe("orbit-only");
+        expect(planet.surfaceMode).toBe("none");
+      } else {
+        surfaceCapableWorlds += 1;
+        expect(planet.population?.capability).toBe("surface-capable");
+      }
+    }
+  }
+  expect(giantWorlds).toBeGreaterThan(0);
+  expect(surfaceCapableWorlds).toBeGreaterThan(giantWorlds);
+
+  const hero = decorateAuthoredSystem(createHeroSystem());
+  expect(validateSystemPopulation(hero)).toEqual([]);
+  expect(hero.population?.provenance).toBe("authored");
+  expect(
+    hero.planets.every(
+      (planet) => planet.population?.reservedForAuthored === true,
+    ),
+  ).toBeTruthy();
+  const authoredWorld = hero.planets.find((planet) => planet.heroKey === "home");
+  expect(authoredWorld?.population?.provenance).toBe("authored");
+  expect(authoredWorld?.population?.capability).toBe("authored-surface");
+});
+
+test("observed population keeps catalog provenance and indexed identity", () => {
+  const metadata = catalogMetadata();
+  expect(metadata.indexedCount).toBe(metadata.count);
+  expect(metadata.count).toBeGreaterThan(0);
+
+  const markers = catalogMarkers(Math.min(24, metadata.count));
+  expect(markers.length).toBeGreaterThan(0);
+  for (const marker of markers) {
+    expect(marker.population?.provenance).toMatch(/^(observed|hybrid)$/);
+    expect(marker.population?.observedFields).toContain("hostname");
+    const system = catalogSystem(marker);
+    expect(system).not.toBeNull();
+    expect(validateSystemPopulation(system!)).toEqual([]);
+    expect(system!.catalogId).toBe(marker.catalogId);
+    expect(system!.population?.provenance).toMatch(/^(observed|hybrid)$/);
+    for (const planet of system!.planets) {
+      expect(planet.observed).toBeTruthy();
+      expect(planet.population?.provenance).toMatch(/^(observed|hybrid)$/);
+      expect(planet.population?.observedFields).toContain("name");
+      expect(planet.population?.inferredFields).toContain("archetype");
+    }
+  }
+});
+
+test("population rarity and focused-system materialization stay bounded", () => {
+  let rare = 0;
+  let uncommon = 0;
+  const sampleCount = 4096;
+  for (let index = 0; index < sampleCount; index += 1) {
+    const { rarity } = populationRarityForSeed(
+      `population:rarity-sample:${index}`,
+    );
+    if (rarity === "rare") rare += 1;
+    if (rarity === "uncommon") uncommon += 1;
+  }
+  expect(rare / sampleCount).toBeGreaterThan(0.01);
+  expect(rare / sampleCount).toBeLessThan(0.05);
+  expect((rare + uncommon) / sampleCount).toBeGreaterThan(0.08);
+  expect((rare + uncommon) / sampleCount).toBeLessThan(0.16);
+
+  const cache = new PopulationSystemCache<{ id: number }>(8);
+  for (let index = 0; index < 96; index += 1) {
+    cache.set(`system:${index}`, { id: index });
+  }
+  let stats = cache.stats();
+  expect(stats.size).toBe(8);
+  expect(stats.capacity).toBe(8);
+  expect(stats.evictions).toBe(88);
+  expect(cache.get("system:95")).toEqual({ id: 95 });
+  expect(cache.get("system:95")).toEqual({ id: 95 });
+  expect(cache.get("system:0")).toBeUndefined();
+  stats = cache.stats();
+  expect(stats.size).toBe(8);
+  expect(stats.hits).toBe(2);
+  expect(stats.misses).toBe(1);
+});
+
+test("generated system deep link preserves canonical identity across reload", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?engine=v2&phase=system&star=proc%3A0&freeze=1");
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-engine", "v2");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  const systemName = page.locator(".system-copy strong");
+  await expect(systemName).toBeVisible();
+  const firstName = (await systemName.textContent())?.trim();
+  expect(firstName).toBeTruthy();
+
+  const url = new URL(page.url());
+  expect(url.searchParams.get("star")).toBe("proc:0");
+
+  await page.reload();
+  await expect(html).toHaveAttribute("data-universe-engine", "v2");
+  await expect(html).toHaveAttribute(
+    "data-universe-navigation-phase",
+    "system",
+  );
+  await expect(systemName).toHaveText(firstName!);
+  expect(new URL(page.url()).searchParams.get("star")).toBe("proc:0");
+
+  await runtime.assertClean(testInfo);
+});
+
 test("v2 query remains a healthy rollback path", async ({ page }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?engine=v2&freeze=1");
@@ -3733,7 +3935,7 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     box!.y + box!.height * 0.5,
   );
 
-  // Even a sub-threshold trackpad intent is manual navigation and must stop
+  // Even one small trackpad sample is manual navigation and must stop
   // Journey auto-advance immediately without changing destination identity.
   await page.mouse.wheel(0, -16);
   await expect(controls).toHaveCount(0);
@@ -3749,12 +3951,12 @@ test("wheel scale takeover interrupts Journey without changing destination", asy
     destinationBefore,
   );
 
-  // The identity assertions above may exceed the single-sample gesture
-  // reset. Start a fresh trackpad-like gesture and cross the threshold inside
-  // one reset window; Journey must stay stopped while manual scale resumes.
-  // Chromium can coalesce tiny automation-level mouse.wheel samples; use the
-  // same DOM WheelEvent accumulator probe as the dedicated trackpad contract.
-  // The first page.mouse.wheel above still validates real pointer takeover.
+  // The identity assertions above may exceed the diagnostic gesture reset.
+  // Start a fresh trackpad-like burst; every delivered sample must move the
+  // live coordinate directly while Journey remains stopped. Chromium can
+  // coalesce tiny automation-level mouse.wheel samples, so use DOM WheelEvents
+  // for the burst. The first page.mouse.wheel above still validates real
+  // pointer takeover.
   for (let index = 0; index < 11; index += 1) {
     await dispatchScaleWheel(page, -16);
     await page.waitForTimeout(20);
@@ -4491,6 +4693,85 @@ test("high-frequency wheel bursts publish at most one scale render per frame", a
   expect(afterOut - afterIn).toBeLessThanOrEqual(2);
   await expect(html).not.toHaveAttribute(
     "data-universe-scale-queued",
+    /world:/,
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("mixed-sign 144Hz-like oscillation never creates a deferred world queue", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(
+    "/?phase=approach&star=h-aurora&body=aurora-01&freeze=1",
+  );
+  await waitForYeisEngine(page);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 15_000 },
+  );
+
+  await page.evaluate(() => {
+    const root = document.documentElement;
+    const queuedValues: string[] = [];
+    Object.assign(window, { __worldScaleQueueHistory: queuedValues });
+    new MutationObserver(() => {
+      const value = root.dataset.universeScaleQueued;
+      if (value) queuedValues.push(value);
+    }).observe(root, {
+      attributes: true,
+      attributeFilter: ["data-universe-scale-queued"],
+    });
+  });
+
+  const startingGesture = Number(
+    await html.getAttribute("data-universe-scale-gesture"),
+  ) || 0;
+
+  // Alternate every ~7ms to model a high-frequency touchpad correction burst.
+  // Every delivered sample must act on the live coordinate immediately; no
+  // old-direction phase step may be stored for camera settlement to drain.
+  for (let pair = 0; pair < 24; pair += 1) {
+    await dispatchScaleWheel(page, -8);
+    await page.waitForTimeout(7);
+    await dispatchScaleWheel(page, 8);
+    await page.waitForTimeout(7);
+  }
+
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    "2.000",
+  );
+  const stoppedAt = await html.getAttribute("data-universe-scale-position");
+  await page.waitForTimeout(400);
+  await expect(html).toHaveAttribute(
+    "data-universe-scale-position",
+    stoppedAt!,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-camera-settled",
+    "approach",
+    { timeout: 10_000 },
+  );
+
+  const queueHistory = await page.evaluate(() =>
+    ((window as typeof window & { __worldScaleQueueHistory?: string[] })
+      .__worldScaleQueueHistory ?? []),
+  );
+  expect(queueHistory.filter((value) => value.startsWith("world:"))).toEqual([]);
+  expect(
+    Number(await html.getAttribute("data-universe-scale-gesture")),
+  ).toBeGreaterThan(startingGesture + 20);
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-queued",
+    /world:/,
+  );
+  await expect(html).not.toHaveAttribute(
+    "data-universe-scale-cancelled-queue",
     /world:/,
   );
 
