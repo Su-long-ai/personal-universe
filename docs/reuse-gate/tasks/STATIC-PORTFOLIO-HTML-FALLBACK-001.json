@@ -1,0 +1,197 @@
+{
+  "schema": 2,
+  "task_id": "STATIC-PORTFOLIO-HTML-FALLBACK-001",
+  "title": "Serve a shareable bilingual portfolio from Astro with and without the 3D island",
+  "scope": {
+    "level": "implementation",
+    "subject": "Use existing Astro content and static pages to give the authored Personal Universe work an index/detail, plain navigation from the HUD, and a non-WebGL / no-JavaScript homepage fallback, with no changes to galaxy, camera or renderer ownership."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Main already owns an Astro portfolio Content Collection, a bilingual React HUD and canonical product navigation. PR #180 adds canonical JSON content identity/bilingual values but no public work routes. A full template or managed portfolio would introduce a second site/theme/content owner; ordinary Astro static paths and semantic HTML supply all needed routing and fallback while keeping the immersive island unchanged.",
+  "planned_files": [
+    "src/pages/index.astro",
+    "src/pages/portfolio/[...entry].astro",
+    "src/pages/zh/portfolio/[...entry].astro",
+    "src/components/portfolio/PortfolioHomeFallback.astro",
+    "src/components/portfolio/PortfolioPage.astro",
+    "src/components/universe/UniverseHud.tsx",
+    "src/lib/portfolio/paths.ts",
+    "src/lib/portfolio/content.ts",
+    "tests/e2e/portfolio.spec.ts",
+    "docs/architecture/portfolio-fallback.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/chrismwilliams/astro-theme-cactus",
+      "finding": "A mature Astro/Markdown theme supplies a whole installable blog and portfolio-like site, with its own layout, configuration and collections. Available to study rather than copy the entire site."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/content-collections/",
+      "finding": "Astro getCollection reads the existing entry schema and can filter non-public rows at build time. Astro render presents existing Markdown entries without creating a content service or executing client navigation."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/routing/",
+      "finding": "Static getStaticPaths plus a rest route can prerender the collection index and each detail; both language URLs are actual HTML pages, not client history entries."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/:has",
+      "finding": "A CSS relational selector can limit the static fallback to the absence of the mounted island root without introducing another WebGL probe or subscribing to the engine. A noscript rule explicitly disables the stale island on no-JavaScript sessions."
+    },
+    {
+      "url": "https://docs.astro.build/en/guides/deploy/github/",
+      "finding": "Build links from import.meta.env.BASE_URL to support GitHub Pages under a repository subpath as well as root-local builds."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-browser#browser-new-context",
+      "finding": "Use the existing Playwright lifecycle to create JavaScript-disabled/mobile sessions and Chromium opt-out of WebGL; validate actual plain links as well as the normal canvas route."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "A downloadable Astro site could stand up a text portfolio, but duplicates the already working product shell and Content Collection to solve two small read routes."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections",
+        "astro-base-url",
+        "playwright-test"
+      ],
+      "source_refs": [
+        1,
+        2,
+        4,
+        5
+      ],
+      "conclusion": "Static Astro routing, existing content, native URLs and the established acceptance runner cover build-time identity, language, mobile/Pages portability and end-to-end fallback."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "astro-content-collections"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Reuse the one authored collection and canonical ID; no additional content loader, CMS, i18n package or 3D state machine."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "astro-base-url",
+        "playwright-test"
+      ],
+      "source_refs": [
+        3,
+        4,
+        5
+      ],
+      "conclusion": "Use plain browser hyperlinks, a normal noscript branch, and the repository's existing authored/preview assets. No fallback canvas or generated marketing assets."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "astro-cactus-site",
+      "name": "Astro Cactus starter",
+      "level": "full_solution",
+      "source": "chrismwilliams/astro-theme-cactus",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "A separate theme and content topology would displace the existing 3D homepage or duplicate the Astro build for a tiny native entry/detail flow.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "astro-static-collection-pages",
+      "name": "Astro static collection routes and native HTML",
+      "level": "framework_engine",
+      "registry_id": "astro-content-collections",
+      "source": "Existing project Astro installation and Content Collection",
+      "license": "MIT (Astro) / platform HTML",
+      "decision": "reuse",
+      "reason": "Produces static links and details from the current authored data, respects non-public rows and reuses the same identity across Markdown→canonical JSON.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "astro-pages-base",
+      "name": "Existing Astro base-aware URLs",
+      "level": "framework_engine",
+      "registry_id": "astro-base-url",
+      "source": "Existing Astro site/base configuration",
+      "license": "MIT (Astro)",
+      "decision": "reuse",
+      "reason": "Gives the HUD and static pages working root/subpath deeplinks and canonical language URLs without another URL configuration or router.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-fallback-validation",
+      "name": "Existing Playwright browser tests",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Existing Playwright runner and Chromium",
+      "license": "Apache-2.0 (Playwright)",
+      "decision": "reuse",
+      "reason": "Validates actual visitors with disabled JS or disabled WebGL, bilingual routes, HTML on the project subpath and ordinary 3D rendering using established fixtures.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "astro-static-collection-pages",
+      "astro-pages-base",
+      "playwright-fallback-validation"
+    ],
+    "rationale": "Keep one published collection and one live 3D authority; only add native static read-side presentation and an ordinary link from the already bilingual HUD. Text fallback is outside the island and remains readable if the rendering tree is removed.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "astro-cactus-site",
+        "reason": "A general portfolio theme is helpful for a greenfield site, not for a self-contained companion to an existing immersive page with an approved content authority."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If the CSS relational selector is unavailable, the static entry remains server-generated and reachable directly, and the explicit no-JavaScript fallback still works; do not introduce a second WebGL context just to detect availability."
+  }
+}
