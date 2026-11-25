@@ -67,7 +67,16 @@ export type UniverseNavigationCameraTarget =
   | { kind: "galaxy"; index: number }
   | { kind: "landmark"; index: number };
 
+export type UniverseDestinationOrigin =
+  | "personal"
+  | "hero"
+  | "observed"
+  | "generated"
+  | "curated"
+  | "catalog";
+
 export interface UniverseNavigationDestination {
+  /** Stable canonical identity used by Search, Places, journeys and deep links. */
   id: string;
   kind: UniverseNavigationKind;
   group: UniverseNavigationGroup;
@@ -77,6 +86,11 @@ export interface UniverseNavigationDestination {
   markerId?: string;
   entryId?: string;
   keywords?: string[];
+  /** Presentation/search metadata; never changes the canonical id/target. */
+  origin?: UniverseDestinationOrigin;
+  aliases?: string[];
+  importance?: number;
+  featured?: boolean;
 }
 
 export interface UniverseNavigationSection {
@@ -309,6 +323,19 @@ const QUERY_ALIASES: Record<string, string> = {
   "星团": "cluster",
   "星團": "cluster",
   "星系": "galaxy",
+  "个人宇宙": "personal universe",
+  "個人宇宙": "personal universe",
+  "个人信号": "personal signal",
+  "個人信號": "personal signal",
+  "项目": "project",
+  "項目": "project",
+  "研究": "research",
+  "经历": "experience",
+  "經歷": "experience",
+  "作品": "artifact",
+  "笔记": "note",
+  "筆記": "note",
+  "家": "home",
 };
 
 export async function loadUniverseNavigation(
@@ -316,35 +343,94 @@ export async function loadUniverseNavigation(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
   currentSystem: SystemDefinition | null = null,
+  recentDestinationIds: string[] = [],
 ): Promise<UniverseNavigationDestination[]> {
   const [{ loadYeisCore }, { normalizeQuery }] = await Promise.all([
     import("./index"),
     import("../../../vendor/yeis/core/Universe"),
   ]);
   const runtime = await loadYeisCore();
-  if (!query.trim()) {
+  const trimmed = query.trim();
+  if (!trimmed) {
     return dedupe(
-      buildPlaces(runtime, placements, markers).flatMap(
+      buildPlaces(runtime, placements, markers, currentSystem).flatMap(
         (section) => section.destinations,
       ),
     ).slice(0, 80);
   }
-  return searchDestinations(
+
+  const resolvedExact = /^(?:personal:|hero(?::|$)|observed:|exoplanet:|star:|body:|landmark:|galaxy:|blackhole:)/i.test(
+    trimmed,
+  )
+    ? await resolveUniverseNavigationDestination(
+        trimmed,
+        placements,
+        markers,
+      )
+    : null;
+  const ranked = searchDestinations(
     runtime,
-    query,
+    trimmed,
     placements,
     markers,
     currentSystem,
+    recentDestinationIds,
     normalizeQuery,
   );
+  return resolvedExact
+    ? dedupe([resolvedExact, ...ranked]).slice(0, 80)
+    : ranked;
 }
 
 export async function loadUniversePlaces(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
+  currentSystem: SystemDefinition | null = null,
+  recentDestinationIds: string[] = [],
 ): Promise<UniverseNavigationSection[]> {
   const { loadYeisCore } = await import("./index");
-  return buildPlaces(await loadYeisCore(), placements, markers);
+  const sections = buildPlaces(
+    await loadYeisCore(),
+    placements,
+    markers,
+    currentSystem,
+  );
+  if (recentDestinationIds.length === 0) return sections;
+
+  const knownIds = new Set(
+    sections.flatMap((section) =>
+      section.destinations.map((destination) => destination.id),
+    ),
+  );
+  const resolved = await Promise.all(
+    recentDestinationIds.slice(0, 8).map((id) =>
+      resolveUniverseNavigationDestination(id, placements, markers),
+    ),
+  );
+
+  for (const destination of resolved) {
+    if (!destination || knownIds.has(destination.id)) continue;
+    knownIds.add(destination.id);
+
+    const existing = sections.find(
+      (section) => section.id === destination.group,
+    );
+    if (existing) {
+      existing.destinations.push(destination);
+      continue;
+    }
+
+    const nextSection = section(destination.group, [destination]);
+    const nextRank = SEARCH_GROUP_ORDER.indexOf(destination.group);
+    const insertAt = sections.findIndex(
+      (candidate) =>
+        SEARCH_GROUP_ORDER.indexOf(candidate.id) > nextRank,
+    );
+    if (insertAt >= 0) sections.splice(insertAt, 0, nextSection);
+    else sections.push(nextSection);
+  }
+
+  return sections;
 }
 
 export function navigationSectionsForResults(
@@ -364,6 +450,66 @@ export function navigationSectionsForResults(
     return destinations?.length
       ? [{ id, title: GROUP_TITLES[id], destinations }]
       : [];
+  });
+}
+
+export type UniverseGuidedJourneyId =
+  | "featured"
+  | "projects"
+  | "research";
+
+export interface UniverseGuidedJourney {
+  id: UniverseGuidedJourneyId;
+  title: string;
+  destinations: UniverseNavigationDestination[];
+}
+
+export function guidedJourneysForSections(
+  sections: UniverseNavigationSection[],
+): UniverseGuidedJourney[] {
+  const personal =
+    sections.find((section) => section.id === "personal-signals")
+      ?.destinations ?? [];
+  const featuredIds = new Set(
+    (sections.find((section) => section.id === "featured")
+      ?.destinations ?? [])
+      .filter((destination) => destination.entryId)
+      .map((destination) => destination.id),
+  );
+
+  const candidates: UniverseGuidedJourney[] = [
+    {
+      id: "featured",
+      title: "Featured Journey",
+      destinations: personal.filter((destination) =>
+        featuredIds.has(destination.id),
+      ),
+    },
+    {
+      id: "projects",
+      title: "Projects Journey",
+      destinations:
+        sections.find((section) => section.id === "projects")
+          ?.destinations ?? [],
+    },
+    {
+      id: "research",
+      title: "Research Journey",
+      destinations:
+        sections.find((section) => section.id === "research")
+          ?.destinations ?? [],
+    },
+  ];
+
+  const seenRoutes = new Set<string>();
+  return candidates.filter((journey) => {
+    if (journey.destinations.length === 0) return false;
+    const routeKey = journey.destinations
+      .map((destination) => destination.id)
+      .join("\u0000");
+    if (seenRoutes.has(routeKey)) return false;
+    seenRoutes.add(routeKey);
+    return true;
   });
 }
 
@@ -391,12 +537,17 @@ export function navigationDestinationForPlacement(
     },
     markerId: placement.markerId,
     entryId: placement.entry.id,
+    origin: "personal",
+    importance: placement.entry.importance,
+    featured: placement.entry.featured,
+    aliases: placement.entry.tags,
     keywords: [
       placement.entry.summary,
       ...placement.entry.tags,
       placement.entry.kind,
       placement.entry.status,
       marker?.name ?? "",
+      "personal signal",
     ],
   };
 }
@@ -676,7 +827,25 @@ export async function resolveUniverseNavigationDestination(
     const nativeId = key.slice("star:".length);
     if (!nativeId) return null;
     const marker = markers.find((candidate) => candidate.nativeId === nativeId);
-    if (marker) return navigationDestinationForMarker(marker, placements);
+    if (marker) {
+      return {
+        id: key,
+        kind: "star",
+        group: "stars",
+        title: marker.name,
+        detail: (marker.spectralType || "STAR") + " · CATALOG STAR",
+        target: { kind: "star", nativeId },
+        markerId: marker.id,
+        origin:
+          marker.source === "hero"
+            ? "hero"
+            : marker.source === "catalog"
+              ? "observed"
+              : "catalog",
+        aliases: markerKeywords(marker),
+        keywords: markerKeywords(marker),
+      };
+    }
     const { loadYeisCore } = await import("./index");
     const runtime = await loadYeisCore();
     return {
@@ -686,6 +855,7 @@ export async function resolveUniverseNavigationDestination(
       title: runtime.universe.starName(nativeId),
       detail: "STAR · CATALOG",
       target: { kind: "star", nativeId },
+      origin: "catalog",
     };
   }
 
@@ -756,6 +926,7 @@ function buildPlaces(
   runtime: YeisCoreRuntime,
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
+  currentSystem: SystemDefinition | null = null,
 ): UniverseNavigationSection[] {
   const sections: UniverseNavigationSection[] = [];
   const personal = personalDestinations(placements, markers);
@@ -826,7 +997,22 @@ function buildPlaces(
   const exoplanets = observedExoplanetDestinations(markers).slice(0, 24);
   if (exoplanets.length) sections.push(section("exoplanets", exoplanets));
 
-  const bodies = [solarSystemDestination(runtime), ...curatedBodies(runtime)];
+  const currentBodies = currentSystem
+    ? currentSystem.planets.flatMap((planet) => {
+        const destination = navigationDestinationForPlanet(
+          currentSystem,
+          planet,
+          markers,
+          placements,
+        );
+        return destination ? [destination] : [];
+      })
+    : [];
+  const bodies = dedupe([
+    ...currentBodies,
+    solarSystemDestination(runtime),
+    ...curatedBodies(runtime),
+  ]);
   if (bodies.length) sections.push(section("bodies", bodies));
 
   const stars = curatedStars(runtime, CURATED_STARS, "star");
@@ -858,104 +1044,27 @@ function searchDestinations(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
   currentSystem: SystemDefinition | null,
+  recentDestinationIds: string[],
   normalize: (value: string) => string,
 ): UniverseNavigationDestination[] {
   const queries = queryVariants(rawQuery, normalize);
   const out: UniverseNavigationDestination[] = [];
+  const canonicalGraph = dedupe(
+    buildPlaces(runtime, placements, markers, currentSystem).flatMap(
+      (section) => section.destinations,
+    ),
+  );
 
-  for (const destination of personalDestinations(placements, markers)) {
-    const placement = placements.find(
-      (candidate) => candidate.entry.id === destination.entryId,
-    );
-    if (!placement) continue;
-    const haystack = normalize(
-      [
-        placement.entry.title,
-        placement.entry.summary,
-        placement.entry.kind,
-        placement.entry.status,
-        ...placement.entry.tags,
-        destination.detail,
-        ...(destination.keywords ?? []),
-      ].join(" "),
-    );
-    if (matchesAny(haystack, queries)) {
-      out.push({
-        ...destination,
-        kind: placement.entry.kind,
-        group: "personal-signals",
-      });
-    }
-  }
-
-  const heroMarker = markers.find((marker) => marker.source === "hero");
-  if (
-    heroMarker &&
-    matchesAny(
-      normalize("AURORA AURORA-01 HELION HERO WORLD HOME PERSONAL UNIVERSE"),
-      queries,
-    )
-  ) {
-    out.push(heroDestination(heroMarker));
-  }
-
-  if (queries.includes(normalize("solar system"))) {
-    out.push(solarSystemDestination(runtime));
-  }
-
-  for (const destination of observedDestinations(markers)) {
-    const haystack = normalize(
-      [destination.title, destination.detail, ...(destination.keywords ?? [])].join(
-        " ",
-      ),
-    );
-    if (matchesAny(haystack, queries)) out.push(destination);
-  }
-
-  for (const destination of observedExoplanetDestinations(markers)) {
-    const haystack = normalize(
-      [
-        destination.title,
-        destination.detail,
-        ...(destination.keywords ?? []),
-      ].join(" "),
-    );
-    if (matchesAny(haystack, queries)) out.push(destination);
-  }
-
-  if (currentSystem) {
-    const currentStarId = currentSystem.id.startsWith("yeis-system:")
-      ? currentSystem.id.slice("yeis-system:".length)
-      : null;
-    if (currentStarId) {
-      for (const planet of currentSystem.planets) {
-        const haystack = normalize(
-          [
-            planet.name,
-            planet.id,
-            planet.archetype,
-            ...(planet.content?.flatMap((entry) => [
-              entry.title,
-              entry.summary,
-              ...entry.tags,
-            ]) ?? []),
-          ].join(" "),
-        );
-        if (!matchesAny(haystack, queries)) continue;
-        out.push({
-          id: `body:${currentStarId}/${planet.id}`,
-          kind: "body",
-          group: "bodies",
-          title: planet.name,
-          detail: "CURRENT SYSTEM · " + currentSystem.name,
-          target: {
-            kind: "body",
-            starId: currentStarId,
-            bodyId: planet.id,
-          },
-          keywords: [planet.archetype, currentSystem.name],
-        });
-      }
+  for (const destination of canonicalGraph) {
+    if (
+      destinationMatchesQuery(
+        destination,
+        placements,
+        queries,
+        normalize,
+      )
+    ) {
+      out.push(destination);
     }
   }
 
@@ -1053,17 +1162,32 @@ function searchDestinations(
     out.push(...curatedGalaxies(runtime, CURATED_GALAXIES, "galaxy"));
   }
 
-  return dedupe(out).slice(0, 80);
+  return rankSearchDestinations(
+    out,
+    rawQuery,
+    queries,
+    normalize,
+    placements,
+    currentSystem,
+    recentDestinationIds,
+  ).slice(0, 80);
 }
 
 function personalDestinations(
   placements: UniverseContentPlacement[],
   markers: GalaxyMarker[],
 ): UniverseNavigationDestination[] {
-  return placements.flatMap((placement) => {
-    const destination = navigationDestinationForPlacement(placement, markers);
-    return destination ? [destination] : [];
-  });
+  return [...placements]
+    .sort((left, right) =>
+      Number(right.entry.featured) - Number(left.entry.featured) ||
+      right.entry.importance - left.entry.importance ||
+      left.entry.title.localeCompare(right.entry.title) ||
+      left.entry.id.localeCompare(right.entry.id),
+    )
+    .flatMap((placement) => {
+      const destination = navigationDestinationForPlacement(placement, markers);
+      return destination ? [destination] : [];
+    });
 }
 
 function observedDestinations(
@@ -1128,6 +1252,7 @@ function observedExoplanetDestinations(
             bodyId,
           },
           markerId: marker.id,
+          origin: "observed",
           keywords: [
             system.hostname,
             system.hipName ?? "",
@@ -1162,6 +1287,7 @@ function observedDestination(
       ? { kind: "star", nativeId: marker.nativeId }
       : { kind: "marker", markerId: marker.id },
     markerId: marker.id,
+    origin: "observed",
     keywords: markerKeywords(marker),
   };
 }
@@ -1182,6 +1308,10 @@ function heroDestination(
       markerId: marker.id,
     },
     markerId: marker.id,
+    origin: "hero",
+    importance: 5,
+    featured: true,
+    aliases: ["home", "personal universe", "hero world"],
     keywords: ["aurora", "helion", "hero", "home", HERO_SYSTEM_ID],
   };
 }
@@ -1196,6 +1326,9 @@ function solarSystemDestination(
     title: "Solar System",
     detail: "HOME SYSTEM · " + runtime.universe.starName("c0"),
     target: { kind: "star", nativeId: "c0" },
+    origin: "curated",
+    featured: true,
+    aliases: ["Sun", "Sol", "home"],
     keywords: ["Sun", "Sol", "solar", "home system"],
   };
 }
@@ -1219,6 +1352,8 @@ function curatedBodies(
         (place.note ? place.note.toUpperCase() + " · " : "") +
         body.data.type.toUpperCase(),
       target: { kind: "body" as const, starId: "c0", bodyId: body.id },
+      origin: "curated" as const,
+      aliases: [body.name, body.data.name].filter(Boolean),
       keywords: [body.name, body.data.name, place.note ?? ""],
     }];
   });
@@ -1235,14 +1370,21 @@ function curatedStars(
     const info = runtime.catalog.info(index);
     const nativeId = "c" + index;
     return [{
-      id: (kind === "featured" ? "featured:star:" : "star:") + nativeId,
-      kind,
-      group: kind === "featured" ? "featured" as const : "stars" as const,
+      id: "star:" + nativeId,
+      kind: "star" as const,
+      group: "stars" as const,
       title: place.label,
       detail:
         (place.note ? place.note.toUpperCase() + " · " : "") +
         formatDistanceLy(info.distancePc),
       target: { kind: "star" as const, nativeId },
+      origin: "curated" as const,
+      featured: kind === "featured",
+      aliases: [
+        info.name,
+        info.names?.proper ?? "",
+        info.names?.bayer ?? "",
+      ].filter(Boolean),
       keywords: [
         info.name,
         info.names?.proper ?? "",
@@ -1264,13 +1406,10 @@ function curatedBlackHoles(
     const destination = blackHoleDestination(blackHole);
     return [{
       ...destination,
-      id:
-        kind === "featured"
-          ? "featured:blackhole:" + place.ref
-          : destination.id,
-      kind,
-      group: kind === "featured" ? "featured" as const : "black-holes" as const,
+      origin: "curated" as const,
+      featured: kind === "featured",
       title: place.label,
+      aliases: [blackHole.entry.name, place.ref],
       detail:
         (place.note ? place.note.toUpperCase() + " · " : "") +
         "BLACK HOLE",
@@ -1294,12 +1433,12 @@ function curatedLandmarks(
       place.label,
       place.note,
     );
-    if (kind === "featured") {
-      destination.id = "featured:landmark:" + place.ref;
-      destination.kind = "featured";
-      destination.group = "featured";
-    }
-    return [destination];
+    return [{
+      ...destination,
+      origin: "curated" as const,
+      featured: kind === "featured",
+      aliases: [place.label, place.ref],
+    }];
   });
 }
 
@@ -1317,12 +1456,12 @@ function curatedGalaxies(
       place.label,
       place.note,
     );
-    if (kind === "featured") {
-      destination.id = "featured:galaxy:" + index;
-      destination.kind = "featured";
-      destination.group = "featured";
-    }
-    return [destination];
+    return [{
+      ...destination,
+      origin: "curated" as const,
+      featured: kind === "featured",
+      aliases: [place.label, place.ref, ...(place.fallbackRefs ?? [])],
+    }];
   });
 }
 
@@ -1353,6 +1492,7 @@ function blackHoleDestination(
     title: blackHole.entry.name,
     detail: "BLACK HOLE · CATALOG",
     target: { kind: "blackhole", id: blackHole.entry.id },
+    origin: "catalog",
     keywords: [
       blackHole.entry.summary,
       blackHole.entry.id,
@@ -1383,6 +1523,7 @@ function galaxyDestination(
       ("GALAXY · " +
         (index === 0 ? "HOME" : formatDistanceLy(distancePc))),
     target: { kind: "galaxy", index },
+    origin: "catalog",
     keywords: [galaxies.name(index), note ?? ""],
   };
 }
@@ -1407,6 +1548,7 @@ function landmarkDestination(
     target: landmark.systemId
       ? { kind: "star", nativeId: landmark.systemId }
       : { kind: "landmark", index },
+    origin: "catalog",
     keywords: [
       landmark.def.name,
       landmark.def.id,
@@ -1472,6 +1614,144 @@ function targetKey(target: UniverseNavigationTarget): string {
   }
   if (target.kind === "blackhole") return "blackhole:" + target.id;
   return target.kind + ":" + target.index;
+}
+
+function destinationSearchCorpus(
+  destination: UniverseNavigationDestination,
+  placements: UniverseContentPlacement[],
+  normalize: (value: string) => string,
+): string {
+  const placement = destination.entryId
+    ? placements.find((candidate) => candidate.entry.id === destination.entryId)
+    : undefined;
+  return normalize(
+    [
+      destination.id,
+      destination.title,
+      destination.detail,
+      destination.kind,
+      destination.group,
+      destination.origin ?? "",
+      ...(destination.aliases ?? []),
+      ...(destination.keywords ?? []),
+      placement?.entry.summary ?? "",
+      ...(placement?.entry.tags ?? []),
+      placement?.entry.kind ?? "",
+      placement?.entry.status ?? "",
+    ].join(" "),
+  );
+}
+
+function destinationMatchesQuery(
+  destination: UniverseNavigationDestination,
+  placements: UniverseContentPlacement[],
+  queries: string[],
+  normalize: (value: string) => string,
+): boolean {
+  const corpus = destinationSearchCorpus(destination, placements, normalize);
+  return matchesAny(corpus, queries);
+}
+
+export function universeDestinationSystemId(
+  destination: UniverseNavigationDestination,
+): string | null {
+  if (destination.target.kind === "star") return destination.target.nativeId;
+  if (destination.target.kind === "body") return destination.target.starId;
+  if (destination.target.kind === "content") return destination.target.nativeId;
+  return null;
+}
+
+function rankSearchDestinations(
+  destinations: UniverseNavigationDestination[],
+  rawQuery: string,
+  queries: string[],
+  normalize: (value: string) => string,
+  placements: UniverseContentPlacement[],
+  currentSystem: SystemDefinition | null,
+  recentDestinationIds: string[],
+): UniverseNavigationDestination[] {
+  const exactRaw = normalize(rawQuery);
+  const currentSystemId = currentSystem?.id.startsWith("yeis-system:")
+    ? currentSystem.id.slice("yeis-system:".length)
+    : null;
+  const groupOrder = new Map(
+    SEARCH_GROUP_ORDER.map((group, index) => [group, index]),
+  );
+
+  return dedupe(destinations)
+    .map((destination) => {
+      const title = normalize(destination.title);
+      const id = normalize(destination.id);
+      const aliases = (destination.aliases ?? []).map(normalize);
+      const keywords = (destination.keywords ?? []).map(normalize);
+      const corpus = destinationSearchCorpus(
+        destination,
+        placements,
+        normalize,
+      );
+
+      let matchScore = 0;
+      for (const query of queries) {
+        if (!query) continue;
+        if (id === query || (exactRaw && id === exactRaw)) {
+          matchScore = Math.max(matchScore, 12_000);
+        } else if (title === query) {
+          matchScore = Math.max(matchScore, 10_000);
+        } else if (aliases.includes(query)) {
+          matchScore = Math.max(matchScore, 9_200);
+        } else if (title.startsWith(query)) {
+          matchScore = Math.max(matchScore, 8_000);
+        } else if (
+          title.split(/\s+/).some((token) => token.startsWith(query))
+        ) {
+          matchScore = Math.max(matchScore, 7_000);
+        } else if (keywords.some((keyword) => keyword === query)) {
+          matchScore = Math.max(matchScore, 6_500);
+        } else if (corpus.includes(query)) {
+          matchScore = Math.max(matchScore, 5_000);
+        }
+      }
+
+      let productScore = 0;
+      if (destination.origin === "personal") {
+        productScore += 1_500 + (destination.importance ?? 3) * 120;
+      } else if (destination.origin === "hero") {
+        productScore += 1_200;
+      } else if (destination.origin === "observed") {
+        productScore += 500;
+      } else if (destination.origin === "curated") {
+        productScore += 350;
+      } else if (destination.origin === "generated") {
+        productScore += 100;
+      }
+      if (destination.featured) productScore += 300;
+      if (
+        currentSystemId &&
+        universeDestinationSystemId(destination) === currentSystemId
+      ) {
+        productScore += 600;
+      }
+      const recentIndex = recentDestinationIds.indexOf(destination.id);
+      if (recentIndex >= 0) {
+        // Recent history is a light product prior only. Exact/title/alias
+        // relevance stays authoritative, and older visits decay predictably.
+        productScore += Math.max(80, 320 - recentIndex * 30);
+      }
+
+      return {
+        destination,
+        score: matchScore + productScore,
+        groupRank: groupOrder.get(destination.group) ?? 999,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.groupRank - right.groupRank ||
+        left.destination.title.localeCompare(right.destination.title) ||
+        left.destination.id.localeCompare(right.destination.id),
+    )
+    .map(({ destination }) => destination);
 }
 
 function queryVariants(

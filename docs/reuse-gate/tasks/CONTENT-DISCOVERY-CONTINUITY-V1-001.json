@@ -1,0 +1,232 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-CONTINUITY-V1-001",
+  "title": "Recent destinations, discovery filters and session continuity",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Add browser-session recent destination continuity, Personal/Important/Nearby/Recent Navigator filters and recent ranking priors over canonical destination IDs without creating a second router, database or navigation state machine"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Agent 07 explicitly calls for recent destinations, current-path context and browser-native/session mechanisms where sufficient. Personal Universe already owns canonical destination IDs, one URL/history substrate, React local state and the Navigator result graph. Reuse those pieces: record only a bounded ordered list of canonical IDs in sessionStorage, derive filter views in the existing Navigator, and feed the same recent IDs as a small ranking prior into the existing bounded search scorer. Do not persist camera/phase/runtime state and do not add a user-account backend, client router, IndexedDB content store or global state library.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "src/lib/universe/yeis/navigation.ts",
+    "src/lib/universe/locale.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage",
+      "finding": "sessionStorage is tab-scoped and survives reloads while clearing with the browsing session, matching non-invasive recent-navigation continuity without account or server persistence."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/History_API",
+      "finding": "The existing browser-native history/URL layer remains the shareable navigation authority; recent history should store only canonical IDs and never replace URL/deep-link semantics."
+    },
+    {
+      "url": "https://react.dev/reference/react/useMemo",
+      "finding": "Existing React derived state is sufficient for bounded filter views and current-context/recent presentation without another state runtime."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing Playwright acceptance can verify reload continuity, filter behavior, recent ordering and canonical-ID navigation through the real Navigator."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep the existing Personal Universe/YEIS destination and navigation product; recent continuity is presentation metadata over canonical destinations."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "web-url-history-api"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse browser-native session and existing URL/history primitives instead of adding a client router, account backend or persistence framework."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Reuse the existing hosted browser acceptance subsystem for continuity, reload and filter product contracts."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Use existing React state/effects/memoization for a bounded filter toolbar and recent-ID state; no third-party state package is needed."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "browser-session-canonical-recent",
+      "name": "sessionStorage canonical-ID recents on the existing URL/history substrate",
+      "level": "framework_engine",
+      "registry_id": "web-url-history-api",
+      "source": "Web Platform sessionStorage plus current Personal Universe history model",
+      "license": "Web Platform browser APIs / standards",
+      "decision": "reuse",
+      "reason": "Stores only a tiny bounded list of canonical IDs, survives reload in the same tab, clears with the session and cannot become a competing navigation identity or content database.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-derived-discovery-filters",
+      "name": "React-derived Personal/Important/Nearby/Recent filter views",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseNavigator React shell",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Filters the already-loaded canonical graph and reuses current system/metadata without rebuilding an index or adding global state.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-continuity-contract",
+      "name": "Existing hosted Playwright continuity acceptance",
+      "level": "subsystem",
+      "registry_id": "playwright-test",
+      "source": "Current release E2E suite",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Exercises session reload, filter UI, canonical IDs, active state and navigation through the same product path users use.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "persistent-discovery-database",
+      "name": "IndexedDB/account-backed recent destination database",
+      "level": "subsystem",
+      "source": "New persistence backend",
+      "license": "project-owned plus platform storage",
+      "decision": "reject",
+      "reason": "Disproportionate for a bounded recent list and risks becoming the parallel content/history database Agent 07 forbids."
+    },
+    {
+      "id": "global-discovery-state-runtime",
+      "name": "New global state machine/store for Navigator continuity",
+      "level": "framework_engine",
+      "source": "New dependency/runtime",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "Duplicates the existing React/navigation authorities and adds lifecycle complexity for small derived session state."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Recently visited canonical destinations survive reload in the same tab without persisting camera/runtime state",
+      "importance": "high",
+      "coverage": {
+        "browser-session-canonical-recent": "full",
+        "react-derived-discovery-filters": "partial",
+        "playwright-continuity-contract": "partial",
+        "persistent-discovery-database": "full",
+        "global-discovery-state-runtime": "partial"
+      },
+      "decision": "Store only up to eight canonical destination IDs in sessionStorage; hydrate safely and discard malformed values."
+    },
+    {
+      "capability": "Navigator can narrow Places to personal, important, current-system and recent destinations without duplicating Search",
+      "importance": "high",
+      "coverage": {
+        "browser-session-canonical-recent": "partial",
+        "react-derived-discovery-filters": "full",
+        "playwright-continuity-contract": "partial",
+        "persistent-discovery-database": "none",
+        "global-discovery-state-runtime": "full"
+      },
+      "decision": "Add a compact derived filter toolbar only for empty-query Places; Search continues using the shared ranking/query layer."
+    },
+    {
+      "capability": "Recent visits influence search ordering but never identity or exact-match precedence",
+      "importance": "high",
+      "coverage": {
+        "browser-session-canonical-recent": "full",
+        "react-derived-discovery-filters": "partial",
+        "playwright-continuity-contract": "partial",
+        "persistent-discovery-database": "partial",
+        "global-discovery-state-runtime": "partial"
+      },
+      "decision": "Pass recent canonical IDs into the existing scorer as a small bounded prior below textual exact/title/alias relevance."
+    },
+    {
+      "capability": "Responsive bilingual UI and reload continuity remain verifiable in real browser acceptance",
+      "importance": "high",
+      "coverage": {
+        "browser-session-canonical-recent": "partial",
+        "react-derived-discovery-filters": "partial",
+        "playwright-continuity-contract": "full",
+        "persistent-discovery-database": "none",
+        "global-discovery-state-runtime": "none"
+      },
+      "decision": "Extend existing Playwright and locale primitives rather than creating a separate history/filter test or translation system."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "browser-session-canonical-recent",
+      "react-derived-discovery-filters",
+      "playwright-continuity-contract"
+    ],
+    "rationale": "Use only browser-session canonical-ID storage, existing React derived state and the shared discovery scorer. URL/deep-link navigation remains authoritative; history is a bounded presentation/ranking signal rather than a new state machine or database.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "persistent-discovery-database",
+        "reason": "Cross-session/account persistence has more reach but adds product and privacy surface that the current personal homepage does not need."
+      },
+      {
+        "candidate_id": "global-discovery-state-runtime",
+        "reason": "A dedicated state runtime is unnecessary for one bounded array plus derived filters and would compete with existing navigation lifecycle."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If future multi-device history becomes a real product requirement, add a narrow sync adapter around canonical IDs only; do not migrate destination identity, content records or camera/runtime state into that persistence layer."
+  }
+}

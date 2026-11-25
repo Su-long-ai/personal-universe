@@ -1,0 +1,257 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-PRODUCTIZATION-V1-001",
+  "title": "Canonical destination identity and shared discovery ranking",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Unify Search, Places, Navigator, Personal Signal and share-link discovery around canonical destination IDs, one bounded ranking layer and existing YEIS navigation authority"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Personal Universe already has the right navigation authorities: pinned MIT YEIS resolves astronomical targets, the project destination executor owns travel/deep links, React renders Navigator, and Playwright validates browser contracts. The product gap is not another search engine but drift between discovery presentations. Featured Places currently manufactures alternate featured:* IDs for destinations that Search and share links expose as star:*, blackhole:*, landmark:* or galaxy:*; search results are appended by data-source order rather than ranked across one canonical graph. Reuse the existing destination constructors and YEIS domain searches, preserve one canonical destination identity, add presentation metadata and deterministic bounded scoring over resolved destinations, and keep async stale-result suppression in the existing React lifecycle. Generic cmdk/Fuse or Pagefind remain useful only if catalog volume later exceeds the current derived graph; neither should become a second spatial identity authority.",
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/ui/UI.ts",
+      "finding": "Pinned MIT YEIS already supplies the astronomy-domain search primitives and native target identities; Personal Universe should rank resolved destinations rather than build a second astronomy index."
+    },
+    {
+      "url": "https://react.dev/reference/react/useMemo",
+      "finding": "React's existing derived-data primitives are sufficient to memoize bounded discovery presentation without introducing another state runtime or persistent database."
+    },
+    {
+      "url": "https://github.com/pacocoursey/cmdk",
+      "finding": "cmdk and Fuse-style command-palette tooling can provide generic keyboard and fuzzy ranking, but adopting them as the destination authority would duplicate the existing YEIS/domain identity model."
+    },
+    {
+      "url": "https://pagefind.app/",
+      "finding": "Pagefind is optimized for static document full-text search and is not a spatial destination graph or navigation identity system."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing Playwright browser assertions can verify canonical IDs, alias search, responsive interaction, deep-link reload and stale-result suppression through real product surfaces."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Retain the pinned YEIS-backed Personal Universe destination/search product as the full spatial authority; productize identity and ranking above its resolved targets."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing React shell and derived-state lifecycle; a new application state or routing framework would add a competing discovery authority."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "pagefind"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Pagefind is a mature document-search subsystem but does not cover stars, worlds, Personal Signals, native camera targets or canonical spatial deep links."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "cmdk-fuse-navigation",
+        "playwright-test"
+      ],
+      "source_refs": [
+        2,
+        4
+      ],
+      "conclusion": "Generic fuzzy/command-palette tooling is optional later; keep current lightweight ranking and use existing Playwright for real browser acceptance now."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-canonical-destination-graph",
+      "name": "Existing YEIS destination constructors with canonical presentation metadata and bounded ranking",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current src/lib/universe/yeis/navigation.ts plus pinned MIT YEIS search primitives",
+      "license": "MIT pinned YEIS plus project-owned destination adapters",
+      "decision": "reuse",
+      "reason": "Preserves one destination/navigation identity while removing featured-ID drift and data-source-order ranking without another index or router.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "react-derived-discovery-state",
+      "name": "Existing React derived state for grouped discovery presentation",
+      "level": "framework_engine",
+      "registry_id": "react-core-hooks",
+      "source": "React already used by UniverseNavigator",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Supports memoized grouping, active state and bounded presentation while keeping search resolution and navigation outside the component.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 0.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "cmdk-fuse-navigation",
+      "name": "cmdk + Fuse.js command-palette/fuzzy search layer",
+      "level": "component_asset",
+      "registry_id": "cmdk-fuse-navigation",
+      "source": "cmdk / Fuse.js",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Useful if typo/fuzzy volume later requires it, but it would add dependency and a second ranking/index surface before the current canonical graph and deterministic scoring are exhausted.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "pagefind-doc-search",
+      "name": "Pagefind static full-text search",
+      "level": "subsystem",
+      "registry_id": "pagefind",
+      "source": "Pagefind",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Strong document search but cannot replace spatial destination identity, current-system context, generated-world targets or native camera contracts.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 2.5,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-discovery-contract",
+      "name": "Existing Playwright hosted discovery acceptance",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current hosted Playwright suite",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Provides real-browser evidence for one canonical ID across Places/Search/deep links, bilingual aliases, keyboard navigation and stale-result suppression.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "The same target keeps one destination ID across Search, Places, Featured presentation and share-link reload",
+      "importance": "high",
+      "coverage": {
+        "existing-canonical-destination-graph": "full",
+        "react-derived-discovery-state": "partial",
+        "cmdk-fuse-navigation": "none",
+        "pagefind-doc-search": "none",
+        "playwright-discovery-contract": "partial"
+      },
+      "decision": "Canonical IDs remain owned by destination constructors; Featured becomes presentation metadata/section membership rather than an alternate identity prefix."
+    },
+    {
+      "capability": "Personal/authored content outranks generated or generic catalog filler while exact ID/title/alias matches remain deterministic",
+      "importance": "high",
+      "coverage": {
+        "existing-canonical-destination-graph": "full",
+        "react-derived-discovery-state": "partial",
+        "cmdk-fuse-navigation": "partial",
+        "pagefind-doc-search": "partial",
+        "playwright-discovery-contract": "partial"
+      },
+      "decision": "Score already-resolved destinations with explicit exact/prefix/token, authored/featured/current-context priors and deterministic ID tie-breaking."
+    },
+    {
+      "capability": "Navigator remains bounded and responsive as catalog volume grows without rebuilding a heavyweight index per keystroke",
+      "importance": "high",
+      "coverage": {
+        "existing-canonical-destination-graph": "full",
+        "react-derived-discovery-state": "full",
+        "cmdk-fuse-navigation": "full",
+        "pagefind-doc-search": "full",
+        "playwright-discovery-contract": "partial"
+      },
+      "decision": "Keep YEIS-native domain search, dedupe/rank a bounded candidate set, memoize presentation, and cap sections/results rather than rendering the full catalog."
+    },
+    {
+      "capability": "Real browser discovery contracts cover bilingual aliases, keyboard use, deep-link reload and stale async result suppression",
+      "importance": "high",
+      "coverage": {
+        "existing-canonical-destination-graph": "partial",
+        "react-derived-discovery-state": "partial",
+        "cmdk-fuse-navigation": "partial",
+        "pagefind-doc-search": "partial",
+        "playwright-discovery-contract": "full"
+      },
+      "decision": "Extend the existing Playwright suite instead of adding a separate discovery test harness."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-canonical-destination-graph",
+      "react-derived-discovery-state",
+      "playwright-discovery-contract"
+    ],
+    "rationale": "Productize discovery by reusing the existing YEIS-backed destination model, React presentation layer and hosted Playwright evidence. The new work is limited to canonical presentation metadata, deterministic scoring/grouping and browser-visible product behavior; it does not create another router, search database or navigation state machine.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "cmdk-fuse-navigation",
+        "reason": "Generic fuzzy ranking is broader, but current catalog volume and existing YEIS indexes do not justify another dependency or identity/index layer before deterministic product-specific ranking is exhausted."
+      },
+      {
+        "candidate_id": "pagefind-doc-search",
+        "reason": "Pagefind is excellent for static documents but would sit beside the spatial graph and cannot replace destination identity, current-system context or camera targets."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If a substantially larger authored catalog later makes bounded in-memory scoring insufficient, add Fuse/MiniSearch only as a ranking/index adapter over canonical resolved destination IDs; never let it mint independent IDs or own navigation."
+  }
+}

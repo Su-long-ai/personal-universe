@@ -1,0 +1,131 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-VISUAL-ACCEPTANCE-V1-001",
+  "title": "Canonical Featured discovery visual acceptance",
+  "scope": {
+    "level": "implementation",
+    "subject": "Align existing Playwright visual Places acceptance with canonical Featured section membership after removing UI-specific featured destination kinds and IDs"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The hosted visual suite already reuses Playwright and the repository's Places surface. Canonical discovery productization intentionally removes the fake featured destination kind/id while preserving the visible Featured section and data-destination-featured metadata. The only failing release visual case still selects .kind-featured, so reuse the existing Playwright visual harness and assert the real Featured group plus canonical row metadata instead of restoring an identity-only presentation kind.",
+  "planned_files": [
+    "tests/e2e/visual.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://playwright.dev/docs/locators",
+      "finding": "Playwright recommends user-facing or stable semantic locators; the existing Featured group aria-label and explicit destination metadata are more faithful than a removed presentation-only kind class."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing retrying locator assertions are sufficient to validate that the Featured Places group is rendered and contains canonical featured destinations."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep the current YEIS-backed Personal Universe Places product and canonical destination model; no separate visual product is needed."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep Playwright Test as the browser lifecycle and visual/retrying assertion framework."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "playwright-ci-sharding"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing hosted sharded release acceptance topology rather than creating a discovery-only CI lane."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Reuse the existing visualCase and Places screenshot case, changing only its stale Featured locator contract."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-playwright-places-visual",
+      "name": "Existing Playwright Places visual acceptance",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "tests/e2e/visual.spec.ts",
+      "license": "Apache-2.0 Playwright plus project tests",
+      "decision": "reuse",
+      "reason": "Already captures the real Places product in the hosted release matrix; only the stale .kind-featured locator conflicts with canonical identity.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "restore-fake-featured-kind",
+      "name": "Restore a featured destination kind only for visual acceptance",
+      "level": "component_asset",
+      "source": "New project presentation workaround",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would reintroduce the exact identity/presentation drift Agent 07 requires removing and make Search/Places disagree again."
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Places visual smoke proves the Featured section is visible without minting alternate destination identity",
+      "importance": "high",
+      "coverage": {
+        "existing-playwright-places-visual": "full",
+        "restore-fake-featured-kind": "partial"
+      },
+      "decision": "Locate the Featured group by its existing aria-label and assert a row with data-destination-featured=true."
+    },
+    {
+      "capability": "Hosted desktop visual capture remains in the same release suite",
+      "importance": "high",
+      "coverage": {
+        "existing-playwright-places-visual": "full",
+        "restore-fake-featured-kind": "none"
+      },
+      "decision": "Do not create a second screenshot framework or discovery-only visual lane."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-playwright-places-visual"
+    ],
+    "rationale": "Update only the stale visual locator so the existing hosted visual case measures the canonical Featured presentation contract. Do not weaken screenshot/readiness checks and do not reintroduce fake featured identities.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If the semantic Featured group becomes inaccessible, fix the product's accessible section labelling rather than selecting implementation-only CSS or restoring a fake destination kind."
+  }
+}
