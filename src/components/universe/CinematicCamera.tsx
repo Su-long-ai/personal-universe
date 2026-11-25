@@ -437,18 +437,9 @@ export function CinematicCamera({
       // Keep its fit distance as the safety floor, then choose a farther
       // vertical-composition distance with an aspect-aware horizontal cap.
       const aspect = viewportWidth / viewportHeight;
-      const baseVerticalRadius = Math.min(0.28, 0.39 / frameScale);
-      // Very wide viewports make a correctly sized planet occupy too little
-      // of the central visual-acceptance region. Preserve the portrait fit
-      // behavior, but let wide screens move modestly closer while the exact
-      // camera-controls fit distance remains the no-clipping floor below.
-      const wideAspectRatio = aspect / (16 / 9);
-      const wideReadabilityBoost = Math.min(
-        1.4,
-        1 + Math.max(0, wideAspectRatio - 1) * 1.2,
-      );
-      const preferredVerticalRadius =
-        baseVerticalRadius * wideReadabilityBoost;
+      // Compose by height on wide viewports. Expanding the subject with the
+      // extra horizontal space makes the same wheel position a different zoom.
+      const preferredVerticalRadius = Math.min(0.28, 0.39 / frameScale);
       const horizontalSafeVerticalRadius = Math.max(
         0.16,
         aspect * 0.44,
@@ -1006,22 +997,46 @@ export function CinematicCamera({
       controls.smoothTime = 0.05;
       controls.maxSpeed = 1000;
       controls.stop();
-      void controls.lerpLookAt(
-        fromPosition.x,
-        fromPosition.y,
-        fromPosition.z,
-        fromTarget.x,
-        fromTarget.y,
-        fromTarget.z,
-        toPosition.x,
-        toPosition.y,
-        toPosition.z,
-        toTarget.x,
-        toTarget.y,
-        toTarget.z,
-        t,
-        false,
-      );
+      if (lowerPhase === "approach" && upperPhase === "orbit") {
+        // The authored directions straddle -PI/+PI. lerpLookAt interpolates
+        // their signed azimuths through zero, taking the long way around the
+        // dark side. Blend these nearby unit directions on their short arc
+        // separately from distance so the sphere keeps its fitted size.
+        const fromOffset = fromPosition.sub(fromTarget);
+        const toOffset = toPosition.sub(toTarget);
+        const distance = fromOffset.length() * (1 - t) + toOffset.length() * t;
+        desiredPosition.current
+          .lerpVectors(fromOffset.normalize(), toOffset.normalize(), t)
+          .normalize()
+          .multiplyScalar(distance)
+          .add(desiredTarget.current);
+        void controls.setLookAt(
+          desiredPosition.current.x,
+          desiredPosition.current.y,
+          desiredPosition.current.z,
+          desiredTarget.current.x,
+          desiredTarget.current.y,
+          desiredTarget.current.z,
+          false,
+        );
+      } else {
+        void controls.lerpLookAt(
+          fromPosition.x,
+          fromPosition.y,
+          fromPosition.z,
+          fromTarget.x,
+          fromTarget.y,
+          fromTarget.z,
+          toPosition.x,
+          toPosition.y,
+          toPosition.z,
+          toTarget.x,
+          toTarget.y,
+          toTarget.z,
+          t,
+          false,
+        );
+      }
       controls.update(0);
 
       document.documentElement.dataset.universeCameraMode =

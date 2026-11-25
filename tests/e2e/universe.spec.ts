@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { Quaternion, Vector3 } from "three";
 import { test, expect, type Page } from "@playwright/test";
 import {
   continuousScaleResponseDistance,
@@ -7521,5 +7522,33 @@ test("mobile tablet desktop and ultrawide preserve comparable apparent scale", a
     "projected scale should remain comparable from mobile portrait through ultrawide",
   ).toBeLessThan(0.08);
 
+  await runtime.assertClean(testInfo);
+});
+
+test("Approach-Orbit wheel midpoint stays on the illuminated hemisphere", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const html = page.locator("html");
+  const orientation = "data-universe-camera-quaternion";
+  await page.goto("/?phase=approach&star=h-aurora&body=aurora-01&freeze=1");
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "approach");
+
+  // Read a continuous pose first: a phase URL is not itself a wheel pose.
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "2.250");
+  await expect(html).toHaveAttribute(orientation, /.+/);
+  const previous = await html.getAttribute(orientation);
+  await dispatchScaleWheel(page, -48);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "2.500");
+  await expect(html).not.toHaveAttribute(orientation, previous!);
+  const quaternion = new Quaternion().fromArray(
+    (await html.getAttribute(orientation))!.split(",").map(Number),
+  );
+  // Camera-local +Z points from the subject toward the viewer.
+  const towardViewer = new Vector3(0, 0, 1).applyQuaternion(quaternion);
+  expect(
+    towardViewer.dot(new Vector3(...SURFACE_STELLAR_LIGHT_DIRECTION)),
+    "midpoint must not orbit around the unlit side",
+  ).toBeGreaterThan(0);
   await runtime.assertClean(testInfo);
 });
