@@ -1976,6 +1976,56 @@ test("LOW Surface handoff keeps the globe until retained terrain is actually rea
   await runtime.assertClean(testInfo);
 });
 
+type HeldScaleMirrorWindow = Window & {
+  releaseHeldScaleMirror?: () => void;
+};
+
+async function withDeferredScaleMirrorHeld(
+  page: Page,
+  deltaY: number,
+  verify: () => Promise<void>,
+) {
+  await page.locator("main.universe-root").evaluate((root, deltaY) => {
+    const browser = window as HeldScaleMirrorWindow;
+    const request = window.requestAnimationFrame;
+    const cancel = window.cancelAnimationFrame;
+    const held = new Map<number, FrameRequestCallback>();
+    // Only hold callback registrations made by this one synchronous wheel
+    // dispatch. The R3F loop and all other browser frame callbacks still run.
+    window.requestAnimationFrame = (callback) => {
+      const placeholder = request.call(window, () => {});
+      held.set(placeholder, callback);
+      return placeholder;
+    };
+    window.cancelAnimationFrame = (id) => {
+      held.delete(id);
+      cancel.call(window, id);
+    };
+    browser.releaseHeldScaleMirror = () => {
+      window.cancelAnimationFrame = cancel;
+      for (const [id, callback] of held) {
+        cancel.call(window, id);
+        request.call(window, callback);
+      }
+      delete browser.releaseHeldScaleMirror;
+    };
+    try {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY,
+      }));
+    } finally {
+      window.requestAnimationFrame = request;
+    }
+  }, deltaY);
+  try {
+    await verify();
+  } finally {
+    await page.evaluate(() => (window as HeldScaleMirrorWindow).releaseHeldScaleMirror?.());
+  }
+}
+
 test("live landing frame is revoked at four and reacquired on re-entry @webgl-heavy", async ({
   page,
 }, testInfo) => {
@@ -1992,6 +2042,11 @@ test("live landing frame is revoked at four and reacquired on re-entry @webgl-he
 
   const html = page.locator("html");
   await expect(html).toHaveAttribute(
+    "data-universe-world-pipeline",
+    "procedural-planets-pass",
+    { timeout: 30_000 },
+  );
+  await expect(html).toHaveAttribute(
     "data-universe-world-paint-ready",
     "true",
     { timeout: 30_000 },
@@ -2007,65 +2062,101 @@ test("live landing frame is revoked at four and reacquired on re-entry @webgl-he
     "4.000",
   );
 
-  await dispatchScaleWheel(page, -96);
-  await dispatchScaleWheel(page, -48);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "4.600",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-renderer",
-    "procedural-planets-live-surface",
-    { timeout: 15_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-camera-frame",
-    "ready",
-    { timeout: 15_000 },
-  );
+  await withDeferredScaleMirrorHeld(page, -96, async () => {
+    await dispatchScaleWheel(page, -48);
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "4.600",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-renderer",
+      "procedural-planets-live-surface",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-camera-frame",
+      "ready",
+      { timeout: 15_000 },
+    );
+  });
 
   // Crossing back to the exact Atmosphere anchor removes the live landing
   // anchor and clears the published frame. Rotation is allowed to resume only
   // at/below this boundary.
   await dispatchScaleWheel(page, 96);
-  await dispatchScaleWheel(page, 48);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "4.000",
-  );
-  await expect(html).not.toHaveAttribute(
-    "data-universe-surface-camera-frame",
-    /.+/,
-  );
-  await expect(html).not.toHaveAttribute(
-    "data-universe-surface-renderer",
-    "procedural-planets-live-surface",
-  );
+  await withDeferredScaleMirrorHeld(page, 48, async () => {
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "4.000",
+    );
+    await expect(html).not.toHaveAttribute(
+      "data-universe-surface-camera-frame",
+      /.+/,
+    );
+    await expect(html).not.toHaveAttribute(
+      "data-universe-surface-renderer",
+      "procedural-planets-live-surface",
+    );
+  });
 
   await page.waitForTimeout(320);
 
   // A new inward crossing gets a fresh anchor instance/frame from the current
   // planet transform rather than reviving the stale frame from the prior pass.
-  await dispatchScaleWheel(page, -48);
-  await expect(html).toHaveAttribute(
-    "data-universe-scale-position",
-    "4.200",
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-renderer",
-    "procedural-planets-live-surface",
-    { timeout: 15_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-surface-camera-frame",
-    "ready",
-    { timeout: 15_000 },
-  );
-  await expect(html).toHaveAttribute(
-    "data-universe-navigation-phase",
-    "atmosphere",
-  );
+  await withDeferredScaleMirrorHeld(page, -48, async () => {
+    await expect(html).toHaveAttribute(
+      "data-universe-scale-position",
+      "4.200",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-renderer",
+      "procedural-planets-live-surface",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-surface-camera-frame",
+      "ready",
+      { timeout: 15_000 },
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-navigation-phase",
+      "atmosphere",
+    );
+  });
 
+  await runtime.assertClean(testInfo);
+});
+
+test("same-task reversal across the landing edge republishes Atmosphere settlement", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=orbit&star=h-aurora&body=aurora-01&freeze=1");
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "orbit");
+  await dispatchScaleWheel(page, -96);
+  await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "4.000");
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "atmosphere");
+  const before = Number(await html.getAttribute("data-universe-scale-react-commits"));
+
+  await page.locator("main.universe-root").evaluate((root) => {
+    // One task: React may batch the two positions back to the same value.
+    for (const deltaY of [-48, 48]) {
+      root.dispatchEvent(new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY,
+      }));
+    }
+  });
+  await expect(html).toHaveAttribute("data-universe-scale-position", "4.000");
+  await expect
+    .poll(async () => Number(await html.getAttribute("data-universe-scale-react-commits")))
+    .toBeGreaterThan(before);
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "atmosphere");
+  await expect(html).not.toHaveAttribute("data-universe-surface-camera-frame", /.+/);
   await runtime.assertClean(testInfo);
 });
 

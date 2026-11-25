@@ -2703,13 +2703,24 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeScaleQueued;
         delete document.documentElement.dataset.universeScaleBlocked;
 
+        const semanticPhase = worldScalePhaseForPosition(
+          nextPosition,
+          selectedPlanet.surfaceMode,
+        );
+        // The live landing frame mounts above 4 and is revoked at/below 4,
+        // although both sides can still be Atmosphere. Commit that ownership
+        // edge like any phase change instead of waiting for the RAF mirror.
+        const crossesLandingFrameEdge =
+          (currentPosition > 4) !== (nextPosition > 4);
         publishWorldScalePosition(
           nextPosition,
-          worldScalePhaseForPosition(
-            nextPosition,
-            selectedPlanet.surfaceMode,
-          ) !== currentPhase,
+          semanticPhase !== currentPhase || crossesLandingFrameEdge,
         );
+        if (crossesLandingFrameEdge && semanticPhase === currentPhase) {
+          // Two opposite edges can batch back to the previous numeric state.
+          // Keep the ordinary mirror's same-value settlement invalidation.
+          setWorldScaleRenderRevision((revision) => revision + 1);
+        }
         setWorldScaleContinuous(true);
         document.documentElement.dataset.universeScaleDirection = direction;
         document.documentElement.dataset.universeScaleProgress =
@@ -2720,10 +2731,6 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeCameraSettled;
         delete document.documentElement.dataset.universeScaleSettled;
 
-        const semanticPhase = worldScalePhaseForPosition(
-          nextPosition,
-          selectedPlanet.surfaceMode,
-        );
         if (semanticPhase !== currentPhase) {
           setWorldScalePhase(semanticPhase, {
             preserveWorldScalePosition: true,
