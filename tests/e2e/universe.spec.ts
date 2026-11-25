@@ -5665,17 +5665,313 @@ test("Search keyboard navigation reaches personal content", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("Places featured destination navigates", async ({ page }, testInfo) => {
+test("Search ranks bilingual personal alias above generic catalog matches", async ({
+  page,
+}, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?freeze=1");
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const featured = page.locator(".navigator-result-row", {
-    has: page.locator(".kind-featured"),
-  }).first();
-  await expect(featured).toBeVisible();
-  await featured.locator(".navigator-result-open").click();
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("个人宇宙");
+
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toBeVisible();
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-origin",
+    "personal",
+  );
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-id",
+    /^personal:/,
+  );
+  await expect(rows.first()).toContainText("Personal Universe");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Search exact canonical id wins deterministic ranking", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("body:c0/earth");
+
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toHaveAttribute(
+    "data-destination-id",
+    "body:c0/earth",
+  );
+  await expect(rows.first()).toContainText("Earth");
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Recent destination survives reload and filters canonical Places", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  let dialog = await openNavigator(page);
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("body:c0/earth");
+
+  const earth = dialog.locator(
+    '.navigator-result-row[data-destination-id="body:c0/earth"]',
+  );
+  await expect(earth).toBeVisible();
+  await earth.locator(".navigator-result-open").click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/earth",
+  );
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const raw = window.sessionStorage.getItem(
+          "personal-universe.recent-destinations.v1",
+        );
+        return raw ? (JSON.parse(raw) as string[])[0] : null;
+      }),
+    )
+    .toBe("body:c0/earth");
+
+  // Seed one valid long-tail catalogue destination to prove Recent is not
+  // limited to the curated Places inventory. Session history stores identity
+  // only; the existing canonical resolver reconstructs its display metadata.
+  await page.evaluate(() => {
+    window.sessionStorage.setItem(
+      "personal-universe.recent-destinations.v1",
+      JSON.stringify(["star:c50000", "body:c0/earth"]),
+    );
+  });
+
+  const reloadUrl = page.url();
+  await page.goto(reloadUrl);
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    "body:c0/earth",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-recent-destinations",
+    /(^|\|)star:c50000(\||$)/,
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-recent-destinations",
+    /(^|\|)body:c0\/earth(\||$)/,
+  );
+
+  dialog = await openNavigator(page);
+  const recent = dialog.getByRole("button", { name: "RECENT" });
+  await expect(recent).toBeEnabled();
+  await recent.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "recent",
+  );
+
+  const recentRows = dialog.locator(".navigator-result-row");
+  await expect(recentRows.first()).toBeVisible();
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="body:c0/earth"]',
+    ),
+  ).toBeVisible();
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="star:c50000"]',
+    ),
+  ).toBeVisible();
+  expect(
+    await recentRows.evaluateAll((rows) =>
+      rows.every((row) =>
+        (row as HTMLElement).dataset.destinationId?.startsWith(
+          "featured:",
+        ) === false,
+      ),
+    ),
+  ).toBe(true);
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Places filters derive Personal and Important views from canonical graph", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const html = page.locator("html");
+
+  const personal = dialog.getByRole("button", { name: "PERSONAL" });
+  await personal.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "personal",
+  );
+  const personalRows = dialog.locator(".navigator-result-row");
+  await expect(personalRows.first()).toBeVisible();
+  expect(
+    await personalRows.evaluateAll((rows) =>
+      rows.every(
+        (row) =>
+          (row as HTMLElement).dataset.destinationOrigin === "personal",
+      ),
+    ),
+  ).toBe(true);
+
+  const important = dialog.getByRole("button", { name: "IMPORTANT" });
+  await important.click();
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "important",
+  );
+  const importantRows = dialog.locator(".navigator-result-row");
+  await expect(importantRows.first()).toBeVisible();
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-featured="true"]',
+    ).first(),
+  ).toBeVisible();
+
+  const nearby = dialog
+    .locator(".navigator-filters")
+    .getByRole("button", { name: "NEARBY", exact: true });
+  await expect(nearby).toBeDisabled();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Nearby Places only exposes destinations owned by current native system", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+
+  const dialog = await openNavigator(page);
+  const html = page.locator("html");
+  const nearby = dialog
+    .locator(".navigator-filters")
+    .getByRole("button", { name: "NEARBY", exact: true });
+  await expect(nearby).toBeEnabled();
+  await nearby.click();
+
+  await expect(html).toHaveAttribute(
+    "data-universe-navigator-filter",
+    "nearby",
+  );
+  const rows = dialog.locator(".navigator-result-row");
+  await expect(rows.first()).toBeVisible();
+  expect(
+    await rows.evaluateAll((items) =>
+      items.every(
+        (item) =>
+          (item as HTMLElement).dataset.destinationSystem === "c0",
+      ),
+    ),
+  ).toBe(true);
+  await expect(
+    dialog.locator(
+      '.navigator-result-row[data-destination-id="body:c0/earth"]',
+    ),
+  ).toBeVisible();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Default Places density expands local bodies from Galaxy to System while Search keeps long tail", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  let dialog = await openNavigator(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute(
+    "data-universe-discovery-density",
+    "galaxy",
+  );
+
+  const galaxyBodies = dialog.locator(
+    '.navigator-result-group[aria-label="Planets & Bodies"] .navigator-result-row',
+  );
+  await expect(galaxyBodies.first()).toBeVisible();
+  const galaxyBodyCount = await galaxyBodies.count();
+  expect(galaxyBodyCount).toBeGreaterThan(0);
+  expect(galaxyBodyCount).toBeLessThanOrEqual(5);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await page.goto("/?phase=system&star=c0&freeze=1");
+  await waitForYeisEngine(page);
+  dialog = await openNavigator(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-discovery-density",
+    "system",
+  );
+
+  const systemBodies = dialog.locator(
+    '.navigator-result-group[aria-label="Planets & Bodies"] .navigator-result-row',
+  );
+  await expect(systemBodies.first()).toBeVisible();
+  const systemBodyCount = await systemBodies.count();
+  expect(systemBodyCount).toBeGreaterThan(galaxyBodyCount);
+  expect(systemBodyCount).toBeLessThanOrEqual(14);
+
+  // A default Places budget must not turn into a hidden long-tail cutoff.
+  // Canonical IDs outside the curated rows still resolve through Search.
+  const search = page.getByRole("combobox", { name: "Search universe" });
+  await search.fill("star:c50000");
+  const first = dialog.locator(".navigator-result-row").first();
+  await expect(first).toHaveAttribute(
+    "data-destination-id",
+    "star:c50000",
+  );
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Places Featured keeps the canonical destination id across reload", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const featuredGroup = dialog.locator(
+    '.navigator-result-group[aria-label="Featured"]',
+  );
+  const featuredStar = featuredGroup
+    .locator(".navigator-result-row")
+    .filter({ has: page.locator(".kind-star") })
+    .first();
+  await expect(featuredStar).toBeVisible();
+  await expect(featuredStar).toHaveAttribute(
+    "data-destination-featured",
+    "true",
+  );
+  const canonicalId = await featuredStar.getAttribute("data-destination-id");
+  expect(canonicalId).toMatch(/^star:/);
+  expect(canonicalId).not.toMatch(/^featured:/);
+
+  await featuredStar.locator(".navigator-result-open").click();
 
   await expect(dialog).toBeHidden();
   await expect(page.locator("html")).toHaveAttribute(
@@ -5683,14 +5979,22 @@ test("Places featured destination navigates", async ({ page }, testInfo) => {
     "system",
   );
   await expect(page.getByText("STELLAR SYSTEM")).toBeVisible();
-  const activeFeatured = await page
-    .locator("html")
-    .getAttribute("data-universe-active-destination");
-  expect(activeFeatured).toMatch(/^featured:star:/);
-  const placeTarget = await page
-    .locator("html")
-    .getAttribute("data-universe-navigation-target");
-  expect(placeTarget).toBeTruthy();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    canonicalId!,
+  );
+
+  const shared = new URL(page.url());
+  expect(shared.searchParams.get("destination")).toBe(canonicalId);
+  await page.goto(shared.toString());
+  await waitForYeisEngine(page);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-universe-active-destination",
+    canonicalId!,
+  );
+  expect(
+    await page.locator("html").getAttribute("data-universe-navigation-error"),
+  ).toBeNull();
 
   await runtime.assertClean(testInfo);
 });
@@ -5703,9 +6007,9 @@ test("Earth body navigation preserves async search and shareable return flow", a
   await waitForYeis(page);
 
   const dialog = await openNavigator(page);
-  const featuredRows = dialog
-    .locator(".navigator-result-row")
-    .filter({ has: page.locator(".kind-featured") });
+  const featuredRows = dialog.locator(
+    '.navigator-result-group[aria-label="Featured"] .navigator-result-row',
+  );
   await expect(featuredRows.first()).toBeVisible();
 
   const search = page.getByRole("combobox", { name: "Search universe" });
@@ -5802,6 +6106,83 @@ test("Earth body navigation preserves async search and shareable return flow", a
   expect(returnedGalaxyUrl.searchParams.get("star")).toBeNull();
   expect(returnedGalaxyUrl.searchParams.get("body")).toBeNull();
   expect(returnedGalaxyUrl.searchParams.get("destination")).toBeNull();
+
+  await runtime.assertClean(testInfo);
+});
+
+test("Guided Journey share URL reloads the same canonical route and Stop clears route params", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  const featuredJourney = dialog.getByRole("button", {
+    name: /Featured Journey/,
+  });
+  await expect(featuredJourney).toBeEnabled();
+  await featuredJourney.click();
+
+  const controls = page.locator(".universe-journey-controls");
+  const html = page.locator("html");
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-route",
+    "featured",
+  );
+  await expect
+    .poll(() => {
+      const url = new URL(page.url());
+      return [
+        url.searchParams.get("journey"),
+        url.searchParams.get("journeyStep"),
+      ].join(":");
+    })
+    .toBe("featured:0");
+
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("destination"))
+    .toMatch(/^personal:/);
+  const sharedUrl = page.url();
+  const sharedDestination = new URL(sharedUrl).searchParams.get(
+    "destination",
+  );
+
+  await page.goto(sharedUrl);
+  await waitForYeisEngine(page);
+  await expect(html).toHaveAttribute(
+    "data-universe-journey",
+    "Featured Journey",
+    { timeout: 20_000 },
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-route",
+    "featured",
+  );
+  await expect(html).toHaveAttribute(
+    "data-universe-journey-deep-link",
+    "featured:0",
+  );
+  await expect(controls).toBeVisible();
+  await expect(html).toHaveAttribute(
+    "data-universe-active-destination",
+    sharedDestination!,
+    { timeout: 20_000 },
+  );
+
+  await controls
+    .getByRole("button", { name: /Stop guided journey/i })
+    .click();
+  await expect(controls).toBeHidden();
+  await expect(html).not.toHaveAttribute("data-universe-journey");
+  const stoppedUrl = new URL(page.url());
+  expect(stoppedUrl.searchParams.get("journey")).toBeNull();
+  expect(stoppedUrl.searchParams.get("journeyStep")).toBeNull();
+  expect(stoppedUrl.searchParams.get("destination")).toBe(
+    sharedDestination,
+  );
 
   await runtime.assertClean(testInfo);
 });

@@ -14,19 +14,66 @@ import {
   type ProductLocale,
 } from "../../lib/universe/locale";
 import {
+  guidedJourneysForSections,
   loadUniverseNavigation,
   loadUniversePlaces,
   navigationSectionsForResults,
+  universeDestinationSystemId,
   type UniverseNavigationDestination,
+  type UniverseNavigationGroup,
   type UniverseNavigationSection,
 } from "../../lib/universe/yeis/navigation";
+
+const DISCOVERY_DENSITY_LIMITS: Record<
+  UniverseNavigationGroup,
+  readonly [galaxy: number, system: number, world: number]
+> = {
+  "personal-signals": [8, 10, 8],
+  featured: [8, 8, 6],
+  projects: [4, 6, 5],
+  research: [4, 6, 5],
+  experience: [3, 4, 4],
+  artifacts: [3, 4, 4],
+  notes: [3, 4, 4],
+  hero: [2, 2, 2],
+  "observed-hosts": [7, 8, 4],
+  exoplanets: [4, 8, 4],
+  bodies: [5, 14, 16],
+  stars: [6, 6, 3],
+  "black-holes": [4, 4, 3],
+  "deep-sky": [5, 5, 4],
+  galaxies: [4, 4, 3],
+};
+
+function discoveryDensityLimit(
+  group: UniverseNavigationGroup,
+  scalePosition: number,
+): number {
+  const [galaxy, system, world] = DISCOVERY_DENSITY_LIMITS[group];
+  const scale = Math.min(2, Math.max(0, scalePosition));
+  const interpolated =
+    scale <= 1
+      ? galaxy + (system - galaxy) * scale
+      : system + (world - system) * (scale - 1);
+  return Math.max(1, Math.round(interpolated));
+}
+
+function discoveryDensityMode(
+  scalePosition: number,
+): "galaxy" | "system" | "world" {
+  if (scalePosition < 0.75) return "galaxy";
+  if (scalePosition < 1.75) return "system";
+  return "world";
+}
 
 export function UniverseNavigator({
   open,
   markers,
   placements,
   currentSystem,
+  scalePosition = 0,
   activeDestinationId,
+  recentDestinationIds = [],
   pendingDestinationId,
   pendingDestinationMode,
   onClose,
@@ -39,7 +86,9 @@ export function UniverseNavigator({
   markers: GalaxyMarker[];
   placements: UniverseContentPlacement[];
   currentSystem?: SystemDefinition | null;
+  scalePosition?: number;
   activeDestinationId?: string | null;
+  recentDestinationIds?: string[];
   pendingDestinationId?: string | null;
   pendingDestinationMode?: "locating" | "traveling" | null;
   onClose: () => void;
@@ -50,6 +99,7 @@ export function UniverseNavigator({
     destination: UniverseNavigationDestination,
   ) => Promise<void> | void;
   onStartJourney?: (
+    id: "featured" | "projects" | "research",
     title: string,
     destinations: UniverseNavigationDestination[],
   ) => void;
@@ -60,6 +110,9 @@ export function UniverseNavigator({
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [placesFilter, setPlacesFilter] = useState<
+    "all" | "personal" | "important" | "nearby" | "recent"
+  >("all");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [pendingAction, setPendingAction] = useState<{
     destinationId: string;
@@ -67,72 +120,93 @@ export function UniverseNavigator({
   } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const recentDestinationSet = useMemo(
+    () => new Set(recentDestinationIds),
+    [recentDestinationIds],
+  );
+  const currentSystemId =
+    currentSystem?.id.startsWith("yeis-system:")
+      ? currentSystem.id.slice("yeis-system:".length)
+      : null;
+  const densityMode = discoveryDensityMode(scalePosition);
+
   const displaySections = useMemo(() => {
     const seenDestinations = new Set<string>();
+    const searchMode = Boolean(query.trim());
+    const defaultPlaces = !searchMode && placesFilter === "all";
+
     return sections.flatMap((section) => {
-      const destinations = section.destinations.filter((destination) => {
-        if (seenDestinations.has(destination.id)) return false;
-        seenDestinations.add(destination.id);
+      let candidates = section.destinations.filter((destination) => {
+        if (!searchMode) {
+          const matchesFilter =
+            placesFilter === "all" ||
+            (placesFilter === "personal" &&
+              destination.origin === "personal") ||
+            (placesFilter === "important" &&
+              (destination.featured ||
+                (destination.importance ?? 0) >= 4 ||
+                destination.origin === "hero")) ||
+            (placesFilter === "nearby" &&
+              Boolean(currentSystemId) &&
+              universeDestinationSystemId(destination) === currentSystemId) ||
+            (placesFilter === "recent" &&
+              recentDestinationSet.has(destination.id));
+
+          if (!matchesFilter) return false;
+        }
+
+        if (
+          defaultPlaces &&
+          section.id === "personal-signals" &&
+          !destination.featured &&
+          (destination.importance ?? 0) < 4
+        ) {
+          // The catch-all Personal group is a spotlight in default Places.
+          // Lower-priority authored entries remain available in their semantic
+          // Projects/Research/etc groups, explicit Personal filter and Search.
+          return false;
+        }
+
         return true;
       });
-      return destinations.length ? [{ ...section, destinations }] : [];
+
+      candidates = candidates.filter(
+        (destination) => !seenDestinations.has(destination.id),
+      );
+
+      if (defaultPlaces) {
+        candidates = candidates.slice(
+          0,
+          discoveryDensityLimit(section.id, scalePosition),
+        );
+      }
+
+      for (const destination of candidates) {
+        seenDestinations.add(destination.id);
+      }
+
+      return candidates.length
+        ? [{ ...section, destinations: candidates }]
+        : [];
     });
-  }, [sections]);
+  }, [
+    currentSystemId,
+    placesFilter,
+    query,
+    recentDestinationSet,
+    scalePosition,
+    sections,
+  ]);
 
   const results = useMemo(
     () => displaySections.flatMap((section) => section.destinations),
     [displaySections],
   );
 
-  const journeyOptions = useMemo(() => {
-    const personal =
-      sections.find((section) => section.id === "personal-signals")
-        ?.destinations ?? [];
-    const featuredIds = new Set(
-      (sections.find((section) => section.id === "featured")
-        ?.destinations ?? [])
-        .filter((destination) => destination.entryId)
-        .map((destination) => destination.id),
-    );
-    const featured = personal.filter((destination) =>
-      featuredIds.has(destination.id),
-    );
-    const projects =
-      sections.find((section) => section.id === "projects")
-        ?.destinations ?? [];
-    const research =
-      sections.find((section) => section.id === "research")
-        ?.destinations ?? [];
-
-    const candidates = [
-      {
-        id: "featured",
-        title: "Featured Journey",
-        destinations: featured,
-      },
-      {
-        id: "projects",
-        title: "Projects Journey",
-        destinations: projects,
-      },
-      {
-        id: "research",
-        title: "Research Journey",
-        destinations: research,
-      },
-    ];
-
-    const seenRoutes = new Set<string>();
-    return candidates.filter((journey) => {
-      if (journey.destinations.length === 0) return false;
-      const routeKey = journey.destinations
-        .map((destination) => destination.id)
-        .join("\u0000");
-      if (seenRoutes.has(routeKey)) return false;
-      seenRoutes.add(routeKey);
-      return true;
-    });
-  }, [sections]);
+  const journeyOptions = useMemo(
+    () => guidedJourneysForSections(sections),
+    [sections],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -144,6 +218,7 @@ export function UniverseNavigator({
     }
 
     document.documentElement.dataset.universeNavigator = "open";
+    document.documentElement.dataset.universeNavigatorFilter = placesFilter;
     const debugQuery = new URLSearchParams(window.location.search).get("navq");
     if (debugQuery) {
       setQuery(debugQuery);
@@ -153,6 +228,8 @@ export function UniverseNavigator({
       delete document.documentElement.dataset.universeNavigator;
       delete document.documentElement.dataset.universeNavigatorResults;
       delete document.documentElement.dataset.universeNavigatorMode;
+      delete document.documentElement.dataset.universeNavigatorFilter;
+      delete document.documentElement.dataset.universeDiscoveryDensity;
     };
   }, [open]);
 
@@ -176,8 +253,14 @@ export function UniverseNavigator({
             placements,
             markers,
             currentSystem ?? null,
+            recentDestinationIds,
           ).then(navigationSectionsForResults)
-        : loadUniversePlaces(placements, markers);
+        : loadUniversePlaces(
+            placements,
+            markers,
+            currentSystem ?? null,
+            recentDestinationIds,
+          );
 
       void request
         .then((next) => {
@@ -211,7 +294,21 @@ export function UniverseNavigator({
       cancelled = true;
       if (debounceTimer) window.clearTimeout(debounceTimer);
     };
-  }, [currentSystem, markers, open, placements, query]);
+  }, [
+    currentSystem,
+    markers,
+    open,
+    placements,
+    query,
+    recentDestinationIds,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
+    document.documentElement.dataset.universeNavigatorFilter = placesFilter;
+    document.documentElement.dataset.universeDiscoveryDensity = densityMode;
+    setActiveIndex(0);
+  }, [densityMode, open, placesFilter]);
 
   useEffect(() => {
     if (!results[activeIndex]) return;
@@ -364,6 +461,38 @@ export function UniverseNavigator({
           </small>
         </div>
 
+        {!query.trim() && (
+          <div
+            className="navigator-filters"
+            aria-label={text(locale, "discoveryFilters")}
+          >
+            {(
+              [
+                ["all", "filterAll"],
+                ["personal", "filterPersonal"],
+                ["important", "filterImportant"],
+                ["nearby", "filterNearby"],
+                ["recent", "filterRecent"],
+              ] as const
+            ).map(([id, label]) => {
+              const disabled =
+                (id === "nearby" && !currentSystemId) ||
+                (id === "recent" && recentDestinationIds.length === 0);
+              return (
+                <button
+                  type="button"
+                  key={id}
+                  aria-pressed={placesFilter === id}
+                  disabled={disabled}
+                  onClick={() => setPlacesFilter(id)}
+                >
+                  {text(locale, label)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {!query.trim() && onStartJourney && journeyOptions.length > 0 && (
           <div
             className="navigator-journeys"
@@ -378,7 +507,11 @@ export function UniverseNavigator({
                   type="button"
                   key={journey.id}
                   onClick={() => {
-                    onStartJourney(journey.title, journey.destinations);
+                    onStartJourney(
+                      journey.id,
+                      journey.title,
+                      journey.destinations,
+                    );
                     onClose();
                   }}
                 >
@@ -420,7 +553,11 @@ export function UniverseNavigator({
             status !== "loading" &&
             results.length === 0 && (
               <div className="navigator-empty">
-                {text(locale, "noDestination")}
+                {!query.trim() && placesFilter === "recent"
+                  ? text(locale, "noRecentDestinations")
+                  : !query.trim() && placesFilter !== "all"
+                    ? text(locale, "noFilteredDestinations")
+                    : text(locale, "noDestination")}
               </div>
             )}
 
@@ -469,6 +606,17 @@ export function UniverseNavigator({
                       (isKeyboardActive ? " is-active" : "") +
                       (isCurrent ? " is-current" : "") +
                       (isPendingDestination ? " is-pending" : "")
+                    }
+                    data-destination-id={result.id}
+                    data-destination-origin={result.origin ?? "catalog"}
+                    data-destination-system={
+                      universeDestinationSystemId(result) ?? undefined
+                    }
+                    data-destination-featured={
+                      result.featured ? "true" : undefined
+                    }
+                    data-destination-current={
+                      isCurrent ? "true" : undefined
                     }
                     role="option"
                     aria-selected={isKeyboardActive}

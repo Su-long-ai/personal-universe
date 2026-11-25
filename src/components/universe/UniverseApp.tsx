@@ -70,12 +70,15 @@ import {
   type ProductLocale,
 } from "../../lib/universe/locale";
 import {
+  guidedJourneysForSections,
+  loadUniversePlaces,
   navigationCameraTarget,
   navigationDestinationForMarker,
   navigationDestinationForPlacement,
   navigationDestinationForPlanet,
   navigationMarker,
   resolveUniverseNavigationDestination,
+  type UniverseGuidedJourneyId,
   type UniverseNavigationCameraRequest,
   type UniverseNavigationDestination,
 } from "../../lib/universe/yeis/navigation";
@@ -188,7 +191,23 @@ function replaceNavigationUrl({
   window.history.replaceState(window.history.state, "", url);
 }
 
+function replaceJourneyUrl(
+  journeyId: UniverseGuidedJourneyId | null,
+  step = 0,
+) {
+  const url = new URL(window.location.href);
+  if (journeyId) {
+    url.searchParams.set("journey", journeyId);
+    url.searchParams.set("journeyStep", String(Math.max(0, step)));
+  } else {
+    url.searchParams.delete("journey");
+    url.searchParams.delete("journeyStep");
+  }
+  window.history.replaceState(window.history.state, "", url);
+}
+
 type UniverseJourneyState = {
+  id: UniverseGuidedJourneyId;
   title: string;
   destinations: UniverseNavigationDestination[];
   index: number;
@@ -196,6 +215,46 @@ type UniverseJourneyState = {
   completed: boolean;
 };
 
+const RECENT_DESTINATIONS_STORAGE_KEY =
+  "personal-universe.recent-destinations.v1";
+const RECENT_DESTINATIONS_LIMIT = 8;
+
+function readRecentDestinationIds(): string[] {
+  try {
+    const raw = window.sessionStorage.getItem(
+      RECENT_DESTINATIONS_STORAGE_KEY,
+    );
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set<string>();
+    return parsed
+      .filter(
+        (value): value is string =>
+          typeof value === "string" &&
+          value.length > 0 &&
+          value.length <= 200 &&
+          !seen.has(value) &&
+          Boolean(seen.add(value)),
+      )
+      .slice(0, RECENT_DESTINATIONS_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentDestinationIds(ids: string[]) {
+  try {
+    window.sessionStorage.setItem(
+      RECENT_DESTINATIONS_STORAGE_KEY,
+      JSON.stringify(ids),
+    );
+  } catch {
+    // Storage can be unavailable in privacy/sandbox modes. Recent discovery is
+    // optional presentation state and must never block navigation.
+  }
+}
 
 function cameraTargetLabel(
   target: UniverseNavigationCameraRequest["target"],
@@ -513,12 +572,49 @@ export default function UniverseApp({
     request: UniverseNavigationCameraRequest;
     reason: string;
   } | null>(null);
+  const [recentDestinationIds, setRecentDestinationIds] = useState<string[]>([]);
+  const [recentHistoryReady, setRecentHistoryReady] = useState(false);
   const [pendingDestinationId, setPendingDestinationId] = useState<string | null>(
     null,
   );
   const [pendingDestinationMode, setPendingDestinationMode] = useState<
     "locating" | "traveling" | null
   >(null);
+  useEffect(() => {
+    const hydrated = readRecentDestinationIds();
+    setRecentDestinationIds(hydrated);
+    document.documentElement.dataset.universeRecentDestinations =
+      hydrated.join("|");
+    setRecentHistoryReady(true);
+
+    return () => {
+      delete document.documentElement.dataset.universeRecentDestinations;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recentHistoryReady || !activeDestinationId) return;
+
+    setRecentDestinationIds((previous) => {
+      const next = [
+        activeDestinationId,
+        ...previous.filter((id) => id !== activeDestinationId),
+      ].slice(0, RECENT_DESTINATIONS_LIMIT);
+
+      if (
+        next.length === previous.length &&
+        next.every((id, index) => id === previous[index])
+      ) {
+        return previous;
+      }
+
+      persistRecentDestinationIds(next);
+      document.documentElement.dataset.universeRecentDestinations =
+        next.join("|");
+      return next;
+    });
+  }, [activeDestinationId, recentHistoryReady]);
+
   const [signalHover, setSignalHover] = useState<{
     title: string;
     kind: string;
@@ -548,6 +644,7 @@ export default function UniverseApp({
     useState<PlanetDefinition | null>(null);
   const navigationRequestSeq = useRef(0);
   const deepLinkHandledRef = useRef<string | null>(null);
+  const journeyDeepLinkHandledRef = useRef<string | null>(null);
   const openedWorldDestinationRef = useRef<string | null>(null);
   const journeyNavigationRef = useRef(false);
   const journeyRef = useRef<UniverseJourneyState | null>(null);
@@ -1098,6 +1195,9 @@ export default function UniverseApp({
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
+      replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       const system = resolveMarker(marker);
@@ -1143,6 +1243,9 @@ export default function UniverseApp({
       if (!journeyDriven) {
         journeyRef.current = null;
         setJourney(null);
+        replaceJourneyUrl(null);
+        delete document.documentElement.dataset.universeJourneyRoute;
+        delete document.documentElement.dataset.universeJourneyDeepLink;
         delete document.documentElement.dataset.universeJourney;
         delete document.documentElement.dataset.universeJourneyComplete;
       }
@@ -1382,6 +1485,9 @@ export default function UniverseApp({
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
+      replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
       delete document.documentElement.dataset.universeJourney;
       delete document.documentElement.dataset.universeJourneyComplete;
       if (activeEngine !== "yeis") return;
@@ -1445,15 +1551,22 @@ export default function UniverseApp({
 
   const handleStartJourney = useCallback(
     (
+      id: UniverseGuidedJourneyId,
       title: string,
       destinations: UniverseNavigationDestination[],
+      initialIndex = 0,
     ) => {
       if (!destinations.length) return;
       cancelPendingContinuousScaleIntent("start-journey");
+      const index = Math.min(
+        destinations.length - 1,
+        Math.max(0, Math.floor(initialIndex)),
+      );
       const next: UniverseJourneyState = {
+        id,
         title,
         destinations,
-        index: 0,
+        index,
         paused: false,
         completed: false,
       };
@@ -1461,11 +1574,17 @@ export default function UniverseApp({
       journeyRef.current = next;
       setJourney(next);
       journeyNavigationRef.current = true;
-      void handleNavigateDestination(destinations[0]);
+      replaceJourneyUrl(id, index);
+      void handleNavigateDestination(destinations[index]);
       document.documentElement.dataset.universeJourney = title;
+      document.documentElement.dataset.universeJourneyRoute = id;
       console.info(
         "[UNIVERSE-JOURNEY] start " +
+          id +
+          ":" +
           title +
+          " step=" +
+          index +
           " stops=" +
           destinations.length,
       );
@@ -1491,6 +1610,7 @@ export default function UniverseApp({
 
       const next = { ...current, index: nextIndex, completed: false };
       delete document.documentElement.dataset.universeJourneyComplete;
+      replaceJourneyUrl(current.id, nextIndex);
       journeyRef.current = next;
       setJourney(next);
       journeyNavigationRef.current = true;
@@ -1512,8 +1632,11 @@ export default function UniverseApp({
     journeyNavigationRef.current = false;
     journeyRef.current = null;
     setJourney(null);
+    replaceJourneyUrl(null);
     delete document.documentElement.dataset.universeJourney;
     delete document.documentElement.dataset.universeJourneyComplete;
+    delete document.documentElement.dataset.universeJourneyRoute;
+    delete document.documentElement.dataset.universeJourneyDeepLink;
   }, []);
 
   const handleCinematicUserControlStart = useCallback(() => {
@@ -1666,6 +1789,78 @@ export default function UniverseApp({
   useEffect(() => {
     if (activeEngine !== "yeis" || !yeisResolverRef.current) return;
     const params = new URLSearchParams(window.location.search);
+    const rawJourneyId = params.get("journey");
+    if (!rawJourneyId) {
+      journeyDeepLinkHandledRef.current = null;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
+      return;
+    }
+    if (!["featured", "projects", "research"].includes(rawJourneyId)) {
+      document.documentElement.dataset.universeJourneyDeepLink = "unresolved";
+      return;
+    }
+
+    const id = rawJourneyId as UniverseGuidedJourneyId;
+    const requestedStep = Number(params.get("journeyStep") ?? "0");
+    const step = Number.isFinite(requestedStep)
+      ? Math.max(0, Math.floor(requestedStep))
+      : 0;
+    const key = id + ":" + step;
+    if (journeyDeepLinkHandledRef.current === key) return;
+    journeyDeepLinkHandledRef.current = key;
+
+    let cancelled = false;
+    void loadUniversePlaces(
+      contentPlacements,
+      galaxy.markers,
+      null,
+    )
+      .then((sections) => {
+        if (cancelled) return;
+        const route = guidedJourneysForSections(sections).find(
+          (candidate) => candidate.id === id,
+        );
+        if (!route) {
+          document.documentElement.dataset.universeJourneyDeepLink =
+            "unresolved";
+          return;
+        }
+        const restoredStep = Math.min(
+          route.destinations.length - 1,
+          step,
+        );
+        document.documentElement.dataset.universeJourneyDeepLink =
+          id + ":" + restoredStep;
+        handleStartJourney(
+          route.id,
+          route.title,
+          route.destinations,
+          restoredStep,
+        );
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        document.documentElement.dataset.universeJourneyDeepLink = "error";
+        console.error("[UNIVERSE-JOURNEY] deep link failed", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeEngine,
+    contentPlacements,
+    galaxy.markers,
+    handleStartJourney,
+  ]);
+
+  useEffect(() => {
+    if (activeEngine !== "yeis" || !yeisResolverRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("journey")) {
+      deepLinkHandledRef.current = null;
+      return;
+    }
     const destinationId = params.get("destination")?.trim();
     if (!destinationId) {
       deepLinkHandledRef.current = null;
@@ -1837,6 +2032,11 @@ export default function UniverseApp({
       journeyNavigationRef.current = false;
       journeyRef.current = null;
       setJourney(null);
+      replaceJourneyUrl(null);
+      delete document.documentElement.dataset.universeJourneyRoute;
+      delete document.documentElement.dataset.universeJourneyDeepLink;
+      delete document.documentElement.dataset.universeJourney;
+      delete document.documentElement.dataset.universeJourneyComplete;
       setCameraSettledPhase(null);
       setSelectedPlanet(planet);
       ensurePlaying();
@@ -1886,6 +2086,7 @@ export default function UniverseApp({
     journeyNavigationRef.current = false;
     journeyRef.current = null;
     setJourney(null);
+    replaceJourneyUrl(null);
     delete document.documentElement.dataset.universeJourney;
     delete document.documentElement.dataset.universeJourneyComplete;
 
@@ -2939,7 +3140,9 @@ export default function UniverseApp({
         markers={galaxy.markers}
         placements={contentPlacements}
         currentSystem={selectedSystem}
+        scalePosition={worldScalePosition}
         activeDestinationId={activeDestinationId}
+        recentDestinationIds={recentDestinationIds}
         pendingDestinationId={pendingDestinationId}
         pendingDestinationMode={pendingDestinationMode}
         onClose={() => setNavigatorOpen(false)}

@@ -846,6 +846,37 @@ select {
   color: rgba(115, 244, 255, 0.52);
 }
 
+.navigator-filters {
+  margin: 0 18px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.navigator-filters button {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid rgba(180, 214, 255, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(205, 228, 245, 0.58);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.navigator-filters button:hover:not(:disabled),
+.navigator-filters button[aria-pressed="true"] {
+  border-color: rgba(115, 244, 255, 0.32);
+  background: rgba(42, 118, 136, 0.14);
+  color: rgba(231, 250, 255, 0.92);
+}
+
+.navigator-filters button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
 .navigator-journeys {
   margin: 0 18px 12px;
   display: grid;
@@ -1231,8 +1262,25 @@ select {
     width: calc(100vw - 24px);
   }
 
+  .navigator-filters,
   .navigator-journeys {
     margin-inline: 12px;
+  }
+
+  .navigator-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .navigator-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navigator-filters button {
+    flex: 0 0 auto;
+    min-height: 32px;
   }
 
   .navigator-journeys > div {

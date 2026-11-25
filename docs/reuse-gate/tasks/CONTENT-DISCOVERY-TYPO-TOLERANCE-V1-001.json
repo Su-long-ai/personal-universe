@@ -1,0 +1,193 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-TYPO-TOLERANCE-V1-001",
+  "title": "Bounded canonical-graph typo tolerance",
+  "scope": {
+    "level": "implementation",
+    "subject": "Add one-edit or adjacent-transposition typo fallback over bounded canonical destination title/alias tokens while preserving exact/prefix ranking and avoiding fuzzy scans of the full YEIS star catalog"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Agent 07 requires typo-tolerance evidence, but the current product already has a bounded canonical Places graph plus native YEIS domain searches. A full Fuse/MiniSearch dependency or fuzzy index over the 109k-star catalog would add cost and a second ranking layer for a small need. Reuse the existing canonical graph: after exact/prefix/corpus matching fails, compare normalized query variants only against destination title/alias tokens with a strict one-edit-or-adjacent-transposition predicate. Assign this fallback a score below ordinary corpus matches, so exact IDs/titles/aliases and prefixes remain authoritative. Long-tail catalog search remains native/exact and is not fuzzy-scanned.",
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://www.fusejs.io/",
+      "finding": "Fuse.js is a mature fuzzy-search solution, but introducing another dependency/index for the current bounded canonical graph is disproportionate and risks a parallel ranking surface."
+    },
+    {
+      "url": "https://github.com/krisk/Fuse",
+      "finding": "Fuse confirms that generic fuzzy ranking supports broader patterns and scoring, but Personal Universe only needs a conservative typo fallback after its product-specific exact/prefix ranking."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing hosted Playwright can verify misspelled destination discovery through the real Search surface without a separate search-test harness."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Retain the current YEIS-backed canonical destination/search product and add typo fallback only to already-resolved product destinations."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "cmdk-fuse-navigation"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Fuse/cmdk are mature generic fuzzy options but are larger than needed for a bounded one-edit fallback and would create another scoring/index surface."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [],
+      "conclusion": "Keep native YEIS search for long-tail astronomy; typo fallback must not scan or replace the full catalog search subsystem."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Reuse existing browser acceptance to prove conservative typo recovery and ranking order."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "canonical-one-edit-fallback",
+      "name": "Bounded one-edit/transpose fallback on canonical title and alias tokens",
+      "level": "implementation",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Existing canonical destination graph and product ranking layer",
+      "license": "project glue over pinned MIT YEIS",
+      "decision": "reuse",
+      "reason": "Covers ordinary user typos without another dependency/index and cannot expand into a fuzzy scan of the full star catalog.",
+      "evaluation": {
+        "coverage": 4.5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 4.5
+      }
+    },
+    {
+      "id": "cmdk-fuse-fuzzy-index",
+      "name": "Fuse.js/cmdk fuzzy index",
+      "level": "framework_engine",
+      "registry_id": "cmdk-fuse-navigation",
+      "source": "Fuse.js + cmdk",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Broader fuzzy capability is not worth adding a second index/ranking dependency at current catalog/product scale.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "full-catalog-edit-distance",
+      "name": "Edit-distance scan over full YEIS star catalog",
+      "level": "subsystem",
+      "source": "New project-owned full-catalog fuzzy scan",
+      "license": "project code",
+      "decision": "reject",
+      "reason": "Would violate performance and index-boundary constraints by scanning 109k catalog entries per query."
+    },
+    {
+      "id": "playwright-typo-contract",
+      "name": "Existing Playwright Search typo acceptance",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current release E2E suite",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Exercises the real debounced Search, grouping and ranking path with a deliberate misspelling.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "One ordinary insertion/deletion/substitution or adjacent transposition can recover a canonical title/alias",
+      "importance": "high",
+      "coverage": {
+        "canonical-one-edit-fallback": "full",
+        "cmdk-fuse-fuzzy-index": "full",
+        "full-catalog-edit-distance": "full",
+        "playwright-typo-contract": "partial"
+      },
+      "decision": "Match only normalized title/alias tokens of already-resolved canonical destinations after normal matching fails."
+    },
+    {
+      "capability": "Exact ID/title/alias/prefix results always outrank typo fallback",
+      "importance": "high",
+      "coverage": {
+        "canonical-one-edit-fallback": "full",
+        "cmdk-fuse-fuzzy-index": "partial",
+        "full-catalog-edit-distance": "partial",
+        "playwright-typo-contract": "partial"
+      },
+      "decision": "Assign typo fallback below ordinary corpus-match score and retain current exact/prefix/product priors."
+    },
+    {
+      "capability": "No fuzzy scan/index rebuild touches the full YEIS star catalog per keystroke",
+      "importance": "high",
+      "coverage": {
+        "canonical-one-edit-fallback": "full",
+        "cmdk-fuse-fuzzy-index": "partial",
+        "full-catalog-edit-distance": "none",
+        "playwright-typo-contract": "partial"
+      },
+      "decision": "Keep typo helper inside canonical graph matching only; native catalog/domain searches remain unchanged."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "canonical-one-edit-fallback",
+      "playwright-typo-contract"
+    ],
+    "rationale": "Implement the smallest conservative typo glue over canonical title/alias tokens and verify it in the existing browser suite. Do not add Fuse/index state until actual catalog growth or typo requirements exceed one-edit recovery.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "cmdk-fuse-fuzzy-index",
+        "reason": "More capable fuzzy ranking would duplicate the product scorer and add bundle/index complexity for no current evidence of need."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If future product evidence requires multi-edit/fuzzy phrase ranking, wrap Fuse/MiniSearch around canonical IDs only; never let it mint identities or replace native YEIS catalog search."
+  }
+}
