@@ -1,6 +1,10 @@
 import type { Page, TestInfo } from "@playwright/test";
 import { test, expect } from "./support/test";
 import { waitForYeis, waitForYeisEngine } from "./support/runtime";
+import {
+  installWebglProgramOwnerTrace,
+  type OwnerTraceSnapshot,
+} from "./support/webgl-program-owner-trace";
 
 type WebglMetrics = {
   sample: number;
@@ -23,6 +27,7 @@ type WebglMetrics = {
   lifecycle: string | null;
   pipelineLifecycle: string | null;
   sceneLifecycle: string | null;
+  ownerTrace?: OwnerTraceSnapshot;
 };
 
 async function dispatchScaleWheel(page: Page, deltaY: number) {
@@ -342,6 +347,14 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
 
   return page.evaluate(() => {
     const data = document.documentElement.dataset;
+    let ownerTrace: OwnerTraceSnapshot | undefined;
+    try {
+      ownerTrace = (window as Window & {
+        __puProgramOwnersRead?: () => OwnerTraceSnapshot;
+      }).__puProgramOwnersRead?.();
+    } catch {
+      // Keep the established resource measurements as the test authority.
+    }
     return {
       sample: Number(data.universeWebglMetricSample ?? -1),
       renderer: data.universeWebglRenderer ?? "unknown",
@@ -367,6 +380,7 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       lifecycle: data.universeWebglLifecycle ?? null,
       pipelineLifecycle: data.universeWorldPipelineLifecycle ?? null,
       sceneLifecycle: data.universeWorldSceneLifecycle ?? null,
+      ownerTrace,
     };
   });
 }
@@ -730,6 +744,11 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
   // shared 75 s test budget expires. Retain bounded stages and resource limits;
   // give this four-journey acceptance time to sample the last rendered frame.
   test.setTimeout(150_000);
+  const ownerTraceSetup = await installWebglProgramOwnerTrace(page);
+  await testInfo.attach("webgl-program-owner-trace-setup.json", {
+    body: JSON.stringify(ownerTraceSetup, null, 2),
+    contentType: "application/json",
+  });
   await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
   await waitForYeis(page);
 
@@ -766,8 +785,15 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
         }
       },
     );
-    cycles.push(settled);
-    await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, settled);
+    const { ownerTrace, ...metrics } = settled;
+    cycles.push(metrics);
+    await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, metrics);
+    if (ownerTrace) {
+      await testInfo.attach(`webgl-program-owners-cycle-${cycle}.json`, {
+        body: JSON.stringify(ownerTrace),
+        contentType: "application/json",
+      });
+    }
   }
   const baseline = cycles[0]!;
 
