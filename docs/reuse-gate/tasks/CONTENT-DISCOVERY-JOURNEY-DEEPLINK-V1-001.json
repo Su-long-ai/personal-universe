@@ -1,0 +1,221 @@
+{
+  "schema": 2,
+  "task_id": "CONTENT-DISCOVERY-JOURNEY-DEEPLINK-V1-001",
+  "title": "Guided Journey canonical route identity and deep-link resume",
+  "scope": {
+    "level": "subsystem",
+    "subject": "Give existing Guided Journeys stable route IDs and reloadable browser URLs while retaining the current Journey orchestration, canonical destination executor and interruption semantics"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Personal Universe already has a mature Guided Journey orchestration runtime: routes are derived from Places sections, every step calls the canonical destination executor, auto-advance waits for settled navigation, reduced-motion disables auto-advance, and manual navigation interrupts the journey. The remaining discovery gap is route identity/shareability. Reuse the existing browser History API and route derivation: centralize Featured/Projects/Research route construction in the navigation module, assign stable route IDs, store only journey=<id> and journeyStep=<index> in the existing URL, and reconstruct that route from canonical Places sections on reload. Destination deep-link execution must yield to Journey when a journey parameter is present so there is still one navigation owner. Stop/manual interruption clears only the Journey query parameters; destination/phase URLs remain authoritative.",
+  "planned_files": [
+    "src/lib/universe/yeis/navigation.ts",
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/navigation.md"
+  ],
+  "sources": [
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/History_API",
+      "finding": "The existing History API substrate can add/remove journey route parameters without introducing a client router or server state."
+    },
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/core/TourPlayer.ts",
+      "finding": "Pinned MIT YEIS TourPlayer validates route/tour orchestration concepts, while Personal Universe should retain its already-implemented lightweight Journey runtime rather than port narration/cue state."
+    },
+    {
+      "url": "https://react.dev/reference/react/useEffect",
+      "finding": "Existing React effects can restore a URL-declared journey after content/marker state is available without creating a separate route runtime."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Existing hosted Playwright can verify Journey URL creation, reload restore, interruption cleanup and canonical destination continuity."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Retain the current Personal Universe Journey runtime and pinned-YEIS navigation model; only add route identity/share restoration."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "web-url-history-api",
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Reuse browser History API and React effects instead of adding a router, server session or another journey state framework."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep existing settled-before-dwell and interruption semantics; centralize only the route derivation shared by Navigator and deep-link restore."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        3
+      ],
+      "conclusion": "Reuse current Journey/URL browser acceptance and add deep-link resume assertions to the same release suite."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-journey-runtime-url-identity",
+      "name": "Existing Journey runtime plus History API route identity",
+      "level": "full_solution",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Current UniverseApp Journey orchestration and canonical destination executor",
+      "license": "project orchestration over pinned MIT YEIS",
+      "decision": "reuse",
+      "reason": "Adds shareability without duplicating travel, settlement, interruption, destination identity or route execution.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "browser-history-journey-params",
+      "name": "History API journey/id step parameters",
+      "level": "framework_engine",
+      "registry_id": "web-url-history-api",
+      "source": "Existing browser-native URL state",
+      "license": "Web Platform browser APIs / standards",
+      "decision": "reuse",
+      "reason": "Small shareable state belongs in the same URL already used for canonical destinations and phases.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "second-tour-player-runtime",
+      "name": "Port or build a second TourPlayer state machine",
+      "level": "subsystem",
+      "source": "New/ported tour runtime",
+      "license": "varies",
+      "decision": "reject",
+      "reason": "Would duplicate the already-working Journey executor and violate the one-navigation-authority constraint."
+    },
+    {
+      "id": "server-journey-session",
+      "name": "Server/account-backed Journey resume state",
+      "level": "framework_engine",
+      "source": "New persistence backend",
+      "license": "project/backend",
+      "decision": "reject",
+      "reason": "A stable route ID and step index are sufficient for share/reload; server state adds unnecessary privacy and lifecycle surface."
+    },
+    {
+      "id": "playwright-journey-deeplink",
+      "name": "Existing Playwright Journey/deep-link acceptance",
+      "level": "component_asset",
+      "registry_id": "playwright-test",
+      "source": "Current release suite",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Can verify route URL creation, reload reconstruction and interruption cleanup through the real browser product.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "capability": "Journey route has one stable ID shared by discovery UI and reloadable URL",
+      "importance": "high",
+      "coverage": {
+        "existing-journey-runtime-url-identity": "full",
+        "browser-history-journey-params": "full",
+        "second-tour-player-runtime": "partial",
+        "server-journey-session": "full",
+        "playwright-journey-deeplink": "partial"
+      },
+      "decision": "Centralize route derivation and expose stable featured/projects/research IDs; URL stores route ID and bounded step only."
+    },
+    {
+      "capability": "Reload reconstructs the same route and current canonical destination without dual navigation ownership",
+      "importance": "high",
+      "coverage": {
+        "existing-journey-runtime-url-identity": "full",
+        "browser-history-journey-params": "full",
+        "second-tour-player-runtime": "partial",
+        "server-journey-session": "full",
+        "playwright-journey-deeplink": "partial"
+      },
+      "decision": "When journey is present, Journey restore owns initial destination execution and ordinary destination deep-link effect yields."
+    },
+    {
+      "capability": "Manual navigation/Stop interrupts Journey and removes only Journey URL state",
+      "importance": "high",
+      "coverage": {
+        "existing-journey-runtime-url-identity": "full",
+        "browser-history-journey-params": "full",
+        "second-tour-player-runtime": "partial",
+        "server-journey-session": "partial",
+        "playwright-journey-deeplink": "full"
+      },
+      "decision": "Reuse current interruption paths and clear journey/journeyStep parameters without changing destination/phase canonical URL."
+    }
+  ],
+  "decision": {
+    "mode": "partial",
+    "selected_ids": [
+      "existing-journey-runtime-url-identity",
+      "browser-history-journey-params",
+      "playwright-journey-deeplink"
+    ],
+    "rationale": "Add only stable route derivation and browser URL state around the existing Journey runtime. Navigation, settlement, camera, scale and destination identity remain owned by their current authorities.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "second-tour-player-runtime",
+        "reason": "Current Journey behavior is already productized; another runtime would create stale ownership and duplicate cancellation semantics."
+      },
+      {
+        "candidate_id": "server-journey-session",
+        "reason": "URL route ID + step is sufficient for deterministic reload/share and avoids account/privacy/backend scope."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If future journeys need narration or authored timing, extend route metadata around the same canonical route IDs; do not introduce a second destination executor or parallel navigation state machine."
+  }
+}

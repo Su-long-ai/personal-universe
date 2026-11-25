@@ -37,26 +37,38 @@ by UI components.
 
 ## Search
 
-The single navigator input searches, in product-priority order:
+The single navigator input resolves candidates from one canonical discovery
+graph first, then supplements that bounded set with long-tail pinned-YEIS
+domain searches for foreign bodies, catalogue stars, black holes, landmarks
+and galaxies. Search and Places therefore share destination constructors and
+identity instead of minting UI-specific results.
 
-1. Content Collection entries / Personal Signals;
-2. Hero world;
-3. observed exoplanet hosts;
-4. real observed exoplanets from the existing NASA Exoplanet Archive snapshot;
-5. bodies in the currently open product system;
-6. current/native YEIS bodies and bodies in other hand-authored systems;
-7. catalogue stars;
-8. black holes;
-9. landmarks, nebulae and clusters;
-10. galaxies.
+Ranking is deterministic across the combined candidate set. The strongest
+signals are, in order of magnitude:
 
-Personal content searches title, summary, tags, kind and status. Common Chinese
-astronomical aliases are translated into the same normalized YEIS query path
-without adding a second astronomy index. The pinned MIT normalization remains
-the canonical accent/case folding behavior.
+1. exact canonical destination ID;
+2. exact normalized title;
+3. exact alias;
+4. title/token prefix;
+5. exact keyword and general corpus match;
+6. product priors: Personal Signal importance/featured state, Hero, observed
+   and curated destinations;
+7. current-system context;
+8. stable group/title/canonical-ID tie breaking.
 
-Results are grouped. Personal content is intentionally ranked before generic
-astronomy. The keyboard contract is:
+Personal content searches canonical ID, title, summary, tags, kind and status.
+Common Chinese astronomical and personal/category aliases are translated into
+the same normalized YEIS query path without adding a second astronomy index.
+The pinned MIT normalization remains the canonical accent/case folding
+behavior.
+
+This is intentionally a bounded ranking layer over resolved destinations, not
+a second search database. cmdk/Fuse and Pagefind remain fallback candidates if
+future catalog volume justifies them, but neither may own spatial identity.
+
+Results are grouped. Personal/authored content is intentionally louder than
+generic catalogue filler when textual relevance is otherwise comparable. The
+keyboard contract is:
 
 - `Ctrl/Cmd+K` or `/` outside text editing: open navigator;
 - `ArrowUp / ArrowDown`: move selection;
@@ -149,6 +161,70 @@ to its first visible group, so one Personal Signal is not repeated again under
 Featured or its content-kind facet. The underlying grouped sections remain
 intact for Guided Journey derivation and Search semantics; this is display
 de-duplication, not a second destination index.
+
+Featured is now presentation membership only. A featured star remains
+`star:<nativeId>`, a featured black hole remains `blackhole:<id>`, a
+featured landmark remains `landmark:<id>`, and a featured galaxy remains
+`galaxy:<index>`. Featured never rewrites destination kind, group, target or
+deep-link identity. This means Search, Places, Guided Journey, active-state
+tracking and reloadable URLs all refer to the same destination.
+
+The canonical destination also carries lightweight discovery metadata
+(`origin`, `importance`, `featured`, aliases) used only for ranking and
+presentation. Personal entries inherit importance/featured state directly from
+Astro Content Collections; current-system bodies are folded into the same
+Places graph rather than exposed through a separate local list.
+
+### Session continuity and derived filters
+
+Recent discovery is deliberately non-invasive. The app stores at most eight
+**canonical destination IDs** in tab-scoped `sessionStorage` under
+`personal-universe.recent-destinations.v1`. It records no camera position,
+phase transition, renderer state, query, content payload or duplicated target
+metadata. The list survives a reload in the same tab and naturally disappears
+with the browsing session. Storage failure is non-fatal.
+
+The empty-query Places surface derives five views from the same already-loaded
+destination graph:
+
+- **All** — the normal canonical Places graph;
+- **Personal** — destinations whose origin is authored personal content;
+- **Important** — featured/high-importance personal destinations plus Hero;
+- **Nearby** — destinations owned by the currently open native YEIS system;
+- **Recent** — canonical IDs present in the bounded session list.
+
+These are presentation filters only. They do not create alternate destinations,
+do not mutate section identity, and do not apply while the user is typing a
+Search query. Search continues through the shared query/ranking layer.
+
+Recent history is also a small ranking prior. Newer visits score slightly above
+older visits when textual relevance is otherwise comparable, but the prior is
+far below exact canonical-ID, exact title and exact alias relevance. Ranking
+therefore improves continuity without letting visit history override identity
+or query intent.
+
+### Scale-aware default density
+
+The default empty-query **All** Places view uses the existing continuous
+Galaxy=0 → Surface=5 coordinate as a presentation-density signal. It does not
+create a second scale state or alter Search/navigation. Per-section row budgets
+interpolate from a sparse Galaxy profile toward a more local System/world
+profile: Galaxy emphasizes high-priority personal signals, featured
+destinations and system-level astronomy, while System increases the
+Planets & Bodies budget substantially. At close-world scales generic remote
+catalog sections contract again so local/world content stays legible.
+
+The catch-all Personal Signals section is a spotlight in this default view:
+featured or importance >= 4 entries can occupy it first, while lower-priority
+authored entries remain eligible for their semantic Projects, Research,
+Experience, Artifacts or Notes sections. This prevents the catch-all group from
+consuming every authored destination during display de-duplication.
+
+The density budget applies **only** to empty-query All Places. Search, Personal,
+Important, Nearby and Recent operate on the full canonical candidate set. A
+canonical ID such as `star:c50000` is resolved directly before ordinary
+text ranking, so reducing default DOM rows never makes valid long-tail
+destinations unreachable.
 
 ## Product Open vs native travel
 
@@ -674,14 +750,26 @@ surface pins, comparison/pulse effects and simulation-time restoration are
 specific to the upstream educational-tour product and are intentionally not
 copied into Personal Universe.
 
-The Places surface derives:
+The Places surface derives stable route identities from the same canonical
+destination sections:
 
-- Featured Journey
-- Projects Journey
-- Research Journey
+- `featured` → Featured Journey
+- `projects` → Projects Journey
+- `research` → Research Journey
 
-from the same destination sections. Each step calls the same destination
+The derivation now lives in the shared navigation module, so Navigator display
+and deep-link restore cannot silently disagree about route membership or
+ordered destination identity. Each step still calls the same destination
 executor used by Search/Places/canvas/deep links.
+
+A running route publishes only two additional shareable URL parameters:
+`journey=<id>` and `journeyStep=<index>`. The ordinary canonical
+`destination`/phase parameters remain in the URL. On reload, Journey restore
+rebuilds the route from current canonical Places sections, clamps the requested
+step, and owns the initial destination execution; the normal destination
+deep-link effect yields while `journey` is present so two navigation paths do
+not race. Stop or any manual competing navigation removes only the Journey
+parameters and leaves the canonical destination URL intact.
 
 Behavior:
 

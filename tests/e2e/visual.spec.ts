@@ -398,7 +398,13 @@ test("visual: desktop places open", async ({ page }, testInfo) => {
 
     const dialog = page.getByRole("dialog", { name: "Universe navigator" });
     await expect(dialog).toBeVisible();
-    await expect(page.locator(".kind-featured").first()).toBeVisible();
+    const featured = dialog.locator(
+      '.navigator-result-group[aria-label="Featured"]',
+    );
+    await expect(featured).toBeVisible();
+    await expect(
+      featured.locator('[data-destination-featured="true"]').first(),
+    ).toBeVisible();
   });
 });
 
