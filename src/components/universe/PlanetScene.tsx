@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Stars, useTexture } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import { Planet } from "procedural-planets";
 import * as THREE from "three";
 import { ImprovedNoise } from "three/addons/math/ImprovedNoise.js";
@@ -25,6 +25,7 @@ import {
   type SurfaceWorldProfile,
 } from "../../lib/universe/surface";
 import { isSoftwareRenderer, liveWorldFallbackReason } from "./CinematicPipeline";
+import { LifecycleStars } from "./LifecycleStars";
 import type { SurfaceCameraFrame } from "./CinematicCamera";
 
 const LIVE_PLANET_RADIUS = 2000;
@@ -1280,7 +1281,7 @@ export function PlanetScene({
       ) : null}
       <group visible={worldPresentationActive}>
       <DeepSky />
-      <Stars
+      <LifecycleStars
         radius={78}
         depth={30}
         count={softwareRenderer ? 600 : quality === "low" ? 600 : 1400}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { PlanetArchetype, PlanetDefinition, SystemDefinition } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import { LifecycleStars } from "./LifecycleStars";
 
 function spectralColor(type: string) {
   const cls = type.charAt(0).toUpperCase();
@@ -253,7 +253,7 @@ export function SystemScene({
   return (
     <>
       <color attach="background" args={["#010208"]} />
-      <Stars radius={90} depth={45} count={1800} factor={1.7} saturation={0.22} fade speed={0.06} />
+      <LifecycleStars radius={90} depth={45} count={1800} factor={1.7} saturation={0.22} fade speed={0.06} />
       <ambientLight intensity={0.18} />
       <pointLight position={[0, 0, 0]} intensity={34} distance={45} color={starColor} />
 
