@@ -158,7 +158,7 @@ export function SurfaceScene({
   ready: boolean;
   onReadyChange?: (ready: boolean) => void;
 }) {
-  const { gl } = useThree();
+  const { gl, scene } = useThree();
   const softwareRenderer = isSoftwareRenderer(gl);
   const profile = useMemo(
     () => (planet ? buildSurfaceWorldProfile(planet) : null),
@@ -186,6 +186,19 @@ export function SurfaceScene({
     texture.needsUpdate = true;
     return texture;
   }, [profile?.id, softwareRenderer]);
+  const backgroundLease = useRef<{
+    installed: THREE.Texture | null;
+    previous: THREE.Scene["background"];
+  }>({ installed: null, previous: null });
+  const releaseBackground = useCallback(() => {
+    const lease = backgroundLease.current;
+    if (!lease.installed) return;
+    if (scene.background === lease.installed) {
+      scene.background = lease.previous;
+    }
+    lease.installed = null;
+    lease.previous = null;
+  }, [scene]);
   const surfaceGroupRef = useRef<THREE.Group>(null);
   const surfacePaintReadyReported = useRef(false);
   const [beaconActive, setBeaconActive] = useState(false);
@@ -219,9 +232,12 @@ export function SurfaceScene({
 
   useEffect(
     () => () => {
+      if (backgroundLease.current.installed === softwareHorizonBackground) {
+        releaseBackground();
+      }
       softwareHorizonBackground?.dispose();
     },
-    [softwareHorizonBackground],
+    [releaseBackground, softwareHorizonBackground],
   );
 
   const handleAnchorHeight = useCallback((height: number) => {
@@ -239,6 +255,7 @@ export function SurfaceScene({
   );
 
   useFrame(() => {
+    releaseBackground();
     const group = surfaceGroupRef.current;
     if (!group) return;
 
@@ -250,9 +267,20 @@ export function SurfaceScene({
     // navigation authority and will reconcile the same visibility normally.
     group.visible =
       presentationActive && phaseRef.current === "surface";
+    if (group.visible && softwareHorizonBackground) {
+      // A declarative attach stores a previous scene.background, which can
+      // restore this Surface texture after a rapid sequence of other owners'
+      // background attaches. Borrow the existing backdrop for this one
+      // actual Surface draw, just like the synchronous group gate above.
+      const lease = backgroundLease.current;
+      lease.previous = scene.background;
+      lease.installed = softwareHorizonBackground;
+      scene.background = softwareHorizonBackground;
+    }
   }, -100);
 
   useFrame(() => {
+    releaseBackground();
     const group = surfaceGroupRef.current;
     const painted = Boolean(
       group?.visible &&
@@ -514,17 +542,12 @@ export function SurfaceScene({
     <>
       {presentationActive ? (
         <>
-          {softwareRenderer ? (
-            <primitive
-              attach="background"
-              object={softwareHorizonBackground!}
-            />
-          ) : (
+          {!softwareRenderer ? (
             <color
               attach="background"
               args={[profile?.atmosphere.zenith ?? "#030b12"]}
             />
-          )}
+          ) : null}
           {!softwareRenderer ? (
             <fog
               attach="fog"
