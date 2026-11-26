@@ -1,3 +1,9 @@
+/* HUD hit targets must have their final geometry on the first frame after
+   rotation/resizing. Keep the cosmetic background transition, not width. */
+html .universe-hud {
+  transition-property: background;
+}
+
 .universe-render-status {
   position: absolute;
   z-index: 11;

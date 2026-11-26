@@ -103,3 +103,77 @@ for (const [width, height] of [[664, 390], [568, 320], [480, 320], [320, 260]]) 
     }
   });
 }
+
+for (const reducedMotion of ["reduce", "no-preference"] as const) {
+  test(`rotating a live viewport updates the HUD hit area before the first pinch (${reducedMotion})`, async ({ browser, baseURL }) => {
+    const context = await browser.newContext({
+      baseURL, viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true, reducedMotion,
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto("/?freeze=1");
+      await waitForYeis(page);
+      const hud = page.locator(".universe-hud");
+      await expect(hud.getByRole("combobox")).toBeVisible();
+      await page.evaluate(() => {
+        const output = document.createElement("div");
+        output.id = "rotation-touch-contacts";
+        output.hidden = true;
+        document.body.append(output);
+        window.addEventListener("pointerdown", (event) => {
+          if (event.isTrusted && event.pointerType === "touch") {
+            output.textContent += ` ${(event.target as Element).tagName}`;
+          }
+        }, true);
+      });
+      const touch = await context.newCDPSession(page);
+      const contacts = page.locator("#rotation-touch-contacts");
+      const sizes = [{ width: 568, height: 320 }, { width: 390, height: 664 }];
+      const readRight = () => hud.evaluate((node) => node.getBoundingClientRect().right);
+
+      // Exercise repeated rotations in the same live document, with no
+      // waiting for the HUD to settle between resize and the first gesture.
+      for (let cycle = 0; cycle < 2; cycle += 1) {
+        expect(await readRight()).toBeGreaterThan(568 / 2 - 66);
+        for (const size of sizes) {
+          await contacts.evaluate((node) => { node.textContent = ""; });
+          await page.setViewportSize(size);
+          const geometry = await hud.evaluate((node) => {
+            const bounds = node.getBoundingClientRect();
+            return {
+              right: bounds.right,
+              width: bounds.width,
+              viewport: [innerWidth, innerHeight],
+              widthAnimating: node.getAnimations().some((animation) =>
+                "transitionProperty" in animation && animation.transitionProperty === "width"
+              ),
+            };
+          });
+          const center = size.width / 2;
+          const send = (type: "touchStart" | "touchMove" | "touchEnd", gap?: number) =>
+            touch.send("Input.dispatchTouchEvent", {
+              type,
+              touchPoints: gap === undefined ? [] : [-gap, gap].map((delta, id) =>
+                ({ id, x: center + delta, y: size.height / 2 })),
+            });
+
+          await send("touchStart", 66);
+          await send("touchMove", 90);
+          await send("touchMove", 66);
+          await send("touchEnd");
+          await expect(contacts).toHaveText("CANVAS CANVAS");
+          expect(geometry.viewport).toEqual([size.width, size.height]);
+          expect(geometry.widthAnimating).toBe(false);
+          expect(geometry.width).toBeGreaterThan(0);
+          if (size.width === 568) expect(geometry.right).toBeLessThan(center - 66);
+          else expect(geometry.right).toBeGreaterThan(center + 66);
+          expect(await page.evaluate(() => visualViewport?.scale)).toBe(1);
+        }
+      }
+      await expect(hud.getByRole("combobox")).toBeVisible();
+      await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+}
