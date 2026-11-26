@@ -2399,6 +2399,80 @@ test("the first opening wheel always acquires a scale target", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("opening Galaxy wheel tracks both directions without queued travel", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+  const noTimedTravel = async () => {
+    await expect(html).not.toHaveAttribute("data-universe-pending-destination");
+    await expect(html).not.toHaveAttribute("data-universe-traveling");
+  };
+  const track = async (delta: number, expected: string) => {
+    // Check the native renderer's applied frame, not only the coordinator's
+    // number or an eventual arrival after an automatic flight.
+    await page.mouse.wheel(0, delta);
+    const samples = await html.evaluate((element) => new Promise<string[]>((resolve) => {
+      const frames: string[] = [];
+      const sample = () => {
+        frames.push(element.getAttribute("data-universe-galaxy-scale-applied-position") ?? "");
+        if (frames.length === 5) resolve(frames);
+        else requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    }));
+    expect(samples).toContain(expected);
+    await expect(html).toHaveAttribute("data-universe-scale-position", expected);
+    await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", expected);
+    await noTimedTravel();
+    return Number(await html.getAttribute("data-universe-travel-arrival-ratio"));
+  };
+
+  await page.mouse.wheel(0, 120);
+  await expect(html).toHaveAttribute("data-universe-scale-direction", "out");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await noTimedTravel();
+
+  const near = await track(-120, "0.250");
+  const nearer = await track(-120, "0.500");
+  const reverse = await track(120, "0.250");
+  const zero = await track(120, "0.000");
+  expect(nearer).toBeLessThan(near);
+  expect(reverse).toBeGreaterThan(nearer);
+  expect(zero).toBeGreaterThan(reverse);
+  expect(reverse).toBeCloseTo(near, 2);
+  await page.mouse.wheel(0, 120);
+  await html.evaluate(() => new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  ));
+  await noTimedTravel();
+  expect(await track(-120, "0.250")).toBeCloseTo(near, 2);
+  await runtime.assertClean(testInfo);
+});
+
+test("wheel from a located galaxy uses native scale instead of landmark travel", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?destination=galaxy:0&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-active-destination", "galaxy:0");
+  await expect(html).toHaveAttribute("data-universe-scale-focus", "galaxy:0");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.250");
+  await expect(html).not.toHaveAttribute("data-universe-traveling");
+  await expect(html).not.toHaveAttribute("data-universe-pending-destination");
+  await page.mouse.wheel(0, 120);
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.000");
+  await runtime.assertClean(testInfo);
+});
+
 test("manual galaxy takeover disables the opening soft focus", async ({
   page,
 }, testInfo) => {

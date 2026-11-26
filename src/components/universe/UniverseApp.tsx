@@ -2403,72 +2403,6 @@ export default function UniverseApp({
     setWorldScalePhase,
   ]);
 
-  const beginGalaxyScaleTravel = useCallback(
-    (destination: UniverseNavigationDestination) => {
-      const resolvedCameraTarget = navigationCameraTarget(
-        destination,
-        galaxy.markers,
-      );
-      // Scale travel enters the owning stellar system, never the exact body.
-      // Exact body travel remains available to Search/Places/click navigation.
-      const cameraTarget =
-        resolvedCameraTarget?.kind === "body"
-          ? {
-              kind: "star" as const,
-              nativeId: resolvedCameraTarget.starId,
-            }
-          : resolvedCameraTarget;
-      if (!cameraTarget) {
-        void handleNavigateDestination(destination);
-        return;
-      }
-
-      navigationRequestSeq.current += 1;
-      setCameraSettledPhase(null);
-      setNavigationFailure(null);
-      delete document.documentElement.dataset.universeNavigationError;
-      selectedSystemRef.current = null;
-      setSelectedSystem(null);
-      setSelectedPlanet(null);
-      setPhase("galaxy");
-      setActiveDestinationId(null);
-      delete document.documentElement.dataset.universeActiveDestination;
-      setPendingDestinationId(destination.id);
-      setPendingDestinationMode("traveling");
-      document.documentElement.dataset.universePendingDestination =
-        destination.id;
-      setNavigationRequest({
-        requestId: navigationRequestSeq.current,
-        destinationId: destination.id,
-        mode: "travel",
-        target: cameraTarget,
-        title: destination.title,
-      });
-      setNavigationStatus("traveling");
-      document.documentElement.dataset.universeNavigationTarget =
-        cameraTargetLabel(cameraTarget);
-      document.documentElement.dataset.universeNavigationPhase = "galaxy";
-      document.documentElement.dataset.universeScaleMode = "travel";
-      deepLinkHandledRef.current = deepLinkNavigationKey(
-        destination.id,
-        "open",
-        "galaxy",
-      );
-      replaceNavigationUrl({
-        phase: "galaxy",
-        destinationId: destination.id,
-        navigationMode: "open",
-      });
-      console.info(
-        "[UNIVERSE-SCALE] travel " +
-          destination.title +
-          " -> " +
-          cameraTargetLabel(cameraTarget),
-      );
-    },
-    [galaxy.markers, handleNavigateDestination],
-  );
-
   const scheduleApproachScaleHandoff = useCallback(
     (
       system: SystemDefinition,
@@ -2723,48 +2657,38 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= GALAXY_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
-          galaxyScaleTargetRef.current = null;
-          setGalaxyScaleTarget(null);
-          setWorldScaleContinuous(false);
-          delete document.documentElement.dataset.universeGalaxyScaleTarget;
-          delete document.documentElement.dataset.universeGalaxyScaleBridge;
-          // Fall through to retained native outward Galaxy travel.
+          // Galaxy is the outer endpoint. An extra outward notch must never
+          // start a second time-driven voyage or discard the retained path.
+          document.documentElement.dataset.universeScaleDirection = "out";
+          document.documentElement.dataset.universeScaleBlocked = "galaxy-limit";
+          delete document.documentElement.dataset.universeScaleQueued;
+          return;
         } else {
           const centerFocus =
             galaxyScaleTargetRef.current ??
             lockedGalaxyScaleFocusRef.current ??
             galaxyScaleFocusRef.current;
-          const focus =
-            centerFocus ??
-            (galaxySoftFocusAvailableRef.current
+          const nativeStarFor = (destination: UniverseNavigationDestination | null) => {
+            const target = destination && navigationCameraTarget(destination, galaxy.markers);
+            return target?.kind === "star" ? target.nativeId :
+              target?.kind === "body" ? target.starId : null;
+          };
+          // A located landmark/galaxy is not a stellar scale target. Reuse the
+          // existing opening stellar route without turning the wheel into
+          // Search/Places travel. An empty focus after manual drag stays empty.
+          const focus = nativeStarFor(centerFocus)
+            ? centerFocus
+            : centerFocus || galaxySoftFocusAvailableRef.current
               ? defaultGalaxyScaleFocus
-              : null);
-
-          if (!focus) {
+              : null;
+          const nativeStarId = nativeStarFor(focus);
+          if (!focus || !nativeStarId) {
             document.documentElement.dataset.universeScaleBlocked =
               "no-galaxy-focus";
             return;
           }
 
-          const resolvedTarget = navigationCameraTarget(
-            focus,
-            galaxy.markers,
-          );
-          const nativeStarId =
-            resolvedTarget?.kind === "star"
-              ? resolvedTarget.nativeId
-              : resolvedTarget?.kind === "body"
-                ? resolvedTarget.starId
-                : null;
-
-          // Non-native observed/spatial targets retain their existing travel
-          // path. We do not invent a fake physical scale model for them.
-          if (!nativeStarId) {
-            if (direction === "in") {
-              beginGalaxyScaleTravel(focus);
-              return;
-            }
-          } else {
+          {
             if (
               direction === "in" &&
               galaxySoftFocusAvailableRef.current
@@ -2824,6 +2748,7 @@ export default function UniverseApp({
             setPendingDestinationMode(null);
             setNavigationStatus(null);
             delete document.documentElement.dataset.universePendingDestination;
+            delete document.documentElement.dataset.universeTraveling;
             delete document.documentElement.dataset.universeScaleQueued;
             delete document.documentElement.dataset.universeScaleBlocked;
 
@@ -3141,34 +3066,6 @@ export default function UniverseApp({
       );
       delete document.documentElement.dataset.universeScaleBlocked;
 
-      if (currentPhase === "galaxy") {
-        // All valid inward Galaxy scale was consumed by the native direct path
-        // above. Reaching here means outward intent at the coordinate-0 limit
-        // (or an outward non-native navigation target).
-        if (direction === "in") {
-          document.documentElement.dataset.universeScaleBlocked =
-            "no-galaxy-focus";
-          return;
-        }
-        delete document.documentElement.dataset.universeScaleQueued;
-        if (
-          activeDestinationId === "galaxy:0" &&
-          navigationStatus === "arrived"
-        ) {
-          document.documentElement.dataset.universeScaleBlocked =
-            "galaxy-limit";
-          return;
-        }
-        void resolveUniverseNavigationDestination(
-          "galaxy:0",
-          contentPlacements,
-          galaxy.markers,
-        ).then((homeGalaxy) => {
-          if (homeGalaxy) beginGalaxyScaleTravel(homeGalaxy);
-        });
-        return;
-      }
-
       if (currentPhase === "system") {
         // A valid System with an active system/planet focus was consumed by the
         // direct 1→2 path above. Do not synthesize an alternate inward path.
@@ -3187,21 +3084,16 @@ export default function UniverseApp({
       // already returned above.
     },
     [
-      activeDestinationId,
       activeEngine,
-      beginGalaxyScaleTravel,
       cameraSettledPhase,
       commitGalaxyScaleFocusedSystem,
-      contentPlacements,
       defaultGalaxyScaleFocus,
       galaxy.markers,
       galaxyScaleTarget,
       handleContinuousScaleIntentStart,
       scheduleApproachScaleHandoff,
-      handleNavigateDestination,
       handleReturn,
       navigationFailure,
-      navigationStatus,
       navigatorOpen,
       phase,
       selectedPlanet,
