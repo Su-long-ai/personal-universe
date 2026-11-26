@@ -2658,12 +2658,11 @@ export default function UniverseApp({
           : "data-universe-cinematic-scale-applied-position",
       );
       const painted = paintedCoordinate === null ? NaN : Number(paintedCoordinate);
-      // Mixed signs delivered before an input frame paints should cancel in
-      // input space, not manufacture extra movement from a stale renderer
-      // sample. Rebase only when we actually need to turn an in-flight pose.
+      // Mixed signs delivered before an input frame paints cancel in input
+      // space. Once the renderer has moved, it remains the reversal authority
+      // even if event grouping expired during a slow frame.
       const reversePaintedMotion =
         directionChanged &&
-        !gestureExpired &&
         wheel.rendererPhase === currentPhase &&
         wheel.renderedStart !== null &&
         Number.isFinite(painted) &&
