@@ -1,0 +1,159 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-NATIVE-INPUT-FOCUS-001",
+  "title": "Resolve a System wheel focus from the last drawn owner",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the current System renderer’s real centre projection for unlocked wheel gestures without relying on optional highlight update cadence."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Three frozen product browser failures agree: exact #188 R4 attempts 1/2, and independent #189 first, the first real -96 pixel notch on LOW Aurora has unset focus and is explicitly rejected no-planet-focus; next two each contribute one third, camera ends 1.666667 with native/current system active and scale frame ready. Both six-frame centre adapters already compute from camera/body positions; do not copy, prime every frame, choose an arbitrary first target, replay a stale event or use a second camera. Add an identity-bound read from the renderer that actually drew System; call the same projection at input time if no existing locked/explicit target, retain actual empty-space refusal and all endpoint, retention and camera angle oracles. Confirm exact old failure at first wheel with paused real renderer + accepted latest paint. Verify all quality/new-star/context control cases and previous direct and original renderer regressions.",
+  "planned_files": [
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/low-system-retention.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45872106163/job/140090143470",
+      "finding": "Frozen two attempts of an old test fail before quality eviction or Solar; same three delivered trusted wheels, actual first blocked no-planet-focus"
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45870251560",
+      "finding": "An independent UI-only branch produced the identical first attempt, then passed with different timing; exact attached new-byte controls differentiate product input from hosted slowdown."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/807ef29379ab50b4430a05c4930bdbdd152b1332/src/components/universe/YeisSystemScene.tsx",
+      "finding": "Current pinned wrapper projects authoritative body centers using viewport camera and metre scale; periodic highlight sampler throttled to every six draw frames."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks#useframe",
+      "finding": "R3F frame priorities support a post-render witness without adding a draw. Existing priority-2 presented proof can be reused for native and fallback."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "Keep whole current native product and fallback System, no new wheel, routing or camera architecture."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "The shared canvas renderer/camera and one existing presented frame establish synchronous ownership. Do not introduce duplicate picking renderer."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        2,
+        3
+      ],
+      "conclusion": "Reuse renderer centre projection, its body evaluation and same highlight focus bound; bind an actual current scene query for the first unlocked input."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        2,
+        3
+      ],
+      "conclusion": "Existing React ref ownership and identity checks prevent standard, fallback, parked and retired providers from influencing the next native/quality owner."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "reuse-current-centre-projection",
+      "name": "Current native/fallback centre projection via actual presented scene owner",
+      "level": "subsystem",
+      "registry_id": "react-three-fiber",
+      "source": "Actual System scenes, React ref registration and R3F presented frame",
+      "license": "Existing project and MIT Three/R3F",
+      "decision": "reuse",
+      "reason": "Reads already drawn geometry only on first unlocked input. Keeps highlight throttling and blocked empty-space behavior, plus exact physical handoff.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "sample-reticle-every-frame",
+      "name": "Always scan whole System for highlight every rendered frame",
+      "level": "subsystem",
+      "registry_id": "react-three-fiber",
+      "source": "Current existing System frame samplers",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "More hot work when center is genuinely empty, and events can still see cache before after a late camera commit; focus selection must not depend on UI sampling rate.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "target-random-or-replay",
+      "name": "Choose the first known body or temporarily store rejected wheel input",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Current central scale slot and system definitions",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Would navigate arbitrary body or resurrect input after focus ownership changes; preserve explicit locks and fail-closed empty center.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 3,
+        "customization_fit": 1,
+        "maturity": 4
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "reuse-current-centre-projection"
+    ],
+    "rationale": "Directly measures and fixes the first causally rejected input. Existing paint and one timer-free renderer remain sole authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Do not publish if ownership, actual pick, quality/new-star or exact original carry regresses."
+  }
+}
