@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-SURFACE-BACKGROUND-DRAW-OWNERSHIP-001",
+  "approved_at": "2026-11-26T18:49:41.429Z",
+  "baseline_commit": "98d9a6098183cd9a63cd146c78093d363822c3f2",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-SURFACE-BACKGROUND-DRAW-OWNERSHIP-001.json",
+  "record_sha256": "1772c280af3366997a92ac3645facfdbd06fd029d114e2cf57e0021ccd5595da",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep the exact authored software horizon and single Canvas, but stop a Surface texture restoration leaking into the next System frame."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-surface-draw-background"
+  ],
+  "candidate_scores": {
+    "existing-surface-draw-background": 57,
+    "remove-native-horizon": 32,
+    "second-pass-or-pipeline": 23
+  }
+}
