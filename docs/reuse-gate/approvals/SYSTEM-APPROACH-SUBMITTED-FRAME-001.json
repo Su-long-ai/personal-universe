@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "SYSTEM-APPROACH-SUBMITTED-FRAME-001",
+  "approved_at": "2026-11-26T16:39:42.270Z",
+  "baseline_commit": "add6073d9b1207106aaf755c38f096ccac1e8b77",
+  "record_path": "docs/reuse-gate/tasks/SYSTEM-APPROACH-SUBMITTED-FRAME-001.json",
+  "record_sha256": "12ae2b343bfc0a1d033c88703c05cd20083a40021d27e894116d033d09561b48",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing shared render witness to settle the System→Approach boundary at the first exact submitted endpoint, with the existing intent epoch and no secondary raw rAF dependency or modified trajectory limits."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/system-approach-submission.spec.ts"
+  ],
+  "selected_ids": [
+    "shared-post-draw-witness"
+  ],
+  "candidate_scores": {
+    "shared-post-draw-witness": 57,
+    "keep-later-raw-raf": 35,
+    "shorter-timeouts": 25
+  }
+}

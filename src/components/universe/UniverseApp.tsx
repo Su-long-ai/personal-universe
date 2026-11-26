@@ -7,6 +7,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
+import type { SystemScaleFocusSource } from "./SystemScene";
 import { UniverseHud } from "./UniverseHud";
 import { UniverseNavigator } from "./UniverseNavigator";
 import type { YeisSignalHover } from "./YeisGalaxyScene";
@@ -735,7 +736,7 @@ export default function UniverseApp({
   const journeyRef = useRef<UniverseJourneyState | null>(null);
   const galaxyScaleFocusRef =
     useRef<UniverseNavigationDestination | null>(null);
-  const systemScaleFocusRef = useRef<PlanetDefinition | null>(null);
+  const systemScaleFocusSource = useRef<SystemScaleFocusSource | null>(null);
   const lockedGalaxyScaleFocusRef =
     useRef<UniverseNavigationDestination | null>(null);
   const pinnedGalaxyScaleFocusRef =
@@ -745,6 +746,10 @@ export default function UniverseApp({
     useRef<UniverseNavigationDestination | null>(null);
   const galaxySoftFocusAvailableRef = useRef(true);
   const continuousScaleIntentEpochRef = useRef(0);
+  const systemApproachHandoffRef = useRef<{
+    epoch: number;
+    commit: () => void;
+  } | null>(null);
   // The current gesture can already have delivered a coordinate beyond the
   // renderer's matched endpoint. Keep only that bounded coordinate, not a
   // sequence of wheel events. It cannot outlive reversal or navigation.
@@ -833,6 +838,7 @@ export default function UniverseApp({
       options: { preserveGalaxyScaleBridge?: boolean } = {},
     ) => {
       continuousScaleIntentEpochRef.current += 1;
+      systemApproachHandoffRef.current = null;
       inwardScaleIntentRef.current = null;
       outwardScaleIntentRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
@@ -1882,7 +1888,6 @@ export default function UniverseApp({
 
   const handleSystemScaleFocus = useCallback(
     (planet: PlanetDefinition | null) => {
-      systemScaleFocusRef.current = planet;
       if (preferredSystemScaleDestinationRef.current) return;
       if (planet) {
         document.documentElement.dataset.universeScaleFocus =
@@ -2410,6 +2415,25 @@ export default function UniverseApp({
   );
 
   const handleScaleFramePresented = useCallback((presentedPhase: UniversePhase) => {
+    if (presentedPhase === "system") {
+      const pending = systemApproachHandoffRef.current;
+      if (!pending) return;
+      if (
+        pending.epoch !== continuousScaleIntentEpochRef.current ||
+        phaseRef.current !== "system" ||
+        worldScalePositionRef.current < WORLD_SCALE_MIN - WORLD_SCALE_EPSILON
+      ) {
+        systemApproachHandoffRef.current = null;
+        return;
+      }
+      // The shared renderer just submitted this System pose. The camera's
+      // coordinate and matched composition alone are not a paint witness.
+      if (!systemApproachFramePresented()) return;
+      systemApproachHandoffRef.current = null;
+      document.documentElement.dataset.universeScaleHandoff = "system-approach:paint";
+      pending.commit();
+      return;
+    }
     if (
       presentedPhase !== phase ||
       !isWorldScalePhase(phase) ||
@@ -2466,17 +2490,11 @@ export default function UniverseApp({
       preferredSystemScaleDestinationRef.current = null;
       delete document.documentElement.dataset.universeScalePreferred;
 
-      // Prefer one painted matched System endpoint, but never let a
-      // throttled/software rAF stall consume the visitor's next scale
-      // samples. Any newer scale/navigation intent invalidates the handoff.
-      scheduleScaleRendererHandoff({
-        label: "system-approach",
-        isCurrent: () =>
-          continuousScaleIntentEpochRef.current === intentEpoch &&
-          phaseRef.current === "system" &&
-          worldScalePositionRef.current >=
-            WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
-        isRendererReady: systemApproachFramePresented,
+      // Consume this intent on the first actual matched System submission.
+      // Do not require another browser frame after the renderer witnesses it.
+      document.documentElement.dataset.universeScaleHandoff = "system-approach:awaiting-renderer";
+      systemApproachHandoffRef.current = {
+        epoch: intentEpoch,
         commit: () => {
           if (destination) {
             void handleNavigateDestination(destination, {
@@ -2489,7 +2507,7 @@ export default function UniverseApp({
             setWorldScalePhase("approach");
           }
         },
-      });
+      };
     },
     [
       contentPlacements,
@@ -3144,6 +3162,10 @@ export default function UniverseApp({
           return;
         }
 
+        // Highlights are sampled for presentation. A real wheel uses the
+        // matching drawn owner's centre projection without waiting for that
+        // periodic publication; an actually empty centre still blocks it.
+        const focusSource = systemScaleFocusSource.current;
         const targetPlanet =
           systemScaleTargetPlanet ??
           preferredScalePlanet(
@@ -3151,7 +3173,7 @@ export default function UniverseApp({
             preferredSystemScaleDestinationRef.current,
           ) ??
           lockedSystemScaleFocusRef.current ??
-          systemScaleFocusRef.current;
+          (focusSource?.systemId === activeSystem.id ? focusSource.read() : null);
 
         if (!targetPlanet) {
           document.documentElement.dataset.universeScaleBlocked =
@@ -3331,6 +3353,7 @@ export default function UniverseApp({
           onScaleFocusDestination={handleGalaxyScaleFocus}
           onScaleManualTakeover={handleGalaxyScaleManualTakeover}
           onScaleFocusPlanet={handleSystemScaleFocus}
+          systemScaleFocusSource={systemScaleFocusSource}
           onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { PlanetArchetype, PlanetDefinition, SystemDefinition } from "../../lib/universe/types";
@@ -45,6 +45,26 @@ export type SystemScaleFrame = {
   position: [number, number, number];
   radius: number;
 };
+
+export type SystemScaleFocusSource = {
+  systemId: string;
+  read: () => PlanetDefinition | null;
+};
+
+export function useSystemScaleFocusSource(
+  source: MutableRefObject<SystemScaleFocusSource | null> | undefined,
+  systemId: string,
+  read: SystemScaleFocusSource["read"],
+) {
+  useLayoutEffect(() => {
+    if (!source) return;
+    const owner = { systemId, read };
+    source.current = owner;
+    return () => {
+      if (source.current === owner) source.current = null;
+    };
+  }, [read, source, systemId]);
+}
 
 function PlanetBody({
   planet,
@@ -119,6 +139,7 @@ export function SystemScene({
   starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
+  scaleFocusSource,
   scaleTargetPlanet,
   handoffTargetPlanetId,
   onHandoffTargetSuppressed,
@@ -128,6 +149,7 @@ export function SystemScene({
   starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
+  scaleFocusSource?: MutableRefObject<SystemScaleFocusSource | null>;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
   onHandoffTargetSuppressed?: (planetId: string) => void;
@@ -143,6 +165,58 @@ export function SystemScene({
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
+  const presentedTime = useRef<number | null>(null);
+
+
+  const pickScaleFocus = useCallback((time: number) => {
+    let bestPlanet: PlanetDefinition | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < system.planets.length; index += 1) {
+      const planet = system.planets[index];
+      const orbit = compressedOrbit(planet, index);
+      const period = Math.max(0.45, planet.orbitalPeriodYears);
+      const phase =
+        ((hashSeed(planet.seed) % 1000) / 1000) * Math.PI * 2 +
+        time * (0.055 / Math.sqrt(period));
+      const projected = focusProjectionRef.current
+        .copy(
+          focusPositionRef.current.set(
+            Math.cos(phase) * orbit,
+            0,
+            -Math.sin(phase) * orbit,
+          ),
+        )
+        .applyEuler(systemTiltRef.current)
+        .project(camera);
+
+      if (projected.z < -1 || projected.z > 1) continue;
+      const distance = Math.hypot(
+        projected.x * size.width * 0.5,
+        projected.y * size.height * 0.5,
+      );
+      if (distance <= 92 && distance < bestDistance) {
+        bestPlanet = planet;
+        bestDistance = distance;
+      }
+    }
+
+    return bestPlanet;
+  }, [camera, size.height, size.width, system.planets]);
+
+  useLayoutEffect(() => {
+    presentedTime.current = null;
+  }, [system.id]);
+
+  const readScaleFocus = useCallback(() => {
+    const time = presentedTime.current;
+    return time === null ? null : pickScaleFocus(time);
+  }, [pickScaleFocus]);
+  useSystemScaleFocusSource(scaleFocusSource, system.id, readScaleFocus);
+
+  // Same priority after the single Canvas draw as the native witness.
+  useFrame(({ clock }) => {
+    if (scaleFocusSource) presentedTime.current = clock.elapsedTime;
+  }, 2);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -207,37 +281,7 @@ export function SystemScene({
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current !== 0) return;
 
-    let bestPlanet: PlanetDefinition | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (let index = 0; index < system.planets.length; index += 1) {
-      const planet = system.planets[index];
-      const orbit = compressedOrbit(planet, index);
-      const period = Math.max(0.45, planet.orbitalPeriodYears);
-      const phase =
-        ((hashSeed(planet.seed) % 1000) / 1000) * Math.PI * 2 +
-        state.clock.elapsedTime * (0.055 / Math.sqrt(period));
-      const projected = focusProjectionRef.current
-        .copy(
-          focusPositionRef.current.set(
-            Math.cos(phase) * orbit,
-            0,
-            -Math.sin(phase) * orbit,
-          ),
-        )
-        .applyEuler(systemTiltRef.current)
-        .project(camera);
-
-      if (projected.z < -1 || projected.z > 1) continue;
-      const distance = Math.hypot(
-        projected.x * size.width * 0.5,
-        projected.y * size.height * 0.5,
-      );
-      if (distance <= 92 && distance < bestDistance) {
-        bestPlanet = planet;
-        bestDistance = distance;
-      }
-    }
-
+    const bestPlanet = pickScaleFocus(state.clock.elapsedTime);
     const nextId = bestPlanet?.id ?? null;
     if (focusedIdRef.current === nextId) return;
     focusedIdRef.current = nextId;

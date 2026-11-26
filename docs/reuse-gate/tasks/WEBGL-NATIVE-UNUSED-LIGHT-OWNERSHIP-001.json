@@ -1,0 +1,154 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-NATIVE-UNUSED-LIGHT-OWNERSHIP-001",
+  "title": "Scope native System spacecraft-only lights to an actual light consumer",
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep the real native overlap, single renderer and exact close-world body material without a foreign lighting program recipe when spacecraft are absent."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact #188/R3 software WebGL probe identifies two real MeshStandardMaterial shader recipes at the System/Approach overlap and release, incurring two ~1 s frames. Existing pinned BodyRenderer attaches ambient and directional lights for PBR spacecraft; procedural bodies explicitly shade independently, and this product-built StarSystem excludes spacecraft/trajectories. A disposable R3 bundle with the exact color/texture/material and spacecraft-only lights invisible in nonconsumer scenes passes all 3 unchanged fixed-deadline cases. Lambert reduced cost but changed every stable globe interior pixel (7.19 RGB MAE) and failed the strict 120 Hz boundary. A combined temporary atmosphere/cloud suppression also passed but removes authored detail, is unnecessary for this material-ownership change, and will not be promoted. Preserve actual paint, point lighting of prototype System, shader validation and CI budgets.",
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/system-approach-submission.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/blob/e52056897364e060fbd6d00951628f163b57d7a1/src/render/BodyRenderer.ts",
+      "finding": "The pinned local MIT BodyRenderer constructor creates one directional and one ambient for PBR spacecraft; procedural surfaces use bespoke non-Three lighting uniforms."
+    },
+    {
+      "url": "https://github.com/mrdoob/three.js/blob/r185/src/renderers/WebGLRenderer.js",
+      "finding": "Reuse installed Three Object3D.visible; invisible lights are never collected. Zero intensity still allocates the extra directional program recipe."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45865051013/job/140066229315",
+      "finding": "Exact hosted failure runs through native→Approach and retained carry under wide sample intervals. Keep explicit thresholds and readiness; remove unnecessary draw work."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/9fb57350bf4172dce8ccd7474ae19e55362a93e7/src/components/universe/YeisSystemScene.tsx",
+      "finding": "Existing local production system filters spacecraft and trajectory data; retain an actual consumer guard and reuse existing per-system render scene."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "Keep the existing native and fallback System renderer paths."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Keep single Canvas and pass phase information through current React props."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "three-light-visibility"
+      ],
+      "source_refs": [
+        0,
+        1,
+        3
+      ],
+      "conclusion": "Reuse Three visibility gating for light collection: an invisible light is not traversed; power zero alone still specializes a shader key."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "Scope only the native per-system scene’s existing spacecraft-specific lights; retain them if an actual PBR model kind exists."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-three-consumer-visibility",
+      "name": "Existing Three visible flag for native PBR spacecraft lights, with consumer guard",
+      "level": "subsystem",
+      "registry_id": "three-light-visibility",
+      "source": "Installed pinned Three 0.185.1 and local YEIS plus direct cold SwiftShader measurement",
+      "license": "MIT Three plus project code",
+      "decision": "reuse",
+      "reason": "No renderer, asset or material fork. Native directional/ambient lights with no spacecraft consumer do not affect independent close-world material program identity.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "separate-render-pass",
+      "name": "Per-presentation render pass",
+      "level": "component_asset",
+      "source": "Potential additional custom pass",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Would add separate ownership and GL cost. Retain exact one-canvas renderer witness.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    },
+    {
+      "id": "lambert-rewrite",
+      "name": "Substitute fallback globe diffuse material with Lambert",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Disposable exact R3 A/B shadow on actual stable Approach raster",
+      "license": "MIT installed Three",
+      "decision": "reject",
+      "reason": "Rendered globe pixels differ (7.19 average channel difference), and this alone did not close the 120 Hz native boundary. Preserve existing material and shader model.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 1,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-three-consumer-visibility"
+    ],
+    "rationale": "Remove only observed foreign native lighting from the standalone fallback shader. Preserve native star, atmosphere, clouds, light-correct spacecraft, globe material, input and actual paint.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Keep isolated if native ordinary visuals or exact overlap pixels regress, or unchanged fixed-budget cases remain unstable."
+  }
+}

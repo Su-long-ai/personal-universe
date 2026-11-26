@@ -12,49 +12,145 @@ async function wheel(page: Page, deltas: number[]) {
   for (const delta of deltas) await page.mouse.wheel(0, delta);
 }
 
-async function installNativeProbe(page: Page) {
-  await page.addInitScript(() => {
-    const roots = new Set<any>(), renderers = new Map<number, any>();
-    let identity = 0;
-    const w = window as any;
-    w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
-      supportsFiber: true, renderers,
-      inject(renderer: any) { renderers.set(++identity, renderer); return identity; },
-      onCommitFiberRoot(_: number, root: any) { roots.add(root); },
-      onCommitFiberUnmount() {},
-    };
-    w.__nativeRetentionProbe = () => {
+// Share the actual drawn native resource probe with the retention test.
+async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
+  await page.addInitScript((holdEarlyPaint) => {
+    const roots = new Set<any>();
+    const renderers = new WeakSet<any>();
+    const pending = new Map<number, FrameRequestCallback>();
+    const raf = window.requestAnimationFrame.bind(window);
+    const cancel = window.cancelAnimationFrame.bind(window);
+    let id = 0;
+    let previousOwner: string | null = null;
+    let armed = false;
+    let held: { owner: string; quality: "low"; centred: string; distance: number } | null = null;
+    let suspend = false;
+    const resource = (owner?: string, quality?: "low") => {
       for (const root of roots) {
         const stack = [root.current];
-        while (stack.length) {
-          const fiber = stack.pop();
+        for (let fiber; (fiber = stack.pop()); ) {
           if (fiber.child) stack.push(fiber.child);
           if (fiber.sibling) stack.push(fiber.sibling);
           for (let h = fiber.memoizedState, k = 0; h && k < 100; k++, h = h.next) {
-            const r = h.memoizedState;
-            if (!r?.bodies?.views || !r?.scene?.isScene || !r?.instance) continue;
-            const stats = { updates: 0, draws: 0 };
-            const update = r.system.update;
-            r.system.update = function (...args: any[]) {
-              stats.updates++;
-              return update.apply(this, args);
-            };
-            r.scene.traverse((object: any) => {
-              if (!object.geometry || !object.material) return;
-              const draw = object.onBeforeRender;
-              object.onBeforeRender = function (...args: any[]) {
-                stats.draws++;
-                return draw.apply(this, args);
-              };
-            });
-            w.__readNativeRetention = () => ({ ...stats, visible: r.scene.visible });
-            return true;
+            const state = h.memoizedState;
+            if (state?.instance && (!owner || state.instance === owner) &&
+                (!quality || fiber.memoizedProps?.quality === quality) &&
+                state.scene?.isScene && state.scene.visible && state.bodies?.views) {
+              return state;
+            }
           }
         }
       }
-      return false;
+      return null;
     };
-  });
+    const install = () => {
+      for (const root of roots) {
+        const stack = [root.current];
+        for (let fiber; (fiber = stack.pop()); ) {
+          if (fiber.child) stack.push(fiber.child);
+          if (fiber.sibling) stack.push(fiber.sibling);
+          const state = fiber.stateNode?.__r3f?.root?.getState?.();
+          const gl = state?.gl;
+          if (!gl || renderers.has(gl)) continue;
+          renderers.add(gl);
+          const draw = gl.render;
+          gl.render = function (scene: unknown, camera: any) {
+            const result = draw.call(this, scene, camera);
+            if (!armed || scene !== state.scene || gl.getRenderTarget() !== null) {
+              return result;
+            }
+            const data = document.documentElement.dataset;
+            const owner = data.universeNativeSystemInstance;
+            if (!owner || owner === previousOwner || !owner.startsWith("h-aurora:") ||
+                data.universeNavigationPhase !== "system" ||
+                data.universeNativeSystemLifecycle !== "active" ||
+                data.universeCameraSettled !== "system" ||
+                data.universeSystemFocus) return result;
+            // Before a startup AUTO owner exists, previousOwner can be null.
+            // Its first draw is then "new" too; require committed LOW Fiber
+            // props for the exact native resource in the visible root draw.
+            const actual = resource(owner, "low");
+            if (!actual || actual.scene.parent !== state.scene) return result;
+            const size = state.size;
+            const candidates = actual.bodies.views.map((view: any) => {
+              const projected = view.body.position.clone().project(camera);
+              return {
+                id: view.body.id,
+                z: projected.z,
+                distance: Math.hypot(projected.x * size.width / 2, projected.y * size.height / 2),
+                planet: view.body.data.type === "planet",
+              };
+            }).filter((view: any) => view.planet && view.z >= -1 && view.z <= 1)
+              .sort((a: any,b: any) => a.distance - b.distance);
+            const first = candidates[0];
+            if (first?.distance > 92 || !first) return result;
+            held = { owner, quality: "low", centred: first.id, distance: first.distance };
+            armed = false;
+            suspend = true;
+            return result;
+          };
+        }
+      }
+    };
+    Object.assign(window, {
+      __REACT_DEVTOOLS_GLOBAL_HOOK__: {
+        supportsFiber: true,
+        inject: () => ++id,
+        onCommitFiberRoot: (_: number, root: any) => {
+          roots.add(root);
+          if (holdEarlyPaint) install();
+        },
+        onCommitFiberUnmount: () => {},
+      },
+      __nativeRetentionProbe() {
+        const native = resource();
+        if (!native) return false;
+        const stats = { updates: 0, draws: 0 };
+        const update = native.system.update;
+        native.system.update = function (...args: any[]) {
+          stats.updates++;
+          return update.apply(this, args);
+        };
+        native.scene.traverse((object: any) => {
+          if (!object.geometry || !object.material) return;
+          const draw = object.onBeforeRender;
+          object.onBeforeRender = function (...args: any[]) {
+            stats.draws++;
+            return draw.apply(this, args);
+          };
+        });
+        Object.assign(window, { __readNativeRetention: () => ({ ...stats, visible: native.scene.visible }) });
+        return true;
+      },
+      __earlyLowPaint: {
+        arm() { previousOwner = document.documentElement.dataset.universeNativeSystemInstance ?? null; armed = true; },
+        read() { return held; },
+        currentOwner() {
+          const owner = document.documentElement.dataset.universeNativeSystemInstance;
+          return owner && resource(owner, "low") ? owner : null;
+        },
+        release() {
+          armed = false;
+          suspend = false;
+          for (const callback of pending.values()) raf(callback);
+          pending.clear();
+        },
+      },
+    });
+    if (holdEarlyPaint) {
+      window.requestAnimationFrame = (callback) => {
+        const handle = raf((time) => {
+          if (suspend) pending.set(handle, callback);
+          else callback(time);
+        });
+        return handle;
+      };
+      window.cancelAnimationFrame = (handle) => {
+        pending.delete(handle);
+        cancel(handle);
+      };
+    }
+  }, holdFirstLowPaint);
 }
 
 test("LOW native System parks the same owner without updates or draws and republishes only on return", async ({ page }, info) => {
@@ -127,13 +223,41 @@ test("LOW parked native System is evicted by quality and a new star gets an inde
       body: tile,
     }),
   );
+  await installNativeProbe(page, true);
   await page.goto("/?phase=system&star=h-aurora&freeze=1");
   await waitForYeisEngine(page);
+  await page.evaluate(() => (window as any).__earlyLowPaint.arm());
   await page.getByLabel("QUALITY").selectOption("low");
   const html=page.locator("html");
-  await expect(html).toHaveAttribute(instance,/^h-aurora:\d+$/);
-  await expect(html).toHaveAttribute("data-universe-camera-settled","system");
-  await wheel(page,[-96,-96,-96]);
+  try {
+    try {
+      const paint = () => page.evaluate(() => (window as any).__earlyLowPaint.read());
+      await expect.poll(paint).toMatchObject({
+        owner: /^h-aurora:\d+$/, quality: "low", centred: expect.any(String),
+      });
+      await expect(html).not.toHaveAttribute("data-universe-system-focus");
+      await expect(html).toHaveAttribute("data-universe-camera-settled","system");
+      const held = await paint();
+      const currentOwner = () => page.evaluate(() => (window as any).__earlyLowPaint.currentOwner());
+      expect(await currentOwner()).toBe(held.owner);
+      await wheel(page,[-96]);
+      expect(await currentOwner()).toBe(held.owner);
+      await expect(html).toHaveAttribute("data-universe-scale-position","1.333");
+    } finally {
+      await info.attach("first-low-system-wheel.json", {
+        contentType: "application/json",
+        body: JSON.stringify(await page.evaluate(() => ({
+          rendered: (window as any).__earlyLowPaint.read(),
+          currentLowOwner: (window as any).__earlyLowPaint.currentOwner(),
+          requested: document.documentElement.dataset.universeScalePosition,
+          blocked: document.documentElement.dataset.universeScaleBlocked ?? null,
+        }))),
+      });
+    }
+  } finally {
+    await page.evaluate(() => (window as any).__earlyLowPaint.release());
+  }
+  await wheel(page,[-96,-96]);
   await expect(html).toHaveAttribute(phase,"approach",{timeout:15_000});
   await expect(html).toHaveAttribute(lifecycle,"parked");
   const parked=(await html.getAttribute(instance))!;

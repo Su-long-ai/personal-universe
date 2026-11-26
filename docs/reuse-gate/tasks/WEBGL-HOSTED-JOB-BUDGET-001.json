@@ -1,0 +1,194 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-HOSTED-JOB-BUDGET-001",
+  "title": "Fit the exact WebGL release suite inside a bounded hosted job budget",
+  "scope": {
+    "level": "architecture",
+    "subject": "Adjust only GitHub Actions outer job wall time for the immutable one-worker WebGL release lane. Preserve every Playwright timeout, test, retry, threshold, report and required check."
+  },
+  "policy_change": true,
+  "researched_at": "2026-11-26",
+  "research_summary": "PR #188 exact 04eae15a run 45861435660 attempt 1 cancelled job 140053573591 during case 24/24 after only 8.325s of that standalone Surface/quality case. Four E2E shards, build and reuse passed. The same 24 cases in the same order completed on exact main d1e70662 (12m32s job, last case around 16s) and #187 (10m48s). Other successful matched jobs took 9m29s–10m56s. In the cancelled job 20/23 matched intervals were slower than main (median 1.28×), including isolated direct Surface cases untouched by the submitted System handoff. No assertion failure or superseding PR event is evidenced. Use 18 minutes on this single outer GitHub job to cover measured slow aggregate, final test and report upload with about two minutes bounded margin, without changing internal test gates. Test only on a new qualified head; a new assertion failure remains a failure.",
+  "planned_files": [
+    ".github/workflows/ci.yml"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45861435660/job/140053573591",
+      "finding": "Exact frozen one-worker sequence reached 24/24 before the outer deadline; last case running and the uploaded artifact lacks the completed heavy report."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45855961146/job/140034654533",
+      "finding": "Exact main matched 24/24, 12m32s job and final case around 16s; prior exact PR187 suite was 10m48s."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes",
+      "finding": "Native timeout-minutes caps one job wall time, separately from test assertions and spec timeouts."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-timeouts",
+      "finding": "Playwright test and expect timeouts remain unchanged."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-sharding",
+      "finding": "Native shard/blob merging is available if bounded single-worker runs repeatedly prove insufficient."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/04eae15ae5539dfebf95bbbd8f6f84df9d0e778a/.github/workflows/ci.yml",
+      "finding": "Current immutable job name, checkout, one-worker command, combined report and strict propagated outcome."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "github-actions-matrix",
+        "playwright-ci-sharding"
+      ],
+      "source_refs": [
+        2,
+        4,
+        5
+      ],
+      "conclusion": "Reuse current GitHub Actions workflow and Playwright; do not create a competing validation authority."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        3,
+        4
+      ],
+      "conclusion": "Keep Playwright test/expect limits, retries, one worker and reports; do not change execution strategy."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "github-actions-matrix"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "Reuse the native outer job cap to cover the observed aggregate runner lifetime, setup, same 24 tests and artifact export."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        3,
+        5
+      ],
+      "conclusion": "Keep exact test and result artifacts, and propagate true failures through the existing required checks."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "bounded-18m-native-job",
+      "name": "Existing GitHub Actions bounded 18 minute outer job cap",
+      "level": "subsystem",
+      "registry_id": "github-actions-matrix",
+      "source": "Current GitHub Actions job timeout reference and exact job",
+      "license": "GitHub hosted service",
+      "decision": "reuse",
+      "reason": "One scalar; retains all checks and strict report propagation, no additional job or worker, adds wall time only to runs crossing the old deadline, bounded +3m.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "split-webgl-native-shards",
+      "name": "Native two-way heavy sharding and named fan-in",
+      "level": "full_solution",
+      "registry_id": "playwright-ci-sharding",
+      "source": "Playwright sharding and existing blob merge",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Potential shorter wall time, but this lane is intentionally serial. Splitting changes runner isolation and consumes setup and fan-in complexity; reconsider only if the observed outer ceiling regularly repeats.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "relax-product-clock",
+      "name": "Change embedded test deadlines or omit the last case",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Existing product timeout controls reviewed as a rejected alternative",
+      "license": "Apache-2.0",
+      "decision": "reject",
+      "reason": "Would weaken product acceptance rather than give a fixed hosted job enough time to measure it.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "bounded-18m-native-job"
+    ],
+    "rationale": "Use the existing platform cap; no custom failure masking, product budget change or runner scheduling.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "split-webgl-native-shards",
+        "reason": "The full runner sharding pattern is already used for ordinary cases, but changing the measured one-job WebGL contract introduces extra runner setup and required-check fan-in complexity to fix a single aggregate deadline, without any benefit to per-case reliability. Revisit if the observed finite 18-minute ceiling fails."
+      },
+      {
+        "candidate_id": "relax-product-clock",
+        "reason": "Embedded Playwright timeout tuning cannot extend the independent GitHub job lifetime and weakens the very product guarantees the existing lane is measuring; no such change is needed."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "Treat an assertion failure, skip, or repeated bounded outer cancellation as distinct; do not re-extend automatically or bypass required jobs."
+  },
+  "coverage_matrix": [
+    {
+      "capability": "Finish the full measured heavy suite under a finite CI cap",
+      "importance": "high",
+      "coverage": {
+        "bounded-18m-native-job": "full",
+        "split-webgl-native-shards": "full",
+        "relax-product-clock": "none"
+      },
+      "decision": "Keep native serial isolation and give the observed aggregate wall time room to finish within one bounded job."
+    },
+    {
+      "capability": "Keep required job names, report fail propagation, and every embedded acceptance threshold",
+      "importance": "high",
+      "coverage": {
+        "bounded-18m-native-job": "full",
+        "split-webgl-native-shards": "partial",
+        "relax-product-clock": "none"
+      },
+      "decision": "Alter no product acceptance, report fan-in, or required branch check; the exact hosted suite decides acceptance."
+    }
+  ]
+}

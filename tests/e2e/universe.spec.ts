@@ -1604,6 +1604,7 @@ test("low-quality Surface retains the existing terrain fallback", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
+  const readBackground = await observeActualSurfaceBackground(page);
   await page.goto(
     "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
   );
@@ -1686,6 +1687,17 @@ test("low-quality Surface retains the existing terrain fallback", async ({
     ).toBe(true);
   }
 
+  if (await html.getAttribute("data-universe-webgl-software") === "true") {
+    await expect(html).toHaveAttribute("data-universe-surface-paint-ready", "true");
+    const background = await readBackground();
+    await testInfo.attach("surface-background-draw-ownership.json", {
+      body: JSON.stringify(background),
+      contentType: "application/json",
+    });
+    expect(background.surface, "a ready Surface truly painted its gradient").toBeGreaterThan(0);
+    expect(background.textures, "one gradient drawable").toHaveLength(1);
+    expect(background.leaks).toEqual([]);
+  }
   await runtime.assertClean(testInfo);
 });
 
@@ -5387,6 +5399,59 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
 });
 
 
+async function observeActualSurfaceBackground(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as any;
+    const captures = { frames: 0, surface: 0, leaks: [] as string[], textures: [] as string[] };
+    let rendererId = 0;
+    let installed = false;
+    w.__actualSurfaceBackground = captures;
+    w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+      supportsFiber: true,
+      inject: () => ++rendererId,
+      onCommitFiberUnmount: () => {},
+      onCommitFiberRoot(_: number, root: any) {
+        if (installed) return;
+        const stack = [root.current];
+        for (let fiber; (fiber = stack.pop()); ) {
+          if (fiber.child) stack.push(fiber.child);
+          if (fiber.sibling) stack.push(fiber.sibling);
+          const gl = fiber.stateNode?.__r3f?.root?.getState()?.gl;
+          if (!gl) continue;
+          installed = true;
+          const draw = gl.render;
+          gl.render = function (scene: any, camera: any) {
+            const backdrop = scene.background;
+            const gradient = backdrop?.isDataTexture &&
+              backdrop.image?.width === 1 && backdrop.image?.height === 8;
+            const { universeNavigationPhase: phase, universeScalePosition: position } =
+              document.documentElement.dataset;
+            const result = draw.call(this, scene, camera);
+            captures.frames += 1;
+            if (gradient) {
+              if (phase === "surface") {
+                captures.surface += 1;
+                if (!captures.textures.includes(backdrop.uuid)) captures.textures.push(backdrop.uuid);
+              } else {
+                const signature = phase + ":" + position;
+                if (!captures.leaks.includes(signature)) captures.leaks.push(signature);
+              }
+            }
+            return result;
+          };
+          break;
+        }
+      },
+    };
+  });
+  return () => page.evaluate(() => (window as any).__actualSurfaceBackground as {
+    frames: number;
+    surface: number;
+    leaks: string[];
+    textures: string[];
+  });
+}
+
 test("LOW repeated 0 to 5 to 0 journeys retain one Canvas and terrain allocation", async ({
   page,
 }, testInfo) => {
@@ -5395,6 +5460,7 @@ test("LOW repeated 0 to 5 to 0 journeys retain one Canvas and terrain allocation
     "Two complete renderer journeys intentionally exercise retained Surface and reverse lifecycle",
   );
   const runtime = await observeRuntime(page);
+  const readBackground = await observeActualSurfaceBackground(page);
   await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
   await waitForYeis(page);
   await page.getByLabel("QUALITY").selectOption("low");
@@ -5555,6 +5621,19 @@ test("LOW repeated 0 to 5 to 0 journeys retain one Canvas and terrain allocation
   expect(await page.locator("canvas").count()).toBe(1);
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
 
+  if (await html.getAttribute("data-universe-webgl-software") === "true") {
+    const background = await readBackground();
+    await testInfo.attach("low-background-draw-ownership.json", {
+      body: JSON.stringify(background),
+      contentType: "application/json",
+    });
+    expect(background.frames, "the render probe observed actual draws").toBeGreaterThan(0);
+    // The burst can reverse after terrain readiness but before a first
+    // Surface draw. The direct Surface test separately proves the gradient
+    // still paints; a non-Surface draw may never borrow it on this route.
+    expect(background.textures.length, "at most one retained Surface gradient").toBeLessThanOrEqual(1);
+    expect(background.leaks, "a Surface gradient must never draw on a different owner").toEqual([]);
+  }
   await runtime.assertClean(testInfo);
 });
 

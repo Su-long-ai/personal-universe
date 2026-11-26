@@ -1,0 +1,156 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-SURFACE-BACKGROUND-DRAW-OWNERSHIP-001",
+  "title": "Limit the retained Surface gradient to its renderer draw",
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep the exact authored software horizon and single Canvas, but stop a Surface texture restoration leaking into the next System frame."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Both frozen R5 LOW repeated tests reached first outward logical System 1.000 with the same retained native star active, but physical System frame awaited after 13s; only one additional WebGL metrics sample and a new program/geometry. Unchanged original route exact frozen R4/R5 Chromium profiles both pass ordinarily, and both concretely compile the software Surface-only Three BackgroundMaterial on their first outward System frame (311/345ms frame, 302/339ms shader diagnostics). This is independent of R5 first notch. R3F independently attaches background at several transitioning React subtrees, restoring previous owner values on detach; Surface already gates terrain visibility synchronously through phaseRef, but the background attachment is separate. Keep hardware CSS/colors and unchanged authored Surface DataTexture. Bind its participation to the exact existing Surface pre/post render lifetime, preserve actual handoff and cameras; prove real texture/GL draw not present outside Surface. Do not attribute all hosted raster pressure to this one shader without a matching sequence.",
+  "planned_files": [
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45875414316/job/140101444068",
+      "finding": "Two frozen failures on first return, queued intent and same native owner remain valid; no physical frame/one metrics sample over test budget and cold program within that frame."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/5102c3d2d0c1728a478dace22e068da37010d6a5/src/components/universe/SurfaceScene.tsx",
+      "finding": "Existing Surface group is given synchronous phase ownership before actual paint; keep same Lifecycle and add SW background to the same scope only."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks#useframe",
+      "finding": "Existing server React parent is one Canvas: priorities before and after the current render bracket a temporary native Three resource without rendering again."
+    },
+    {
+      "url": "https://github.com/mrdoob/three.js/blob/r185/src/renderers/webgl/WebGLBackground.js",
+      "finding": "An actual Texture background allocates a plane geometry and the named internal BackgroundMaterial; a Color does not."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep native and fallback rendering unchanged and one shared Canvas; no new timeline or handoff state."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Keep the exact Three background texture and existing R3F pre-/post-render callbacks that already establish renderer draw ownership."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1,
+        3
+      ],
+      "conclusion": "Only install temporary Software Surface background in actual Surface frames and restore the earlier scene value, without a sticky attach stack."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Retain one existing DataTexture, explicit limits, and an inline guarded lease scoped to the existing draw and teardown."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-surface-draw-background",
+      "name": "Bracket authored background inside the existing Surface draw",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Pinned React Three Fiber frame priorities and same native Three scene/background",
+      "license": "MIT plus existing app",
+      "decision": "reuse",
+      "reason": "No rendering, math, texture or quality reduction; prevents unnecessary off-owner draw/program and leaves the existing camera handoff as sole authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "remove-native-horizon",
+      "name": "Remove the SW horizon or use the original flat fallback color",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "source": "Existing Three Color path in SurfaceScene",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Visual regression; output must be unchanged during own Surface paint.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 4,
+        "customization_fit": 1,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "second-pass-or-pipeline",
+      "name": "Add dedicated Surface background layer or pass, or wholesale global background refactor",
+      "level": "subsystem",
+      "registry_id": "react-three-fiber",
+      "source": "Three renderer and R3F pipeline",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Exceeds bounded fix, adds draw and duplicate output risks. Existing two callbacks and same native draw are sufficient.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 1,
+        "customization_fit": 4,
+        "maturity": 3
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-surface-draw-background"
+    ],
+    "rationale": "Apply runtime-identifiable Surface-only texture exclusively to existing Surface draw; the existing independent scene colours no longer inherit it.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Preserve approved matched code and report accurately if paired browser tests do not show both significant measured off-owner reduction and exact Surface preservation."
+  }
+}
