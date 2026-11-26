@@ -1,0 +1,162 @@
+{
+  "schema": 2,
+  "task_id": "SYSTEM-WORLD-WHEEL-TEMPORAL-001",
+  "title": "Render System and close-world wheel camera motion across intermediate frames",
+  "scope": {
+    "level": "implementation",
+    "subject": "Damp only the presentation coordinate of the existing CinematicCamera while preserving the authored same camera-controls path, direct input ownership and exact renderer witnesses"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Verified existing deployed main 3d9fd529 relevant code blobs. A trusted wheel notch from System scale 1.250 to 1.500 jumps 85.728 degrees and 1.895 to .23521 camera distance in one observed sample. Approach 2.250 to 2.625 jumps 25.532 degrees in one; Orbit 3.250 to 3.625 jumps 302.31 to 454.48px projection in one. The native Galaxy fix is a distinct integration. Reuse the installed camera-controls geometry, Three MathUtils damping and R3F render-frame loop, not an independent animation timeline. Existing endpoint/paint witness remains necessary.",
+  "registry_additions": [],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep adopted world renderers and route composition; replacing the installed project does not fix an integration-specific wheel target collapsing directly onto a rendered pose."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Retarget in the existing R3F render frame rather than adding timer or a second frame loop."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep installed camera-controls and fitted composition. Its generic transition operates on pose target and would not preserve the authored logarithmic/short-arc camera path and exact coordinate ownership."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber",
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        2,
+        3,
+        4
+      ],
+      "conclusion": "Use installed Three MathUtils.damp inside the adopted R3F callback. Keep exact setLookAt/lerpLookAt per rendered sample and validate physical input in Chromium."
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Native Galaxy and System scenes remain in place."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks#useframe",
+      "finding": "Existing frame callback provides seconds delta before the single CinematicPipeline draw."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "finding": "Installed controls remain sole pose authority, via immediate pose and established settlement tolerances."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/math/MathUtils.damp",
+      "finding": "Installed damp uses exponential decay with explicit delta, without event queues or new packages."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-mouse#mouse-wheel",
+      "finding": "Existing Chromium lane can generate trusted wheel input and sample actual camera distance, angle and frame continuity with render diagnostics."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-frame-damp-camera-controls",
+      "level": "component_asset",
+      "registry_id": "yomotsu-camera-controls",
+      "decision": "reuse",
+      "reason": "Uses existing R3F frame and installed Three damping to apply the same authored progress via existing camera controls.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      },
+      "name": "Existing Frame Damp Camera Controls",
+      "source": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "license": "MIT"
+    },
+    {
+      "id": "camera-controls-direct-shot-smooth-time",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "decision": "reject",
+      "reason": "Smoothing directly between independent camera shot poses doesn't preserve short-arc, logarithmic projection, matching phase anchors or an observable applied progress value.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 3,
+        "customization_fit": 3,
+        "maturity": 5
+      },
+      "name": "Camera Controls Direct Shot Smooth Time",
+      "source": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "license": "MIT"
+    },
+    {
+      "id": "existing-coordinate-only-direct-apply",
+      "level": "component_asset",
+      "registry_id": "react-three-fiber",
+      "decision": "reject",
+      "reason": "Direct setLookAt with false plus update(0) is an input target witness, not smooth motion. Trusted Chromium confirmed a one-frame full step.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 4,
+        "customization_fit": 2,
+        "maturity": 4
+      },
+      "name": "Existing Coordinate Only Direct Apply",
+      "source": "https://github.com/yomotsu/camera-controls/tree/v3.1.2",
+      "license": "MIT"
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-frame-damp-camera-controls"
+    ],
+    "rationale": "Preserve one owner, add a rendered value to the existing loop, retain exact endpoint and renderer witness; evaluate installed fallback without claiming a smooth frame that wasn't rendered.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "camera-controls-direct-shot-smooth-time",
+        "reason": "A direct camera-controls shot transition changes authored geometry, logarithmic projection and exact renderer matching; preserve the original route and interpolate its existing coordinate in R3F."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "Keep live baseline while any candidate does not pass physical wheel trajectories, matched handoff, and delayed-render invalidation."
+  },
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "tests/e2e/scale-temporal-siblings.spec.ts"
+  ]
+}
