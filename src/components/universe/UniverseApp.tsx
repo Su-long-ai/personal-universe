@@ -3209,7 +3209,11 @@ export default function UniverseApp({
         }
         publishWorldScalePosition(
           nextPosition,
-          nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+          // React's ordinary RAF mirror is deliberately coalesced. A real
+          // painted reversal must update it now so System cannot take another
+          // frame toward the abandoned endpoint before it sees the retarget.
+          reversePaintedMotion ||
+            nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
         );
         setWorldScaleContinuous(true);
         document.documentElement.dataset.universeScaleDirection = direction;
