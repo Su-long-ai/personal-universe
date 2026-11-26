@@ -1067,6 +1067,11 @@ export default function UniverseApp({
   }, [cancelPendingContinuousScaleIntent, navigatorOpen]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
+    // The explicit URL language takes priority on boot. Update this history
+    // entry when the user changes it, without changing the current destination.
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", next);
+    window.history.replaceState(window.history.state, "", url);
     setLocale(next);
     applyProductLocale(next);
   }, []);
