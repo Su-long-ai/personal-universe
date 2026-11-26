@@ -5677,10 +5677,7 @@ test("opening galaxy auto-orbits until the visitor takes control", async ({
   await runtime.assertClean(testInfo);
 });
 
-test("opening Galaxy drag orbits the visible core after a quality change", async ({
-  page,
-}, testInfo) => {
-  const runtime = await observeRuntime(page);
+async function installOpeningSubjectProbe(page: Page) {
   await page.addInitScript(() => {
     // Read the rendered cloud's actual scene uniform and active Three camera,
     // not the coordinator's requested pose or its declared pivot.
@@ -5690,6 +5687,8 @@ test("opening Galaxy drag orbits the visible core after a quality change", async
       __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown;
       __readOpeningOrbit?: () => {
         core: number[];
+        star: number[];
+        starDistance: number;
         position: number[];
         quaternion: number[];
       } | null;
@@ -5718,17 +5717,30 @@ test("opening Galaxy drag orbits the visible core after a quality change", async
       const center = native?.galaxyClouds.get(0)?.points.material.uniforms.uCenterRel.value;
       if (!camera || !center || native.disposed || !center.lengthSq()) return null;
       const ndc = center.clone().normalize().multiplyScalar(64).project(camera);
+      const starOffset = native.runtime.universe.star.position.clone()
+        .sub(native.controller.position);
+      const starDistance = starOffset.length();
+      const star = starOffset.normalize().multiplyScalar(64).project(camera);
       return {
         core: [innerWidth * (ndc.x + 1) / 2, innerHeight * (1 - ndc.y) / 2],
+        star: [innerWidth * (star.x + 1) / 2, innerHeight * (1 - star.y) / 2],
+        starDistance,
         position: native.controller.position.toArray(),
         quaternion: camera.quaternion.toArray(),
       };
     };
   });
+  return () => page.evaluate(() => (window as any).__readOpeningOrbit());
+}
+
+test("opening Galaxy drag orbits the visible core after a quality change", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const read = await installOpeningSubjectProbe(page);
   await page.goto("/");
   await waitForYeis(page);
   const html = page.locator("html");
-  const read = () => page.evaluate(() => (window as any).__readOpeningOrbit());
   await expect.poll(read).not.toBeNull();
 
   const canvas = await page.locator("canvas").boundingBox();
@@ -5769,6 +5781,51 @@ test("opening Galaxy drag orbits the visible core after a quality change", async
   await expect.poll(read).not.toBeNull();
   await drag(1);
   await drag(-1);
+  await runtime.assertClean(testInfo);
+});
+
+test("a trusted drag during Galaxy wheel approach orbits the already framed star", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  const read = await installOpeningSubjectProbe(page);
+  await page.goto("/");
+  await waitForYeis(page);
+  await expect.poll(read).not.toBeNull();
+  const canvas = await page.locator("canvas").boundingBox();
+  expect(canvas).toBeTruthy();
+  const x = canvas!.x + canvas!.width / 2;
+  const y = canvas!.y + canvas!.height / 2;
+  await page.mouse.move(x, y);
+  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -120);
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  const start = await read();
+  expect(start).not.toBeNull();
+  expect(Math.hypot(start.star[0] - x, start.star[1] - y)).toBeLessThan(30);
+
+  await page.mouse.down();
+  let end = start;
+  for (let i = 1; i <= 6; i++) {
+    await page.mouse.move(x + i * 15, y + i * 2);
+    await page.evaluate(() => new Promise<void>((done) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => done())),
+    ));
+    end = await read();
+    expect(end).not.toBeNull();
+    expect(Math.hypot(end.star[0] - start.star[0], end.star[1] - start.star[1]))
+      .toBeLessThan(8);
+    expect(Math.abs(end.starDistance / start.starDistance - 1)).toBeLessThan(0.001);
+  }
+  await page.mouse.up();
+  const from = new Vector3().fromArray(start.position);
+  expect(from.distanceTo(new Vector3().fromArray(end.position)) / start.starDistance)
+    .toBeGreaterThan(0.01);
+  expect(new Quaternion().fromArray(start.quaternion)
+    .angleTo(new Quaternion().fromArray(end.quaternion))).toBeGreaterThan(0.05);
+  await expect(html).toHaveAttribute("data-universe-scale-superseded", "manual-camera");
   await runtime.assertClean(testInfo);
 });
 

@@ -1155,7 +1155,31 @@ export function YeisGalaxyScene({
       // the time-driven YEIS autopilot finish one more frame. Freeze exactly
       // where the continuous coordinate left the camera before manual input is
       // applied, then let native free/orbit controls take over from there.
-      state.controller.cancelAutopilot();
+      const controller = state.controller;
+      const trajectory = controller.autopilot;
+      const handoffOrbit =
+        (Math.abs(state.input.dragX) > 0.01 ||
+          Math.abs(state.input.dragY) > 0.01) &&
+        scaleBridgeAutopilotRevisionRef.current === controller.autopilotRevision &&
+        (scaleBridgeRef.current?.renderedScalePosition ?? 0) > WORLD_SCALE_EPSILON &&
+        trajectory?.kind === "gotoPoint" &&
+        trajectory.progressOverride !== undefined &&
+        trajectory.point &&
+        trajectory.anchor;
+      if (handoffOrbit && trajectory.point) {
+        // The scrubbed path never reaches native time-based completion.
+        // Install its real subject as the native orbit pivot, but preserve
+        // the last painted pose before the same drag is consumed.
+        const paintedOrientation = controller.quaternion.clone();
+        controller.orbitPoint(
+          trajectory.point,
+          handoffOrbit.radius,
+          handoffOrbit.name,
+        );
+        controller.quaternion.copy(paintedOrientation);
+      } else {
+        controller.cancelAutopilot();
+      }
       scaleBridgeAutopilotRevisionRef.current = null;
       state.controller.autoOrbit = 0;
       state.controller.velocity.set(0, 0, 0);
