@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "SYSTEM-WORLD-WHEEL-TEMPORAL-001",
+  "approved_at": "2026-11-26T11:35:00.621Z",
+  "baseline_commit": "21e787b0af10057a2f645d130f6cfd7a57012d26",
+  "record_path": "docs/reuse-gate/tasks/SYSTEM-WORLD-WHEEL-TEMPORAL-001.json",
+  "record_sha256": "998a8808a577130f332b26dad24e71496353e981bf012567b82b42294794d318",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Damp only the presentation coordinate of the existing CinematicCamera while preserving the authored same camera-controls path, direct input ownership and exact renderer witnesses"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "tests/e2e/scale-temporal-siblings.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-frame-damp-camera-controls"
+  ],
+  "candidate_scores": {
+    "existing-frame-damp-camera-controls": 57,
+    "camera-controls-direct-shot-smooth-time": 29,
+    "existing-coordinate-only-direct-apply": 31
+  }
+}
