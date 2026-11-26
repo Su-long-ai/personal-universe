@@ -3395,6 +3395,96 @@ test("release scale trace is monotonic from Galaxy zero to Surface five and back
   await runtime.assertClean(testInfo);
 });
 
+async function delayNativeScaleEndpointObservation(page: Page) {
+  await page.addInitScript(() => {
+    const dataset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "dataset");
+    if (!dataset?.get) throw new Error("HTMLElement dataset getter unavailable");
+    const getDataset = dataset.get;
+    const projections = new WeakMap<HTMLElement, DOMStringMap>();
+    Object.defineProperty(HTMLElement.prototype, "dataset", {
+      ...dataset,
+      get(this: HTMLElement) {
+        const real = getDataset.call(this) as DOMStringMap;
+        if (this !== document.documentElement) return real;
+        const existing = projections.get(this);
+        if (existing) return existing;
+        // Delay only the coordinator's applied-coordinate observation. The
+        // renderer still runs its actual draw and updates the real dataset.
+        const projected = new Proxy(real, {
+          get(target, key) {
+            if (
+              key === "universeGalaxyScaleAppliedPosition" &&
+              !document.documentElement.hasAttribute("data-test-release-native-frame")
+            ) {
+              return "0.500";
+            }
+            return Reflect.get(target, key, target);
+          },
+          set(target, key, value) {
+            return Reflect.set(target, key, value, target);
+          },
+        });
+        projections.set(this, projected);
+        return projected;
+      },
+    });
+  });
+}
+
+test("finite wheel burst preserves delivered input while native endpoint paint is delayed", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await delayNativeScaleEndpointObservation(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-active-destination", "hero:aurora-01");
+
+  for (let i = 0; i < 24; i += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(16);
+  }
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute("data-universe-scale-handoff", "galaxy-system:awaiting-renderer");
+
+  await html.evaluate((root) => root.setAttribute("data-test-release-native-frame", ""));
+  for (let i = 0; i < 4; i += 1) {
+    await dispatchScaleWheel(page, -96);
+    await page.waitForTimeout(16);
+  }
+
+  await expect(html).toHaveAttribute("data-universe-scale-position", "5.000", { timeout: 15_000 });
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "surface");
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+  await runtime.assertClean(testInfo);
+});
+
+test("reversing while an inward native endpoint is held discards unapplied intent", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await delayNativeScaleEndpointObservation(page);
+  await page.goto("/?destination=hero:aurora-01&navigation=locate");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-active-destination", "hero:aurora-01");
+
+  for (let i = 0; i < 12; i += 1) {
+    await dispatchScaleWheel(page, -96);
+  }
+  await expect(html).toHaveAttribute("data-universe-scale-handoff", "galaxy-system:awaiting-renderer");
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+
+  await html.evaluate((root) => root.setAttribute("data-test-release-native-frame", ""));
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.750");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
+  await expect(html).not.toHaveAttribute("data-universe-scale-queued");
+  await runtime.assertClean(testInfo);
+});
+
 test("high-frequency sustained wheel crosses renderer handoffs without losing scale intent", async ({
   page,
 }, testInfo) => {
