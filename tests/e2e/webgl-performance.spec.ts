@@ -212,6 +212,10 @@ async function driveGalaxySystemRoundTrip(
     "data-universe-scale-position",
     "0.000",
   );
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    "0.000",
+  );
   await waitForYeis(page);
   // Unlike a full world journey, Galaxy/System never paints the retained
   // planet starfield. No Drei Stars program has a live owner after return.
@@ -422,6 +426,10 @@ async function attachFullJourneyFailure(
         phase: data.universeNavigationPhase ?? null,
         position: data.universeScalePosition ?? null,
         galaxyAppliedPosition: data.universeGalaxyScaleAppliedPosition ?? null,
+        cinematicAppliedPosition: data.universeCinematicScaleAppliedPosition ?? null,
+        rendererAuthority: data.universeRenderAuthority ?? null,
+        cameraSegment: data.universeScaleCameraSegment ?? null,
+        direction: data.universeScaleDirection ?? null,
         handoff: data.universeScaleHandoff ?? null,
         blocked: data.universeScaleBlocked ?? null,
         systemReady: data.universeSystemReady ?? null,

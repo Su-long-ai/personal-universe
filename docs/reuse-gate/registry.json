@@ -4,6 +4,20 @@
   "status_model": "adopt|trial|assess|hold",
   "entries": [
     {
+      "id": "three-frame-rate-independent-damp",
+      "name": "Three.js MathUtils.damp",
+      "url": "https://threejs.org/docs/#api/en/math/MathUtils.damp",
+      "level": "component_asset",
+      "license": "MIT (Three.js)",
+      "status": "adopt",
+      "covers": [
+        "frame-rate-independent presentation damping",
+        "retargetable single-coordinate interpolation"
+      ],
+      "notes": "Verified the installed Three.js MathUtils.damp implementation. Use inside the existing React Three Fiber renderer frame and YEIS native path, no new dependency, camera or event queue.",
+      "last_checked": "2026-11-26"
+    },
+    {
       "id": "three-light-visibility",
       "name": "Three.js Object3D visibility in light collection",
       "url": "https://threejs.org/docs/#api/en/core/Object3D.visible",

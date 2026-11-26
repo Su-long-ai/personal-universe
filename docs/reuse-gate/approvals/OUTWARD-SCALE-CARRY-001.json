@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "OUTWARD-SCALE-CARRY-001",
+  "approved_at": "2026-11-26T13:14:16.615Z",
+  "baseline_commit": "965cfb0de0f6e1ff03c4b28fbdde943f3aecd426",
+  "record_path": "docs/reuse-gate/tasks/OUTWARD-SCALE-CARRY-001.json",
+  "record_sha256": "58b057019818351f39a30146cc2fb4fce635c7ed129b56aef07b78bf001ff005",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Carry one bounded existing response-distance coordinate across real Approach→System and System→Galaxy paint fences; use the same camera and restore retained Galaxy bridge."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/CinematicCamera.tsx",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-frame-damp-camera-controls"
+  ],
+  "candidate_scores": {
+    "existing-frame-damp-camera-controls": 57,
+    "camera-controls-direct-shot-smooth-time": 29,
+    "existing-coordinate-only-direct-apply": 31
+  }
+}

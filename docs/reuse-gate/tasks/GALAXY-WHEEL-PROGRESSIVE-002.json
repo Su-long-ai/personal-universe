@@ -1,0 +1,122 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-WHEEL-PROGRESSIVE-002",
+  "title": "Render progressive Galaxy wheel zoom on the retained native path",
+  "scope": {
+    "level": "implementation",
+    "subject": "Subdivide strong physical Galaxy wheel targets through the existing native render path without adding navigation, delaying input, or bypassing exact handoff."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Real Chromium wheel on the #185 build turns one 120-pixel notch into an immediate 0 to 0.250 jump in the applied native scale. The existing YEIS path already supports continuous scrubbing and the renderer has its own delta and matched-endpoint signal. Reuse the installed Three.js MathUtils.damp inside that frame; the coordinator still owns input and boundaries. Compare camera-controls smoothing (wrong owner for the native Galaxy camera) and timed YEIS navigation (locks wheel and introduces two authorities).",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Current pinned native renderer remains the authority; no upstream patch or new camera."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/math/MathUtils.damp",
+      "finding": "Installed MathUtils.damp interpolates using delta time with no internal queue or clock; pass the existing R3F frame delta."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the installed MIT YEIS and current camera entry/return behaviors; not a renderer replacement."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing R3F Canvas and React phase state, no new scene or camera."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the retained native YEIS bridge; existing camera-controls interpolates the separate close-world camera, not Galaxy."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "three-frame-rate-independent-damp"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Reuse MathUtils.damp on the existing native-applied coordinate; input target retains one owner."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "three-damp-existing-yeis",
+      "name": "Installed MathUtils.damp on the existing YEIS path",
+      "level": "component_asset",
+      "registry_id": "three-frame-rate-independent-damp",
+      "source": "Installed Three.js MathUtils plus native Galaxy frame in YeisGalaxyScene",
+      "license": "Project code plus existing MIT camera dependency",
+      "decision": "reuse",
+      "reason": "Retarget from the currently rendered value every frame without changing path, boundaries, or producing a navigation request.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "wheel-galaxy-travel-fallback",
+      "name": "Use camera-controls or timed autopilot instead",
+      "level": "component_asset",
+      "source": "Existing close-world CameraControls and native YEIS timed navigation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Wrong camera owner or returns to autonomous travel; duplicates manual scale authority.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 3,
+        "customization_fit": 2,
+        "maturity": 3
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "three-damp-existing-yeis"
+    ],
+    "rationale": "Keep native YEIS camera, current scale target and matching; apply only a short interruptible visual response before native scrubbing.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Retain #185 on main if real mouse progressive/reversal and native handoff checks are not green."
+  }
+}

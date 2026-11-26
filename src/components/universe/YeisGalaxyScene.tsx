@@ -5,6 +5,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Material,
+  MathUtils,
   Mesh,
   PerspectiveCamera,
   Points,
@@ -115,7 +116,63 @@ export type YeisGalaxyScaleBridgeState = {
   approachDirection: [number, number, number];
   entryViewDirection: [number, number, number];
   frameSwitchJumpKm: number;
+  renderedScalePosition: number;
+  renderedScaleMotion?: { target: number; logFrameBudget: number };
 };
+
+const MAX_GALAXY_LOG_FRAME_FRACTION = 0.68;
+const GALAXY_LOG_SETTLE_TOLERANCE = 0.01;
+
+function boundedGalaxyScaleFrame(
+  bridge: YeisGalaxyScaleBridgeState,
+  proposed: number,
+  target: number,
+): number {
+  const current = bridge.renderedScalePosition;
+  if (proposed === current) return current;
+  // CameraController's owned gotoPoint evaluates this eased progress and
+  // lerps between the logarithms of the captured radial distances. Limiting
+  // the input coordinate alone is not a physical movement bound, especially
+  // on the return from the short opening Galaxy wheel segment.
+  const logProgress = (position: number) =>
+    MathUtils.smoothstep(galaxyScaleVisualResponse(position), 0, 1);
+  const from = logProgress(current);
+  const remaining = Math.abs(logProgress(target) - from);
+  // Measure one frame against the physical span first requested by the
+  // latest target, not the shrinking remainder. The cap must not add a
+  // second easing tail to ordinary convergence and hold up the next owner.
+  if (bridge.renderedScaleMotion?.target !== target) {
+    bridge.renderedScaleMotion = {
+      target,
+      logFrameBudget: MAX_GALAXY_LOG_FRAME_FRACTION * remaining,
+    };
+  }
+  const frameBudget = bridge.renderedScaleMotion.logFrameBudget;
+  if (Math.abs(logProgress(proposed) - from) <= frameBudget) return proposed;
+
+  if (proposed === target) {
+    const fullLogTravel = Math.abs(
+      Math.log(bridge.arrivalDistanceKm) -
+      Math.log(Math.max(bridge.startDistanceKm, 1e-3)),
+    );
+    // Preserve exact endpoint acknowledgement for the sub-1% radial tail,
+    // including the matched System seam. Do not leave the camera waiting on
+    // an imperceptible remainder just to report more intermediate frames.
+    if (remaining * fullLogTravel <= GALAXY_LOG_SETTLE_TOLERANCE) return proposed;
+  }
+
+  // Invert only the violating portion of the same monotonic native path.
+  // Nothing is added to input/gesture state or to the native trajectory.
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 12; i += 1) {
+    const fraction = (low + high) / 2;
+    const probe = MathUtils.lerp(current, proposed, fraction);
+    if (Math.abs(logProgress(probe) - from) <= frameBudget) low = fraction;
+    else high = fraction;
+  }
+  return MathUtils.lerp(current, proposed, low);
+}
 
 export type YeisSignalHover = {
   entryId: string;
@@ -1075,10 +1132,11 @@ export function YeisGalaxyScene({
       }
     }
     const scaleDestination = scaleTargetRef.current;
-    const scalePosition = Math.min(
+    const targetScalePosition = Math.min(
       1,
       Math.max(0, scalePositionRef.current),
     );
+    let scalePosition = targetScalePosition;
     let scaleBridgeActive = false;
 
     if (
@@ -1174,6 +1232,7 @@ export function YeisGalaxyScene({
                 number,
               ],
             frameSwitchJumpKm,
+            renderedScalePosition: 0,
           };
           scaleBridgeRef.current = bridge;
           document.documentElement.dataset.universeGalaxyScalePath =
@@ -1225,6 +1284,25 @@ export function YeisGalaxyScene({
             String(state.controller.autopilotRevision);
         }
 
+        // Reuse Three's time-based damping in the existing R3F frame. A
+        // stalled frame cannot swallow a whole mouse notch; each fresh wheel
+        // sample retargets directly from the last rendered coordinate.
+        const intermediate = MathUtils.damp(
+          bridge.renderedScalePosition,
+          targetScalePosition,
+          34,
+          Math.min(delta, 1 / 30),
+        );
+        // The pinned YEIS geometry already has near-zero slope at the
+        // matched System endpoint. Finish its imperceptible tail before
+        // awaiting paint, especially on slow/software WebGL. Interior
+        // targets still settle to the full diagnostic precision.
+        const settleEpsilon = targetScalePosition === 1 ? 0.007 : 0.00045;
+        const proposed = Math.abs(intermediate - targetScalePosition) < settleEpsilon
+          ? targetScalePosition
+          : intermediate;
+        scalePosition = boundedGalaxyScaleFrame(bridge, proposed, targetScalePosition);
+        bridge.renderedScalePosition = scalePosition;
         const visualScalePosition =
           galaxyScaleVisualResponse(scalePosition);
         state.controller.setAutopilotProgress(
@@ -1237,8 +1315,7 @@ export function YeisGalaxyScene({
           visualScalePosition.toFixed(4);
         state.controller.autoOrbit = 0;
         state.controller.speed = 0;
-        state.systemOverview =
-          scalePosition >= 1 - WORLD_SCALE_EPSILON;
+        state.systemOverview = scalePosition === 1;
 
         document.documentElement.dataset.yeisNativeSystemOverview =
           state.systemOverview
@@ -1291,14 +1368,18 @@ export function YeisGalaxyScene({
     if (scaleBridgeActive && scaleBridgeRef.current) {
       const bridge = scaleBridgeRef.current;
       document.documentElement.dataset.universeGalaxyScaleAppliedPosition =
-        scalePosition.toFixed(3);
+        // A three-decimal acknowledgement is reserved for the exact target
+        // frame. Interior six-decimal samples must not look falsely settled.
+        scalePosition === targetScalePosition
+          ? scalePosition.toFixed(3)
+          : Math.min(scalePosition, 0.999999).toFixed(6);
       document.documentElement.dataset.universeTravelArrivalRatio =
         (
           state.controller.position.distanceTo(
             scaleBridgeTargetCentre.fromArray(bridge.targetCentreKm),
           ) / Math.max(state.nativeSystemSpanKm, 1)
         ).toFixed(4);
-      if (scalePosition >= 1 - WORLD_SCALE_EPSILON) {
+      if (scalePosition === 1) {
         state.systemOverview = true;
         writeGalaxyViewState(state, viewStateRef, true);
         document.documentElement.dataset.yeisNativeSystemOverview =

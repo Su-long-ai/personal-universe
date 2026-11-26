@@ -1,0 +1,24 @@
+{
+  "capability_id": "interaction.temporal_continuity_validation",
+  "platform": "browser",
+  "primitive": "rendered_trajectory_validation",
+  "status": "CANDIDATE",
+  "version": "1.0.0",
+  "implementation": {
+    "ref": "tests/e2e/support/temporal-continuity.ts",
+    "scope": "frame-sampled-rendered-trajectory"
+  },
+  "verified_at": null,
+  "health_probe": {
+    "probe_id": "interaction.temporal_continuity_validation.chromium",
+    "mode": "isolated_then_read_only",
+    "max_age_s": 604800
+  },
+  "rollback": {
+    "mode": "leave_baseline",
+    "ref": "pull/186"
+  },
+  "projects_using": ["personal-universe"],
+  "evidence": [],
+  "revision": 1
+}
