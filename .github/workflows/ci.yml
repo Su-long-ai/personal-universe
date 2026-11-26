@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: personal-universe-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.ref || github.ref }}
@@ -326,3 +327,29 @@ jobs:
             echo "Browser validation did not fully succeed; merged diagnostics were preserved above." >&2
             exit 1
           fi
+
+  dot-wake-test:
+    name: Dot wake bridge probe
+    needs: [reuse-gate, build, e2e, webgl-heavy, e2e-report]
+    if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'relay/dot-wake-pr-comment-v1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Emit PR wake comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REUSE_RESULT: ${{ needs.reuse-gate.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          WEBGL_RESULT: ${{ needs.webgl-heavy.result }}
+          REPORT_RESULT: ${{ needs.e2e-report.result }}
+        run: |
+          body="<!-- dot-wake:ci:${RUN_ID}:${RUN_ATTEMPT} -->
+          DOT_WAKE_CI run_id=${RUN_ID} attempt=${RUN_ATTEMPT} head_sha=${HEAD_SHA} reuse=${REUSE_RESULT} build=${BUILD_RESULT} e2e=${E2E_RESULT} webgl=${WEBGL_RESULT} report=${REPORT_RESULT}"
+          gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
