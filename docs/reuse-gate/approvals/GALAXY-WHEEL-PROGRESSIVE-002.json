@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "GALAXY-WHEEL-PROGRESSIVE-002",
+  "approved_at": "2026-11-26T11:14:54.279Z",
+  "baseline_commit": "2aa31f30ba5b9c273c27e8c72dffbbaf0c911020",
+  "record_path": "docs/reuse-gate/tasks/GALAXY-WHEEL-PROGRESSIVE-002.json",
+  "record_sha256": "b3a824a32630d83019049025dd4b27daa5260d0e093d45edc59dd2fb782af2c7",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "three-frame-rate-independent-damp": "623c5ea56067bcb90aacf6b2a4d55deaf1e1236b2eacecca1b9075fb47e3bfe2",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Subdivide strong physical Galaxy wheel targets through the existing native render path without adding navigation, delaying input, or bypassing exact handoff."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "three-damp-existing-yeis"
+  ],
+  "candidate_scores": {
+    "three-damp-existing-yeis": 57,
+    "wheel-galaxy-travel-fallback": 25
+  }
+}
