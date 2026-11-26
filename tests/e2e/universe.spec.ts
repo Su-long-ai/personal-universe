@@ -3456,6 +3456,12 @@ test("finite wheel burst preserves delivered input while native endpoint paint i
 
   await expect(html).toHaveAttribute("data-universe-scale-position", "5.000", { timeout: 15_000 });
   await expect(html).toHaveAttribute("data-universe-navigation-phase", "surface");
+  // Catch-up may consume already delivered input, but it must not bypass the
+  // actual matched System -> Approach camera handoff.
+  await expect(html).toHaveAttribute(
+    "data-universe-handoff-entry-projected-radius",
+    /.+/,
+  );
   await expect(html).not.toHaveAttribute("data-universe-scale-queued");
   await runtime.assertClean(testInfo);
 });

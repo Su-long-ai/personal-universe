@@ -270,6 +270,14 @@ function cameraTargetLabel(
   return target.kind + ":" + target.index;
 }
 
+function clearSystemApproachHandoffEvidence() {
+  const data = document.documentElement.dataset;
+  delete data.universeHandoffExitProjectedRadius;
+  delete data.universeHandoffExitQuaternion;
+  delete data.universeHandoffEntryProjectedRadius;
+  delete data.universeHandoffEntryQuaternion;
+}
+
 function preferredScalePlanet(
   system: SystemDefinition,
   preferred: UniverseNavigationDestination | null,
@@ -1452,33 +1460,16 @@ export default function UniverseApp({
         delete document.documentElement.dataset.universeLocated;
         ensurePlaying();
         const deliveredPosition =
-          scaleHandoffEpoch !== undefined &&
-          planet &&
-          inwardScaleIntentRef.current !== null
-            ? Math.min(
-                worldScaleMax(planet.surfaceMode),
-                inwardScaleIntentRef.current,
-              )
+          scaleHandoffEpoch !== undefined && planet
+            ? inwardScaleIntentRef.current
             : null;
         if (scaleHandoffEpoch !== undefined) {
-          inwardScaleIntentRef.current = null;
-          if (planet) worldScalePlanetRef.current = planet.id;
+          cancelPendingContinuousScaleIntent("navigate-destination", options);
+          // Let CinematicCamera publish its matched Approach entry before
+          // applying any already-delivered motion past the visual boundary.
+          inwardScaleIntentRef.current = deliveredPosition;
         }
-        const nextPhase: UniversePhase =
-          planet && deliveredPosition !== null
-            ? worldScalePhaseForPosition(deliveredPosition, planet.surfaceMode)
-            : planet
-              ? "approach"
-              : "system";
-        if (scaleHandoffEpoch !== undefined) {
-          phaseRef.current = nextPhase;
-        }
-        if (deliveredPosition !== null) {
-          publishWorldScalePosition(deliveredPosition, true);
-          setWorldScaleContinuous(true);
-          document.documentElement.dataset.universeScaleProgress =
-            worldScaleSegmentProgress(deliveredPosition).toFixed(3);
-        }
+        const nextPhase: UniversePhase = planet ? "approach" : "system";
         setPhase(nextPhase);
 
         const destinationStarId =
@@ -1585,7 +1576,6 @@ export default function UniverseApp({
       cancelPendingContinuousScaleIntent,
       ensurePlaying,
       galaxy.markers,
-      publishWorldScalePosition,
       resolveMarker,
     ],
   );
@@ -2371,6 +2361,48 @@ export default function UniverseApp({
     [galaxy.markers, selectedPlanet, selectedSystem],
   );
 
+  const handleScaleFramePresented = useCallback((presentedPhase: UniversePhase) => {
+    if (
+      presentedPhase !== phase ||
+      !isWorldScalePhase(phase) ||
+      phaseRef.current !== phase ||
+      cameraSettledPhaseRef.current !== phase ||
+      !selectedPlanet ||
+      inwardScaleIntentRef.current === null
+    ) {
+      return;
+    }
+    const current = worldScalePositionRef.current;
+    const desired = Math.min(
+      worldScaleMax(selectedPlanet.surfaceMode),
+      inwardScaleIntentRef.current,
+    );
+    // Apply the accepted coordinate through the existing presented phases:
+    // after Close World entry, do not skip the next camera anchor to catch up.
+    const position = Math.min(desired, scalePhaseIndex(phase) + 1);
+    inwardScaleIntentRef.current =
+      desired > position + WORLD_SCALE_EPSILON ? desired : null;
+    if (position <= current + WORLD_SCALE_EPSILON) return;
+
+    const nextPhase = worldScalePhaseForPosition(
+      position,
+      selectedPlanet.surfaceMode,
+    );
+    publishWorldScalePosition(position, true);
+    setWorldScaleContinuous(true);
+    document.documentElement.dataset.universeScaleDirection = "in";
+    document.documentElement.dataset.universeScaleProgress =
+      worldScaleSegmentProgress(position).toFixed(3);
+    if (nextPhase !== phase) {
+      setWorldScalePhase(nextPhase, { preserveWorldScalePosition: true });
+    }
+  }, [
+    phase,
+    publishWorldScalePosition,
+    selectedPlanet,
+    setWorldScalePhase,
+  ]);
+
   const beginGalaxyScaleTravel = useCallback(
     (destination: UniverseNavigationDestination) => {
       const resolvedCameraTarget = navigationCameraTarget(
@@ -2462,6 +2494,11 @@ export default function UniverseApp({
           phaseRef.current === "system" &&
           worldScalePositionRef.current >=
             WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
+        isRendererReady: () =>
+          inwardScaleIntentRef.current === null ||
+          Boolean(
+            document.documentElement.dataset.universeHandoffExitProjectedRadius,
+          ),
         commit: () => {
           if (destination) {
             void handleNavigateDestination(destination, {
@@ -2539,36 +2576,65 @@ export default function UniverseApp({
         navigationMode: "open",
       });
 
-      const deliveredPosition = inwardScaleIntentRef.current;
-      const pendingPlanet = preferredScalePlanet(system, focus);
-      if (deliveredPosition === null || !pendingPlanet) {
-        inwardScaleIntentRef.current = null;
-        return;
-      }
-      const renderedPosition = Math.min(WORLD_SCALE_MIN, deliveredPosition);
-      if (renderedPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON) {
-        inwardScaleIntentRef.current = null;
-        return;
-      }
-      inwardScaleIntentRef.current =
-        deliveredPosition > WORLD_SCALE_MIN ? deliveredPosition : null;
-      lockedSystemScaleFocusRef.current = pendingPlanet;
-      setSystemScaleTargetPlanet(pendingPlanet);
-      publishWorldScalePosition(renderedPosition, true);
-      document.documentElement.dataset.universeScaleProgress =
-        systemScaleSegmentProgress(renderedPosition).toFixed(3);
-      if (renderedPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON) {
-        scheduleApproachScaleHandoff(system, pendingPlanet, intentEpoch);
-      }
+      // Any held inward intent is consumed by the System owner after its
+      // own camera has presented the native entry, not in this Galaxy commit.
     },
-    [
-      ensurePlaying,
-      galaxy.markers,
-      publishWorldScalePosition,
-      resolveMarker,
-      scheduleApproachScaleHandoff,
-    ],
+    [ensurePlaying, galaxy.markers, resolveMarker],
   );
+
+  useEffect(() => {
+    if (
+      phase !== "system" ||
+      phaseRef.current !== "system" ||
+      cameraSettledPhase !== "system" ||
+      worldScalePositionRef.current > SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON ||
+      inwardScaleIntentRef.current === null ||
+      !selectedSystem
+    ) {
+      return;
+    }
+    const pendingPlanet = preferredScalePlanet(
+      selectedSystem,
+      preferredSystemScaleDestinationRef.current,
+    );
+    const deliveredPosition = inwardScaleIntentRef.current;
+    const renderedPosition = Math.min(WORLD_SCALE_MIN, deliveredPosition);
+    if (
+      !pendingPlanet ||
+      renderedPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON
+    ) {
+      inwardScaleIntentRef.current = null;
+      return;
+    }
+    inwardScaleIntentRef.current =
+      deliveredPosition > WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
+        ? deliveredPosition
+        : null;
+    clearSystemApproachHandoffEvidence();
+    lockedSystemScaleFocusRef.current = pendingPlanet;
+    setSystemScaleTargetPlanet(pendingPlanet);
+    publishWorldScalePosition(renderedPosition, true);
+    setWorldScaleContinuous(true);
+    cameraSettledPhaseRef.current = null;
+    setCameraSettledPhase(null);
+    delete document.documentElement.dataset.universeCameraSettled;
+    delete document.documentElement.dataset.universeScaleSettled;
+    document.documentElement.dataset.universeScaleProgress =
+      systemScaleSegmentProgress(renderedPosition).toFixed(3);
+    if (renderedPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON) {
+      scheduleApproachScaleHandoff(
+        selectedSystem,
+        pendingPlanet,
+        continuousScaleIntentEpochRef.current,
+      );
+    }
+  }, [
+    cameraSettledPhase,
+    phase,
+    publishWorldScalePosition,
+    scheduleApproachScaleHandoff,
+    selectedSystem,
+  ]);
 
   const handleContinuousScaleWheel = useCallback(
     (event: ReactWheelEvent<HTMLElement>) => {
@@ -2595,6 +2661,7 @@ export default function UniverseApp({
       const direction = continuousScaleDirection(normalizedDelta);
       if (!direction) return;
 
+      if (direction === "out") inwardScaleIntentRef.current = null;
       const now = performance.now();
       const wheel = scaleWheelRef.current;
       const previousDirection = wheel.direction;
@@ -2722,7 +2789,18 @@ export default function UniverseApp({
             const deliveredPosition =
               intentPosition +
               continuousScaleInputResponseDelta(intentPosition, normalizedDelta);
-            if (direction === "in" && deliveredPosition > SYSTEM_SCALE_MIN) {
+            const nativeAppliedPosition = Number(
+              document.documentElement.dataset.universeGalaxyScaleAppliedPosition,
+            );
+            if (
+              direction === "in" &&
+              deliveredPosition > SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON &&
+              (inwardScaleIntentRef.current !== null ||
+                (currentPosition >= SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON &&
+                  (!Number.isFinite(nativeAppliedPosition) ||
+                    nativeAppliedPosition <
+                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON)))
+            ) {
               inwardScaleIntentRef.current = deliveredPosition;
             }
             const nextPosition = applyGalaxyScaleWheel(
@@ -2804,6 +2882,16 @@ export default function UniverseApp({
 
       if (isWorldScalePhase(currentPhase) && selectedPlanet) {
         const currentPosition = worldScalePositionRef.current;
+        if (
+          direction === "in" &&
+          inwardScaleIntentRef.current !== null
+        ) {
+          const intent = inwardScaleIntentRef.current;
+          inwardScaleIntentRef.current =
+            intent + continuousScaleInputResponseDelta(intent, normalizedDelta);
+          return;
+        }
+
         const maxPosition = worldScaleMax(selectedPlanet.surfaceMode);
 
         if (
@@ -2943,6 +3031,17 @@ export default function UniverseApp({
           return;
         }
 
+        if (
+          direction === "in" &&
+          currentPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON &&
+          inwardScaleIntentRef.current !== null
+        ) {
+          const intent = inwardScaleIntentRef.current;
+          inwardScaleIntentRef.current =
+            intent + continuousScaleInputResponseDelta(intent, normalizedDelta);
+          return;
+        }
+
         const targetPlanet =
           systemScaleTargetPlanet ??
           preferredScalePlanet(
@@ -2968,7 +3067,14 @@ export default function UniverseApp({
         const deliveredPosition =
           intentPosition +
           continuousScaleInputResponseDelta(intentPosition, normalizedDelta);
-        if (direction === "in" && deliveredPosition > WORLD_SCALE_MIN) {
+        // Ordinary System input remains immediate; only the native Galaxy
+        // readiness hold can start an unapplied coordinate. Do not turn
+        // ordinary endpoint paint latency into a second buffering mechanism.
+        if (
+          direction === "in" &&
+          inwardScaleIntentRef.current !== null &&
+          deliveredPosition > WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
+        ) {
           inwardScaleIntentRef.current = deliveredPosition;
         }
         const nextPosition = applySystemScaleWheel(
@@ -2986,6 +3092,9 @@ export default function UniverseApp({
         const intentEpoch = continuousScaleIntentEpochRef.current;
         delete document.documentElement.dataset.universeScaleBlocked;
         delete document.documentElement.dataset.universeScaleQueued;
+        if (currentPosition <= SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON) {
+          clearSystemApproachHandoffEvidence();
+        }
         publishWorldScalePosition(
           nextPosition,
           nextPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
@@ -3141,6 +3250,7 @@ export default function UniverseApp({
           quality={quality}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
+          onScaleFramePresented={handleScaleFramePresented}
           onCinematicPhaseComplete={handleCinematicPhaseComplete}
           onCinematicUserControlStart={handleCinematicUserControlStart}
         />

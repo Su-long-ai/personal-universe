@@ -8,7 +8,7 @@ import {
   useState,
   type MutableRefObject,
 } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { Planet } from "procedural-planets";
 import { GalaxyScene } from "./GalaxyScene";
 import {
@@ -141,6 +141,19 @@ function RendererPageLifecycle({
   return null;
 }
 
+function ScaleFrameWitness({
+  phase,
+  onPresented,
+}: {
+  phase: UniversePhase;
+  onPresented: (phase: UniversePhase) => void;
+}) {
+  // CinematicPipeline owns the draw at priority 1. At priority 2 the
+  // current tree has actually submitted its frame; never draw a second one.
+  useFrame(() => onPresented(phase), 2);
+  return null;
+}
+
 export function UniverseCanvas({
   phase,
   phaseRef,
@@ -171,6 +184,7 @@ export function UniverseCanvas({
   scrollDepth,
   reducedMotion,
   onCinematicPhaseComplete,
+  onScaleFramePresented,
   onCinematicUserControlStart,
 }: {
   phase: UniversePhase;
@@ -209,6 +223,7 @@ export function UniverseCanvas({
   scrollDepth: number;
   reducedMotion: boolean;
   onCinematicPhaseComplete: (phase: UniversePhase) => void;
+  onScaleFramePresented: (phase: UniversePhase) => void;
   onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
@@ -655,6 +670,9 @@ export function UniverseCanvas({
         prewarmLiveWorld={prewarmLiveWorld}
         planetReleaseRef={worldPlanetReleaseRef}
       />
+      {closeWorldPhase && (
+        <ScaleFrameWitness phase={phase} onPresented={onScaleFramePresented} />
+      )}
     </Canvas>
   );
 }
