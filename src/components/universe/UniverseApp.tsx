@@ -2727,10 +2727,24 @@ export default function UniverseApp({
             ) {
               inwardScaleIntentRef.current = deliveredPosition;
             }
-            const nextPosition = applyGalaxyScaleWheel(
+            let nextPosition = applyGalaxyScaleWheel(
               currentPosition,
               normalizedDelta,
             );
+            // Reversal must turn the rendered camera, not first run down
+            // an unpainted backlog of previous-direction wheel intent.
+            if (
+              directionChanged &&
+              Number.isFinite(nativeAppliedPosition) &&
+              (direction === "out"
+                ? nextPosition >= nativeAppliedPosition
+                : nextPosition <= nativeAppliedPosition)
+            ) {
+              nextPosition = applyGalaxyScaleWheel(
+                nativeAppliedPosition,
+                normalizedDelta,
+              );
+            }
 
             if (
               Math.abs(nextPosition - currentPosition) <=

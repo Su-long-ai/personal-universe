@@ -5,6 +5,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Material,
+  MathUtils,
   Mesh,
   PerspectiveCamera,
   Points,
@@ -115,6 +116,7 @@ export type YeisGalaxyScaleBridgeState = {
   approachDirection: [number, number, number];
   entryViewDirection: [number, number, number];
   frameSwitchJumpKm: number;
+  renderedScalePosition: number;
 };
 
 export type YeisSignalHover = {
@@ -1075,10 +1077,11 @@ export function YeisGalaxyScene({
       }
     }
     const scaleDestination = scaleTargetRef.current;
-    const scalePosition = Math.min(
+    const targetScalePosition = Math.min(
       1,
       Math.max(0, scalePositionRef.current),
     );
+    let scalePosition = targetScalePosition;
     let scaleBridgeActive = false;
 
     if (
@@ -1174,6 +1177,7 @@ export function YeisGalaxyScene({
                 number,
               ],
             frameSwitchJumpKm,
+            renderedScalePosition: 0,
           };
           scaleBridgeRef.current = bridge;
           document.documentElement.dataset.universeGalaxyScalePath =
@@ -1225,6 +1229,19 @@ export function YeisGalaxyScene({
             String(state.controller.autopilotRevision);
         }
 
+        // Reuse Three's time-based damping in the existing R3F frame. A
+        // stalled frame cannot swallow a whole mouse notch; each fresh wheel
+        // sample retargets directly from the last rendered coordinate.
+        const intermediate = MathUtils.damp(
+          bridge.renderedScalePosition,
+          targetScalePosition,
+          34,
+          Math.min(delta, 1 / 30),
+        );
+        scalePosition = Math.abs(intermediate - targetScalePosition) < 0.00045
+          ? targetScalePosition
+          : intermediate;
+        bridge.renderedScalePosition = scalePosition;
         const visualScalePosition =
           galaxyScaleVisualResponse(scalePosition);
         state.controller.setAutopilotProgress(

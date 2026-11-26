@@ -2415,6 +2415,7 @@ test("opening Galaxy wheel tracks both directions without queued travel", async 
   const track = async (delta: number, expected: string) => {
     // Check the native renderer's applied frame, not only the coordinator's
     // number or an eventual arrival after an automatic flight.
+    const previousApplied = await html.getAttribute("data-universe-galaxy-scale-applied-position") ?? "0.000";
     await page.mouse.wheel(0, delta);
     const samples = await html.evaluate((element) => new Promise<string[]>((resolve) => {
       const frames: string[] = [];
@@ -2425,7 +2426,7 @@ test("opening Galaxy wheel tracks both directions without queued travel", async 
       };
       requestAnimationFrame(sample);
     }));
-    expect(samples).toContain(expected);
+    expect(samples.some((sample) => sample !== "" && sample !== previousApplied)).toBe(true);
     await expect(html).toHaveAttribute("data-universe-scale-position", expected);
     await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", expected);
     await noTimedTravel();
@@ -2452,6 +2453,83 @@ test("opening Galaxy wheel tracks both directions without queued travel", async 
   await noTimedTravel();
   expect(await track(-120, "0.250")).toBeCloseTo(near, 2);
   await runtime.assertClean(testInfo);
+});
+
+test("one real Galaxy notch renders several intermediate zoom frames", async ({ page }) => {
+  await page.goto("/");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+  await html.evaluate((element) => {
+    window.addEventListener("wheel", () => {
+      const frames: string[] = [];
+      const sample = () => {
+        frames.push([
+          performance.now().toFixed(1),
+          element.getAttribute("data-universe-galaxy-scale-applied-position") ?? "0",
+          element.getAttribute("data-universe-travel-arrival-ratio") ?? "",
+          element.hasAttribute("data-universe-traveling") ? "travel" : "",
+        ].join(":"));
+        element.setAttribute("data-wheel-probe-frames", frames.join(","));
+        if (frames.length < 18) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    }, { capture: true, once: true });
+  });
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.250");
+  const frames = (await html.getAttribute("data-wheel-probe-frames"))!.split(",")
+    .map((frame) => frame.split(":"));
+  const intermediate = frames.filter(([, position]) => +position > 0 && +position < 0.25);
+  expect(new Set(intermediate.map(([, position]) => position)).size, JSON.stringify(frames))
+    .toBeGreaterThanOrEqual(3);
+  expect(new Set(intermediate.map(([, , ratio]) => ratio)).size).toBeGreaterThanOrEqual(3);
+  expect(frames.some(([, , , mode]) => mode === "travel")).toBe(false);
+});
+
+test("Galaxy reversal redirects the next painted frame before old wheel motion settles", async ({ page }) => {
+  await page.goto("/");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  // Drive a retarget from inside the frame sampler so a slow browser runner
+  // cannot accidentally send the reversal only after the motion has settled.
+  const probe = html.evaluate((element) => new Promise<{ before: number; after: number[] }>((resolve) => {
+    const applied = () => Number(element.getAttribute("data-universe-galaxy-scale-applied-position"));
+    const canvas = element.querySelector("canvas")!;
+    let frames = 0;
+    const check = () => {
+      const before = applied();
+      if (before > 0.01 && before < 0.25) {
+        // The stale input target is 0.25, so an outward 4px delta alone
+        // would still move inward if applied only to that endpoint.
+        canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 4, bubbles: true, cancelable: true }));
+        const after: number[] = [];
+        const sample = () => {
+          after.push(applied());
+          if (after.length >= 5) resolve({ before, after });
+          else requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      } else if (++frames >= 60) {
+        resolve({ before, after: [] });
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    requestAnimationFrame(check);
+  }));
+  await page.mouse.wheel(0, -120);
+  const { before, after } = await probe;
+  expect(after.length).toBe(5);
+  expect(after.find((position) => position !== before)).toBeLessThan(before);
+  expect(after.every((position) => position <= before)).toBe(true);
+  await expect(html).not.toHaveAttribute("data-universe-traveling");
 });
 
 test("wheel from a located galaxy uses native scale instead of landmark travel", async ({ page }, testInfo) => {
