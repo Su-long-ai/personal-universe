@@ -707,7 +707,7 @@ export function UniverseCanvas({
         prewarmLiveWorld={prewarmLiveWorld}
         planetReleaseRef={worldPlanetReleaseRef}
       />
-      {closeWorldPhase && (
+      {(phase === "system" || closeWorldPhase) && (
         <ScaleFrameWitness phase={phase} onPresented={onScaleFramePresented} />
       )}
     </Canvas>
