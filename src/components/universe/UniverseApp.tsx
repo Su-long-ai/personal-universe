@@ -2747,8 +2747,9 @@ export default function UniverseApp({
             }
 
             if (
-              Math.abs(nextPosition - currentPosition) <=
-              WORLD_SCALE_EPSILON
+              nextPosition === currentPosition ||
+              (nextPosition !== SYSTEM_SCALE_MIN &&
+                Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON)
             ) {
               // Same-direction input at the matched endpoint must not
               // invalidate the paint/deadline handoff already in flight.
@@ -2786,28 +2787,17 @@ export default function UniverseApp({
               "active";
 
             if (
-              direction === "in" &&
-              nextPosition >=
-                SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
+              direction === "in" && nextPosition === SYSTEM_SCALE_MIN
             ) {
               scheduleScaleRendererHandoff({
                 label: "galaxy-system",
                 isCurrent: () =>
                   continuousScaleIntentEpochRef.current === intentEpoch &&
                   phaseRef.current === "galaxy" &&
-                  worldScalePositionRef.current >=
-                    SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON,
-                isRendererReady: () => {
-                  const appliedPosition = Number(
-                    document.documentElement.dataset
-                      .universeGalaxyScaleAppliedPosition,
-                  );
-                  return (
-                    Number.isFinite(appliedPosition) &&
-                    appliedPosition >=
-                      SYSTEM_SCALE_MIN - WORLD_SCALE_EPSILON
-                  );
-                },
+                  worldScalePositionRef.current === SYSTEM_SCALE_MIN,
+                isRendererReady: () =>
+                  document.documentElement.dataset
+                    .universeGalaxyScaleAppliedPosition === "1.000",
                 commit: () => {
                   void commitGalaxyScaleFocusedSystem(focus, intentEpoch);
                 },

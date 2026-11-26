@@ -1254,8 +1254,7 @@ export function YeisGalaxyScene({
           visualScalePosition.toFixed(4);
         state.controller.autoOrbit = 0;
         state.controller.speed = 0;
-        state.systemOverview =
-          scalePosition >= 1 - WORLD_SCALE_EPSILON;
+        state.systemOverview = scalePosition === 1;
 
         document.documentElement.dataset.yeisNativeSystemOverview =
           state.systemOverview
@@ -1308,14 +1307,16 @@ export function YeisGalaxyScene({
     if (scaleBridgeActive && scaleBridgeRef.current) {
       const bridge = scaleBridgeRef.current;
       document.documentElement.dataset.universeGalaxyScaleAppliedPosition =
-        scalePosition.toFixed(3);
+        // Round interior values inward at the upper boundary. "1.000" is
+        // reserved for the exact applied frame that publishes the entry view.
+        (scalePosition === 1 ? 1 : Math.min(scalePosition, 0.999)).toFixed(3);
       document.documentElement.dataset.universeTravelArrivalRatio =
         (
           state.controller.position.distanceTo(
             scaleBridgeTargetCentre.fromArray(bridge.targetCentreKm),
           ) / Math.max(state.nativeSystemSpanKm, 1)
         ).toFixed(4);
-      if (scalePosition >= 1 - WORLD_SCALE_EPSILON) {
+      if (scalePosition === 1) {
         state.systemOverview = true;
         writeGalaxyViewState(state, viewStateRef, true);
         document.documentElement.dataset.yeisNativeSystemOverview =

@@ -35,6 +35,7 @@ import {
   waitForYeis,
   waitForYeisEngine,
 } from "./support/runtime";
+import { measureTemporalContinuity } from "./support/temporal-continuity";
 
 test("Surface lighting metadata stays aligned with the close-world stellar axis", () => {
   const [x, y, z] = SURFACE_STELLAR_LIGHT_DIRECTION;
@@ -2455,6 +2456,17 @@ test("opening Galaxy wheel tracks both directions without queued travel", async 
   await runtime.assertClean(testInfo);
 });
 
+test("temporal continuity oracle rejects wrong trajectories with correct endpoints", () => {
+  const instant = measureTemporalContinuity([0, 1, 1]);
+  expect(instant.intermediatePositions).toBe(0);
+  expect(instant.largestStepFraction).toBe(1);
+  const bounced = measureTemporalContinuity([0, 0.2, 0.5, 0.4, 0.7, 1]);
+  expect(bounced.monotonic).toBe(false);
+  const mostlyJumped = measureTemporalContinuity([0, 0.05, 0.08, 0.11, 1]);
+  expect(mostlyJumped.intermediatePositions).toBe(3);
+  expect(mostlyJumped.largestStepFraction).toBeGreaterThan(0.72);
+});
+
 test("one real Galaxy notch renders several intermediate zoom frames", async ({ page }) => {
   await page.goto("/");
   await waitForYeis(page);
@@ -2467,27 +2479,38 @@ test("one real Galaxy notch renders several intermediate zoom frames", async ({ 
     window.addEventListener("wheel", () => {
       const frames: string[] = [];
       const sample = () => {
-        frames.push([
-          performance.now().toFixed(1),
-          element.getAttribute("data-universe-galaxy-scale-applied-position") ?? "0",
-          element.getAttribute("data-universe-travel-arrival-ratio") ?? "",
-          element.hasAttribute("data-universe-traveling") ? "travel" : "",
-        ].join(":"));
-        element.setAttribute("data-wheel-probe-frames", frames.join(","));
-        if (frames.length < 18) requestAnimationFrame(sample);
+        const position = element.getAttribute("data-universe-galaxy-scale-applied-position") ?? "0";
+        const distance = element.getAttribute("data-universe-travel-arrival-ratio") ?? "";
+        const startKm = Number(element.getAttribute("data-universe-galaxy-scale-start-distance-km"));
+        const spanKm = Number(element.getAttribute("data-yeis-native-system-span-km"));
+        frames.push([position, distance, element.hasAttribute("data-universe-traveling") ? "travel" : ""].join(":"));
+        if (startKm > 0 && spanKm > 0) element.setAttribute("data-wheel-probe-start", String(startKm / spanKm));
+        if (position === "0.250" || frames.length >= 120) {
+          element.setAttribute("data-wheel-probe-frames", frames.join(","));
+        } else {
+          requestAnimationFrame(sample);
+        }
       };
       requestAnimationFrame(sample);
     }, { capture: true, once: true });
   });
   await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.250");
+  await expect(html).toHaveAttribute("data-wheel-probe-frames", /0\.250:/);
   await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.250");
   const frames = (await html.getAttribute("data-wheel-probe-frames"))!.split(",")
     .map((frame) => frame.split(":"));
-  const intermediate = frames.filter(([, position]) => +position > 0 && +position < 0.25);
-  expect(new Set(intermediate.map(([, position]) => position)).size, JSON.stringify(frames))
-    .toBeGreaterThanOrEqual(3);
-  expect(new Set(intermediate.map(([, , ratio]) => ratio)).size).toBeGreaterThanOrEqual(3);
-  expect(frames.some(([, , , mode]) => mode === "travel")).toBe(false);
+  const applied = measureTemporalContinuity([0, ...frames.map(([position]) => +position)]);
+  const start = Number(await html.getAttribute("data-wheel-probe-start"));
+  const distance = measureTemporalContinuity(
+    [start, ...frames.map(([, ratio]) => +ratio).filter((ratio) => ratio > 0)].map(Math.log),
+  );
+  for (const result of [applied, distance]) {
+    expect(result.monotonic, JSON.stringify(frames)).toBe(true);
+    expect(result.intermediatePositions, JSON.stringify(frames)).toBeGreaterThanOrEqual(3);
+    expect(result.largestStepFraction, JSON.stringify(frames)).toBeLessThan(0.72);
+  }
+  expect(frames.some(([, , mode]) => mode === "travel")).toBe(false);
 });
 
 test("Galaxy reversal redirects the next painted frame before old wheel motion settles", async ({ page }) => {
