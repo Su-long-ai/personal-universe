@@ -1,0 +1,154 @@
+{
+  "schema": 2,
+  "task_id": "SYSTEM-APPROACH-SUBMITTED-FRAME-001",
+  "title": "Consume the actual matched System endpoint frame before inward Approach handoff",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing shared render witness to settle the System→Approach boundary at the first exact submitted endpoint, with the existing intent epoch and no secondary raw rAF dependency or modified trajectory limits."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact main d1e70662 GitHub run 45855961146 shard 2 fails before Approach in both traces while target2 starts near applied1.29. Retry reaches System applied2 with matched exit projection at the verdict and has not published Approach. Its generic raw rAF observers are independent of the actual priority-1 draw and can either observe pre-draw DOM or miss the true draw until a later RAF. Existing ScaleFrameWitness at priority2 already provides post-draw ownership. Native GL first-use costs and hidden 8K decoration are measurable but not shown to explain that endpoint dependency; no assets/timeouts/angle changes.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/system-approach-submission.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45855961146/job/140034654653",
+      "finding": "Original direct flaky-in-two-attempts runtime evidence; includes two exact varying renderer schedule failures rather than only a code hypothesis."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/d1e70662e1e3434e67c5f53487b2a931bdaa66ef/src/components/universe/UniverseCanvas.tsx",
+      "finding": "Existing positive priority shared render witness after the single CinematicPipeline frame, used for close-world carried input."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/d1e70662e1e3434e67c5f53487b2a931bdaa66ef/src/components/universe/UniverseApp.tsx",
+      "finding": "Existing canonical epoch and exact camera-applied projection prove matched endpoint, but raw scheduling is decoupled from its submission."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-mouse",
+      "finding": "Drive actual trusted browser wheel, with a deterministic test-only next-frame suspension observed by the actual Three render to distinguish right-now ownership from an unrelated later frame."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Retain the installed native app and current render authority; no second camera or new reactor."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "The established R3F priority-2 witness already follows the single priority-1 draw; use it for System as well."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Reuse exact matched endpoint shape and user intent epoch, only extending the existing witness to this boundary."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2,
+        3
+      ],
+      "conclusion": "Use a single nullable pending callback and a true-wheel stage test, not generic rAF scheduling or another permanent worker."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "shared-post-draw-witness",
+      "name": "Existing actual R3F submission witness and latest intent epoch",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing pinned UniverseCanvas and camera pipeline",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Use the first correct presented System frame, not a later raw rAF observation. Keep exact endpoints, derivative limits, projection authority and reversals.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "keep-later-raw-raf",
+      "name": "Existing raw rAF/deadline polling for all boundaries",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Exact main existing generic coordinator; retained for other boundaries",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "An independent requestAnimationFrame does not prove that the exact captured System pose has been submitted, and can cost a full extra slot under software scheduling.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 1,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "shorter-timeouts",
+      "name": "Bypass exact renderer ownership on logical scale2",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Existing wheel endpoint and cinematic camera authority, evaluated as alternative only",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Would accept stale camera, or move a larger angular/radial step only to make a deadline pass.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 2,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "shared-post-draw-witness"
+    ],
+    "rationale": "Finish pending same-epoch handoff from actual rendered point, keeping canonical continuous motion and fallback replay. Only own the System→Approach boundary.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "No publication if the actual frame oracle fails, if any prior wheel carry/reversal/trajectory bound changes, or if direct user paths regress."
+  }
+}
