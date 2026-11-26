@@ -1,0 +1,133 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-NATIVE-LOG-STEP-001",
+  "title": "Bound the physical Galaxy camera log-distance in both wheel directions",
+  "scope": {
+    "level": "implementation",
+    "subject": "Clamp only excessive proposed frame progress along the existing captured native YEIS logarithmic camera trajectory; add a trusted outward camera regression without changing input or path ownership."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact V11 c4 upgrade 476e4558 CI build artifact 15121451959 (run 45829527163 attempt 2) passes all hosted checks and the inward <0.72 oracle, but a trusted +120 notch from opening Galaxy scale 0.250 to 0.000 advances 0.870525 of physical logarithmic span in its first 45ms-delayed R3F paint. Three MutationObserver trials captured every native applied write and left requested scale/pose untouched. Exact main 3d9fd529 CI dist artifact 15109169088 jumps 1.000. Source: pinned CameraController.update evaluates smoothstep(galaxyScaleVisualResponse(scale)) then log-lerps d0/d1; replace no motion/authority, cap only the overly-large physical log displacement that the existing scalar damp failed to constrain.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Current pinned native renderer remains the authority; no upstream patch or new camera."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/math/MathUtils.damp",
+      "finding": "Installed MathUtils.damp interpolates using delta time with no internal queue or clock; pass the existing R3F frame delta."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/476e455885a940dfbf9d4d96709d922f5de16910/src/vendor/yeis/camera/CameraController.ts",
+      "finding": "Pinned native CameraController still owns the exact path: cubic smoothstep of normalized progress, then geometric interpolation of true radial distance between captured endpoints."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-mouse#mouse-wheel",
+      "finding": "Use installed Playwright trusted wheel with direct native camera ratio observations for both directions; not a JS-only coordinate test."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Reuse captured native YEIS travel and astronomical reference transfer; generic replacement wheel/camera product would lose authored near/far composition."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "R3F continues to decide when the selected native pose is drawn; Three MathUtils smoothstep matches the existing pinned trajectory and damp clock."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Keep the same CameraController scrub geometry and exact endpoint/ownership signal. No second camera, update loop, or timer."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "three-frame-rate-independent-damp"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Cap the existing proposed product coordinate by its exact normalized physical log-distance, inverting only over the same monotonic path when the candidate exceeds the per-frame budget."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "three-damp-existing-yeis",
+      "name": "Existing Native YEIS Path With Log-Distance Frame Bound",
+      "level": "component_asset",
+      "registry_id": "three-frame-rate-independent-damp",
+      "source": "Installed Three.js MathUtils plus native Galaxy frame in YeisGalaxyScene",
+      "license": "Project code plus existing MIT camera dependency",
+      "decision": "reuse",
+      "reason": "Uses the existing damp and smoothstep trajectory; caps only excessive actual log-distance movement, without changing input gain, regular fast frames, handoff poses or source authority.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "wheel-galaxy-travel-fallback",
+      "name": "Use camera-controls or timed autopilot instead",
+      "level": "component_asset",
+      "source": "Existing close-world CameraControls and native YEIS timed navigation",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Wrong camera owner or returns to autonomous travel; duplicates manual scale authority. Neither fixes the physical log-distance jump of the reused native segment without duplicating or changing the trajectory.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 3,
+        "customization_fit": 2,
+        "maturity": 3
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "three-damp-existing-yeis"
+    ],
+    "rationale": "Bound actual physical displacement as a fraction of the remaining authored native path, not a separate timer/velocity/distance authority. Preserve existing imperceptible exact settle and match slow-runner bidirectional real camera benchmarks.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Do not merge/deploy V11/V12 on a failing directional physical bound. Leave existing frame budgets, deadlines, resource tests and same-path acceptance untouched."
+  }
+}
