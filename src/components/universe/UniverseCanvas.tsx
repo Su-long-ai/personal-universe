@@ -13,6 +13,7 @@ import type { Planet } from "procedural-planets";
 import { GalaxyScene } from "./GalaxyScene";
 import {
   SystemScene,
+  type SystemScaleFocusSource,
   type SystemScaleFrame,
 } from "./SystemScene";
 import { CinematicPipeline } from "./CinematicPipeline";
@@ -182,6 +183,7 @@ export function UniverseCanvas({
   onScaleFocusDestination,
   onScaleManualTakeover,
   onScaleFocusPlanet,
+  systemScaleFocusSource,
   onSelectPlanet,
   quality,
   scrollDepth,
@@ -221,6 +223,7 @@ export function UniverseCanvas({
   ) => void;
   onScaleManualTakeover: () => void;
   onScaleFocusPlanet: (planet: PlanetDefinition | null) => void;
+  systemScaleFocusSource: MutableRefObject<SystemScaleFocusSource | null>;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   quality: QualityMode;
   scrollDepth: number;
@@ -613,6 +616,7 @@ export function UniverseCanvas({
                 starPointLightVisible={phase === "system"}
                 onSelectPlanet={onSelectPlanet}
                 onScaleFocus={onScaleFocusPlanet}
+                scaleFocusSource={phase === "system" ? systemScaleFocusSource : undefined}
                 scaleTargetPlanet={systemScaleTargetPlanet}
                 handoffTargetPlanetId={handoffTargetPlanetId}
                 onHandoffTargetSuppressed={handleSystemTargetSuppressed}
@@ -629,6 +633,7 @@ export function UniverseCanvas({
               starPointLightVisible={phase === "system"}
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}
+              scaleFocusSource={systemScaleFocusSource}
               scaleTargetPlanet={systemScaleTargetPlanet}
               handoffTargetPlanetId={handoffTargetPlanetId}
               onHandoffTargetSuppressed={handleSystemTargetSuppressed}
@@ -642,6 +647,7 @@ export function UniverseCanvas({
             starPointLightVisible={phase === "system"}
             onSelectPlanet={onSelectPlanet}
             onScaleFocus={onScaleFocusPlanet}
+            scaleFocusSource={phase === "system" ? systemScaleFocusSource : undefined}
             scaleTargetPlanet={systemScaleTargetPlanet}
             handoffTargetPlanetId={handoffTargetPlanetId}
             onHandoffTargetSuppressed={handleSystemTargetSuppressed}

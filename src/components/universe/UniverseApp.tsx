@@ -7,6 +7,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { UniverseCanvas } from "./UniverseCanvas";
+import type { SystemScaleFocusSource } from "./SystemScene";
 import { UniverseHud } from "./UniverseHud";
 import { UniverseNavigator } from "./UniverseNavigator";
 import type { YeisSignalHover } from "./YeisGalaxyScene";
@@ -735,7 +736,7 @@ export default function UniverseApp({
   const journeyRef = useRef<UniverseJourneyState | null>(null);
   const galaxyScaleFocusRef =
     useRef<UniverseNavigationDestination | null>(null);
-  const systemScaleFocusRef = useRef<PlanetDefinition | null>(null);
+  const systemScaleFocusSource = useRef<SystemScaleFocusSource | null>(null);
   const lockedGalaxyScaleFocusRef =
     useRef<UniverseNavigationDestination | null>(null);
   const pinnedGalaxyScaleFocusRef =
@@ -1887,7 +1888,6 @@ export default function UniverseApp({
 
   const handleSystemScaleFocus = useCallback(
     (planet: PlanetDefinition | null) => {
-      systemScaleFocusRef.current = planet;
       if (preferredSystemScaleDestinationRef.current) return;
       if (planet) {
         document.documentElement.dataset.universeScaleFocus =
@@ -3162,6 +3162,10 @@ export default function UniverseApp({
           return;
         }
 
+        // Highlights are sampled for presentation. A real wheel uses the
+        // matching drawn owner's centre projection without waiting for that
+        // periodic publication; an actually empty centre still blocks it.
+        const focusSource = systemScaleFocusSource.current;
         const targetPlanet =
           systemScaleTargetPlanet ??
           preferredScalePlanet(
@@ -3169,7 +3173,7 @@ export default function UniverseApp({
             preferredSystemScaleDestinationRef.current,
           ) ??
           lockedSystemScaleFocusRef.current ??
-          systemScaleFocusRef.current;
+          (focusSource?.systemId === activeSystem.id ? focusSource.read() : null);
 
         if (!targetPlanet) {
           document.documentElement.dataset.universeScaleBlocked =
@@ -3349,6 +3353,7 @@ export default function UniverseApp({
           onScaleFocusDestination={handleGalaxyScaleFocus}
           onScaleManualTakeover={handleGalaxyScaleManualTakeover}
           onScaleFocusPlanet={handleSystemScaleFocus}
+          systemScaleFocusSource={systemScaleFocusSource}
           onSelectPlanet={handleSelectPlanet}
           quality={quality}
           scrollDepth={scrollDepth}

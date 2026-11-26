@@ -24,6 +24,8 @@ import { BodyPoints } from "../../vendor/yeis/render/BodyPoints";
 import { OrbitLines } from "../../vendor/yeis/render/OrbitLines";
 import {
   SystemScene,
+  useSystemScaleFocusSource,
+  type SystemScaleFocusSource,
   type SystemScaleFrame,
 } from "./SystemScene";
 import { LifecycleStars } from "./LifecycleStars";
@@ -231,6 +233,7 @@ export function YeisSystemScene({
   starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
+  scaleFocusSource,
   scaleTargetPlanet,
   handoffTargetPlanetId,
   onHandoffTargetSuppressed,
@@ -245,6 +248,7 @@ export function YeisSystemScene({
   starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
+  scaleFocusSource?: MutableRefObject<SystemScaleFocusSource | null>;
   scaleTargetPlanet?: PlanetDefinition | null;
   handoffTargetPlanetId?: string | null;
   onHandoffTargetSuppressed?: (planetId: string) => void;
@@ -435,6 +439,42 @@ export function YeisSystemScene({
     };
   }, [onScaleFocus, onScaleFrame, presenting]);
 
+  const pickScaleFocus = useCallback(() => {
+    if (!resources) return null;
+    let bestPlanet: PlanetDefinition | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const planet of system.planets) {
+      const body = resources.system.get(nativePlanetId(planet));
+      if (!body) continue;
+      const projected = focusProjectionRef.current
+        .copy(body.position)
+        .project(camera as THREE.PerspectiveCamera);
+      if (projected.z < -1 || projected.z > 1) continue;
+      const distance = Math.hypot(
+        projected.x * size.width * 0.5,
+        projected.y * size.height * 0.5,
+      );
+      if (distance <= 92 && distance < bestDistance) {
+        bestPlanet = planet;
+        bestDistance = distance;
+      }
+    }
+
+    return bestPlanet;
+  }, [camera, resources, size.height, size.width, system.planets]);
+
+  const readScaleFocus = useCallback(() => (
+    resources?.scene.visible && presentedResource.current === resources &&
+    phaseRef.current === "system" ? pickScaleFocus() : null
+  ), [phaseRef, pickScaleFocus, resources]);
+  useSystemScaleFocusSource(
+    presenting && phase === "system" && !failed && resources
+      ? scaleFocusSource
+      : undefined,
+    system.id,
+    readScaleFocus,
+  );
+
   // Like the retained Surface tree, the coordinator's synchronous phase
   // invalidates a stale committed presentation before the existing draw.
   // Keep the native objects/programs, not a hidden native simulation.
@@ -489,25 +529,7 @@ export function YeisSystemScene({
 
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current === 0) {
-      let bestPlanet: PlanetDefinition | null = null;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      for (const planet of system.planets) {
-        const body = native.get(nativePlanetId(planet));
-        if (!body) continue;
-        const projected = focusProjectionRef.current
-          .copy(body.position)
-          .project(camera as THREE.PerspectiveCamera);
-        if (projected.z < -1 || projected.z > 1) continue;
-        const distance = Math.hypot(
-          projected.x * size.width * 0.5,
-          projected.y * size.height * 0.5,
-        );
-        if (distance <= 92 && distance < bestDistance) {
-          bestPlanet = planet;
-          bestDistance = distance;
-        }
-      }
-
+      const bestPlanet = pickScaleFocus();
       const nextId = bestPlanet?.id ?? null;
       const nextNativeId = bestPlanet ? nativePlanetId(bestPlanet) : null;
       if (focusedIdRef.current !== nextId) {
@@ -580,12 +602,12 @@ export function YeisSystemScene({
   });
 
   useFrame(() => {
-    if (!onPresented || !resources || !resources.scene.visible ||
+    if (!resources || !resources.scene.visible ||
         !ownsFrame() || presentedResource.current === resources) return;
     // The original CinematicPipeline at priority 1 already submitted the
     // scene. Mark eligibility once; this is not camera/endpoint evidence.
     presentedResource.current = resources;
-    onPresented();
+    onPresented?.();
   }, 2);
 
   if (!starId || failed || !resources) {
@@ -596,6 +618,7 @@ export function YeisSystemScene({
         starPointLightVisible={starPointLightVisible}
         onSelectPlanet={onSelectPlanet}
         onScaleFocus={onScaleFocus}
+        scaleFocusSource={phase === "system" ? scaleFocusSource : undefined}
         scaleTargetPlanet={scaleTargetPlanet}
         handoffTargetPlanetId={handoffTargetPlanetId}
         onHandoffTargetSuppressed={onHandoffTargetSuppressed}
