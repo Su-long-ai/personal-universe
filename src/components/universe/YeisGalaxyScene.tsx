@@ -117,7 +117,62 @@ export type YeisGalaxyScaleBridgeState = {
   entryViewDirection: [number, number, number];
   frameSwitchJumpKm: number;
   renderedScalePosition: number;
+  renderedScaleMotion?: { target: number; logFrameBudget: number };
 };
+
+const MAX_GALAXY_LOG_FRAME_FRACTION = 0.68;
+const GALAXY_LOG_SETTLE_TOLERANCE = 0.01;
+
+function boundedGalaxyScaleFrame(
+  bridge: YeisGalaxyScaleBridgeState,
+  proposed: number,
+  target: number,
+): number {
+  const current = bridge.renderedScalePosition;
+  if (proposed === current) return current;
+  // CameraController's owned gotoPoint evaluates this eased progress and
+  // lerps between the logarithms of the captured radial distances. Limiting
+  // the input coordinate alone is not a physical movement bound, especially
+  // on the return from the short opening Galaxy wheel segment.
+  const logProgress = (position: number) =>
+    MathUtils.smoothstep(galaxyScaleVisualResponse(position), 0, 1);
+  const from = logProgress(current);
+  const remaining = Math.abs(logProgress(target) - from);
+  // Measure one frame against the physical span first requested by the
+  // latest target, not the shrinking remainder. The cap must not add a
+  // second easing tail to ordinary convergence and hold up the next owner.
+  if (bridge.renderedScaleMotion?.target !== target) {
+    bridge.renderedScaleMotion = {
+      target,
+      logFrameBudget: MAX_GALAXY_LOG_FRAME_FRACTION * remaining,
+    };
+  }
+  const frameBudget = bridge.renderedScaleMotion.logFrameBudget;
+  if (Math.abs(logProgress(proposed) - from) <= frameBudget) return proposed;
+
+  if (proposed === target) {
+    const fullLogTravel = Math.abs(
+      Math.log(bridge.arrivalDistanceKm) -
+      Math.log(Math.max(bridge.startDistanceKm, 1e-3)),
+    );
+    // Preserve exact endpoint acknowledgement for the sub-1% radial tail,
+    // including the matched System seam. Do not leave the camera waiting on
+    // an imperceptible remainder just to report more intermediate frames.
+    if (remaining * fullLogTravel <= GALAXY_LOG_SETTLE_TOLERANCE) return proposed;
+  }
+
+  // Invert only the violating portion of the same monotonic native path.
+  // Nothing is added to input/gesture state or to the native trajectory.
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 12; i += 1) {
+    const fraction = (low + high) / 2;
+    const probe = MathUtils.lerp(current, proposed, fraction);
+    if (Math.abs(logProgress(probe) - from) <= frameBudget) low = fraction;
+    else high = fraction;
+  }
+  return MathUtils.lerp(current, proposed, low);
+}
 
 export type YeisSignalHover = {
   entryId: string;
@@ -1243,9 +1298,10 @@ export function YeisGalaxyScene({
         // awaiting paint, especially on slow/software WebGL. Interior
         // targets still settle to the full diagnostic precision.
         const settleEpsilon = targetScalePosition === 1 ? 0.007 : 0.00045;
-        scalePosition = Math.abs(intermediate - targetScalePosition) < settleEpsilon
+        const proposed = Math.abs(intermediate - targetScalePosition) < settleEpsilon
           ? targetScalePosition
           : intermediate;
+        scalePosition = boundedGalaxyScaleFrame(bridge, proposed, targetScalePosition);
         bridge.renderedScalePosition = scalePosition;
         const visualScalePosition =
           galaxyScaleVisualResponse(scalePosition);

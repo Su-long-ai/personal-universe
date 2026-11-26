@@ -2513,6 +2513,64 @@ test("one real Galaxy notch renders several intermediate zoom frames", async ({ 
   expect(frames.some(([, , mode]) => mode === "travel")).toBe(false);
 });
 
+test("one real outward Galaxy notch bounds camera distance on a delayed frame", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.wheel(0, -120);
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.250");
+
+  await html.evaluate((root) => {
+    window.addEventListener("wheel", (event) => {
+      const readFrame = () => ({
+        position: root.getAttribute("data-universe-galaxy-scale-applied-position"),
+        distance: Number(root.getAttribute("data-universe-travel-arrival-ratio")),
+        traveling: root.hasAttribute("data-universe-traveling"),
+      });
+      const frames = [readFrame()];
+      const observer = new MutationObserver(() => {
+        const next = readFrame();
+        if (frames.at(-1)!.position !== next.position) frames.push(next);
+        if (next.position !== "0.000") return;
+        observer.disconnect();
+        root.setAttribute("data-test-outward-native-paints", JSON.stringify({
+          trusted: event.isTrusted, deltaY: event.deltaY, frames,
+        }));
+      });
+      // Capture native pose publications, not another RAF with arbitrary
+      // registration order. A late frame must not hide a real camera jump.
+      observer.observe(root, { attributes: true, attributeFilter: [
+        "data-universe-galaxy-scale-applied-position", "data-universe-travel-arrival-ratio",
+      ] });
+      const started = performance.now();
+      while (performance.now() - started < 45) {
+        // Emulate one delayed paint without changing wheel, path or camera.
+      }
+    }, { capture: true, once: true });
+  });
+  await page.mouse.wheel(0, 120);
+  await expect(html).toHaveAttribute("data-test-outward-native-paints", /.+/);
+  const trace = JSON.parse((await html.getAttribute("data-test-outward-native-paints"))!) as {
+    trusted: boolean; deltaY: number;
+    frames: Array<{ position: string; distance: number; traveling: boolean }>;
+  };
+  await testInfo.attach("outward-native-physical-trajectory.json", {
+    body: JSON.stringify(trace, null, 2), contentType: "application/json",
+  });
+  expect(trace.trusted).toBe(true);
+  expect(trace.deltaY).toBe(120);
+  expect(trace.frames[0].position).toBe("0.250");
+  expect(trace.frames.at(-1)!.position).toBe("0.000");
+  expect(trace.frames.every((frame) => !frame.traveling && frame.distance > 0)).toBe(true);
+  const movement = measureTemporalContinuity(trace.frames.map(({ distance }) => Math.log(distance)));
+  expect(movement.monotonic).toBe(true);
+  expect(movement.intermediatePositions).toBeGreaterThanOrEqual(3);
+  expect(movement.largestStepFraction).toBeLessThanOrEqual(0.72);
+});
+
 test("Galaxy reversal redirects the next painted frame before old wheel motion settles", async ({ page }, testInfo) => {
   await page.goto("/");
   await waitForYeis(page);
