@@ -562,6 +562,7 @@ export function UniverseCanvas({
             fallback={
               <SystemScene
                 system={selectedSystem}
+                starPointLightVisible={phase === "system"}
                 onSelectPlanet={onSelectPlanet}
                 onScaleFocus={onScaleFocusPlanet}
                 scaleTargetPlanet={systemScaleTargetPlanet}
@@ -573,6 +574,7 @@ export function UniverseCanvas({
           >
             <LazyYeisSystemScene
               system={selectedSystem}
+              starPointLightVisible={phase === "system"}
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}
               scaleTargetPlanet={systemScaleTargetPlanet}
@@ -585,6 +587,7 @@ export function UniverseCanvas({
         ) : (
           <SystemScene
             system={selectedSystem}
+            starPointLightVisible={phase === "system"}
             onSelectPlanet={onSelectPlanet}
             onScaleFocus={onScaleFocusPlanet}
             scaleTargetPlanet={systemScaleTargetPlanet}

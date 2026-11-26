@@ -116,6 +116,7 @@ function PlanetBody({
 
 export function SystemScene({
   system,
+  starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
@@ -124,6 +125,7 @@ export function SystemScene({
   onScaleFrame,
 }: {
   system: SystemDefinition;
+  starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
@@ -255,7 +257,13 @@ export function SystemScene({
       <color attach="background" args={["#010208"]} />
       <LifecycleStars radius={90} depth={45} count={1800} factor={1.7} saturation={0.22} fade speed={0.06} />
       <ambientLight intensity={0.18} />
-      <pointLight position={[0, 0, 0]} intensity={34} distance={45} color={starColor} />
+      <pointLight
+        visible={starPointLightVisible}
+        position={[0, 0, 0]}
+        intensity={34}
+        distance={45}
+        color={starColor}
+      />
 
       <group rotation={[0.03, 0, -0.015]}>
         <mesh>

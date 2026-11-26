@@ -221,6 +221,7 @@ function ProductPlanetTarget({
 
 export function YeisSystemScene({
   system,
+  starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
@@ -230,6 +231,7 @@ export function YeisSystemScene({
   quality,
 }: {
   system: SystemDefinition;
+  starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
@@ -532,6 +534,7 @@ export function YeisSystemScene({
     return (
       <SystemScene
         system={system}
+        starPointLightVisible={starPointLightVisible}
         onSelectPlanet={onSelectPlanet}
         onScaleFocus={onScaleFocus}
         scaleTargetPlanet={scaleTargetPlanet}
