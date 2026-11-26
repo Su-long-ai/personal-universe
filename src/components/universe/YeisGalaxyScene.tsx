@@ -99,6 +99,11 @@ export type YeisGalaxyViewState = {
   positionKm: [number, number, number];
   quaternion: [number, number, number, number];
   systemOverview: boolean;
+  fixedOrbit: {
+    positionKm: [number, number, number];
+    radiusKm: number;
+    name: string;
+  } | null;
 };
 
 export type YeisGalaxyScaleBridgeState = {
@@ -194,6 +199,7 @@ function writeGalaxyViewState(
       positionKm: [0, 0, 0],
       quaternion: [0, 0, 0, 1],
       systemOverview,
+      fixedOrbit: null,
     };
     viewStateRef.current = view;
   }
@@ -207,6 +213,22 @@ function writeGalaxyViewState(
   view.quaternion[2] = state.controller.quaternion.z;
   view.quaternion[3] = state.controller.quaternion.w;
   view.systemOverview = systemOverview;
+  const anchor =
+    state.controller.mode === "orbit" && !state.controller.target
+      ? state.controller.anchor
+      : null;
+  if (anchor) {
+    const fixedOrbit = (view.fixedOrbit ??= {
+      positionKm: [0, 0, 0],
+      radiusKm: 0,
+      name: "",
+    });
+    anchor.position.toArray(fixedOrbit.positionKm);
+    fixedOrbit.radiusKm = anchor.radius;
+    fixedOrbit.name = anchor.name;
+  } else {
+    view.fixedOrbit = null;
+  }
   return view;
 }
 
@@ -218,6 +240,9 @@ function cloneGalaxyViewState(
     positionKm: [...view.positionKm] as [number, number, number],
     quaternion: [...view.quaternion] as [number, number, number, number],
     systemOverview: view.systemOverview,
+    fixedOrbit: view.fixedOrbit
+      ? { ...view.fixedOrbit, positionKm: [...view.fixedOrbit.positionKm] }
+      : null,
   };
 }
 
@@ -620,7 +645,13 @@ export function YeisGalaxyScene({
         const orbitRadiusKm = milkyWay.radius * 0.045 * PARSEC_KM;
         if (savedView) {
           controller.position.fromArray(savedView.positionKm);
-          if (savedView.systemOverview) {
+          if (savedView.fixedOrbit) {
+            controller.orbitPoint(
+              new Vector3().fromArray(savedView.fixedOrbit.positionKm),
+              savedView.fixedOrbit.radiusKm,
+              savedView.fixedOrbit.name,
+            );
+          } else if (savedView.systemOverview) {
             const span = nativeSystemSpan(runtime.universe.current);
             controller.orbitPoint(
               runtime.universe.star.position,
@@ -630,6 +661,8 @@ export function YeisGalaxyScene({
           } else {
             controller.setReference(runtime.universe.star);
           }
+          // Restoring the anchor must neither recenter the last painted pose
+          // nor make an ordinary quality change switch drag into free look.
           controller.quaternion.fromArray(savedView.quaternion);
           runtime.universe.toParsecs(controller.position, cameraPc);
         } else {
@@ -1122,7 +1155,31 @@ export function YeisGalaxyScene({
       // the time-driven YEIS autopilot finish one more frame. Freeze exactly
       // where the continuous coordinate left the camera before manual input is
       // applied, then let native free/orbit controls take over from there.
-      state.controller.cancelAutopilot();
+      const controller = state.controller;
+      const trajectory = controller.autopilot;
+      const handoffOrbit =
+        (Math.abs(state.input.dragX) > 0.01 ||
+          Math.abs(state.input.dragY) > 0.01) &&
+        scaleBridgeAutopilotRevisionRef.current === controller.autopilotRevision &&
+        (scaleBridgeRef.current?.renderedScalePosition ?? 0) > WORLD_SCALE_EPSILON &&
+        trajectory?.kind === "gotoPoint" &&
+        trajectory.progressOverride !== undefined &&
+        trajectory.point &&
+        trajectory.anchor;
+      if (handoffOrbit && trajectory.point) {
+        // The scrubbed path never reaches native time-based completion.
+        // Install its real subject as the native orbit pivot, but preserve
+        // the last painted pose before the same drag is consumed.
+        const paintedOrientation = controller.quaternion.clone();
+        controller.orbitPoint(
+          trajectory.point,
+          handoffOrbit.radius,
+          handoffOrbit.name,
+        );
+        controller.quaternion.copy(paintedOrientation);
+      } else {
+        controller.cancelAutopilot();
+      }
       scaleBridgeAutopilotRevisionRef.current = null;
       state.controller.autoOrbit = 0;
       state.controller.velocity.set(0, 0, 0);

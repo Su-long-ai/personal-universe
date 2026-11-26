@@ -1,0 +1,135 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-OPENING-PRESERVE-SUBJECT-PIVOT-001",
+  "title": "Preserve opening Galaxy subject through renderer reinitialization",
+  "scope": {
+    "level": "implementation",
+    "subject": "Preserve the exact native fixed orbit anchor with the captured Galaxy pose when settings or renderer remount; ensure drag continues around the already visible subject."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact current public No-query cold Galaxy keeps the physical Milky Way core centred under real drag. Source distinguishes returning camera pose from input ownership: the shared view snapshot carries position and quaternion but omits fixed orbit anchor, so renderer reinitialization for a normal quality change restores a free camera instead of the exact existing native fixed pivot. Preserve the original native fixed-point geometry in the existing snapshot. Reject blanket look-at or camera replacement; restoring the pose and anchor must not recenter, invent a star, or affect true free flight.",
+  "planned_files": [
+    "src/components/universe/YeisGalaxyScene.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Current pinned native renderer remains the authority; no upstream patch or new camera."
+    },
+    {
+      "url": "https://react.dev/reference/react/useRef",
+      "finding": "The current R3F scene uses a shared React ref for repeatable camera restore on renderer replacement."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/8d394498f0872cebb943d9e2080e68a0ba5df30a/src/components/universe/YeisGalaxyScene.tsx",
+      "finding": "The existing native orbitPoint and saved-view ref already own pivot geometry and restoration; persist only the state needed by the same executor."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-mouse",
+      "finding": "Use true move/down/up events and Three projection of the rendered galaxy, not semantic flags alone."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Reuse the installed pinned MIT YEIS: the first visit already has a stable mathematical centre and only remount loses its state."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Keep current R3F camera and existing React ref snapshots; no second renderer or drag loop."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "Keep native CameraController.orbitPoint, equivalent to saved target restoration already used by the same project; do not layer cinematic camera-controls into native Galaxy."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Preserve exact native local anchor, radius and label in existing snapshot; restore saved quaternion after establishing target, no new screen-space target heuristic."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "restore-existing-native-anchor",
+      "name": "Native fixed orbit point and existing Galaxy view snapshot",
+      "level": "subsystem",
+      "registry_id": "your-eyes-in-space-mit-e520568",
+      "source": "Exact main and loaded native CameraController",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "Preserves the same astronomical subject and rendered orientation; leaves genuine free flight unchanged.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "add-second-galaxy-camera",
+      "name": "Install separate Drei camera-controls on the already native Galaxy",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Existing cinematic camera implementation",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Would create competing input and position owners and lose native floating-frame semantics.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 2,
+        "customization_fit": 2,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "restore-existing-native-anchor"
+    ],
+    "rationale": "Retain and restore only the real native fixed orbit anchor when the saved pose was in orbit, restoring the original quaternion to avoid a snap.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Do not publish if the public direct drag repro is not improved or first-view, free flight and renderer handoffs regress."
+  }
+}
