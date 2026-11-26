@@ -5677,6 +5677,101 @@ test("opening galaxy auto-orbits until the visitor takes control", async ({
   await runtime.assertClean(testInfo);
 });
 
+test("opening Galaxy drag orbits the visible core after a quality change", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.addInitScript(() => {
+    // Read the rendered cloud's actual scene uniform and active Three camera,
+    // not the coordinator's requested pose or its declared pivot.
+    const roots = new Set<any>();
+    let rendererId = 0;
+    const probe = window as Window & {
+      __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown;
+      __readOpeningOrbit?: () => {
+        core: number[];
+        position: number[];
+        quaternion: number[];
+      } | null;
+    };
+    probe.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+      supportsFiber: true,
+      inject: () => ++rendererId,
+      onCommitFiberRoot: (_: number, root: unknown) => roots.add(root),
+      onCommitFiberUnmount: () => {},
+    };
+    probe.__readOpeningOrbit = () => {
+      let camera: any;
+      let native: any;
+      for (const root of roots) {
+        const fibres = [root.current];
+        for (let fibre; (fibre = fibres.pop()); ) {
+          if (fibre.child) fibres.push(fibre.child);
+          if (fibre.sibling) fibres.push(fibre.sibling);
+          camera ??= fibre.stateNode?.__r3f?.root?.getState()?.camera;
+          for (let hook = fibre.memoizedState, i = 0; hook && i < 70; hook = hook.next, i++) {
+            const candidate = hook.memoizedState?.current;
+            if (candidate?.galaxyClouds && candidate.controller) native = candidate;
+          }
+        }
+      }
+      const center = native?.galaxyClouds.get(0)?.points.material.uniforms.uCenterRel.value;
+      if (!camera || !center || native.disposed || !center.lengthSq()) return null;
+      const ndc = center.clone().normalize().multiplyScalar(64).project(camera);
+      return {
+        core: [innerWidth * (ndc.x + 1) / 2, innerHeight * (1 - ndc.y) / 2],
+        position: native.controller.position.toArray(),
+        quaternion: camera.quaternion.toArray(),
+      };
+    };
+  });
+  await page.goto("/");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  const read = () => page.evaluate(() => (window as any).__readOpeningOrbit());
+  await expect.poll(read).not.toBeNull();
+
+  const canvas = await page.locator("canvas").boundingBox();
+  expect(canvas).toBeTruthy();
+  const x = canvas!.x + canvas!.width / 2;
+  const y = canvas!.y + canvas!.height / 2;
+  const frame = () => page.evaluate(() => new Promise<void>((done) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => done())),
+  ));
+  const drag = async (direction: number) => {
+    const first = await read();
+    expect(first).not.toBeNull();
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    const poses = [];
+    for (let step = 1; step <= 6; step++) {
+      await page.mouse.move(x + direction * step * 15, y + step * 3);
+      await frame();
+      poses.push(await read());
+    }
+    await page.mouse.up();
+    const end = poses.at(-1);
+    for (const pose of poses) {
+      expect(Math.hypot(pose.core[0] - first.core[0], pose.core[1] - first.core[1]))
+        .toBeLessThan(8);
+    }
+    expect(new Quaternion().fromArray(first.quaternion)
+      .angleTo(new Quaternion().fromArray(end.quaternion))).toBeGreaterThan(0.05);
+    // An in-place mouse-look can change orientation, but never this position.
+    const from = new Vector3().fromArray(first.position);
+    expect(from.distanceTo(new Vector3().fromArray(end.position)) / from.length())
+      .toBeGreaterThan(0.01);
+  };
+
+  await drag(1);
+  await page.locator(".universe-hud select").selectOption("low");
+  await expect(html).toHaveAttribute("data-yeis-opening-motion", "restored");
+  await expect.poll(read).not.toBeNull();
+  await drag(1);
+  await drag(-1);
+  await runtime.assertClean(testInfo);
+});
+
 test("Chinese and English switch in place and persist", async ({
   page,
 }, testInfo) => {
