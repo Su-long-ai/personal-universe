@@ -284,6 +284,14 @@ function systemApproachFramePresented(): boolean {
     Boolean(data.universeHandoffExitProjectedRadius);
 }
 
+function exactScaleEndpoint(position: number, endpoint: number): number {
+  // Fold only floating-point roundoff. A real unfinished scale step must
+  // still wait for an actual painted endpoint before changing owners.
+  return Math.abs(position - endpoint) <= 8 * Number.EPSILON
+    ? endpoint
+    : position;
+}
+
 function retargetScaleReversal(
   requested: number,
   direction: ContinuousScaleDirection,
@@ -739,11 +747,15 @@ export default function UniverseApp({
   const outwardScaleIntentRef = useRef<number | null>(null);
   const scaleWheelRef = useRef<{
     direction: ContinuousScaleDirection | null;
+    renderedStart: number | null;
+    rendererPhase: UniversePhase | null;
     lastAt: number;
     samples: number;
     gesture: number;
   }>({
     direction: null,
+    renderedStart: null,
+    rendererPhase: null,
     lastAt: 0,
     samples: 0,
     gesture: 0,
@@ -826,6 +838,8 @@ export default function UniverseApp({
 
       const wheel = scaleWheelRef.current;
       wheel.direction = null;
+      wheel.renderedStart = null;
+      wheel.rendererPhase = null;
       wheel.lastAt = 0;
       wheel.samples = 0;
       wheel.gesture += 1;
@@ -2638,7 +2652,32 @@ export default function UniverseApp({
           : CONTINUOUS_SCALE_RESET_MS;
       const gestureExpired =
         wheel.direction !== null && now - wheel.lastAt > resetWindow;
-      if (wheel.direction === null || directionChanged || gestureExpired) {
+      const paintedCoordinate = document.documentElement.getAttribute(
+        currentPhase === "galaxy"
+          ? "data-universe-galaxy-scale-applied-position"
+          : "data-universe-cinematic-scale-applied-position",
+      );
+      const painted = paintedCoordinate === null ? NaN : Number(paintedCoordinate);
+      // Mixed signs delivered before an input frame paints should cancel in
+      // input space, not manufacture extra movement from a stale renderer
+      // sample. Rebase only when we actually need to turn an in-flight pose.
+      const reversePaintedMotion =
+        directionChanged &&
+        !gestureExpired &&
+        wheel.rendererPhase === currentPhase &&
+        wheel.renderedStart !== null &&
+        Number.isFinite(painted) &&
+        (previousDirection === "in"
+          ? painted > wheel.renderedStart + WORLD_SCALE_EPSILON
+          : painted < wheel.renderedStart - WORLD_SCALE_EPSILON);
+      const startingGesture = wheel.direction === null || directionChanged || gestureExpired;
+      if (startingGesture || wheel.rendererPhase !== currentPhase) {
+        wheel.renderedStart = Number.isFinite(painted)
+          ? painted
+          : worldScalePositionRef.current;
+        wheel.rendererPhase = currentPhase;
+      }
+      if (startingGesture) {
         wheel.gesture += 1;
         wheel.samples = 0;
         wheel.direction = direction;
@@ -2765,15 +2804,16 @@ export default function UniverseApp({
             );
             // Reversal must turn the rendered camera, not first run down
             // an unpainted backlog of previous-direction wheel intent.
-            if (directionChanged) {
+            if (reversePaintedMotion) {
               nextPosition = retargetScaleReversal(
                 nextPosition, direction,
-                document.documentElement.getAttribute("data-universe-galaxy-scale-applied-position"),
+                paintedCoordinate,
                 GALAXY_SCALE_MIN, SYSTEM_SCALE_MIN,
                 (position) => applyGalaxyScaleWheel(position, normalizedDelta),
               );
             }
 
+            nextPosition = exactScaleEndpoint(nextPosition, SYSTEM_SCALE_MIN);
             if (
               nextPosition === currentPosition ||
               (nextPosition !== SYSTEM_SCALE_MIN &&
@@ -2909,10 +2949,10 @@ export default function UniverseApp({
         const stepWorld = (position: number) =>
           applyWorldScaleWheel(position, normalizedDelta, selectedPlanet.surfaceMode);
         const requested = stepWorld(currentPosition);
-        const nextPosition = directionChanged
+        const nextPosition = reversePaintedMotion
           ? retargetScaleReversal(
               requested, direction,
-              document.documentElement.getAttribute("data-universe-cinematic-scale-applied-position"),
+              paintedCoordinate,
               WORLD_SCALE_MIN, maxPosition, stepWorld,
             )
           : requested;
@@ -3066,12 +3106,14 @@ export default function UniverseApp({
           inwardScaleIntentRef.current = deliveredPosition;
         }
         const stepSystem = (position: number) =>
-          applySystemScaleWheel(position, normalizedDelta);
+          exactScaleEndpoint(
+            applySystemScaleWheel(position, normalizedDelta), WORLD_SCALE_MIN,
+          );
         const requested = stepSystem(currentPosition);
-        const nextPosition = directionChanged
+        const nextPosition = reversePaintedMotion
           ? retargetScaleReversal(
               requested, direction,
-              document.documentElement.getAttribute("data-universe-cinematic-scale-applied-position"),
+              paintedCoordinate,
               SYSTEM_SCALE_MIN, WORLD_SCALE_MIN, stepSystem,
             )
           : requested;

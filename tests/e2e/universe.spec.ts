@@ -3692,6 +3692,10 @@ test("reversing while an inward native endpoint is held discards unapplied inten
     await dispatchScaleWheel(page, -96);
   }
   await expect(html).toHaveAttribute("data-universe-scale-handoff", "galaxy-system:awaiting-renderer");
+  // This test delays only the coordinator acknowledgment. First confirm an
+  // actual terminal camera frame, otherwise the separate active-reversal
+  // contract correctly rebases from a moving pose instead of 1.000.
+  await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "1.000");
   await dispatchScaleWheel(page, 96);
   await expect(html).toHaveAttribute("data-universe-scale-position", "0.750");
 
