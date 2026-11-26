@@ -1,0 +1,31 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-CARRIED-FRAME-PROOF-001",
+  "approved_at": "2026-11-26T09:00:51.180Z",
+  "baseline_commit": "722616f36030caeb53c37befd0ab5e26e4b73cb2",
+  "record_path": "docs/reuse-gate/tasks/SCALE-CARRIED-FRAME-PROOF-001.json",
+  "record_sha256": "ecdbdeebb9285fd89cb270947a30e691a7980fed01811d691e85bd14bc7a39eb",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Gate only the held native wheel coordinate on an actual post-render witness from the existing R3F loop."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-wheel-coordinate"
+  ],
+  "candidate_scores": {
+    "existing-wheel-coordinate": 57,
+    "synthetic-wheel-replay": 21
+  }
+}
