@@ -39,50 +39,67 @@ test("real WebGL loss announces recovery and offers the static portfolio", async
   await expect(page.locator("canvas")).toHaveCount(1);
 });
 
-test("short landscape HUD leaves both fingers of a centered pinch on the canvas", async ({ browser, baseURL }) => {
-  const context = await browser.newContext({
-    baseURL,
-    viewport: { width: 664, height: 390 },
-    isMobile: true,
-    hasTouch: true,
-    reducedMotion: "reduce",
-  });
-  try {
-    const page = await context.newPage();
-    await page.goto("/?freeze=1");
-    await waitForYeis(page);
-    const hud = page.locator(".universe-hud");
-    await expect(hud.getByRole("combobox")).toBeVisible();
-    await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
-    await expect(hud.getByRole("link", { name: "Portfolio" })).toBeVisible();
-    await page.evaluate(() => {
-      const record = document.createElement("div");
-      record.hidden = true;
-      record.id = "trusted-pinch-test-record";
-      document.body.append(record);
-      window.addEventListener("pointerdown", (event) => {
-        if (event.isTrusted && event.pointerType === "touch") {
-          record.textContent += ` ${(event.target as HTMLElement).tagName}`;
-        }
-      }, true);
+for (const [width, height] of [[664, 390], [568, 320], [480, 320], [320, 260]]) {
+  test(`short landscape HUD leaves both fingers of a centered pinch on the canvas at ${width}×${height}`, async ({ browser, baseURL }) => {
+    const context = await browser.newContext({
+      baseURL,
+      viewport: { width, height },
+      isMobile: true,
+      hasTouch: true,
+      reducedMotion: "reduce",
     });
-    const touch = await context.newCDPSession(page);
-    const send = (type: "touchStart" | "touchMove" | "touchEnd", x: number[]) =>
-      touch.send("Input.dispatchTouchEvent", {
-        type, touchPoints: x.map((value, id) => ({ id, x: value, y: 191 })),
+    try {
+      const page = await context.newPage();
+      await page.goto("/?freeze=1");
+      await waitForYeis(page);
+      const hud = page.locator(".universe-hud");
+      await expect(hud.getByRole("combobox")).toBeVisible();
+      await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
+      await expect(hud.getByRole("link", { name: "Portfolio" })).toBeVisible();
+      await page.evaluate(() => {
+        const record = document.createElement("div");
+        record.hidden = true;
+        record.id = "trusted-pinch-test-record";
+        document.body.append(record);
+        window.addEventListener("pointerdown", (event) => {
+          if (event.isTrusted && event.pointerType === "touch") {
+            record.textContent += ` ${(event.target as HTMLElement).tagName}`;
+          }
+        }, true);
       });
-    await send("touchStart", [266, 398]);
-    await send("touchMove", [236, 428]);
-    await send("touchMove", [206, 458]);
-    await send("touchEnd", []);
-    await expect(page.locator("#trusted-pinch-test-record")).toHaveText("CANVAS CANVAS");
-    expect(await page.evaluate(() => visualViewport?.scale)).toBe(1);
+      const touch = await context.newCDPSession(page);
+      const send = (type: "touchStart" | "touchMove" | "touchEnd", x: number[]) =>
+        touch.send("Input.dispatchTouchEvent", {
+          type, touchPoints: x.map((value, id) => ({ id, x: value, y: height / 2 })),
+        });
+      const mid = width / 2;
+      const contact = (gap: number) => [mid - gap, mid + gap];
+      await send("touchStart", contact(66));
+      await send("touchMove", contact(96));
+      await send("touchMove", contact(126));
+      await send("touchMove", contact(66));
+      await send("touchEnd", []);
+      const contacts = page.locator("#trusted-pinch-test-record");
+      await expect(contacts).toHaveText("CANVAS CANVAS");
 
-    await page.setViewportSize({ width: 390, height: 664 });
-    await expect(hud.getByRole("combobox")).toBeVisible();
-    await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  } finally {
-    await context.close();
-  }
-});
+      await hud.getByRole("button", { name: "HIDE", exact: true }).click();
+      await expect(hud.getByRole("button", { name: "OPEN", exact: true })).toBeVisible();
+      await contacts.evaluate((node) => { node.textContent = ""; });
+      await send("touchStart", contact(66));
+      await send("touchMove", contact(126));
+      await send("touchMove", contact(66));
+      await send("touchEnd", []);
+      await expect(contacts).toHaveText("CANVAS CANVAS");
+      await hud.getByRole("button", { name: "OPEN", exact: true }).click();
+      await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
+      expect(await page.evaluate(() => visualViewport?.scale)).toBe(1);
+
+      await page.setViewportSize({ width: 390, height: 664 });
+      await expect(hud.getByRole("combobox")).toBeVisible();
+      await expect(hud.getByRole("button", { name: /search \/ places/i })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    } finally {
+      await context.close();
+    }
+  });
+}
