@@ -1,0 +1,34 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-NATIVE-INPUT-FOCUS-001",
+  "approved_at": "2026-11-26T18:22:18.935Z",
+  "baseline_commit": "026bc4b8d9a561092ff82651b9b9f02c3686687e",
+  "record_path": "docs/reuse-gate/tasks/SCALE-NATIVE-INPUT-FOCUS-001.json",
+  "record_sha256": "c5369acc22c8b90bb49ea0884fd198a0ffc3a7221a3bdc2af05196c7521f1ca1",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the current System renderer’s real centre projection for unlocked wheel gestures without relying on optional highlight update cadence."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/low-system-retention.spec.ts"
+  ],
+  "selected_ids": [
+    "reuse-current-centre-projection"
+  ],
+  "candidate_scores": {
+    "reuse-current-centre-projection": 57,
+    "sample-reticle-every-frame": 32,
+    "target-random-or-replay": 20
+  }
+}
