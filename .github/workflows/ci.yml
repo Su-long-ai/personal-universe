@@ -16,8 +16,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: personal-universe-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.ref || github.ref }}
@@ -329,14 +327,18 @@ jobs:
             exit 1
           fi
 
-  dot-wake-test:
-    name: Dot wake bridge probe
+  dot-wake:
+    name: Dot wake bridge
     needs: [reuse-gate, build, e2e, webgl-heavy, e2e-report]
-    if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'relay/dot-wake-pr-comment-v1' }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Emit PR wake comment
+      - name: Emit CI terminal wake comment
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
