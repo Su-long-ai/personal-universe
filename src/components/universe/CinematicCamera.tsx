@@ -259,6 +259,10 @@ export function CinematicCamera({
     phase === "system" &&
     worldScaleContinuous &&
     (worldScalePosition > 1 + WORLD_SCALE_EPSILON ||
+      // Outbound input may already target the exact wide endpoint when this
+      // owner takes over from Approach. Continue from that presented pose,
+      // not the discrete wide shot, even while the System frame is preparing.
+      (renderedScalePosition.current ?? 1) > 1 ||
       (Boolean(systemScaleFrame) && renderScaleStep.current?.phase === "system"));
   const activeSurfaceCameraFrame =
     phase === "surface" || worldScalePosition > 4

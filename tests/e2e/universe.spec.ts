@@ -2622,6 +2622,95 @@ test("rapid outward notches cannot hand off Approach before its actual 2.000 fra
   await expect(html).not.toHaveAttribute("data-universe-traveling");
 });
 
+test("finite outward wheel intent survives both painted return fences without extra input", async ({ page }, testInfo) => {
+  await page.goto("/?destination=hero:aurora-01&navigation=locate&freeze=1");
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-active-destination", "hero:aurora-01");
+  for (let i = 0; i < 4; i++) await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "system");
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "system");
+  for (let i = 0; i < 3; i++) await dispatchScaleWheel(page, -96);
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "approach");
+  await dispatchScaleWheel(page, -72);
+  await expect(html).toHaveAttribute("data-universe-cinematic-scale-applied-position", "2.375");
+
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await html.evaluate((root) => {
+    const data = root.dataset;
+    const canvas = root.querySelector("canvas")!;
+    const trace = {
+      delivery: { trusted: false, approachHeld: false, count: 0 },
+      frames: [] as Array<{ phase: string; requested: string; applied: string }>,
+    };
+    (window as Window & { __outwardCarryTrace?: typeof trace }).__outwardCarryTrace = trace;
+    // React's delegated main handler has consumed the trusted wheel event by
+    // the time it bubbles to Window. Deliver the remaining finite input while
+    // Approach still owns the exact same held camera, not on later test ticks.
+    window.addEventListener("wheel", (first) => {
+      trace.delivery.trusted = first.isTrusted;
+      trace.delivery.approachHeld = data.universeNavigationPhase === "approach" &&
+        data.universeScalePosition === "2.000" &&
+        data.universeCinematicScaleAppliedPosition === "2.375";
+      for (let i = 0; i < 7; i++) {
+        canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 96, bubbles: true, cancelable: true }));
+        trace.delivery.count++;
+      }
+    }, { once: true });
+    // Observe writer mutations rather than another RAF with arbitrary order:
+    // camera apply and coordinator commit can be separate callbacks within
+    // one browser frame, and a sampling callback may run after both.
+    const observer = new MutationObserver(() => {
+      const phase = data.universeNavigationPhase ?? "";
+      const requested = data.universeScalePosition ?? "";
+      const applied = (phase === "galaxy"
+        ? data.universeGalaxyScaleAppliedPosition
+        : data.universeCinematicScaleAppliedPosition) ?? "";
+      const previous = trace.frames.at(-1);
+      if (!previous || previous.phase !== phase || previous.requested !== requested || previous.applied !== applied) {
+        trace.frames.push({ phase, requested, applied });
+      }
+      if ((phase === "galaxy" && applied === "0.000") || trace.frames.length >= 240) observer.disconnect();
+    });
+    observer.observe(root, { attributes: true, attributeFilter: [
+      "data-universe-navigation-phase", "data-universe-scale-position",
+      "data-universe-cinematic-scale-applied-position", "data-universe-galaxy-scale-applied-position",
+    ] });
+  });
+  await page.mouse.wheel(0, 72);
+  type Trace = { delivery: {trusted: boolean; approachHeld: boolean; count: number};
+    frames: {phase: string; requested: string; applied: string}[] };
+  let trace: Trace | undefined;
+  try {
+    await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy", { timeout: 20_000 });
+    await expect(html).toHaveAttribute("data-universe-galaxy-scale-applied-position", "0.000");
+  } finally {
+    trace = await page.evaluate(() => (window as Window & { __outwardCarryTrace?: Trace }).__outwardCarryTrace);
+    await testInfo.attach("outward-held-paint-trajectory.json", {
+      body: Buffer.from(JSON.stringify(trace, null, 2)),
+      contentType: "application/json",
+    });
+  }
+  expect(trace?.delivery).toEqual({ trusted: true, approachHeld: true, count: 7 });
+  const frames = trace!.frames;
+  const approachExit = frames.findIndex(({ phase, applied }) => phase === "approach" && applied === "2.000");
+  const systemExit = frames.findIndex(({ phase, applied }) => phase === "system" && applied === "1.000");
+  expect(approachExit).toBeGreaterThanOrEqual(0);
+  expect(systemExit).toBeGreaterThan(approachExit);
+  const systemInterior = frames.slice(approachExit, systemExit).filter(
+    ({ phase, applied }) => phase === "system" && +applied > 1 && +applied < 2,
+  ).map(({ applied }) => Number(applied));
+  const motion = measureTemporalContinuity([2, ...systemInterior, 1]);
+  expect(motion.intermediatePositions).toBeGreaterThanOrEqual(3);
+  expect(motion.monotonic).toBe(true);
+  expect(motion.largestStepFraction).toBeLessThanOrEqual(0.65);
+  expect(frames.findIndex(({ phase }) => phase === "galaxy")).toBeGreaterThan(systemExit);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await expect(html).not.toHaveAttribute("data-universe-traveling");
+});
+
 test("wheel from a located galaxy uses native scale instead of landmark travel", async ({ page }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?destination=galaxy:0&navigation=locate&freeze=1");

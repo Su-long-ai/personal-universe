@@ -292,6 +292,13 @@ function exactScaleEndpoint(position: number, endpoint: number): number {
     : position;
 }
 
+function advanceOutwardScaleIntent(position: number, delta: number): number {
+  return exactScaleEndpoint(
+    position + continuousScaleInputResponseDelta(position, delta),
+    SYSTEM_SCALE_MIN,
+  );
+}
+
 function retargetScaleReversal(
   requested: number,
   direction: ContinuousScaleDirection,
@@ -2615,6 +2622,57 @@ export default function UniverseApp({
     selectedSystem,
   ]);
 
+  const commitSystemScaleGalaxy = useCallback((
+    focus: UniverseNavigationDestination,
+    position: number,
+  ) => {
+    continuousScaleIntentEpochRef.current += 1;
+    outwardScaleIntentRef.current = null;
+    setSystemScaleTargetPlanet(null);
+    phaseRef.current = "galaxy";
+    publishWorldScalePosition(position, true);
+    setWorldScaleContinuous(true);
+    setPhase("galaxy");
+    cameraSettledPhaseRef.current = null;
+    setCameraSettledPhase(null);
+    const data = document.documentElement.dataset;
+    delete data.universeCameraSettled;
+    delete data.universeScaleSettled;
+    data.universeScaleDirection = "out";
+    data.universeScaleProgress = galaxyScaleSegmentProgress(position).toFixed(3);
+    data.universeNavigationPhase = "galaxy";
+    data.universeGalaxyScaleTarget = focus.id;
+    data.universeGalaxyScaleBridge = "active";
+    replaceNavigationUrl({
+      phase: "galaxy",
+      destinationId: focus.id,
+      navigationMode: "open",
+    });
+  }, [publishWorldScalePosition]);
+
+  const scheduleSystemScaleGalaxy = useCallback((
+    focus: UniverseNavigationDestination,
+    intentEpoch: number,
+  ) => {
+    const data = document.documentElement.dataset;
+    scheduleScaleRendererHandoff({
+      label: "system-galaxy",
+      isCurrent: () =>
+        continuousScaleIntentEpochRef.current === intentEpoch &&
+        phaseRef.current === "system" &&
+        worldScalePositionRef.current === SYSTEM_SCALE_MIN &&
+        galaxyScaleTargetRef.current?.id === focus.id &&
+        outwardScaleIntentRef.current !== null,
+      isRendererReady: () =>
+        data.universeRenderAuthority === "system" &&
+        data.universeCinematicScaleAppliedPosition === "1.000",
+      commit: () => {
+        const delivered = outwardScaleIntentRef.current;
+        if (delivered !== null) commitSystemScaleGalaxy(focus, delivered);
+      },
+    });
+  }, [commitSystemScaleGalaxy]);
+
   const handleContinuousScaleWheel = useCallback(
     (event: ReactWheelEvent<HTMLElement>) => {
       if (navigatorOpen || navigationFailure) return;
@@ -2658,17 +2716,29 @@ export default function UniverseApp({
           : "data-universe-cinematic-scale-applied-position",
       );
       const painted = paintedCoordinate === null ? NaN : Number(paintedCoordinate);
+      // The user may first reverse after an older outward burst crossed
+      // Approach→System. The latest wheel still belongs to Approach, but a
+      // fresh interior pose from the current System owner can retarget now.
+      const data = document.documentElement.dataset;
+      const reversingCarriedSystemMotion =
+        currentPhase === "system" && direction === "in" &&
+        outwardScaleIntentRef.current !== null &&
+        data.universeRenderAuthority === "system" &&
+        data.universeScaleCameraSegment === "system:approach" &&
+        painted > SYSTEM_SCALE_MIN + WORLD_SCALE_EPSILON &&
+        painted < WORLD_SCALE_MIN;
       // Mixed signs delivered before an input frame paints cancel in input
       // space. Once the renderer has moved, it remains the reversal authority
       // even if event grouping expired during a slow frame.
-      const reversePaintedMotion =
-        directionChanged &&
+      const reversedSamePhaseMotion =
         wheel.rendererPhase === currentPhase &&
         wheel.renderedStart !== null &&
         Number.isFinite(painted) &&
         (previousDirection === "in"
           ? painted > wheel.renderedStart + WORLD_SCALE_EPSILON
           : painted < wheel.renderedStart - WORLD_SCALE_EPSILON);
+      const reversePaintedMotion =
+        directionChanged && (reversingCarriedSystemMotion || reversedSamePhaseMotion);
       const startingGesture = wheel.direction === null || directionChanged || gestureExpired;
       if (startingGesture || wheel.rendererPhase !== currentPhase) {
         wheel.renderedStart = Number.isFinite(painted)
@@ -2894,8 +2964,12 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
-          const publishSystemReturn = (position: number) => {
-            outwardScaleIntentRef.current = null;
+          const publishSystemReturn = (delivered: number) => {
+            const retainedGalaxyTarget = galaxyScaleTargetRef.current;
+            const carriesToGalaxy = retainedGalaxyTarget !== null &&
+              delivered < SYSTEM_SCALE_MIN;
+            const position = Math.max(SYSTEM_SCALE_MIN, delivered);
+            outwardScaleIntentRef.current = carriesToGalaxy ? delivered : null;
             setSystemScaleTargetPlanet(selectedPlanet);
             publishWorldScalePosition(position, true);
             setWorldScaleContinuous(true);
@@ -2903,13 +2977,22 @@ export default function UniverseApp({
             document.documentElement.dataset.universeScaleProgress =
               systemScaleSegmentProgress(position).toFixed(3);
             setWorldScalePhase("system", { preserveWorldScalePosition: true });
+            if (carriesToGalaxy) {
+              scheduleSystemScaleGalaxy(
+                retainedGalaxyTarget,
+                continuousScaleIntentEpochRef.current,
+              );
+            }
           };
           // An outward notch can reach System in input space before the
           // existing close-world camera has actually painted Approach=2.
           // Keep only the bounded delivered coordinate while that frame
           // arrives; do not create a timed trip or release a stale view.
           const held = outwardScaleIntentRef.current;
-          const nextPosition = applySystemScaleWheel(held ?? WORLD_SCALE_MIN, normalizedDelta);
+          const nextPosition = advanceOutwardScaleIntent(
+            held ?? WORLD_SCALE_MIN,
+            normalizedDelta,
+          );
           const data = document.documentElement.dataset;
           if (Number(data.universeCinematicScaleAppliedPosition) > WORLD_SCALE_MIN) {
             outwardScaleIntentRef.current = nextPosition;
@@ -3013,37 +3096,31 @@ export default function UniverseApp({
         ) {
           const retainedGalaxyTarget = galaxyScaleTargetRef.current;
           if (retainedGalaxyTarget) {
-            continuousScaleIntentEpochRef.current += 1;
-            const nextPosition = applyGalaxyScaleWheel(
-              SYSTEM_SCALE_MIN,
+            const held = outwardScaleIntentRef.current;
+            const nextPosition = advanceOutwardScaleIntent(
+              held ?? SYSTEM_SCALE_MIN,
               normalizedDelta,
             );
-            setSystemScaleTargetPlanet(null);
-            publishWorldScalePosition(nextPosition, true);
-            setWorldScaleContinuous(true);
-            phaseRef.current = "galaxy";
-            setPhase("galaxy");
-            cameraSettledPhaseRef.current = null;
-            setCameraSettledPhase(null);
-            delete document.documentElement.dataset.universeCameraSettled;
-            delete document.documentElement.dataset.universeScaleSettled;
-            document.documentElement.dataset.universeScalePosition =
-              nextPosition.toFixed(3);
-            document.documentElement.dataset.universeScaleDirection =
-              direction;
-            document.documentElement.dataset.universeScaleProgress =
-              galaxyScaleSegmentProgress(nextPosition).toFixed(3);
-            document.documentElement.dataset.universeNavigationPhase =
-              "galaxy";
-            document.documentElement.dataset.universeGalaxyScaleTarget =
-              retainedGalaxyTarget.id;
-            document.documentElement.dataset.universeGalaxyScaleBridge =
-              "active";
-            replaceNavigationUrl({
-              phase: "galaxy",
-              destinationId: retainedGalaxyTarget.id,
-              navigationMode: "open",
-            });
+            if (held !== null) {
+              outwardScaleIntentRef.current = nextPosition;
+              return;
+            }
+            const data = document.documentElement.dataset;
+            const applied = data.universeCinematicScaleAppliedPosition;
+            if (Number(applied) > SYSTEM_SCALE_MIN ||
+                (data.universeScaleCameraSegment === "system:approach" &&
+                  applied !== "1.000")) {
+              // An already painted wide System has no continuous witness to
+              // wait for. Otherwise retain input until the in-flight camera
+              // has really traced the System interval back to 1.000.
+              outwardScaleIntentRef.current = nextPosition;
+              scheduleSystemScaleGalaxy(
+                retainedGalaxyTarget,
+                continuousScaleIntentEpochRef.current,
+              );
+            } else {
+              commitSystemScaleGalaxy(retainedGalaxyTarget, nextPosition);
+            }
             return;
           }
 
@@ -3194,11 +3271,13 @@ export default function UniverseApp({
       activeEngine,
       cameraSettledPhase,
       commitGalaxyScaleFocusedSystem,
+      commitSystemScaleGalaxy,
       defaultGalaxyScaleFocus,
       galaxy.markers,
       galaxyScaleTarget,
       handleContinuousScaleIntentStart,
       scheduleApproachScaleHandoff,
+      scheduleSystemScaleGalaxy,
       handleReturn,
       navigationFailure,
       navigatorOpen,
