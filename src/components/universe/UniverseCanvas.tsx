@@ -67,8 +67,10 @@ const UNIVERSE_DPR_DEFAULT: [number, number] = [1, 1.75];
 
 function RendererPageLifecycle({
   onContextLost,
+  onContextRestored,
 }: {
   onContextLost: () => void;
+  onContextRestored: () => void;
 }) {
   const { gl } = useThree();
 
@@ -94,6 +96,7 @@ function RendererPageLifecycle({
       html.dataset.universeWebglContextGeneration = String(
         Number(html.dataset.universeWebglContextGeneration ?? "0") + 1,
       );
+      onContextRestored();
     };
 
     const onPageHide = (event: PageTransitionEvent) => {
@@ -136,7 +139,7 @@ function RendererPageLifecycle({
         delete html.dataset.universeWebglContextGeneration;
       }
     };
-  }, [gl, onContextLost]);
+  }, [gl, onContextLost, onContextRestored]);
 
   return null;
 }
@@ -244,14 +247,19 @@ export function UniverseCanvas({
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
   const [webglContextGeneration, setWebglContextGeneration] = useState(0);
+  const [webglAvailable, setWebglAvailable] = useState(true);
   const handleWebglContextLost = useCallback(() => {
     // A restored WebGL context keeps the same Canvas authority but none of the
     // old first-paint evidence describes the newly restored GPU resources.
     // Version product paint authority immediately; the retained scene must earn
     // concrete paint again after Three/ProceduralPlanets restore their state.
     setWebglContextGeneration((generation) => generation + 1);
+    setWebglAvailable(false);
     delete document.documentElement.dataset.universeWorldPaintStarted;
     delete document.documentElement.dataset.universeWorldPaintReady;
+  }, []);
+  const handleWebglContextRestored = useCallback(() => {
+    setWebglAvailable(true);
   }, []);
   const worldPlanetReleaseRef =
     useRef<((planet: Planet) => void) | null>(null);
@@ -460,6 +468,25 @@ export function UniverseCanvas({
       !worldPaintReady ||
       (Boolean(handoffTargetPlanetId) && !systemTargetSuppressed)
     );
+  const systemPresenting = phase === "system" || keepSystemForHandoff;
+  const nativeSystemKey = webglAvailable &&
+    selectedSystem?.id.startsWith("yeis-system:")
+      ? JSON.stringify([selectedSystem.id, quality, webglContextGeneration])
+      : null;
+  const [paintedSystemKey, setPaintedSystemKey] = useState<string | null>(null);
+  const rememberPresentedSystem = useCallback(() => {
+    if (nativeSystemKey !== null) setPaintedSystemKey(nativeSystemKey);
+  }, [nativeSystemKey]);
+  const canParkNativeSystem =
+    quality === "low" && closeWorldPhase && paintedSystemKey === nativeSystemKey;
+  // Only the LOW return that has already shown this exact renderer is kept.
+  // Evict the sole owner on full departure, target/quality/context change.
+  useEffect(() => {
+    if (nativeSystemKey === null || (!systemPresenting && !closeWorldPhase) ||
+        paintedSystemKey !== nativeSystemKey) {
+      setPaintedSystemKey(null);
+    }
+  }, [nativeSystemKey, systemPresenting, closeWorldPhase, paintedSystemKey]);
   const handleSystemTargetSuppressed = useCallback(
     (planetId: string) => {
       const authority = worldPaintAuthorityRef.current;
@@ -510,7 +537,10 @@ export function UniverseCanvas({
       camera={UNIVERSE_CAMERA_CONFIG}
       gl={canvasGl}
     >
-      <RendererPageLifecycle onContextLost={handleWebglContextLost} />
+      <RendererPageLifecycle
+        onContextLost={handleWebglContextLost}
+        onContextRestored={handleWebglContextRestored}
+      />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
@@ -571,11 +601,14 @@ export function UniverseCanvas({
         />
       )}
 
-      {(phase === "system" || keepSystemForHandoff) && selectedSystem && (
+      {webglAvailable && selectedSystem && (systemPresenting || (
+        nativeSystemKey !== null && canParkNativeSystem
+      )) && (
         selectedSystem.id.startsWith("yeis-system:") ? (
           <Suspense
+            key={nativeSystemKey}
             fallback={
-              <SystemScene
+              systemPresenting ? <SystemScene
                 system={selectedSystem}
                 starPointLightVisible={phase === "system"}
                 onSelectPlanet={onSelectPlanet}
@@ -584,11 +617,15 @@ export function UniverseCanvas({
                 handoffTargetPlanetId={handoffTargetPlanetId}
                 onHandoffTargetSuppressed={handleSystemTargetSuppressed}
                 onScaleFrame={setSystemScaleFrame}
-              />
+              /> : null
             }
           >
             <LazyYeisSystemScene
               system={selectedSystem}
+              phase={phase}
+              phaseRef={phaseRef}
+              presenting={systemPresenting}
+              onPresented={quality === "low" ? rememberPresentedSystem : undefined}
               starPointLightVisible={phase === "system"}
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}

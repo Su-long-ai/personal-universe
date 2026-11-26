@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import {
@@ -6,6 +6,7 @@ import {
   type PlanetDefinition,
   type QualityMode,
   type SystemDefinition,
+  type UniversePhase,
 } from "../../lib/universe/types";
 import { loadYeisCore } from "../../lib/universe/yeis";
 import { J2000_JD } from "../../vendor/yeis/core/constants";
@@ -28,8 +29,10 @@ import {
 import { LifecycleStars } from "./LifecycleStars";
 
 const HIT_RADIUS = 0.34;
+let nativeSystemInstanceSequence = 0;
 
 type NativeResources = {
+  instance: string;
   system: StarSystem;
   scene: THREE.Scene;
   bodies: BodyRenderer;
@@ -221,6 +224,10 @@ function ProductPlanetTarget({
 
 export function YeisSystemScene({
   system,
+  phase,
+  phaseRef,
+  presenting,
+  onPresented,
   starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
@@ -231,6 +238,10 @@ export function YeisSystemScene({
   quality,
 }: {
   system: SystemDefinition;
+  phase: UniversePhase;
+  phaseRef: MutableRefObject<UniversePhase>;
+  presenting: boolean;
+  onPresented?: () => void;
   starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
@@ -244,6 +255,7 @@ export function YeisSystemScene({
   const [resources, setResources] = useState<NativeResources | null>(null);
   const [failed, setFailed] = useState(false);
   const starId = nativeStarId(system);
+  const presentedResource = useRef<NativeResources | null>(null);
   const focusFrameRef = useRef(0);
   const focusedIdRef = useRef<string | null>(null);
   const focusedNativeIdRef = useRef<string | null>(null);
@@ -312,20 +324,16 @@ export function YeisSystemScene({
     let active = true;
     let created: NativeResources | null = null;
 
-    delete document.documentElement.dataset.universeSystemReady;
-    document.documentElement.dataset.universeSystemRenderer =
-      starId ? "yeis-native-loading" : "prototype";
-
     if (!starId) {
       setFailed(true);
-      return () => {
-        delete document.documentElement.dataset.universeSystemRenderer;
-        delete document.documentElement.dataset.universeSystemReady;
-      };
+      return;
     }
 
     void loadYeisCore()
       .then((runtime) => {
+        // A quick departure or key/context change can retire this instance while
+        // the shared runtime is still loading. Never allocate its old owner.
+        if (!active) return;
         const source = runtime.universe.system(starId);
         const { renderSystem, scale } = createRenderSystem(source);
         const renderScene = new THREE.Scene();
@@ -341,6 +349,7 @@ export function YeisSystemScene({
         const [r, g, b] = starLightColor(renderSystem.starTemperature);
 
         created = {
+          instance: `${starId}:${++nativeSystemInstanceSequence}`,
           system: renderSystem,
           scene: renderScene,
           bodies,
@@ -351,44 +360,79 @@ export function YeisSystemScene({
           sunColor: new THREE.Vector3(r, g, b),
         };
 
-        if (!active) {
-          disposeResources(created);
-          return;
-        }
-
         setResources(created);
         setFailed(false);
-        document.documentElement.dataset.universeSystemRenderer = "yeis-native";
-        document.documentElement.dataset.universeSystemReady = "true";
       })
       .catch((error) => {
         if (!active) return;
         console.error("[YEIS-NATIVE-SYSTEM] FAILED; retaining product fallback", error);
         setFailed(true);
-        document.documentElement.dataset.universeSystemRenderer =
-          "prototype-fallback";
-        delete document.documentElement.dataset.universeSystemReady;
       });
 
     return () => {
       active = false;
-      document.body.classList.remove("planet-hover");
-      delete document.documentElement.dataset.universeSystemRenderer;
-      delete document.documentElement.dataset.universeSystemReady;
-      delete document.documentElement.dataset.universeSystemFocus;
-      delete document.documentElement.dataset.universeSystemTargetSuppressed;
-      focusedIdRef.current = null;
-      focusedNativeIdRef.current = null;
-      focusFillRef.current.clear();
-      if (scaleFrameIdRef.current !== null) onScaleFrame?.(null);
-      scaleFrameIdRef.current = null;
-      suppressedHandoffIdRef.current = null;
       if (created) disposeResources(created);
     };
   }, [gl, starId]);
 
-  useFrame((state) => {
+  useEffect(() => {
+    const data = document.documentElement.dataset;
     if (!resources) return;
+    data.universeNativeSystemInstance = resources.instance;
+    return () => {
+      if (data.universeNativeSystemInstance === resources.instance) {
+        delete data.universeNativeSystemInstance;
+      }
+    };
+  }, [resources]);
+
+  useEffect(() => {
+    const data = document.documentElement.dataset;
+    if (resources) {
+      data.universeNativeSystemLifecycle = presenting ? "active" : "parked";
+    }
+    if (presenting) {
+      data.universeSystemRenderer = resources
+        ? "yeis-native"
+        : failed ? "prototype-fallback" : starId ? "yeis-native-loading" : "prototype";
+      if (resources) data.universeSystemReady = "true";
+    }
+    return () => {
+      delete data.universeNativeSystemLifecycle;
+      if (!presenting) return;
+      delete data.universeSystemRenderer;
+      delete data.universeSystemReady;
+    };
+  }, [failed, presenting, resources, starId]);
+
+  useEffect(() => {
+    if (!presenting) return;
+    return () => {
+      document.body.classList.remove("planet-hover");
+      delete document.documentElement.dataset.universeSystemFocus;
+      delete document.documentElement.dataset.universeSystemTargetSuppressed;
+      if (focusedIdRef.current !== null) onScaleFocus?.(null);
+      if (scaleFrameIdRef.current !== null) onScaleFrame?.(null);
+      focusedIdRef.current = null;
+      focusedNativeIdRef.current = null;
+      focusFillRef.current.clear();
+      scaleFrameIdRef.current = null;
+      scaleFrameTickRef.current = 0;
+      focusFrameRef.current = 0;
+      suppressedHandoffIdRef.current = null;
+    };
+  }, [onScaleFocus, onScaleFrame, presenting]);
+
+  // Like the retained Surface tree, the coordinator's synchronous phase
+  // invalidates a stale committed presentation before the existing draw.
+  // Keep the native objects/programs, not a hidden native simulation.
+  const ownsFrame = () => presenting && phaseRef.current === phase;
+  useFrame(() => {
+    if (resources) resources.scene.visible = ownsFrame();
+  }, -100);
+
+  useFrame((state) => {
+    if (!resources || !ownsFrame()) return;
 
     // Pinned YEIS renderers intentionally emit camera-relative coordinates
     // because their native host keeps the camera at a floating origin. Our R3F
@@ -523,14 +567,17 @@ export function YeisSystemScene({
     );
   });
 
-  useEffect(
-    () => () => {
-      if (focusedIdRef.current !== null) onScaleFocus?.(null);
-    },
-    [onScaleFocus],
-  );
+  useFrame(() => {
+    if (!onPresented || !resources || !resources.scene.visible ||
+        !ownsFrame() || presentedResource.current === resources) return;
+    // The original CinematicPipeline at priority 1 already submitted the
+    // scene. Mark eligibility once; this is not camera/endpoint evidence.
+    presentedResource.current = resources;
+    onPresented();
+  }, 2);
 
   if (!starId || failed || !resources) {
+    if (!presenting) return null;
     return (
       <SystemScene
         system={system}
@@ -547,18 +594,20 @@ export function YeisSystemScene({
 
   return (
     <>
-      <color attach="background" args={["#010208"]} />
-      <LifecycleStars
-        radius={90}
-        depth={45}
-        count={quality === "low" ? 900 : 1800}
-        factor={1.7}
-        saturation={0.22}
-        fade
-        speed={0.06}
-      />
-      <primitive object={resources.scene} />
-      {system.planets.map((planet) =>
+      {presenting && <>
+        <color attach="background" args={["#010208"]} />
+        <LifecycleStars
+          radius={90}
+          depth={45}
+          count={quality === "low" ? 900 : 1800}
+          factor={1.7}
+          saturation={0.22}
+          fade
+          speed={0.06}
+        />
+      </>}
+      <primitive object={resources.scene} visible={presenting} />
+      {presenting && system.planets.map((planet) =>
         planet.id === handoffTargetPlanetId ? null : (
           <ProductPlanetTarget
             key={planet.id}
