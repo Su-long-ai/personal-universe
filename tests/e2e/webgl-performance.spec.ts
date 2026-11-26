@@ -328,7 +328,10 @@ async function driveFullScaleRoundTrip(page: Page) {
   );
 }
 
-async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
+async function readWebglMetrics(
+  page: Page,
+  ownerTraceLimit?: number,
+): Promise<WebglMetrics> {
   const html = page.locator("html");
   await expect(html).toHaveAttribute("data-universe-webgl-renderer", /.+/);
   for (const attribute of [
@@ -345,13 +348,16 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
     });
   }
 
-  return page.evaluate(() => {
+  return page.evaluate((limit) => {
     const data = document.documentElement.dataset;
+    const programs = Number(data.universeWebglPrograms ?? 0);
     let ownerTrace: OwnerTraceSnapshot | undefined;
     try {
-      ownerTrace = (window as Window & {
-        __puProgramOwnersRead?: () => OwnerTraceSnapshot;
-      }).__puProgramOwnersRead?.();
+      if (limit === null || programs > limit) {
+        ownerTrace = (window as Window & {
+          __puProgramOwnersRead?: () => OwnerTraceSnapshot;
+        }).__puProgramOwnersRead?.();
+      }
     } catch {
       // Keep the established resource measurements as the test authority.
     }
@@ -361,7 +367,7 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       software: data.universeWebglSoftware === "true",
       geometries: Number(data.universeWebglGeometries ?? 0),
       textures: Number(data.universeWebglTextures ?? 0),
-      programs: Number(data.universeWebglPrograms ?? 0),
+      programs,
       calls: Number(data.universeWebglCalls ?? 0),
       triangles: Number(data.universeWebglTriangles ?? 0),
       allocations: Number(data.universeWorldPipelineAllocations ?? 0),
@@ -382,7 +388,7 @@ async function readWebglMetrics(page: Page): Promise<WebglMetrics> {
       sceneLifecycle: data.universeWorldSceneLifecycle ?? null,
       ownerTrace,
     };
-  });
+  }, ownerTraceLimit ?? null);
 }
 
 async function settleWebglMetrics(page: Page) {
@@ -761,6 +767,11 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
 
   const cycles: WebglMetrics[] = [];
   for (let cycle = 1; cycle <= 4; cycle += 1) {
+    // Snapshot warm-up identities, then traverse owner lifetimes only on a
+    // guard violation, with no extra browser round trip or wait.
+    const limit = cycle <= 2
+      ? undefined
+      : Math.max(cycles[0]!.programs, cycles[1]!.programs) + 1;
     const settled = await test.step(
       `Full scale journey ${cycle} of 4`,
       async () => {
@@ -773,7 +784,7 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
             async () => {
               await waitForYeis(page);
               await waitForNextWebglMetric(page, await readWebglMetricSample(page));
-              return readWebglMetrics(page);
+              return readWebglMetrics(page, limit);
             },
           );
         } catch (error) {
@@ -790,7 +801,11 @@ test("repeated full scale journeys keep WebGL resources bounded @webgl-heavy", a
     await attachMetrics(testInfo, `webgl-cycle-${cycle}.json`, metrics);
     if (ownerTrace) {
       await testInfo.attach(`webgl-program-owners-cycle-${cycle}.json`, {
-        body: JSON.stringify(ownerTrace),
+        body: JSON.stringify({
+          metricSample: metrics.sample,
+          programLimit: limit ?? null,
+          ...ownerTrace,
+        }),
         contentType: "application/json",
       });
     }
