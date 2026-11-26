@@ -1238,7 +1238,12 @@ export function YeisGalaxyScene({
           34,
           Math.min(delta, 1 / 30),
         );
-        scalePosition = Math.abs(intermediate - targetScalePosition) < 0.00045
+        // The pinned YEIS geometry already has near-zero slope at the
+        // matched System endpoint. Finish its imperceptible tail before
+        // awaiting paint, especially on slow/software WebGL. Interior
+        // targets still settle to the full diagnostic precision.
+        const settleEpsilon = targetScalePosition === 1 ? 0.007 : 0.00045;
+        scalePosition = Math.abs(intermediate - targetScalePosition) < settleEpsilon
           ? targetScalePosition
           : intermediate;
         bridge.renderedScalePosition = scalePosition;
@@ -1307,9 +1312,11 @@ export function YeisGalaxyScene({
     if (scaleBridgeActive && scaleBridgeRef.current) {
       const bridge = scaleBridgeRef.current;
       document.documentElement.dataset.universeGalaxyScaleAppliedPosition =
-        // Round interior values inward at the upper boundary. "1.000" is
-        // reserved for the exact applied frame that publishes the entry view.
-        (scalePosition === 1 ? 1 : Math.min(scalePosition, 0.999)).toFixed(3);
+        // A three-decimal acknowledgement is reserved for the exact target
+        // frame. Interior six-decimal samples must not look falsely settled.
+        scalePosition === targetScalePosition
+          ? scalePosition.toFixed(3)
+          : Math.min(scalePosition, 0.999999).toFixed(6);
       document.documentElement.dataset.universeTravelArrivalRatio =
         (
           state.controller.position.distanceTo(

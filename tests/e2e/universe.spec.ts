@@ -2555,6 +2555,43 @@ test("Galaxy reversal redirects the next painted frame before old wheel motion s
   await expect(html).not.toHaveAttribute("data-universe-traveling");
 });
 
+test("rapid outward notches cannot hand off Approach before its actual 2.000 frame", async ({ page }) => {
+  await page.goto("/?phase=approach&star=h-aurora&body=aurora-01&freeze=1");
+  await waitForYeisEngine(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-camera-settled", "approach");
+  const box = await page.locator("canvas").boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.wheel(0, -72);
+  await expect(html).toHaveAttribute("data-universe-cinematic-scale-applied-position", "2.375");
+
+  const trace = html.evaluate((root) => new Promise<Array<[string, string]>>((resolve) => {
+    const frames: Array<[string, string]> = [];
+    const canvas = root.querySelector("canvas")!;
+    let sent = false;
+    const observe = () => {
+      const phase = root.getAttribute("data-universe-navigation-phase") ?? "";
+      const applied = root.getAttribute("data-universe-cinematic-scale-applied-position") ?? "";
+      const target = root.getAttribute("data-universe-scale-position");
+      frames.push([phase, applied]);
+      if (!sent && target === "2.000" && +applied > 2.025) {
+        sent = true;
+        canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 72, bubbles: true, cancelable: true }));
+      }
+      if ((sent && phase === "system") || frames.length >= 120) resolve(frames);
+      else requestAnimationFrame(observe);
+    };
+    requestAnimationFrame(observe);
+  }));
+  await page.mouse.wheel(0, 72);
+  const frames = await trace;
+  expect(frames[frames.length - 1][0]).toBe("system");
+  expect(frames.some(([phase, applied]) => phase === "approach" && applied === "2.000"), JSON.stringify(frames)).toBe(true);
+  await expect(html).toHaveAttribute("data-universe-scale-position", "1.750");
+  await expect(html).not.toHaveAttribute("data-universe-traveling");
+});
+
 test("wheel from a located galaxy uses native scale instead of landmark travel", async ({ page }, testInfo) => {
   const runtime = await observeRuntime(page);
   await page.goto("/?destination=galaxy:0&navigation=locate&freeze=1");
@@ -4576,15 +4613,10 @@ test("Galaxy direct scale keeps one captured physical path through intermediate 
       "data-universe-galaxy-scale-target",
       target,
     );
-    await expect
-      .poll(async () =>
-        Number(
-          await html.getAttribute(
-            "data-universe-galaxy-scale-applied-position",
-          ),
-        ),
-      )
-      .toBeCloseTo(expected, 2);
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-applied-position",
+      expected.toFixed(3),
+    );
     const ratio = Number(
       await html.getAttribute("data-universe-travel-arrival-ratio"),
     );
@@ -4744,8 +4776,12 @@ test("Galaxy direct scale accepts tiny mixed trackpad deltas across pauses", asy
     "no-galaxy-focus",
   );
 
-  // Mixed reverse samples retrace the same curve instead of scheduling a
-  // separate return animation.
+  // This case measures exact retracing of a settled tiny input. The
+  // separate active-reversal case intentionally interrupts a moving pose.
+  await expect(html).toHaveAttribute(
+    "data-universe-galaxy-scale-applied-position",
+    accumulated.toFixed(3),
+  );
   await dispatchScaleWheel(page, 8);
   accumulated -= 8 / 384;
   await expect
@@ -5263,6 +5299,10 @@ test("LOW repeated 0 to 5 to 0 journeys retain one Canvas and terrain allocation
     );
     await expect(html).toHaveAttribute(
       "data-universe-scale-position",
+      "0.000",
+    );
+    await expect(html).toHaveAttribute(
+      "data-universe-galaxy-scale-applied-position",
       "0.000",
     );
     await expect(html).toHaveAttribute(

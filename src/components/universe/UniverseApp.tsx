@@ -278,6 +278,29 @@ function clearSystemApproachHandoffEvidence() {
   delete data.universeHandoffEntryQuaternion;
 }
 
+function systemApproachFramePresented(): boolean {
+  const data = document.documentElement.dataset;
+  return data.universeCinematicScaleAppliedPosition === "2.000" &&
+    Boolean(data.universeHandoffExitProjectedRadius);
+}
+
+function retargetScaleReversal(
+  requested: number,
+  direction: ContinuousScaleDirection,
+  painted: string | null,
+  min: number,
+  max: number,
+  step: (position: number) => number,
+): number {
+  const position = painted === null ? Number.NaN : Number(painted);
+  if (!Number.isFinite(position) || position < min || position > max) {
+    return requested;
+  }
+  return (direction === "out" ? requested >= position : requested <= position)
+    ? step(position)
+    : requested;
+}
+
 function preferredScalePlanet(
   system: SystemDefinition,
   preferred: UniverseNavigationDestination | null,
@@ -711,6 +734,9 @@ export default function UniverseApp({
   // renderer's matched endpoint. Keep only that bounded coordinate, not a
   // sequence of wheel events. It cannot outlive reversal or navigation.
   const inwardScaleIntentRef = useRef<number | null>(null);
+  // Outward carry shares the same intent epoch/paint fence as inward carry.
+  // They are mutually exclusive: a new direction or navigation clears it.
+  const outwardScaleIntentRef = useRef<number | null>(null);
   const scaleWheelRef = useRef<{
     direction: ContinuousScaleDirection | null;
     lastAt: number;
@@ -789,6 +815,7 @@ export default function UniverseApp({
     ) => {
       continuousScaleIntentEpochRef.current += 1;
       inwardScaleIntentRef.current = null;
+      outwardScaleIntentRef.current = null;
       lockedGalaxyScaleFocusRef.current = null;
       lockedSystemScaleFocusRef.current = null;
       if (!options.preserveGalaxyScaleBridge) {
@@ -2428,11 +2455,7 @@ export default function UniverseApp({
           phaseRef.current === "system" &&
           worldScalePositionRef.current >=
             WORLD_SCALE_MIN - WORLD_SCALE_EPSILON,
-        isRendererReady: () =>
-          inwardScaleIntentRef.current === null ||
-          Boolean(
-            document.documentElement.dataset.universeHandoffExitProjectedRadius,
-          ),
+        isRendererReady: systemApproachFramePresented,
         commit: () => {
           if (destination) {
             void handleNavigateDestination(destination, {
@@ -2474,7 +2497,15 @@ export default function UniverseApp({
       selectedSystemRef.current = system;
       setSelectedSystem(system);
       setSelectedPlanet(null);
-      setSystemScaleTargetPlanet(null);
+      // A carried inward gesture has already chosen its next destination.
+      // Prewarm that native System frame on entry, rather than waiting for
+      // the settled callback to allocate it. The camera still waits for its
+      // exact entry/exit paint; no coordinate or phase is skipped.
+      setSystemScaleTargetPlanet(
+        (inwardScaleIntentRef.current ?? SYSTEM_SCALE_MIN) > SYSTEM_SCALE_MIN
+          ? preferredScalePlanet(system, focus)
+          : null,
+      );
       setScrollDepth(0);
       setNavigationRequest(null);
       setNavigationStatus("arrived");
@@ -2613,6 +2644,7 @@ export default function UniverseApp({
         wheel.direction = direction;
         if (directionChanged) {
           inwardScaleIntentRef.current = null;
+          outwardScaleIntentRef.current = null;
           continuousScaleIntentEpochRef.current += 1;
           document.documentElement.dataset.universeScaleReversal = String(
             wheel.gesture,
@@ -2733,16 +2765,12 @@ export default function UniverseApp({
             );
             // Reversal must turn the rendered camera, not first run down
             // an unpainted backlog of previous-direction wheel intent.
-            if (
-              directionChanged &&
-              Number.isFinite(nativeAppliedPosition) &&
-              (direction === "out"
-                ? nextPosition >= nativeAppliedPosition
-                : nextPosition <= nativeAppliedPosition)
-            ) {
-              nextPosition = applyGalaxyScaleWheel(
-                nativeAppliedPosition,
-                normalizedDelta,
+            if (directionChanged) {
+              nextPosition = retargetScaleReversal(
+                nextPosition, direction,
+                document.documentElement.getAttribute("data-universe-galaxy-scale-applied-position"),
+                GALAXY_SCALE_MIN, SYSTEM_SCALE_MIN,
+                (position) => applyGalaxyScaleWheel(position, normalizedDelta),
               );
             }
 
@@ -2827,22 +2855,43 @@ export default function UniverseApp({
           direction === "out" &&
           currentPosition <= WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
         ) {
-          // Preserve the physical wheel sample across the Approach -> System
-          // renderer boundary. The boundary itself must not consume input:
-          // a normalized +96 sample moves 2 -> 1.5, then the next 1.5 -> 1.
-          const nextPosition = applySystemScaleWheel(
-            WORLD_SCALE_MIN,
-            normalizedDelta,
-          );
-          setSystemScaleTargetPlanet(selectedPlanet);
-          publishWorldScalePosition(nextPosition, true);
-          setWorldScaleContinuous(true);
-          document.documentElement.dataset.universeScaleDirection = direction;
-          document.documentElement.dataset.universeScaleProgress =
-            systemScaleSegmentProgress(nextPosition).toFixed(3);
-          setWorldScalePhase("system", {
-            preserveWorldScalePosition: true,
-          });
+          const publishSystemReturn = (position: number) => {
+            outwardScaleIntentRef.current = null;
+            setSystemScaleTargetPlanet(selectedPlanet);
+            publishWorldScalePosition(position, true);
+            setWorldScaleContinuous(true);
+            document.documentElement.dataset.universeScaleDirection = "out";
+            document.documentElement.dataset.universeScaleProgress =
+              systemScaleSegmentProgress(position).toFixed(3);
+            setWorldScalePhase("system", { preserveWorldScalePosition: true });
+          };
+          // An outward notch can reach System in input space before the
+          // existing close-world camera has actually painted Approach=2.
+          // Keep only the bounded delivered coordinate while that frame
+          // arrives; do not create a timed trip or release a stale view.
+          const held = outwardScaleIntentRef.current;
+          const nextPosition = applySystemScaleWheel(held ?? WORLD_SCALE_MIN, normalizedDelta);
+          const data = document.documentElement.dataset;
+          if (Number(data.universeCinematicScaleAppliedPosition) > WORLD_SCALE_MIN) {
+            outwardScaleIntentRef.current = nextPosition;
+            if (held === null) {
+              const intentEpoch = continuousScaleIntentEpochRef.current;
+              scheduleScaleRendererHandoff({
+                label: "approach-system",
+                isCurrent: () =>
+                  continuousScaleIntentEpochRef.current === intentEpoch &&
+                  phaseRef.current === currentPhase &&
+                  outwardScaleIntentRef.current !== null,
+                isRendererReady: () => data.universeCinematicScaleAppliedPosition === "2.000",
+                commit: () => {
+                  const delivered = outwardScaleIntentRef.current;
+                  if (delivered !== null) publishSystemReturn(delivered);
+                },
+              });
+            }
+          } else {
+            publishSystemReturn(nextPosition);
+          }
           return;
         }
 
@@ -2857,11 +2906,16 @@ export default function UniverseApp({
           return;
         }
 
-        const nextPosition = applyWorldScaleWheel(
-          currentPosition,
-          normalizedDelta,
-          selectedPlanet.surfaceMode,
-        );
+        const stepWorld = (position: number) =>
+          applyWorldScaleWheel(position, normalizedDelta, selectedPlanet.surfaceMode);
+        const requested = stepWorld(currentPosition);
+        const nextPosition = directionChanged
+          ? retargetScaleReversal(
+              requested, direction,
+              document.documentElement.getAttribute("data-universe-cinematic-scale-applied-position"),
+              WORLD_SCALE_MIN, maxPosition, stepWorld,
+            )
+          : requested;
 
         if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
           return;
@@ -2999,20 +3053,28 @@ export default function UniverseApp({
         const deliveredPosition =
           intentPosition +
           continuousScaleInputResponseDelta(intentPosition, normalizedDelta);
-        // Ordinary System input remains immediate; only the native Galaxy
-        // readiness hold can start an unapplied coordinate. Do not turn
-        // ordinary endpoint paint latency into a second buffering mechanism.
+        // Reuse the one carried coordinate at the matched renderer boundary.
+        // Additional delivered samples cannot begin Approach before its System
+        // exit frame, but must not disappear while that frame is arriving.
         if (
           direction === "in" &&
-          inwardScaleIntentRef.current !== null &&
-          deliveredPosition > WORLD_SCALE_MIN + WORLD_SCALE_EPSILON
+          deliveredPosition > WORLD_SCALE_MIN + WORLD_SCALE_EPSILON &&
+          (inwardScaleIntentRef.current !== null ||
+            (currentPosition >= WORLD_SCALE_MIN - WORLD_SCALE_EPSILON &&
+              !systemApproachFramePresented()))
         ) {
           inwardScaleIntentRef.current = deliveredPosition;
         }
-        const nextPosition = applySystemScaleWheel(
-          currentPosition,
-          normalizedDelta,
-        );
+        const stepSystem = (position: number) =>
+          applySystemScaleWheel(position, normalizedDelta);
+        const requested = stepSystem(currentPosition);
+        const nextPosition = directionChanged
+          ? retargetScaleReversal(
+              requested, direction,
+              document.documentElement.getAttribute("data-universe-cinematic-scale-applied-position"),
+              SYSTEM_SCALE_MIN, WORLD_SCALE_MIN, stepSystem,
+            )
+          : requested;
 
         if (Math.abs(nextPosition - currentPosition) <= WORLD_SCALE_EPSILON) {
           // Preserve the already-scheduled System→Approach handoff while

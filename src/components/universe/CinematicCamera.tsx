@@ -8,7 +8,7 @@ import {
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, type CameraControls as CameraControlsApi } from "@react-three/drei";
 import CameraControlsImpl from "camera-controls";
-import { PerspectiveCamera, Quaternion, Vector3 } from "three";
+import { MathUtils, Matrix4, PerspectiveCamera, Quaternion, Vector3 } from "three";
 import {
   PLANET_ANCHOR,
   PLANET_RENDER_RADIUS,
@@ -66,6 +66,34 @@ type CinematicCameraProps = {
 };
 
 const WORLD = PLANET_ANCHOR;
+const SCALE_RENDER_EPSILON = 0.00045;
+const SYSTEM_SCALE_MAX_ANGLE_STEP = MathUtils.degToRad(20);
+const WORLD_UP = new Vector3(0, 1, 0);
+const ZERO = new Vector3();
+type RenderScaleStep = {
+  phase: UniversePhase;
+  target: number;
+  min: number;
+  max: number;
+  apply: (position: number) => void;
+  clampAngleStep?: (from: number, to: number) => number;
+  previous: number | null;
+};
+
+type RenderScaleMotion = {
+  phase: UniversePhase;
+  target: number;
+  initialGap: number;
+};
+
+function formatRenderedScale(position: number, target: number): string {
+  // A rounded intermediate must never claim the exact applied token (e.g.
+  // 2.000 for System exit). Use the compact token only at the actual target.
+  const exactToken = position.toFixed(3);
+  return position === target && Number(exactToken) === position
+    ? exactToken
+    : position.toFixed(6);
+}
 
 const DISABLED_MOUSE = {
   left: CameraControlsImpl.ACTION.NONE,
@@ -224,10 +252,14 @@ export function CinematicCamera({
     surfaceFallbackRequested ? surfaceFallbackReady : worldFrameReady;
   const surfaceRendererMode: SurfaceManualCameraView["renderer"] =
     surfaceFallbackAvailable ? "fallback" : "live";
+  const renderedScalePosition = useRef<number | null>(null);
+  const renderScaleStep = useRef<RenderScaleStep | null>(null);
+  const renderScaleMotion = useRef<RenderScaleMotion | null>(null);
   const continuousSystemCamera =
     phase === "system" &&
     worldScaleContinuous &&
-    worldScalePosition > 1 + WORLD_SCALE_EPSILON;
+    (worldScalePosition > 1 + WORLD_SCALE_EPSILON ||
+      (Boolean(systemScaleFrame) && renderScaleStep.current?.phase === "system"));
   const activeSurfaceCameraFrame =
     phase === "surface" || worldScalePosition > 4
       ? surfaceCameraFrame
@@ -252,14 +284,10 @@ export function CinematicCamera({
   const currentTarget = useRef(new Vector3());
   const desiredPosition = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
-  const scratchWorldUp = useRef(new Vector3(0, 1, 0));
   const scratchSurfaceUp = useRef(new Vector3());
   const scratchSystemTarget = useRef(new Vector3());
   const scratchSystemPosition = useRef(new Vector3());
   const scratchForward = useRef(new Vector3());
-  const scratchApproachTarget = useRef(new Vector3());
-  const scratchApproachPosition = useRef(new Vector3());
-  const scratchApproachDirection = useRef(new Vector3());
   const scratchEndpointOffset = useRef(new Vector3());
   const scratchEndpointTarget = useRef(new Vector3());
   const scratchSystemDirection = useRef(new Vector3());
@@ -269,6 +297,12 @@ export function CinematicCamera({
   const scratchToPosition = useRef(new Vector3());
   const scratchToTarget = useRef(new Vector3());
   const scratchNativeQuaternion = useRef(new Quaternion());
+  const scratchScaleAngleMatrix = useRef(new Matrix4());
+  const scratchScaleAngleCurrent = useRef(new Quaternion());
+  const scratchScaleAngleNext = useRef(new Quaternion());
+  const scratchScaleDirectionRotation = useRef(new Quaternion());
+  const scratchScaleAngleDirection = useRef(new Vector3());
+  const scratchScaleAngleUp = useRef(new Vector3());
   const desiredPositionTolerance = useRef(0);
   const desiredTargetTolerance = useRef(0);
   const worldFrameReadyRef = useRef(currentWorldFrameReady);
@@ -371,9 +405,9 @@ export function CinematicCamera({
         continuousSystemCamera || continuousWorldCamera;
       if (
         continuousScaleCamera &&
-        (continuousSystemCamera ||
-          Math.abs(worldScalePosition - scalePhaseIndex(phase)) >
-            WORLD_SCALE_EPSILON)
+        (Math.abs(worldScalePosition - scalePhaseIndex(phase)) >
+          WORLD_SCALE_EPSILON ||
+          renderedScalePosition.current !== worldScalePosition)
       ) {
         return;
       }
@@ -538,6 +572,10 @@ export function CinematicCamera({
   const handleUserControlStart = useCallback(() => {
     if (!manualCameraEnabled) return;
     manualOverride.current = true;
+    renderScaleStep.current = null;
+    renderScaleMotion.current = null;
+    renderedScalePosition.current = null;
+    delete document.documentElement.dataset.universeCinematicScaleAppliedPosition;
     completedPhase.current = null;
     transitionGeneration.current += 1;
     if (transitionWatchdog.current !== null) {
@@ -614,6 +652,7 @@ export function CinematicCamera({
     completedPhase.current = null;
     configuredPhase.current = null;
     manualOverride.current = false;
+    renderScaleStep.current = null;
     transitionGeneration.current += 1;
     const generation = transitionGeneration.current;
     if (transitionWatchdog.current !== null) {
@@ -642,6 +681,7 @@ export function CinematicCamera({
         "system:approach";
       document.documentElement.dataset.universeSystemScaleFrame =
         "awaiting";
+      delete document.documentElement.dataset.universeCinematicScaleAppliedPosition;
       return;
     }
     if (systemScaleFrame) {
@@ -691,54 +731,47 @@ export function CinematicCamera({
       camera.updateProjectionMatrix();
     }
 
-    if (
-      phase === "surface" &&
-      !surfaceFallback &&
-      activeSurfaceCameraFrame
-    ) {
-      camera.up.set(...activeSurfaceCameraFrame.up).normalize();
-    } else if (
-      continuousSystemCamera &&
-      nativeSystemEntryQuaternion
-    ) {
-      const linearUpT = Math.min(
-        1,
-        Math.max(0, worldScalePosition - 1),
-      );
-      const upT = continuousScaleResponse(linearUpT);
-      camera.up
-        .set(0, 1, 0)
-        .applyQuaternion(nativeSystemEntryQuaternion)
-        .lerp(scratchWorldUp.current.set(0, 1, 0), upT)
-        .normalize();
-    } else if (nativeSystemEntryQuaternion) {
-      camera.up
-        .set(0, 1, 0)
-        .applyQuaternion(nativeSystemEntryQuaternion)
-        .normalize();
-    } else if (
-      continuousWorldCamera &&
-      activeSurfaceCameraFrame &&
-      worldScalePosition > 4
-    ) {
-      const surfaceInfluence = continuousScaleResponse(
-        Math.min(1, worldScalePosition - 4),
-      );
-      camera.up
-        .set(0, 1, 0)
-        .lerp(
-          scratchSurfaceUp.current
-            .set(...activeSurfaceCameraFrame.up)
-            .normalize(),
-          surfaceInfluence,
-        )
-        .normalize();
-    } else {
-      camera.up.set(0, 1, 0);
-    }
-    controls.updateCameraUp();
+    const resolveCameraUp = (up: Vector3, position: number) => {
+      if (continuousSystemCamera && nativeSystemEntryQuaternion) {
+        const upT = continuousScaleResponse(Math.max(0, position - 1));
+        up
+          .set(0, 1, 0)
+          .applyQuaternion(nativeSystemEntryQuaternion)
+          .lerp(WORLD_UP, upT)
+          .normalize();
+      } else if (nativeSystemEntryQuaternion) {
+        up
+          .set(0, 1, 0)
+          .applyQuaternion(nativeSystemEntryQuaternion)
+          .normalize();
+      } else if (
+        activeSurfaceCameraFrame &&
+        !surfaceFallback &&
+        (phase === "surface" || (continuousWorldCamera && position > 4))
+      ) {
+        const surfaceInfluence = continuousWorldCamera
+          ? continuousScaleResponse(Math.min(1, Math.max(0, position - 4)))
+          : 1;
+        up
+          .set(0, 1, 0)
+          .lerp(
+            scratchSurfaceUp.current
+              .set(...activeSurfaceCameraFrame.up)
+              .normalize(),
+            surfaceInfluence,
+          )
+          .normalize();
+      } else {
+        up.set(0, 1, 0);
+      }
+    };
+    const applyCameraUp = (position: number) => {
+      resolveCameraUp(camera.up, position);
+      controls.updateCameraUp();
+    };
 
     if (phase === "galaxy") {
+      applyCameraUp(worldScalePosition);
       controls.smoothTime = reducedMotion ? 0.05 : 0.58;
       controls.maxSpeed = 38;
       void controls.setLookAt(
@@ -757,317 +790,369 @@ export function CinematicCamera({
       const systemShot = SHOTS.system;
       const approachShot = SHOTS.approach;
       if (!systemShot || !approachShot) return;
+      const systemAngleDirection = nativeSystemEntryQuaternion
+        ? new Vector3(0, 0, 1).applyQuaternion(nativeSystemEntryQuaternion).normalize()
+        : new Vector3(...systemShot.position).sub(new Vector3(...systemShot.target)).normalize();
+      const approachAngleDirection = new Vector3(...approachShot.position)
+        .sub(new Vector3(...approachShot.target))
+        .normalize();
+      // Keep the existing normalized direction interpolation; exactly
+      // opposed endpoint directions otherwise have no finite midpoint.
+      const antipodalRotation = systemAngleDirection.dot(approachAngleDirection) < -0.9999
+        ? new Quaternion().setFromUnitVectors(systemAngleDirection, approachAngleDirection)
+        : null;
+      const interpolateSystemDirection = (out: Vector3, t: number) => {
+        if (antipodalRotation) {
+          return out.copy(systemAngleDirection).applyQuaternion(
+            scratchScaleDirectionRotation.current.identity().slerp(antipodalRotation, t),
+          );
+        }
+        return out.copy(systemAngleDirection).lerp(approachAngleDirection, t).normalize();
+      };
+      const anglePose = (position: number, out: Quaternion) => {
+        const t = continuousScaleResponse(Math.max(0, position - 1));
+        const direction = interpolateSystemDirection(scratchScaleAngleDirection.current, t);
+        const up = scratchScaleAngleUp.current;
+        resolveCameraUp(up, position);
+        scratchScaleAngleMatrix.current.lookAt(direction, ZERO, up);
+        return out.setFromRotationMatrix(scratchScaleAngleMatrix.current);
+      };
+      renderScaleStep.current = {
+        phase,
+        target: worldScalePosition,
+        min: 1,
+        max: 2,
+        previous: null,
+        clampAngleStep(from, to) {
+          const current = anglePose(from, scratchScaleAngleCurrent.current);
+          const next = scratchScaleAngleNext.current;
+          if (current.angleTo(anglePose(to, next)) <= SYSTEM_SCALE_MAX_ANGLE_STEP) return to;
+          // Normalized direction lerp can turn sharply midway between nearly
+          // opposite directions even if the coordinate step itself is small.
+          // Limit movement along that same authored path, not its geometry.
+          let low = 0;
+          let high = 1;
+          for (let i = 0; i < 8; i += 1) {
+            const mid = (low + high) / 2;
+            if (current.angleTo(anglePose(MathUtils.lerp(from, to, mid), next)) <= SYSTEM_SCALE_MAX_ANGLE_STEP) {
+              low = mid;
+            } else {
+              high = mid;
+            }
+          }
+          return MathUtils.lerp(from, to, low);
+        },
+        apply(position) {
+          applyCameraUp(position);
+          const systemTarget = scratchSystemTarget.current.set(
+            ...systemShot.target,
+          );
+          const systemPosition = scratchSystemPosition.current.set(
+            ...systemShot.position,
+          );
+          if (systemShot.frameScale) {
+            const distance =
+              controls.getDistanceToFitSphere(
+                systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
+              ) * systemShot.frameScale;
+            if (nativeSystemEntryQuaternion) {
+              const forward = scratchForward.current
+                .set(0, 0, -1)
+                .applyQuaternion(nativeSystemEntryQuaternion)
+                .normalize();
+              systemPosition
+                .copy(systemTarget)
+                .addScaledVector(forward, -distance);
+            } else {
+              systemPosition
+                .sub(systemTarget)
+                .normalize()
+                .multiplyScalar(distance)
+                .add(systemTarget);
+            }
+          }
 
-      const systemTarget = scratchSystemTarget.current.set(
-        ...systemShot.target,
-      );
-      const systemPosition = scratchSystemPosition.current.set(
-        ...systemShot.position,
-      );
-      if (systemShot.frameScale) {
-        const distance =
-          controls.getDistanceToFitSphere(
-            systemShot.fitRadius ?? SYSTEM_OVERVIEW_RADIUS,
-          ) * systemShot.frameScale;
-        if (nativeSystemEntryQuaternion) {
-          const forward = scratchForward.current
-            .set(0, 0, -1)
-            .applyQuaternion(nativeSystemEntryQuaternion)
-            .normalize();
-          systemPosition
-            .copy(systemTarget)
-            .addScaledVector(forward, -distance);
-        } else {
-          systemPosition
-            .sub(systemTarget)
-            .normalize()
+          // Preserve the authored Approach composition at the renderer boundary:
+          // the target offset is expressed as a fraction of planet radius, while
+          // the viewing direction comes from the existing Approach shot. Reuse
+          // scratch vectors here because this path runs for every continuous frame.
+          const endpointTargetOffset = scratchEndpointOffset.current
+            .set(...approachShot.target)
+            .sub(scratchFrameCenter.current.set(...WORLD))
+            .multiplyScalar(
+              Math.max(systemScaleFrame.radius, 1e-8) / PLANET_RENDER_RADIUS,
+            );
+          const endpointTarget = scratchEndpointTarget.current
+            .set(...systemScaleFrame.position)
+            .add(endpointTargetOffset);
+
+          const linearT = Math.min(
+            1,
+            Math.max(0, position - 1),
+          );
+          const t = continuousScaleResponse(linearT);
+          const direction = interpolateSystemDirection(scratchSystemDirection.current, t);
+
+          const startDistance = Math.max(
+            1e-8,
+            systemPosition.distanceTo(systemTarget),
+          );
+          const endpointDistance = Math.max(
+            1e-8,
+            framedWorldDistance(
+              controls,
+              Math.max(systemScaleFrame.radius, 1e-8),
+              approachShot.frameScale ?? 1,
+            ),
+          );
+          const distance = Math.exp(
+            Math.log(startDistance) * (1 - t) +
+              Math.log(endpointDistance) * t,
+          );
+
+          desiredTarget.current.lerpVectors(
+            systemTarget,
+            endpointTarget,
+            t,
+          );
+          desiredPosition.current
+            .copy(direction)
             .multiplyScalar(distance)
-            .add(systemTarget);
-        }
-      }
+            .add(desiredTarget.current);
+          desiredPositionTolerance.current = Math.min(
+            systemShot.positionTolerance,
+            approachShot.positionTolerance,
+          );
+          desiredTargetTolerance.current = Math.min(
+            systemShot.targetTolerance,
+            approachShot.targetTolerance,
+          );
+          configuredPhase.current = phase;
 
-      // Preserve the authored Approach composition at the renderer boundary:
-      // the target offset is expressed as a fraction of planet radius, while
-      // the viewing direction comes from the existing Approach shot. Reuse
-      // scratch vectors here because this path runs for every continuous frame.
-      const approachTarget = scratchApproachTarget.current.set(
-        ...approachShot.target,
-      );
-      const approachPosition = scratchApproachPosition.current.set(
-        ...approachShot.position,
-      );
-      const approachDirection = scratchApproachDirection.current
-        .copy(approachPosition)
-        .sub(approachTarget)
-        .normalize();
-      const endpointTargetOffset = scratchEndpointOffset.current
-        .set(...approachShot.target)
-        .sub(scratchFrameCenter.current.set(...WORLD))
-        .multiplyScalar(
-          Math.max(systemScaleFrame.radius, 1e-8) / PLANET_RENDER_RADIUS,
-        );
-      const endpointTarget = scratchEndpointTarget.current
-        .set(...systemScaleFrame.position)
-        .add(endpointTargetOffset);
+          controls.smoothTime = 0.05;
+          controls.maxSpeed = 1000;
+          void controls.setLookAt(
+            desiredPosition.current.x,
+            desiredPosition.current.y,
+            desiredPosition.current.z,
+            desiredTarget.current.x,
+            desiredTarget.current.y,
+            desiredTarget.current.z,
+            false,
+          );
+          controls.update(0);
 
-      const systemDirection = scratchSystemDirection.current
-        .copy(systemPosition)
-        .sub(systemTarget)
-        .normalize();
-      const linearT = Math.min(
-        1,
-        Math.max(0, worldScalePosition - 1),
-      );
-      const t = continuousScaleResponse(linearT);
-      const direction = systemDirection
-        .lerp(approachDirection, t)
-        .normalize();
-
-      const startDistance = Math.max(
-        1e-8,
-        systemPosition.distanceTo(systemTarget),
-      );
-      const endpointDistance = Math.max(
-        1e-8,
-        framedWorldDistance(
-          controls,
-          Math.max(systemScaleFrame.radius, 1e-8),
-          approachShot.frameScale ?? 1,
-        ),
-      );
-      const distance = Math.exp(
-        Math.log(startDistance) * (1 - t) +
-          Math.log(endpointDistance) * t,
-      );
-
-      desiredTarget.current.lerpVectors(
-        systemTarget,
-        endpointTarget,
-        t,
-      );
-      desiredPosition.current
-        .copy(direction)
-        .multiplyScalar(distance)
-        .add(desiredTarget.current);
-      desiredPositionTolerance.current = Math.min(
-        systemShot.positionTolerance,
-        approachShot.positionTolerance,
-      );
-      desiredTargetTolerance.current = Math.min(
-        systemShot.targetTolerance,
-        approachShot.targetTolerance,
-      );
-      configuredPhase.current = phase;
-
-      controls.smoothTime = 0.05;
-      controls.maxSpeed = 1000;
-      controls.stop();
-      void controls.setLookAt(
-        desiredPosition.current.x,
-        desiredPosition.current.y,
-        desiredPosition.current.z,
-        desiredTarget.current.x,
-        desiredTarget.current.y,
-        desiredTarget.current.z,
-        false,
-      );
-      controls.update(0);
-
-      document.documentElement.dataset.universeCameraMode =
-        "scale-continuous";
-      document.documentElement.dataset.universeScaleCameraSegment =
-        "system:approach";
-      document.documentElement.dataset.universeScaleSegment =
-        "system:approach";
-      document.documentElement.dataset.universeSystemScaleDistance =
-        distance.toExponential(4);
-      publishScaleFrameDiagnostics(
-        scratchFrameCenter.current.set(...systemScaleFrame.position),
-        systemScaleFrame.radius,
-      );
-      if (worldScalePosition >= 2 - WORLD_SCALE_EPSILON) {
-        const html = document.documentElement;
-        if (html.dataset.universeProjectedRadius) {
-          html.dataset.universeHandoffExitProjectedRadius =
-            html.dataset.universeProjectedRadius;
-        }
-        if (html.dataset.universeCameraQuaternion) {
-          html.dataset.universeHandoffExitQuaternion =
-            html.dataset.universeCameraQuaternion;
-        }
-      }
+          document.documentElement.dataset.universeCameraMode =
+            "scale-continuous";
+          document.documentElement.dataset.universeScaleCameraSegment =
+            "system:approach";
+          document.documentElement.dataset.universeScaleSegment =
+            "system:approach";
+          document.documentElement.dataset.universeSystemScaleDistance =
+            distance.toExponential(4);
+          publishScaleFrameDiagnostics(
+            scratchFrameCenter.current.set(...systemScaleFrame.position),
+            systemScaleFrame.radius,
+          );
+          if (position === 1) publishIfReached(generation);
+          if (position === 2) {
+            const html = document.documentElement;
+            if (html.dataset.universeProjectedRadius) {
+              html.dataset.universeHandoffExitProjectedRadius =
+                html.dataset.universeProjectedRadius;
+            }
+            if (html.dataset.universeCameraQuaternion) {
+              html.dataset.universeHandoffExitQuaternion =
+                html.dataset.universeCameraQuaternion;
+            }
+          }
+        },
+      };
       return;
     }
 
     if (continuousWorldCamera) {
-      const clampedPosition = Math.max(
-        2,
-        Math.min(5, worldScalePosition),
-      );
-      const lowerIndex = Math.min(5, Math.floor(clampedPosition));
-      const upperIndex = Math.min(5, lowerIndex + 1);
-      const phaseForIndex = (index: number): UniversePhase =>
-        index >= 5
-          ? "surface"
-          : index >= 4
-            ? "atmosphere"
-            : index >= 3
-              ? "orbit"
-              : "approach";
-      const lowerPhase = phaseForIndex(lowerIndex);
-      const upperPhase = phaseForIndex(upperIndex);
-      const rememberedSurfaceView =
-        surfaceManualView.current?.identity === surfaceIdentity &&
-        surfaceManualView.current?.renderer === surfaceRendererMode
-          ? surfaceManualView.current
-          : null;
-      const defaultSurfaceShot =
-        activeSurfaceCameraFrame && liveSurfaceShot
-          ? liveSurfaceShot
-          : SHOTS.surface;
-      const rememberedSurfaceBaseShot =
-        rememberedSurfaceView?.renderer === "fallback"
-          ? FALLBACK_SURFACE_SHOT
-          : defaultSurfaceShot;
-      const surfaceShot =
-        rememberedSurfaceView && rememberedSurfaceBaseShot
-          ? {
-              ...rememberedSurfaceBaseShot,
-              position: rememberedSurfaceView.position,
-              target: rememberedSurfaceView.target,
-            }
-          : defaultSurfaceShot;
-      const lowerShot =
-        lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
-      const upperShot =
-        upperPhase === "surface" ? surfaceShot : SHOTS[upperPhase];
-      if (!lowerShot || !upperShot) return;
+      renderScaleStep.current = {
+        phase,
+        target: worldScalePosition,
+        min: 2,
+        max: 5,
+        previous: null,
+        apply(position) {
+          applyCameraUp(position);
+          const clampedPosition = Math.max(
+            2,
+            Math.min(5, position),
+          );
+          const lowerIndex = Math.min(5, Math.floor(clampedPosition));
+          const upperIndex = Math.min(5, lowerIndex + 1);
+          const phaseForIndex = (index: number): UniversePhase =>
+            index >= 5
+              ? "surface"
+              : index >= 4
+                ? "atmosphere"
+                : index >= 3
+                  ? "orbit"
+                  : "approach";
+          const lowerPhase = phaseForIndex(lowerIndex);
+          const upperPhase = phaseForIndex(upperIndex);
+          const rememberedSurfaceView =
+            surfaceManualView.current?.identity === surfaceIdentity &&
+            surfaceManualView.current?.renderer === surfaceRendererMode
+              ? surfaceManualView.current
+              : null;
+          const defaultSurfaceShot =
+            activeSurfaceCameraFrame && liveSurfaceShot
+              ? liveSurfaceShot
+              : SHOTS.surface;
+          const rememberedSurfaceBaseShot =
+            rememberedSurfaceView?.renderer === "fallback"
+              ? FALLBACK_SURFACE_SHOT
+              : defaultSurfaceShot;
+          const surfaceShot =
+            rememberedSurfaceView && rememberedSurfaceBaseShot
+              ? {
+                  ...rememberedSurfaceBaseShot,
+                  position: rememberedSurfaceView.position,
+                  target: rememberedSurfaceView.target,
+                }
+              : defaultSurfaceShot;
+          const lowerShot =
+            lowerPhase === "surface" ? surfaceShot : SHOTS[lowerPhase];
+          const upperShot =
+            upperPhase === "surface" ? surfaceShot : SHOTS[upperPhase];
+          if (!lowerShot || !upperShot) return;
 
-      const fromTarget = scratchFromTarget.current.set(...lowerShot.target);
-      const fromPosition = scratchFromPosition.current.set(
-        ...lowerShot.position,
-      );
-      if (lowerShot.frameScale) {
-        const distance = framedWorldDistance(
-          controls,
-          lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          lowerShot.frameScale,
-        );
-        fromPosition
-          .sub(fromTarget)
-          .normalize()
-          .multiplyScalar(distance)
-          .add(fromTarget);
-      }
+          const fromTarget = scratchFromTarget.current.set(...lowerShot.target);
+          const fromPosition = scratchFromPosition.current.set(
+            ...lowerShot.position,
+          );
+          if (lowerShot.frameScale) {
+            const distance = framedWorldDistance(
+              controls,
+              lowerShot.fitRadius ?? PLANET_RENDER_RADIUS,
+              lowerShot.frameScale,
+            );
+            fromPosition
+              .sub(fromTarget)
+              .normalize()
+              .multiplyScalar(distance)
+              .add(fromTarget);
+          }
 
-      const toTarget = scratchToTarget.current.set(...upperShot.target);
-      const toPosition = scratchToPosition.current.set(...upperShot.position);
-      if (upperShot.frameScale) {
-        const distance = framedWorldDistance(
-          controls,
-          upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
-          upperShot.frameScale,
-        );
-        toPosition
-          .sub(toTarget)
-          .normalize()
-          .multiplyScalar(distance)
-          .add(toTarget);
-      }
-      const linearT =
-        lowerIndex === upperIndex
-          ? 0
-          : clampedPosition - lowerIndex;
-      // Preserve non-zero motion through authored anchors so continuous input
-      // reads as one descent rather than a sequence of eased cinematics.
-      const t = continuousScaleResponse(linearT);
+          const toTarget = scratchToTarget.current.set(...upperShot.target);
+          const toPosition = scratchToPosition.current.set(...upperShot.position);
+          if (upperShot.frameScale) {
+            const distance = framedWorldDistance(
+              controls,
+              upperShot.fitRadius ?? PLANET_RENDER_RADIUS,
+              upperShot.frameScale,
+            );
+            toPosition
+              .sub(toTarget)
+              .normalize()
+              .multiplyScalar(distance)
+              .add(toTarget);
+          }
+          const linearT =
+            lowerIndex === upperIndex
+              ? 0
+              : clampedPosition - lowerIndex;
+          // Preserve non-zero motion through authored anchors so continuous input
+          // reads as one descent rather than a sequence of eased cinematics.
+          const t = continuousScaleResponse(linearT);
 
-      desiredPosition.current.lerpVectors(fromPosition, toPosition, t);
-      desiredTarget.current.lerpVectors(fromTarget, toTarget, t);
-      desiredPositionTolerance.current = Math.min(
-        lowerShot.positionTolerance,
-        upperShot.positionTolerance,
-      );
-      desiredTargetTolerance.current = Math.min(
-        lowerShot.targetTolerance,
-        upperShot.targetTolerance,
-      );
-      configuredPhase.current = phase;
+          desiredPosition.current.lerpVectors(fromPosition, toPosition, t);
+          desiredTarget.current.lerpVectors(fromTarget, toTarget, t);
+          desiredPositionTolerance.current = Math.min(
+            lowerShot.positionTolerance,
+            upperShot.positionTolerance,
+          );
+          desiredTargetTolerance.current = Math.min(
+            lowerShot.targetTolerance,
+            upperShot.targetTolerance,
+          );
+          configuredPhase.current = phase;
 
-      controls.smoothTime = 0.05;
-      controls.maxSpeed = 1000;
-      controls.stop();
-      if (lowerPhase === "approach" && upperPhase === "orbit") {
-        // The authored directions straddle -PI/+PI. lerpLookAt interpolates
-        // their signed azimuths through zero, taking the long way around the
-        // dark side. Blend these nearby unit directions on their short arc
-        // separately from distance so the sphere keeps its fitted size.
-        const fromOffset = fromPosition.sub(fromTarget);
-        const toOffset = toPosition.sub(toTarget);
-        const distance = fromOffset.length() * (1 - t) + toOffset.length() * t;
-        desiredPosition.current
-          .lerpVectors(fromOffset.normalize(), toOffset.normalize(), t)
-          .normalize()
-          .multiplyScalar(distance)
-          .add(desiredTarget.current);
-        void controls.setLookAt(
-          desiredPosition.current.x,
-          desiredPosition.current.y,
-          desiredPosition.current.z,
-          desiredTarget.current.x,
-          desiredTarget.current.y,
-          desiredTarget.current.z,
-          false,
-        );
-      } else {
-        void controls.lerpLookAt(
-          fromPosition.x,
-          fromPosition.y,
-          fromPosition.z,
-          fromTarget.x,
-          fromTarget.y,
-          fromTarget.z,
-          toPosition.x,
-          toPosition.y,
-          toPosition.z,
-          toTarget.x,
-          toTarget.y,
-          toTarget.z,
-          t,
-          false,
-        );
-      }
-      controls.update(0);
+          controls.smoothTime = 0.05;
+          controls.maxSpeed = 1000;
+          if (lowerPhase === "approach" && upperPhase === "orbit") {
+            // The authored directions straddle -PI/+PI. lerpLookAt interpolates
+            // their signed azimuths through zero, taking the long way around the
+            // dark side. Blend these nearby unit directions on their short arc
+            // separately from distance so the sphere keeps its fitted size.
+            const fromOffset = fromPosition.sub(fromTarget);
+            const toOffset = toPosition.sub(toTarget);
+            const distance = fromOffset.length() * (1 - t) + toOffset.length() * t;
+            desiredPosition.current
+              .lerpVectors(fromOffset.normalize(), toOffset.normalize(), t)
+              .normalize()
+              .multiplyScalar(distance)
+              .add(desiredTarget.current);
+            void controls.setLookAt(
+              desiredPosition.current.x,
+              desiredPosition.current.y,
+              desiredPosition.current.z,
+              desiredTarget.current.x,
+              desiredTarget.current.y,
+              desiredTarget.current.z,
+              false,
+            );
+          } else {
+            void controls.lerpLookAt(
+              fromPosition.x,
+              fromPosition.y,
+              fromPosition.z,
+              fromTarget.x,
+              fromTarget.y,
+              fromTarget.z,
+              toPosition.x,
+              toPosition.y,
+              toPosition.z,
+              toTarget.x,
+              toTarget.y,
+              toTarget.z,
+              t,
+              false,
+            );
+          }
+          controls.update(0);
 
-      document.documentElement.dataset.universeCameraMode =
-        "scale-continuous";
-      document.documentElement.dataset.universeScaleCameraSegment =
-        lowerPhase + ":" + upperPhase;
-      document.documentElement.dataset.universeScaleSegment =
-        lowerPhase + ":" + upperPhase;
-      if (
-        rememberedSurfaceView &&
-        (lowerPhase === "surface" || upperPhase === "surface")
-      ) {
-        document.documentElement.dataset.universeSurfaceManualView =
-          "scale-endpoint";
-      }
-      publishScaleFrameDiagnostics(
-        scratchFrameCenter.current.set(...WORLD),
-        PLANET_RENDER_RADIUS,
-      );
+          document.documentElement.dataset.universeCameraMode =
+            "scale-continuous";
+          document.documentElement.dataset.universeScaleCameraSegment =
+            lowerPhase + ":" + upperPhase;
+          document.documentElement.dataset.universeScaleSegment =
+            lowerPhase + ":" + upperPhase;
+          if (
+            rememberedSurfaceView &&
+            (lowerPhase === "surface" || upperPhase === "surface")
+          ) {
+            document.documentElement.dataset.universeSurfaceManualView =
+              "scale-endpoint";
+          }
+          publishScaleFrameDiagnostics(
+            scratchFrameCenter.current.set(...WORLD),
+            PLANET_RENDER_RADIUS,
+          );
 
-      if (
-        Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
-        WORLD_SCALE_EPSILON
-      ) {
-        publishIfReached(generation);
-      }
+          if (
+            Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
+            WORLD_SCALE_EPSILON
+          ) {
+            publishIfReached(generation);
+          }
+        },
+      };
       return;
     }
 
     delete document.documentElement.dataset.universeScaleCameraSegment;
     delete document.documentElement.dataset.universeScaleSegment;
+    delete document.documentElement.dataset.universeCinematicScaleAppliedPosition;
+    renderScaleMotion.current = null;
+    renderedScalePosition.current = scalePhaseIndex(phase);
+    applyCameraUp(worldScalePosition);
 
     const rememberedSurfaceView =
       surfaceManualView.current?.identity === surfaceIdentity &&
@@ -1267,6 +1352,46 @@ export function CinematicCamera({
     return () => controls.removeEventListener("rest", handleRest);
   }, [publishIfReached]);
 
+  useFrame((_, delta) => {
+    const step = renderScaleStep.current;
+    if (!step || phaseRef.current !== step.phase || manualOverride.current) return;
+    const start = MathUtils.clamp(
+      renderedScalePosition.current ?? scalePhaseIndex(step.phase),
+      step.min,
+      step.max,
+    );
+    // Use the existing render clock and the latest intent, never timed phase
+    // playback. Cap a missed frame's contribution so dropping frames cannot
+    // turn the full distance or angle change into one rendered jump.
+    let motion = renderScaleMotion.current;
+    if (!motion || motion.phase !== step.phase || motion.target !== step.target) {
+      motion = { phase: step.phase, target: step.target, initialGap: Math.abs(start - step.target) };
+      renderScaleMotion.current = motion;
+    }
+    // Keep the regular 60 Hz response, but a slower renderer may advance
+    // up to one 30 Hz step. At lambda 30 that is at most 63% of the
+    // remaining distance (and System's physical angle cap still applies).
+    // A late frame must neither jump to its target nor spend extra frames
+    // emulating the nominal display refresh rate during a carried handoff.
+    const next = MathUtils.damp(start, step.target, 30, Math.min(delta, 1 / 30));
+    // Retain the first gap across plan rebuilds caused by system-frame and
+    // projection updates. Re-measuring it each time prolongs the tail and
+    // can make a recipient wait on an endpoint visually reached long ago.
+    const settleThreshold = Math.max(SCALE_RENDER_EPSILON, motion.initialGap * 0.035);
+    const dampedPosition = Math.abs(next - step.target) < settleThreshold
+      ? step.target
+      : next;
+    const position = reducedMotion
+      ? step.target
+      : step.clampAngleStep?.(start, dampedPosition) ?? dampedPosition;
+    if (step.previous === position) return;
+    renderedScalePosition.current = position;
+    step.previous = position;
+    step.apply(position);
+    document.documentElement.dataset.universeCinematicScaleAppliedPosition =
+      formatRenderedScale(position, step.target);
+  });
+
   useFrame(() => {
     const controls = controlsRef.current;
     const shot =
@@ -1312,6 +1437,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemScaleFrame;
       delete document.documentElement.dataset.universeSystemScaleRadius;
       delete document.documentElement.dataset.universeSystemScaleDistance;
+      delete document.documentElement.dataset.universeCinematicScaleAppliedPosition;
       delete document.documentElement.dataset.universeSystemEntryView;
       delete document.documentElement.dataset.universeSurfaceManualView;
     },
