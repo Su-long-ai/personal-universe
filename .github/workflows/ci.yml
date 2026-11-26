@@ -17,6 +17,7 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: write
 
 concurrency:
   group: personal-universe-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.ref || github.ref }}
