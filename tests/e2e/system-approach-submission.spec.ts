@@ -3,15 +3,43 @@ import { Quaternion } from "three";
 import { observeRuntime, waitForYeis } from "./support/runtime";
 
 type Submitted = { at: number; position: number; quaternion: number[]; radius: number };
+type ImageUpload = { phase: string | null; width: number; height: number; imageBitmap: boolean };
 
 async function observeActualSystemPaint(page: Page, stopAt: "endpoint" | "interior") {
   await page.addInitScript((mode) => {
     const roots = new Set<any>();
     const renderers = new WeakSet<any>();
     const history: Submitted[] = [];
+    const imageUploads: ImageUpload[] = [];
+    const approachStandardDirectionalLights: number[] = [];
+    const shaderSource = WebGL2RenderingContext.prototype.shaderSource;
+    WebGL2RenderingContext.prototype.shaderSource = function (shader, source) {
+      if (
+        document.documentElement.dataset.universeNavigationPhase === "approach" &&
+        source.includes("#define SHADER_TYPE MeshStandardMaterial")
+      ) {
+        const lights = source.match(/uniform DirectionalLight directionalLights\[\s*(\d+)\s*\]/);
+        if (lights) approachStandardDirectionalLights.push(Number(lights[1]));
+      }
+      return shaderSource.call(this, shader, source);
+    };
     const held = new Map<number, FrameRequestCallback>();
     const raf = window.requestAnimationFrame.bind(window);
     const cancel = window.cancelAnimationFrame.bind(window);
+    const upload = WebGL2RenderingContext.prototype.texSubImage2D;
+    WebGL2RenderingContext.prototype.texSubImage2D = function (...args: any[]) {
+      const img = args.find((source) =>
+        (source instanceof HTMLImageElement || source instanceof ImageBitmap) &&
+        source.width >= 4096);
+      const result = (upload as (...values: any[]) => unknown).apply(this, args);
+      if (img) imageUploads.push({
+        phase: document.documentElement.getAttribute("data-universe-navigation-phase"),
+        width: img.width,
+        height: img.height,
+        imageBitmap: img instanceof ImageBitmap,
+      });
+      return result;
+    };
     let rendererId = 0;
     let armed = false;
     let pausedAt: Submitted | null = null;
@@ -79,7 +107,7 @@ async function observeActualSystemPaint(page: Page, stopAt: "endpoint" | "interi
       },
       __systemSubmission: {
         arm() { armed = true; },
-        read() { return { history, pausedAt, held: held.size }; },
+        read() { return { history, pausedAt, held: held.size, imageUploads, approachStandardDirectionalLights }; },
         release() {
           paused = false;
           for (const callback of held.values()) raf(callback);
@@ -90,7 +118,13 @@ async function observeActualSystemPaint(page: Page, stopAt: "endpoint" | "interi
   }, stopAt);
 }
 
-const read = (page: Page): Promise<{ history: Submitted[]; pausedAt: Submitted | null; held: number }> =>
+const read = (page: Page): Promise<{
+  history: Submitted[];
+  pausedAt: Submitted | null;
+  held: number;
+  imageUploads: ImageUpload[];
+  approachStandardDirectionalLights: number[];
+}> =>
   page.evaluate(() => (window as any).__systemSubmission.read());
 
 async function openAndReachSystemEndpoint(page: Page) {
@@ -120,6 +154,9 @@ test("the exact System exit paint can commit Approach without a spare renderer f
     const painted = await read(page);
     expect(painted.pausedAt?.position).toBe(2);
     expect(painted.pausedAt!.radius).toBeGreaterThan(0);
+    // The optional DeepSky image cannot upload from the hidden world while
+    // the actual native System still has to paint its matched exit.
+    expect(painted.imageUploads).toEqual([]);
     await info.attach("system-submitted-frames.json", {
       contentType: "application/json", body: JSON.stringify(painted),
     });
@@ -141,6 +178,18 @@ test("the exact System exit paint can commit Approach without a spare renderer f
     await page.evaluate(() => (window as any).__systemSubmission.release());
   }
   await expect(html).toHaveAttribute("data-universe-world-paint-ready", "true");
+  await expect.poll(async () => (await read(page)).imageUploads).toEqual([
+    { phase: "approach", width: 4096, height: 2048, imageBitmap: true },
+  ]);
+  // A real fragment program through matched paint/overlap uses only the
+  // close-world stellar light, not an unused native spacecraft light.
+  const paintedWorld = await read(page);
+  expect(paintedWorld.approachStandardDirectionalLights.length).toBeGreaterThan(0);
+  expect(new Set(paintedWorld.approachStandardDirectionalLights)).toEqual(new Set([1]));
+  await info.attach("system-approach-light-recipes.json", {
+    contentType: "application/json",
+    body: JSON.stringify(paintedWorld.approachStandardDirectionalLights),
+  });
   await runtime.assertClean(info);
 });
 

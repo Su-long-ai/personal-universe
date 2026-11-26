@@ -342,6 +342,18 @@ export function YeisSystemScene({
           gl.capabilities.getMaxAnisotropy(),
         );
         bodies.setSystem(renderSystem);
+        // The pinned native renderer adds these Three lights for the PBR
+        // spacecraft models; its procedural bodies already shade themselves.
+        // The product projection omits spacecraft. Don't let these otherwise
+        // unused lights leak into (and recompile) the separate, authored globe
+        // material while native and close-world scenes overlap in the Canvas.
+        if (!renderSystem.bodies.some(({ data }) => data.appearance.kind === "spacecraft")) {
+          for (const child of renderScene.children) {
+            if (child instanceof THREE.DirectionalLight || child instanceof THREE.AmbientLight) {
+              child.visible = false;
+            }
+          }
+        }
         const points = new BodyPoints(renderScene);
         points.setViews(bodies.views);
         const orbits = new OrbitLines(renderScene);

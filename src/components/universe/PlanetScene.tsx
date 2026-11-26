@@ -766,13 +766,9 @@ function createFallbackSurfaceTexture(planet: PlanetDefinition) {
   return texture;
 }
 
-function DeepSky() {
-  const texture = useTexture(
-    `${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`,
-  );
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+const DEEP_SKY_IMAGE = `${import.meta.env.BASE_URL}textures/stars_milky_way.jpg`;
 
+function DeepSkySphere({ texture }: { texture: THREE.Texture }) {
   return (
     <mesh rotation={[0.18, -0.72, -0.1]} frustumCulled={false}>
       <sphereGeometry args={[92, 64, 64]} />
@@ -787,6 +783,52 @@ function DeepSky() {
       />
     </mesh>
   );
+}
+
+function DeepSky() {
+  const texture = useTexture(DEEP_SKY_IMAGE);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return <DeepSkySphere texture={texture} />;
+}
+
+function SoftwareDeepSky() {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    let active = true;
+    let owned: { bitmap: ImageBitmap; texture: THREE.Texture } | null = null;
+    const loader = new THREE.ImageBitmapLoader().setOptions({
+      resizeWidth: 4096,
+      resizeHeight: 2048,
+      resizeQuality: "high",
+      imageOrientation: "flipY",
+      premultiplyAlpha: "none",
+    });
+    // The same optional panorama must not suspend the primary world or
+    // eagerly upload the 8K image while its System warm-up group is hidden.
+    void loader.loadAsync(DEEP_SKY_IMAGE).then((bitmap) => {
+      if (!active) {
+        bitmap.close();
+        return;
+      }
+      const next = new THREE.Texture(bitmap);
+      next.colorSpace = THREE.SRGBColorSpace;
+      next.minFilter = THREE.LinearFilter;
+      next.generateMipmaps = false;
+      next.needsUpdate = true;
+      owned = { bitmap, texture: next };
+      setTexture(next);
+    }).catch(() => {
+      // A missing optional sky is not a failed planet presentation.
+    });
+    return () => {
+      active = false;
+      loader.abort();
+      owned?.texture.dispose();
+      owned?.bitmap.close();
+    };
+  }, []);
+  return texture ? <DeepSkySphere texture={texture} /> : null;
 }
 
 type LiveQualityMode = Exclude<QualityMode, "low">;
@@ -1280,7 +1322,9 @@ export function PlanetScene({
         <color attach="background" args={["#000106"]} />
       ) : null}
       <group visible={worldPresentationActive}>
-      <DeepSky />
+      {softwareRenderer && typeof createImageBitmap === "function"
+        ? <SoftwareDeepSky />
+        : <DeepSky />}
       <LifecycleStars
         radius={78}
         depth={30}
