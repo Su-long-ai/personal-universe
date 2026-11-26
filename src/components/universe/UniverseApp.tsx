@@ -1067,11 +1067,13 @@ export default function UniverseApp({
   }, [cancelPendingContinuousScaleIntent, navigatorOpen]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
-    // The explicit URL language takes priority on boot. Update this history
-    // entry when the user changes it, without changing the current destination.
+    // An incoming URL language takes priority on boot. Keep that override in
+    // sync on selection, while bare URLs still use the stored preference alone.
     const url = new URL(window.location.href);
-    url.searchParams.set("lang", next);
-    window.history.replaceState(window.history.state, "", url);
+    if (url.searchParams.has("lang") && url.searchParams.get("lang") !== next) {
+      url.searchParams.set("lang", next);
+      window.history.replaceState(window.history.state, "", url);
+    }
     setLocale(next);
     applyProductLocale(next);
   }, []);
