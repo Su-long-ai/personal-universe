@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "NATIVE-SYSTEM-RETAIN-LOW-001",
+  "approved_at": "2026-11-26T15:45:30.840Z",
+  "baseline_commit": "cf184320fd34d834dfd1db0ed0d8a0c889cb7b29",
+  "record_path": "docs/reuse-gate/tasks/NATIVE-SYSTEM-RETAIN-LOW-001.json",
+  "record_sha256": "f16a2d1cef063c619d1b2fd6c4e69342572e3121463e9ae66723fb8c1677cd3b",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "three-light-visibility": "59acfb330626a533af3ab15e56e9aeb36fda08a3c7e34fbb17dbeac3a5efad01",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Retain the same pinned System renderer resources across the close-world detour, park presentation and update work, and keep exact camera handoffs."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/low-system-retention.spec.ts"
+  ],
+  "selected_ids": [
+    "r3f-park-one-painted-yeis"
+  ],
+  "candidate_scores": {
+    "r3f-park-one-painted-yeis": 57,
+    "three-visibility-owner": 45,
+    "three-compile-async-warmup": 37
+  }
+}
