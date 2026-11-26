@@ -4,6 +4,21 @@
   "status_model": "adopt|trial|assess|hold",
   "entries": [
     {
+      "id": "three-light-visibility",
+      "name": "Three.js Object3D visibility in light collection",
+      "url": "https://threejs.org/docs/#api/en/core/Object3D.visible",
+      "level": "subsystem",
+      "license": "MIT (Three.js)",
+      "status": "adopt",
+      "covers": [
+        "visibility-gated scene traversal",
+        "point-light shader variant specialization",
+        "existing one-canvas renderer reuse"
+      ],
+      "notes": "Current Three WebGLRenderer checks Object3D.visible before collecting lights. A zero-intensity visible point still influences program key specialization.",
+      "last_checked": "2026-11-26"
+    },
+    {
       "id": "backstage-catalog",
       "name": "Backstage Software Catalog",
       "url": "https://backstage.io/docs/features/software-catalog/",
