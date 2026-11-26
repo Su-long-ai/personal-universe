@@ -1,0 +1,120 @@
+{
+  "schema": 2,
+  "task_id": "POPULATION-CAPABILITY-DIAGNOSTIC-OWNERSHIP-001",
+  "title": "Separate world population and renderer capability diagnostics",
+  "scope": {
+    "level": "implementation",
+    "subject": "Publish selected-world population capability under an independent diagnostic field without changing PlanetScene renderer selection, quality behavior, scene lifecycle or navigation."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Baseline is exact draft 183 head 0826b08afd32d3af29410f4ef287256f2f3be7e5. Hosted shard 3 job 139436842579 first expected authored-surface but received fallback-software-renderer. At that head UniverseApp publishes selected-world population capability and PlanetScene publishes concrete renderer capability, then either effect can delete the same attribute. Existing population architecture treats authored metadata independently of the renderer, and rendering architecture defines the shared attribute as the renderer capability. Keep the existing React effects and the rendering diagnostic's established name; move only population capability to data-universe-world-population-capability alongside its provenance. Update the existing authored Hero test to assert both independent values while changing quality, and assert cleanup when there is no selected world. No change to dependencies, readiness, quality, renderer or test policy.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts",
+    "docs/architecture/population.md"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/actions/runs/45679642412/job/139436842579",
+      "finding": "Exact hosted baseline first failed the authored Hero assertion with fallback-software-renderer rather than authored-surface; retry passed, consistent with independently scheduled effects."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/0826b08afd32d3af29410f4ef287256f2f3be7e5/docs/architecture/rendering.md#L222-L252",
+      "finding": "Rendering architecture assigns the existing world-capability attribute to the concrete renderer; preserve that external diagnostic and its paint/lifecycle relationships."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/0826b08afd32d3af29410f4ef287256f2f3be7e5/docs/architecture/population.md#L33-L43",
+      "finding": "Population capability is stable authored or generated metadata and must not enable or select a renderer."
+    },
+    {
+      "url": "https://react.dev/reference/react/useEffect",
+      "finding": "Keep the existing React effect's publish/clear lifecycle; independent DOM fields prevent one effect from overwriting or deleting another effect's value."
+    },
+    {
+      "url": "https://playwright.dev/docs/test-assertions",
+      "finding": "Use the existing browser suite and retrying DOM assertions to verify that renderer quality changes while authored capability persists; check existing navigation cleanup."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [1, 2],
+      "conclusion": "A different universe product cannot repair two otherwise correct project-specific diagnostic publishers without replacing working navigation and rendering behavior."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": ["playwright-test"],
+      "source_refs": [0, 4],
+      "conclusion": "Use the already adopted Playwright browser suite instead of introducing an external diagnostic-testing harness."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [1, 2],
+      "conclusion": "The population and renderer subsystems already compute correct values. Do not combine them into a shared arbiter or introduce another state owner."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": ["react-core-hooks", "playwright-test"],
+      "source_refs": [2, 3, 4],
+      "conclusion": "Reuse the existing population effect with a population-owned dataset field and the existing Hero browser regression to distinguish authored and renderer semantics."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-react-population-effect",
+      "name": "Existing selected-world React diagnostic publisher",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "UniverseApp world population effect and adjacent provenance dataset field",
+      "license": "MIT (React) and existing project code",
+      "decision": "reuse",
+      "reason": "Only the diagnostic field name needs separate ownership; the effect already follows selected-world population metadata.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "existing-hero-browser-acceptance",
+      "name": "Existing hosted Playwright authored Hero test",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Repository universe.spec.ts, release project",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Verify real renderer capability and stable population metadata through quality changes with no new browser/tool policy.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-react-population-effect",
+      "existing-hero-browser-acceptance"
+    ],
+    "rationale": "Retain the documented renderer-owned diagnostic and keep selected-world population metadata separate. Use one existing effect and browser regression without introducing a renderer arbiter or changing any rendering threshold.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If browser verification fails, check each field's namespace and cleanup against its individual owner; do not relax renderer expectations or gate limits."
+  }
+}

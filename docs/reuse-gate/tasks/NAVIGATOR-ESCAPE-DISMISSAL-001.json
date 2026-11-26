@@ -1,0 +1,159 @@
+{
+  "schema": 2,
+  "task_id": "NAVIGATOR-ESCAPE-DISMISSAL-001",
+  "title": "Dismiss the existing Navigator with Escape regardless of focused control",
+  "scope": {
+    "level": "implementation",
+    "subject": "Make the current Navigator own one Escape handler for the mounted modal; retain localized dialog labels, pointer dismissal, combobox navigation and the rest of the 3D UI. Validate early Escape and descendant focus separately from the portfolio route."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "Hosted #182 failed twice because the backdrop stayed open after Escape and intercepted the visible portfolio link. The only production Escape handler is owned by the search input and autofocus is delayed with a zero-delay timer. Escape must be modal-scoped. Reusing React lifetime plus native keyboard events is narrower than replacing the complete already localized Navigator or bringing in another search/modal state owner.",
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "tests/e2e/portfolio.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://www.radix-ui.com/primitives/docs/components/dialog",
+      "finding": "Radix Dialog offers whole-modal keyboard dismissal and focus management; replacing the current dialog would change markup, focus, backdrop and portalling outside this narrow defect."
+    },
+    {
+      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/",
+      "finding": "Escape is a modal-dialog keyboard action, not a search-editing action tied to one textbox. Preserve the existing role and accessible name."
+    },
+    {
+      "url": "https://react.dev/reference/react/useLayoutEffect",
+      "finding": "A layout effect in the already mounted browser dialog can install its native key listener before paint and release it at unmount instead of waiting for a focus timeout."
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/isComposing",
+      "finding": "Keyboard event composition state lets the modal avoid intercepting an Escape intended for an active IME composition."
+    },
+    {
+      "url": "https://playwright.dev/docs/api/class-keyboard",
+      "finding": "Send an actual browser Escape after establishing focus states and assert that the backdrop disappears; maintain the separate portfolio route using the rendered close control."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Existing modal packages handle the full dialog contract, but the product already owns routing, overlay markup and locale. Do not add/dialog-stack swap for one dismissal defect."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "playwright-test"
+      ],
+      "source_refs": [
+        2,
+        4
+      ],
+      "conclusion": "Reuse React's mounted-dialog lifecycle and the project's installed Playwright on the existing browser/runtime, with no polling or deferred test workaround."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        3
+      ],
+      "conclusion": "Reuse the current Navigator and its onClose authority, attach only while the modal exists, and let the search field own only combobox editing/navigation."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks",
+        "playwright-test"
+      ],
+      "source_refs": [
+        2,
+        3,
+        4
+      ],
+      "conclusion": "Use the existing hook/event primitives. Keep the current close button, IME composition and localized names; test a real Escape regardless of the focused DOM node."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "radix-dialog",
+      "name": "Radix UI Dialog",
+      "level": "full_solution",
+      "source": "Radix UI primitives Dialog",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Whole modal replacement unnecessarily changes proven backdrop, render tree/focus, application CSS and accessibility behavior across several independent lanes.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 4,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "mounted-native-keyboard",
+      "name": "Mounted React lifetime and native Escape event",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Current React / browser DOM and Navigator component",
+      "license": "MIT (React) / browser platform",
+      "decision": "reuse",
+      "reason": "Keeps one existing onClose authority, covers opener/search/filters/results, and cleans the listener before any closed-dialog keystroke without replacing the modal.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "playwright-keyboard-regression",
+      "name": "Existing Playwright Keyboard/ARIA literals",
+      "level": "framework_engine",
+      "registry_id": "playwright-test",
+      "source": "Repository Playwright runner with actual navigator UI",
+      "license": "Apache-2.0",
+      "decision": "reuse",
+      "reason": "Exercises actual keyboard focused controls and independent click closure. No waits are added to mask delivery to the wrong element.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "mounted-native-keyboard",
+      "playwright-keyboard-regression"
+    ],
+    "rationale": "Keep the current rendered Navigator/normal route and one scoped Escape override. Minimum change to production and separate behavioral acceptance for the scope that previously saw the backdrop block a working link.",
+    "higher_level_tradeoffs": [
+      {
+        "candidate_id": "radix-dialog",
+        "reason": "A future broad accessibility modernization could reuse a complete standard dialog, but separate focus-trap, pointer and layout work is not required to correct this genuine closure failure."
+      }
+    ],
+    "score_overrides": [],
+    "fallback": "If keyboard dismissal does not belong to the observed dialog lifetime on some host, preserve the close button/backdrop behavior and investigate delivery in that exact browser rather than changing release thresholds."
+  }
+}

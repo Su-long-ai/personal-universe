@@ -118,6 +118,7 @@ export type YeisGalaxyScaleBridgeState = {
 };
 
 export type YeisSignalHover = {
+  entryId: string;
   title: string;
   kind: string;
   clientX: number;
@@ -216,31 +217,12 @@ function disposeNativeSystemRenderers(
   state: NativeGalaxyState,
   parentScene: Scene,
 ) {
-  const geometries = new Set<BufferGeometry>();
-  const materials = new Set<Material>();
-
-  state.nativeSystemScene.traverse((object) => {
-    const mesh = object as Mesh;
-    if (mesh.geometry) geometries.add(mesh.geometry);
-    const material = mesh.material;
-    if (Array.isArray(material)) {
-      for (const entry of material) materials.add(entry);
-    } else if (material) {
-      materials.add(material);
-    }
-  });
-
-  for (const view of state.nativeBodies.views) {
-    view.dispose(state.nativeSystemScene);
-  }
-  for (const line of state.nativeOrbits.lines) {
-    state.nativeSystemScene.remove(line.line);
-  }
-  state.nativeSystemScene.remove(state.nativeBodyPoints.points);
-  for (const geometry of geometries) geometry.dispose();
-  for (const material of materials) material.dispose();
+  state.nativeBodies.dispose();
+  state.nativeBodyPoints.dispose();
+  state.nativeOrbits.dispose();
   state.nativeSystemScene.clear();
   parentScene.remove(state.nativeSystemScene);
+
 }
 
 const heroProjection = new Vector3();
@@ -931,6 +913,7 @@ export function YeisGalaxyScene({
           document.documentElement.dataset.personalSignalHover =
             best.placement.entry.id;
           signalHoverRef.current({
+            entryId: best.placement.entry.id,
             title: best.placement.entry.title,
             kind: best.placement.entry.kind,
             clientX: event.clientX,

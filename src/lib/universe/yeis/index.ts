@@ -28,7 +28,8 @@ export function loadYeisCore(): Promise<YeisCoreRuntime> {
 }
 
 async function createRuntime(): Promise<YeisCoreRuntime> {
-  await initI18n("en");
+  // Keep the native astronomy dictionary, but leave the document language to the host.
+  await initI18n("en", { setDocumentLanguage: false });
   const catalog = await StarCatalog.load(YEIS_DATA_BASE_URL);
   const universe = new Universe(catalog);
   universe.registerExtraSystem(createAuroraSystem());

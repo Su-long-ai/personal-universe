@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -10,19 +11,29 @@ import { useGLTF } from "@react-three/drei";
 import { type FiniteTerrain } from "procedural-terrains";
 import { createInfiniteTerrain } from "procedural-terrains/infinite";
 import * as THREE from "three";
+import {
+  SURFACE_CONTENT_SIGNAL_BUDGET,
+  rankSurfaceContentAnchors,
+  rankSurfaceContentClusters,
+  rankSurfaceWorldLandmarks,
+  rankSurfaceWorldRegions,
+  type SurfaceWorldProfile,
+} from "../../lib/universe/surface";
 import { isSoftwareRenderer } from "./CinematicPipeline";
+import { FALLBACK_SURFACE_CAMERA_FRAME } from "./CinematicCamera";
 
 const TERRAIN_Y = 0;
-const SOFTWARE_FULL_COVERAGE_CHUNKS = 29;
+// Radius 2 contains 13 radial chunks. The generated software horizon supplies
+// the far-distance depth cue, so SwiftShader does not need the 29-chunk ring.
+const SOFTWARE_FULL_COVERAGE_CHUNKS = 13;
 const HARDWARE_FULL_COVERAGE_CHUNKS = 29;
-const SOFTWARE_STREAM_WARMUP_UPDATES = 32;
-
-const ROCKS = [
-  { x: -8.6, z: 1.8, scale: 3.4, ry: 0.45, tilt: 0.04 },
-  { x: 11.0, z: 2.6, scale: 2.8, ry: 2.0, tilt: -0.06 },
-  { x: -9.8, z: -13.5, scale: 2.8, ry: 2.6, tilt: 0.03 },
-  { x: 9.6, z: -18.0, scale: 3.3, ry: 0.9, tilt: -0.04 },
-] as const;
+const SOFTWARE_TERRAIN_CHUNK_SIZE = 32;
+const SOFTWARE_STREAM_WARMUP_UPDATES = 16;
+const SOFTWARE_STREAM_REBASE_UPDATES = 6;
+const SOFTWARE_VIEW_REFRESH_UPDATES = 1;
+const SOFTWARE_POSITION_REFRESH_DISTANCE_SQ = 1;
+const SOFTWARE_ROTATION_REFRESH_EPSILON = 1e-5;
+let surfaceTerrainInstanceSequence = 0;
 
 function terrainErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return null;
@@ -42,20 +53,94 @@ function seededClone(source: THREE.Object3D, index: number) {
   return clone;
 }
 
+function SurfaceRocks({
+  terrain,
+  profile,
+}: {
+  terrain: FiniteTerrain;
+  profile: SurfaceWorldProfile;
+}) {
+  // Keep decorative glTF work behind the real-GPU branch. SwiftShader must not
+  // fetch, parse, cache or compile this asset, while hardware still reuses the
+  // existing boulder model at deterministic profile landmarks.
+  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
+  const rockInstances = useMemo(
+    () =>
+      profile.landmarks.slice(0, 4).map((landmark, index) => {
+        const object = seededClone(boulder.scene, index);
+        const localHeight =
+          terrain.sampleHeight(landmark.position[0], landmark.position[1]) ?? 0;
+        const scale = 1.45 + landmark.scale * 1.55;
+        object.position.set(
+          landmark.position[0],
+          TERRAIN_Y + localHeight - scale * 0.52,
+          landmark.position[1],
+        );
+        object.rotation.set(
+          landmark.prominence * 0.08,
+          landmark.prominence * Math.PI * 1.7,
+          -landmark.prominence * 0.04,
+        );
+        object.scale.setScalar(scale);
+        return object;
+      }),
+    [boulder.scene, profile.id, profile.landmarks, terrain],
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.universeSurfaceDecorations =
+      "hardware-rocks";
+    return () => {
+      if (
+        document.documentElement.dataset.universeSurfaceDecorations ===
+        "hardware-rocks"
+      ) {
+        delete document.documentElement.dataset.universeSurfaceDecorations;
+      }
+      for (const object of rockInstances) {
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            // Geometry/materials remain owned by drei's shared glTF cache.
+            child.castShadow = false;
+          }
+        });
+      }
+    };
+  }, [rockInstances]);
+
+  return (
+    <>
+      {rockInstances.map((object) => (
+        <primitive key={object.name} object={object} />
+      ))}
+    </>
+  );
+}
+
 export function SurfaceTerrain({
+  prepare,
   active,
+  presenting,
   phaseRef,
+  profile,
+  focusedEntryId,
+  onFocusEntry,
   onAnchorHeight,
 }: {
+  prepare: boolean;
   active: boolean;
+  presenting: boolean;
   phaseRef: MutableRefObject<"galaxy" | "system" | "approach" | "orbit" | "atmosphere" | "surface" | "returning">;
+  profile: SurfaceWorldProfile;
+  focusedEntryId: string | null;
+  onFocusEntry: (entryId: string) => void;
   onAnchorHeight?: (height: number) => void;
 }) {
   const { gl, camera } = useThree();
-  const boulder = useGLTF("/models/boulder_01/boulder_01_1k.gltf");
   const [terrain, setTerrain] = useState<FiniteTerrain | null>(null);
-  const [activated, setActivated] = useState(active);
+
   const softwareRenderer = isSoftwareRenderer(gl);
+  const landingStreamCamera = useMemo(() => camera.clone(false), [camera]);
   const terrainViewInitialized = useRef(false);
   const terrainReadyPublished = useRef(false);
   const softwareStreamUpdates = useRef(0);
@@ -65,19 +150,49 @@ export function SurfaceTerrain({
   const lastProjection = useRef(new THREE.Matrix4());
   const currentCameraPosition = useRef(new THREE.Vector3());
   const currentCameraQuaternion = useRef(new THREE.Quaternion());
+  const lastSoftwareChunkX = useRef<number | null>(null);
+  const lastSoftwareChunkZ = useRef<number | null>(null);
+  const productTerrainUpdateOptions = useMemo(() => ({ camera }), [camera]);
+  const landingTerrainUpdateOptions = useMemo(
+    () => ({ camera: landingStreamCamera }),
+    [landingStreamCamera],
+  );
 
   useEffect(() => {
-    if (active) setActivated(true);
-  }, [active]);
+    if (softwareRenderer) return;
+    // Start the shared drei cache fetch while real-GPU terrain prepares.
+    // Software fallback never touches this hardware-only asset.
+    useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");
+  }, [softwareRenderer]);
 
   useEffect(() => {
-    if (!activated) return;
-
     let cancelled = false;
     let instance: FiniteTerrain | null = null;
     const controller = new AbortController();
+    setTerrain(null);
+
+    // ProceduralTerrains Infinite World streams around the camera supplied to
+    // prepare/update. Prime it at the actual fallback landing frame instead of
+    // the still-visible globe camera, otherwise a "full" ring can be centred on
+    // the wrong world-space region and immediately churn when presentation
+    // hands over.
+    landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+    landingStreamCamera.projectionMatrixInverse.copy(
+      camera.projectionMatrixInverse,
+    );
+    landingStreamCamera.position.set(
+      ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+    );
+    landingStreamCamera.up.set(0, 1, 0);
+    landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+    landingStreamCamera.updateMatrixWorld(true);
 
     void (async () => {
+      const html = document.documentElement;
+      html.dataset.universeSurfaceTerrainAllocations = String(
+        Number(html.dataset.universeSurfaceTerrainAllocations ?? "0") + 1,
+      );
+      const instanceId = ++surfaceTerrainInstanceSequence;
       instance = await createInfiniteTerrain({
         renderer: gl,
         signal: controller.signal,
@@ -89,11 +204,14 @@ export function SurfaceTerrain({
                 // window. The runtime streams no more than three chunks per
                 // scheduled update and keeps its clipmap at the minimum supported
                 // resolution.
-                chunkSize: 32,
-                viewRadius: 3,
-                triangleBudget: 35000,
-                maxCreatesPerFrame: 3,
-                streamBudgetMs: 0.6,
+                chunkSize: SOFTWARE_TERRAIN_CHUNK_SIZE,
+                viewRadius: 2,
+                triangleBudget: 20000,
+                maxCreatesPerFrame: 2,
+                streamBudgetMs: 0.45,
+                // ProceduralTerrains 2.0.5 formally accepts 64..1024.
+                // Use the package minimum so SwiftShader stays bounded without
+                // falling into an invalid configuration before prepare().
                 cacheResolution: 64,
               }
             : {
@@ -108,22 +226,22 @@ export function SurfaceTerrain({
               },
           source: {
             kind: "noise",
-            seed: 73021,
+            seed: profile.terrain.noiseSeed,
             // The pinned ProceduralTerrains shader specializes its octave
             // count at compile time. Driver compilation itself cannot be
             // interrupted, so use the package's formal lower-complexity
             // configuration on software WebGL instead of starting the
             // seven-octave shader and trying to cancel it later.
             octaves: softwareRenderer ? 2 : 7,
-            scale: 0.025,
-            ridge: 0.7,
-            warp: 0.3,
-            persistence: 0.54,
-            lacunarity: 2.08,
+            scale: profile.terrain.scale,
+            ridge: profile.terrain.ridge,
+            warp: profile.terrain.warp,
+            persistence: profile.terrain.persistence,
+            lacunarity: profile.terrain.lacunarity,
             edgeFalloffMode: "mountains",
           },
-          heightScale: 34,
-          seaLevel: -20,
+          heightScale: profile.terrain.heightScale,
+          seaLevel: profile.terrain.seaLevel,
           quality: softwareRenderer
             ? {
                 lodSegments: [16, 8, 4, 2],
@@ -147,38 +265,26 @@ export function SurfaceTerrain({
             terrainTriplanar: !softwareRenderer,
           },
           style: {
-            paletteSaturation: 0.7,
-            paletteContrast: 1.16,
-            paletteTint: [0.72, 0.82, 0.9],
-            sunColor: [1.0, 0.69, 0.42],
-            sunIntensity: 1.45,
-            skyAmbient: [0.07, 0.13, 0.2],
-            groundBounce: [0.04, 0.075, 0.08],
+            paletteSaturation: profile.terrain.saturation,
+            paletteContrast: profile.terrain.contrast,
+            paletteTint: profile.terrain.tint,
+            sunColor: profile.lighting.sunColor,
+            sunIntensity: profile.lighting.sunIntensity,
+            skyAmbient: profile.lighting.skyAmbient,
+            groundBounce: profile.lighting.groundBounce,
           },
           lighting: {
-            sunAzimuth: 145,
-            sunElevation: 14,
-            fogDensity: 0.0025,
+            sunAzimuth: profile.lighting.sunAzimuth,
+            sunElevation: profile.lighting.sunElevation,
+            fogDensity: profile.atmosphere.fogDensity,
           },
-          palette: {
-            sand: [0.19, 0.2, 0.18],
-            dune: [0.16, 0.17, 0.16],
-            dryGrass: [0.12, 0.16, 0.13],
-            grass: [0.055, 0.12, 0.1],
-            forest: [0.025, 0.075, 0.065],
-            jungle: [0.02, 0.07, 0.065],
-            swamp: [0.025, 0.065, 0.07],
-            tundra: [0.19, 0.22, 0.23],
-            redRock: [0.26, 0.2, 0.18],
-            redRock2: [0.18, 0.16, 0.16],
-            rock: [0.13, 0.15, 0.16],
-            rockHi: [0.26, 0.29, 0.31],
-            snow: [0.62, 0.69, 0.73],
-          },
+          palette: profile.terrain.palette,
         },
       });
 
-      await instance.prepare(camera, { signal: controller.signal });
+      await instance.prepare(landingStreamCamera, {
+        signal: controller.signal,
+      });
 
       if (cancelled) {
         instance.dispose();
@@ -192,6 +298,9 @@ export function SurfaceTerrain({
       softwareStreamAccumulator.current = 0;
       document.documentElement.dataset.universeSurfaceTerrainProfile =
         softwareRenderer ? "infinite-software" : "infinite-hardware";
+      document.documentElement.dataset.universeSurfaceTerrainWorld = profile.id;
+      document.documentElement.dataset.universeSurfaceTerrainInstance =
+        `${profile.id}:${instanceId}`;
       setTerrain(instance);
     })().catch((error) => {
       const code = terrainErrorCode(error);
@@ -212,17 +321,24 @@ export function SurfaceTerrain({
       controller.abort();
       instance?.dispose();
       delete document.documentElement.dataset.universeSurfaceTerrainProfile;
+      delete document.documentElement.dataset.universeSurfaceTerrainReadyView;
+      delete document.documentElement.dataset.universeSurfaceTerrainWorld;
+      delete document.documentElement.dataset.universeSurfaceTerrainInstance;
     };
-  }, [activated, camera, gl, onAnchorHeight, softwareRenderer]);
+  }, [
+    camera,
+    gl,
+    landingStreamCamera,
+    profile.id,
+    softwareRenderer,
+  ]);
 
   useEffect(() => {
-    const lifecycle = !activated
-      ? "idle"
-      : !terrain
-        ? "preparing"
-        : active
-          ? "active"
-          : "parked";
+    const lifecycle = !terrain
+      ? "preparing"
+      : active
+        ? "active"
+        : "parked";
     document.documentElement.dataset.universeSurfaceTerrainLifecycle =
       lifecycle;
     return () => {
@@ -234,44 +350,90 @@ export function SurfaceTerrain({
           .universeSurfaceTerrainLifecycle;
       }
     };
-  }, [active, activated, terrain]);
+  }, [active, terrain]);
 
   useFrame((_, delta) => {
-    // `active` is delivered through the R3F reconciler. Read the coordinator
-    // ref first so no *new* Surface work starts after an outward wheel intent.
-    if (!active || phaseRef.current !== "surface" || !terrain) return;
+    // Hidden Atmosphere prewarm is allowed to populate the destination ring,
+    // but only while the coordinator still owns Atmosphere. A reverse to
+    // Orbit pauses streaming immediately; an already-created terrain remains
+    // retained for the next inward journey.
+    const surfaceStreaming =
+      active && phaseRef.current === "surface";
+    const hiddenLandingPrestream =
+      prepare &&
+      !active &&
+      phaseRef.current === "atmosphere" &&
+      !terrainReadyPublished.current;
+    if ((!surfaceStreaming && !hiddenLandingPrestream) || !terrain) return;
+
+    const streamCamera = presenting ? camera : landingStreamCamera;
+    if (!presenting) {
+      // Keep projection identical to the product camera, but use a detached
+      // non-rendered view at the final terrain landing pose. camera-controls
+      // remains the only visible/product camera authority.
+      landingStreamCamera.projectionMatrix.copy(camera.projectionMatrix);
+      landingStreamCamera.projectionMatrixInverse.copy(
+        camera.projectionMatrixInverse,
+      );
+      landingStreamCamera.position.set(
+        ...FALLBACK_SURFACE_CAMERA_FRAME.position,
+      );
+      landingStreamCamera.up.set(0, 1, 0);
+      landingStreamCamera.lookAt(...FALLBACK_SURFACE_CAMERA_FRAME.target);
+      landingStreamCamera.updateMatrixWorld(true);
+    }
 
     if (softwareRenderer) {
-      // Infinite World needs several bounded updates to populate the initial
-      // camera-centred ring. SwiftShader still must not run streaming work every
-      // frame forever, so schedule a short warm-up burst, then return to the
-      // previous camera-driven policy. Any real manual camera/projection change
-      // restarts the bounded burst.
-      camera.updateWorldMatrix(true, false);
-      camera.getWorldPosition(currentCameraPosition.current);
-      camera.getWorldQuaternion(currentCameraQuaternion.current);
+      // Infinite World changes its desired chunk set only when the camera
+      // crosses a terrain chunk. Do not restart a long warmup for tiny settling
+      // motion: initial fill gets a bounded burst, real chunk crossings get a
+      // shorter rebase burst, and same-chunk view changes get one refresh.
+      streamCamera.updateWorldMatrix(true, false);
+      streamCamera.getWorldPosition(currentCameraPosition.current);
+      streamCamera.getWorldQuaternion(currentCameraQuaternion.current);
+
+      const currentChunkX = Math.floor(
+        currentCameraPosition.current.x / SOFTWARE_TERRAIN_CHUNK_SIZE,
+      );
+      const currentChunkZ = Math.floor(
+        currentCameraPosition.current.z / SOFTWARE_TERRAIN_CHUNK_SIZE,
+      );
+      const chunkChanged =
+        lastSoftwareChunkX.current === null ||
+        lastSoftwareChunkZ.current === null ||
+        lastSoftwareChunkX.current !== currentChunkX ||
+        lastSoftwareChunkZ.current !== currentChunkZ;
       const positionChanged =
         !terrainViewInitialized.current ||
         currentCameraPosition.current.distanceToSquared(
           lastCameraPosition.current,
-        ) > 1e-8;
+        ) > SOFTWARE_POSITION_REFRESH_DISTANCE_SQ;
       const rotationChanged =
         !terrainViewInitialized.current ||
-        1 - Math.abs(
-          currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
-        ) > 1e-8;
+        1 -
+          Math.abs(
+            currentCameraQuaternion.current.dot(lastCameraQuaternion.current),
+          ) >
+          SOFTWARE_ROTATION_REFRESH_EPSILON;
       const projectionChanged =
         !terrainViewInitialized.current ||
-        !camera.projectionMatrix.equals(lastProjection.current);
+        !streamCamera.projectionMatrix.equals(lastProjection.current);
 
-      if (positionChanged || rotationChanged || projectionChanged) {
+      if (chunkChanged || positionChanged || rotationChanged || projectionChanged) {
         lastCameraPosition.current.copy(currentCameraPosition.current);
         lastCameraQuaternion.current.copy(currentCameraQuaternion.current);
-        lastProjection.current.copy(camera.projectionMatrix);
+        lastProjection.current.copy(streamCamera.projectionMatrix);
+        lastSoftwareChunkX.current = currentChunkX;
+        lastSoftwareChunkZ.current = currentChunkZ;
+        const requestedUpdates = chunkChanged
+          ? terrainViewInitialized.current
+            ? SOFTWARE_STREAM_REBASE_UPDATES
+            : SOFTWARE_STREAM_WARMUP_UPDATES
+          : SOFTWARE_VIEW_REFRESH_UPDATES;
         terrainViewInitialized.current = true;
         softwareStreamUpdates.current = Math.max(
           softwareStreamUpdates.current,
-          SOFTWARE_STREAM_WARMUP_UPDATES,
+          requestedUpdates,
         );
         softwareStreamAccumulator.current = 0;
       }
@@ -283,7 +445,12 @@ export function SurfaceTerrain({
       softwareStreamUpdates.current -= 1;
     }
 
-    terrain.update(delta, { camera });
+    terrain.update(
+      delta,
+      presenting
+        ? productTerrainUpdateOptions
+        : landingTerrainUpdateOptions,
+    );
 
     if (!terrainReadyPublished.current) {
       const diagnostics = terrain.getDiagnostics() as { chunks?: number };
@@ -296,53 +463,312 @@ export function SurfaceTerrain({
         : HARDWARE_FULL_COVERAGE_CHUNKS;
       if ((diagnostics.chunks ?? 0) >= readyChunkCount) {
         terrainReadyPublished.current = true;
-        onAnchorHeight?.((terrain.sampleHeight(0.4, -5.4) ?? 0) + 0.75);
+        if (softwareRenderer) {
+          // Initial full coverage is the stop condition. Future software work
+          // is scheduled only by meaningful camera/chunk changes above.
+          softwareStreamUpdates.current = 0;
+          softwareStreamAccumulator.current = 0;
+        }
+        document.documentElement.dataset.universeSurfaceTerrainReadyView =
+          presenting ? "product-camera" : "landing-prestream";
+        onAnchorHeight?.(
+          (terrain.sampleHeight(profile.landing[0], profile.landing[1]) ?? 0) +
+            0.75,
+        );
       }
     }
   });
 
-  const rockInstances = useMemo(() => {
-    // Decorative PBR glTF rocks add first-use shader programs but do not
-    // contribute to terrain identity. Keep them on real GPUs only.
-    if (!terrain || softwareRenderer) return [];
+  const pathSegments = useMemo(() => {
+    if (!terrain) return [];
+    const subdivisions = softwareRenderer ? 3 : 6;
+    return profile.paths.flatMap((path) =>
+      Array.from({ length: subdivisions }, (_, index) => {
+        const t0 = index / subdivisions;
+        const t1 = (index + 1) / subdivisions;
+        const x0 = THREE.MathUtils.lerp(path.from[0], path.to[0], t0);
+        const z0 = THREE.MathUtils.lerp(path.from[1], path.to[1], t0);
+        const x1 = THREE.MathUtils.lerp(path.from[0], path.to[0], t1);
+        const z1 = THREE.MathUtils.lerp(path.from[1], path.to[1], t1);
+        const x = (x0 + x1) * 0.5;
+        const z = (z0 + z1) * 0.5;
+        const dx = x1 - x0;
+        const dz = z1 - z0;
+        return {
+          id: `${path.id}:${index}`,
+          landmarkId: path.landmarkId,
+          position: [
+            x,
+            (terrain.sampleHeight(x, z) ?? 0) + 0.09,
+            z,
+          ] as [number, number, number],
+          length: Math.hypot(dx, dz),
+          rotationY: Math.atan2(dx, dz),
+          width: path.width,
+        };
+      }),
+    );
+  }, [profile.id, softwareRenderer, terrain]);
 
-    return ROCKS.map((placement, index) => {
-      const object = seededClone(boulder.scene, index);
-      const localHeight = terrain.sampleHeight(placement.x, placement.z) ?? 0;
-      object.position.set(
-        placement.x,
-        TERRAIN_Y + localHeight - placement.scale * 0.52,
-        placement.z,
-      );
-      object.rotation.set(placement.tilt, placement.ry, placement.tilt * 0.4);
-      object.scale.setScalar(placement.scale);
-      return object;
-    });
-  }, [boulder.scene, softwareRenderer, terrain]);
+  const rankedContent = useMemo(
+    () => rankSurfaceContentAnchors(profile.contentAnchors, focusedEntryId),
+    [focusedEntryId, profile.contentAnchors],
+  );
+  const focusedAnchor =
+    rankedContent.find((anchor) => anchor.entryId === focusedEntryId) ?? null;
+  const rankedLandmarks = useMemo(
+    () =>
+      rankSurfaceWorldLandmarks(
+        profile.landmarks,
+        focusedAnchor?.landmarkId ?? null,
+      ),
+    [focusedAnchor?.landmarkId, profile.landmarks],
+  );
+  const rankedRegions = useMemo(
+    () =>
+      rankSurfaceWorldRegions(
+        profile.regions,
+        focusedAnchor?.regionId ?? null,
+      ),
+    [focusedAnchor?.regionId, profile.regions],
+  );
+  const visibleLandmarks = softwareRenderer
+    ? rankedLandmarks.slice(0, 3)
+    : rankedLandmarks;
+  const visibleRegions = softwareRenderer
+    ? rankedRegions.slice(0, 2)
+    : rankedRegions;
+  const visibleContent = rankedContent.slice(
+    0,
+    softwareRenderer
+      ? SURFACE_CONTENT_SIGNAL_BUDGET.software
+      : SURFACE_CONTENT_SIGNAL_BUDGET.stable,
+  );
 
   useEffect(() => {
+    document.documentElement.dataset.universeSurfaceInteractiveSignals = String(
+      active ? visibleContent.length : 0,
+    );
     return () => {
-      for (const object of rockInstances) {
-        object.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            // Geometry/materials belong to the shared glTF cache and are not disposed here.
-            child.castShadow = false;
-          }
-        });
-      }
+      delete document.documentElement.dataset.universeSurfaceInteractiveSignals;
     };
-  }, [rockInstances]);
+  }, [active, profile.id, visibleContent.length]);
+
+  const rankedClusters = useMemo(
+    () =>
+      rankSurfaceContentClusters(
+        profile.contentClusters,
+        focusedAnchor?.cluster ?? null,
+      ),
+    [focusedAnchor?.cluster, profile.contentClusters],
+  );
+  const visibleClusters = softwareRenderer
+    ? rankedClusters.slice(0, 2)
+    : rankedClusters;
+
+
 
   if (!terrain) return null;
 
   return (
     <>
       <primitive object={terrain.object} />
-      {rockInstances.map((object) => (
-        <primitive key={object.name} object={object} />
-      ))}
+      {!softwareRenderer ? (
+        <Suspense fallback={null}>
+          <SurfaceRocks terrain={terrain} profile={profile} />
+        </Suspense>
+      ) : null}
+      {pathSegments.map((segment) => {
+        const focused =
+          segment.landmarkId === focusedAnchor?.landmarkId;
+        return (
+          <mesh
+            key={segment.id}
+            position={segment.position}
+            rotation={[0, segment.rotationY, 0]}
+          >
+            <boxGeometry
+              args={[
+                segment.width * (focused ? 1.3 : 1),
+                0.035,
+                segment.length,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={
+                focused ? 0.38 : softwareRenderer ? 0.18 : 0.14
+              }
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+      {visibleClusters.map((cluster) => {
+        const height =
+          (terrain.sampleHeight(cluster.center[0], cluster.center[1]) ?? 0) + 0.08;
+        const focused = focusedAnchor?.cluster === cluster.index;
+        const radius =
+          (cluster.priority === "primary"
+            ? 0.52
+            : cluster.priority === "secondary"
+              ? 0.4
+              : 0.3) * (focused ? 1.18 : 1);
+        return (
+          <mesh
+            key={cluster.id}
+            position={[cluster.center[0], height, cluster.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[radius, radius + 0.045, softwareRenderer ? 14 : 28]}
+            />
+            <meshBasicMaterial
+              color={profile.accent}
+              transparent
+              opacity={
+                focused
+                  ? 0.46
+                  : cluster.priority === "primary"
+                    ? 0.34
+                    : cluster.priority === "secondary"
+                      ? 0.22
+                      : 0.14
+              }
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+      {visibleRegions.map((region) => {
+        const height =
+          (terrain.sampleHeight(region.center[0], region.center[1]) ?? 0) + 0.12;
+        const focused = region.id === focusedAnchor?.regionId;
+        const focusScale = focused ? 1.12 : 1;
+        return (
+          <mesh
+            key={region.id}
+            position={[region.center[0], height, region.center[1]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <ringGeometry
+              args={[
+                Math.max(0.34, region.radius * 0.1) * focusScale,
+                Math.max(0.5, region.radius * 0.14) * focusScale,
+                softwareRenderer ? 12 : 24,
+              ]}
+            />
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={
+                focused ? 0.42 : softwareRenderer ? 0.2 : 0.12
+              }
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+      {visibleLandmarks.map((landmark) => {
+        const focused = landmark.id === focusedAnchor?.landmarkId;
+        const focusScale = focused ? 1.18 : 1;
+        const height =
+          (terrain.sampleHeight(landmark.position[0], landmark.position[1]) ??
+            0) + 0.34 * landmark.scale * focusScale;
+        return (
+          <mesh
+            key={landmark.id}
+            position={[landmark.position[0], height, landmark.position[1]]}
+            scale={[
+              0.32 * landmark.scale * focusScale,
+              0.9 * landmark.scale * focusScale,
+              0.32 * landmark.scale * focusScale,
+            ]}
+          >
+            {landmark.kind === "crater" || landmark.kind === "basin" ? (
+              <torusGeometry args={[0.68, 0.13, 6, softwareRenderer ? 10 : 18]} />
+            ) : landmark.kind === "ridge" ? (
+              <boxGeometry args={[1.1, 0.46, 0.34]} />
+            ) : (
+              <coneGeometry args={[0.55, 1.55, softwareRenderer ? 5 : 8]} />
+            )}
+            <meshBasicMaterial
+              color={focused ? "#fff0cf" : profile.accent}
+              transparent
+              opacity={
+                focused ? 0.84 : 0.38 + landmark.prominence * 0.22
+              }
+            />
+          </mesh>
+        );
+      })}
+      {visibleContent.map((anchor) => {
+        const focused = anchor.entryId === focusedEntryId;
+        const priorityScale = focused
+          ? 1.38
+          : anchor.priority === "primary"
+            ? 1.25
+            : anchor.priority === "secondary"
+              ? 1
+              : 0.82;
+        const height =
+          (terrain.sampleHeight(anchor.position[0], anchor.position[1]) ?? 0) +
+          0.42 * priorityScale;
+        return (
+          <group
+            key={anchor.id}
+            name={`surface-signal-${anchor.id}`}
+            userData={{ surfaceEntryId: anchor.entryId }}
+            position={[anchor.position[0], height, anchor.position[1]]}
+            scale={priorityScale}
+            onClick={
+              active
+                ? (event) => {
+                    event.stopPropagation();
+                    onFocusEntry(anchor.entryId);
+                  }
+                : undefined
+            }
+          >
+            {active ? (
+              <mesh
+                name={`surface-signal-hit-${anchor.id}`}
+                position={[0, 0.22, 0]}
+              >
+                <sphereGeometry args={[0.3, 8, 6]} />
+                <meshBasicMaterial
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                />
+              </mesh>
+            ) : null}
+            <mesh>
+              <cylinderGeometry args={[0.045, 0.07, 0.74, 6]} />
+              <meshBasicMaterial
+                color={profile.accent}
+                transparent
+                opacity={
+                  focused || anchor.priority === "primary" ? 0.98 : 0.76
+                }
+              />
+            </mesh>
+            <mesh position={[0, 0.48, 0]}>
+              <octahedronGeometry args={[0.12, 0]} />
+              <meshBasicMaterial
+                color={
+                  focused || anchor.priority === "primary"
+                    ? "#fff0cf"
+                    : "#ffffff"
+                }
+              />
+            </mesh>
+          </group>
+        );
+      })}
     </>
   );
 }
-
-useGLTF.preload("/models/boulder_01/boulder_01_1k.gltf");

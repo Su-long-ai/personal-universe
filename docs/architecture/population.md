@@ -41,6 +41,12 @@ worlds may be `surface-capable`. Explicit authored hero worlds may be
 change the existing `surfaceMode`; it is the stable contract Surface can
 consume.
 
+The selected world's population capability is exposed as
+`data-universe-world-population-capability` alongside its population provenance.
+`data-universe-world-capability` is independently owned by the active renderer
+and can change with quality or hardware while the population capability stays
+the same. Neither diagnostic selects a renderer.
+
 ## Determinism and rarity
 
 The existing Helios-derived `SeededRng` and `hashSeed` remain the generation
@@ -86,3 +92,28 @@ consumes the world capability/archetype contract without moving population
 identity into renderer code. Native YEIS identity remains the fixed astronomy
 boundary, and authored personal content reservations always outrank generated
 filler.
+
+## Pinned YEIS native adapter
+
+The default YEIS path uses the same population schema rather than a second
+population graph. The adapter classifies existing native materialization:
+
+- Aurora/hero identity is `authored`;
+- the native Solar System is `observed`. Product archetype/capability and
+  periods computed from orbital elements are inferred; a period explicitly
+  supplied by the native orbit remains observed;
+- named catalogue-star systems are `hybrid`: catalogue star identity is
+  observed while the pinned YEIS system generator supplies their worlds.
+  Native photometric estimates are inferred, while explicit measured host
+  overrides retain observed status field by field;
+- procedural native systems remain `generated`.
+
+The adapter does **not** add another native system cache. Pinned YEIS
+`Universe.system()` already retains only a small recent-system working set.
+Product `SystemDefinition` display names are therefore remapped on demand so a
+locale change cannot be frozen by an Agent 08 cache.
+
+For browser/release evidence the selected canonical materialization publishes
+only narrow diagnostics for population schema/generator, system provenance and
+selected-world provenance/capability. These diagnostics do not own navigation,
+rendering, Search ranking or Surface behavior.

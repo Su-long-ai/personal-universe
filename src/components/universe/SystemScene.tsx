@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { PlanetArchetype, PlanetDefinition, SystemDefinition } from "../../lib/universe/types";
 import { hashSeed } from "../../lib/universe/generation";
+import { LifecycleStars } from "./LifecycleStars";
 
 function spectralColor(type: string) {
   const cls = type.charAt(0).toUpperCase();
@@ -116,15 +116,21 @@ function PlanetBody({
 
 export function SystemScene({
   system,
+  starPointLightVisible,
   onSelectPlanet,
   onScaleFocus,
   scaleTargetPlanet,
+  handoffTargetPlanetId,
+  onHandoffTargetSuppressed,
   onScaleFrame,
 }: {
   system: SystemDefinition;
+  starPointLightVisible: boolean;
   onSelectPlanet: (planet: PlanetDefinition) => void;
   onScaleFocus?: (planet: PlanetDefinition | null) => void;
   scaleTargetPlanet?: PlanetDefinition | null;
+  handoffTargetPlanetId?: string | null;
+  onHandoffTargetSuppressed?: (planetId: string) => void;
   onScaleFrame?: (frame: SystemScaleFrame | null) => void;
 }) {
   const starColor = spectralColor(system.star.spectralType);
@@ -137,6 +143,24 @@ export function SystemScene({
   const scaleFrameIdRef = useRef<string | null>(null);
   const scaleFrameTickRef = useRef(0);
   const systemTiltRef = useRef(new THREE.Euler(0.03, 0, -0.015));
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      html.dataset.universeSystemTargetSuppressed = handoffTargetPlanetId;
+      onHandoffTargetSuppressed?.(handoffTargetPlanetId);
+    } else {
+      delete html.dataset.universeSystemTargetSuppressed;
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemTargetSuppressed ===
+        handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemTargetSuppressed;
+      }
+    };
+  }, [handoffTargetPlanetId, onHandoffTargetSuppressed]);
 
   useFrame((state) => {
     scaleFrameTickRef.current = (scaleFrameTickRef.current + 1) % 4;
@@ -183,7 +207,8 @@ export function SystemScene({
     focusFrameRef.current = (focusFrameRef.current + 1) % 6;
     if (focusFrameRef.current !== 0) return;
 
-    let best: { planet: PlanetDefinition; distance: number } | null = null;
+    let bestPlanet: PlanetDefinition | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (let index = 0; index < system.planets.length; index += 1) {
       const planet = system.planets[index];
       const orbit = compressedOrbit(planet, index);
@@ -207,15 +232,16 @@ export function SystemScene({
         projected.x * size.width * 0.5,
         projected.y * size.height * 0.5,
       );
-      if (distance <= 92 && (!best || distance < best.distance)) {
-        best = { planet, distance };
+      if (distance <= 92 && distance < bestDistance) {
+        bestPlanet = planet;
+        bestDistance = distance;
       }
     }
 
-    const nextId = best?.planet.id ?? null;
+    const nextId = bestPlanet?.id ?? null;
     if (focusedIdRef.current === nextId) return;
     focusedIdRef.current = nextId;
-    onScaleFocus(best?.planet ?? null);
+    onScaleFocus(bestPlanet);
   });
 
   useEffect(
@@ -229,9 +255,15 @@ export function SystemScene({
   return (
     <>
       <color attach="background" args={["#010208"]} />
-      <Stars radius={90} depth={45} count={1800} factor={1.7} saturation={0.22} fade speed={0.06} />
+      <LifecycleStars radius={90} depth={45} count={1800} factor={1.7} saturation={0.22} fade speed={0.06} />
       <ambientLight intensity={0.18} />
-      <pointLight position={[0, 0, 0]} intensity={34} distance={45} color={starColor} />
+      <pointLight
+        visible={starPointLightVisible}
+        position={[0, 0, 0]}
+        intensity={34}
+        distance={45}
+        color={starColor}
+      />
 
       <group rotation={[0.03, 0, -0.015]}>
         <mesh>
@@ -249,14 +281,16 @@ export function SystemScene({
           />
         </mesh>
 
-        {system.planets.map((planet, index) => (
-          <PlanetBody
-            key={planet.id}
-            planet={planet}
-            index={index}
-            onSelect={onSelectPlanet}
-          />
-        ))}
+        {system.planets.map((planet, index) =>
+          planet.id === handoffTargetPlanetId ? null : (
+            <PlanetBody
+              key={planet.id}
+              planet={planet}
+              index={index}
+              onSelect={onSelectPlanet}
+            />
+          ),
+        )}
       </group>
     </>
   );

@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "MOBILE-HUD-COMPACT-ORBIT-V1-001",
+  "approved_at": "2026-11-25T17:13:21.250Z",
+  "baseline_commit": "88ec81c0c5eddcc908b38ad1c9d31b48f032be12",
+  "record_path": "docs/reuse-gate/tasks/MOBILE-HUD-COMPACT-ORBIT-V1-001.json",
+  "record_sha256": "513009885205bcd029a8030f05a96d0452f7cb54a36f75d66cedf09723e411c3",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Vertical CSS-only density adjustment in existing responsive HUD and focused touch acceptance"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/universe.css",
+    "tests/e2e/mobile-hud-compact.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-hud-responsive-density",
+    "playwright-existing-mobile-visuals"
+  ],
+  "candidate_scores": {
+    "existing-hud-responsive-density": 57,
+    "auto-collapsed-mobile-hud": 43.5,
+    "separate-mobile-hud": null,
+    "playwright-existing-mobile-visuals": 57
+  }
+}

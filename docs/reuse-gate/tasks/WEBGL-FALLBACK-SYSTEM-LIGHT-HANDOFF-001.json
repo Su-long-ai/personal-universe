@@ -1,0 +1,122 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-FALLBACK-SYSTEM-LIGHT-HANDOFF-001",
+  "title": "Prevent fallback System point from specializing close-world shader",
+  "scope": {
+    "level": "implementation",
+    "subject": "Give the existing fallback System star point its System-phase lifetime while keeping normal System lighting and current geometry handoff."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact bundle capture and controlled real Chromium test of delayed native chunk show the fallback System point at origin (34 intensity, 45 distance) enters an Approach draw with the close-world sphere, adding the exact third sphere key. Point-only test filter removed it while leaving native lighting and ordinary System fallback point intact. Keep one Canvas, no threshold changes, no extra pass, no renderer fork, and verify transition visually.",
+  "planned_files": [
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisSystemScene.tsx"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Keep pinned native System lighting and do not fork default render authority."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/core/Object3D.visible",
+      "finding": "Three source in the installed renderer skips invisible Object3D before collecting lights; its program key specializes on point light count."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the existing native and fallback System renderer paths."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep single Canvas and pass phase information through current React props."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "three-light-visibility"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Reuse Three visibility gating for light collection: an invisible light is not traversed; power zero alone still specializes a shader key."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing point light, with visibility limited to ordinary System ownership."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-point-visibility",
+      "name": "Existing Three point visibility scoped to System",
+      "level": "subsystem",
+      "registry_id": "three-light-visibility",
+      "source": "Current Three renderer and existing SystemScene / UniverseCanvas phase",
+      "license": "MIT Three plus project code",
+      "decision": "reuse",
+      "reason": "Remove a foreign light from the close-world frame while preserving System scene lighting and visibility of fallback geometry.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "separate-render-pass",
+      "name": "Per-presentation render pass",
+      "level": "component_asset",
+      "source": "Potential additional custom pass",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Adds renderer authority and cost to a bounded light-overlap case. Both phases need one scene and no new timing dependency.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-point-visibility"
+    ],
+    "rationale": "Pass existing phase from UniverseCanvas to fallback renderer; Three light visibility owns collection. No shader, camera, or timing changes.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Keep isolated if ordinary System or overlap visual behavior regresses, or the tightened owner control does not close."
+  }
+}

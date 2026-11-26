@@ -3,11 +3,13 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
 } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import type { Planet } from "procedural-planets";
 import { GalaxyScene } from "./GalaxyScene";
 import {
   SystemScene,
@@ -54,14 +56,45 @@ const LazyYeisSystemScene = lazy(() =>
   })),
 );
 
-function RendererPageLifecycle() {
+const UNIVERSE_CAMERA_CONFIG = {
+  position: [0, 26.5, 43] as [number, number, number],
+  fov: 48,
+  near: 0.05,
+  far: 260,
+};
+const UNIVERSE_DPR_LOW: [number, number] = [1, 1];
+const UNIVERSE_DPR_DEFAULT: [number, number] = [1, 1.75];
+
+function RendererPageLifecycle({
+  onContextLost,
+}: {
+  onContextLost: () => void;
+}) {
   const { gl } = useThree();
 
   useEffect(() => {
     let released = false;
     let releaseTimer: number | null = null;
     const html = document.documentElement;
+    const canvas = gl.domElement;
     html.dataset.universeWebglLifecycle = "active";
+    html.dataset.universeWebglContextGeneration ??= "0";
+
+    const onWebglContextLost = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "lost";
+      delete html.dataset.universeWorldPaintStarted;
+      delete html.dataset.universeWorldPaintReady;
+      onContextLost();
+    };
+
+    const onWebglContextRestored = () => {
+      if (released) return;
+      html.dataset.universeWebglLifecycle = "active";
+      html.dataset.universeWebglContextGeneration = String(
+        Number(html.dataset.universeWebglContextGeneration ?? "0") + 1,
+      );
+    };
 
     const onPageHide = (event: PageTransitionEvent) => {
       if (event.persisted || released) return;
@@ -84,19 +117,40 @@ function RendererPageLifecycle() {
       }, 0);
     };
 
+    canvas.addEventListener("webglcontextlost", onWebglContextLost);
+    canvas.addEventListener("webglcontextrestored", onWebglContextRestored);
     window.addEventListener("pagehide", onPageHide);
     return () => {
+      canvas.removeEventListener("webglcontextlost", onWebglContextLost);
+      canvas.removeEventListener(
+        "webglcontextrestored",
+        onWebglContextRestored,
+      );
       window.removeEventListener("pagehide", onPageHide);
       if (releaseTimer !== null) {
         window.clearTimeout(releaseTimer);
         releaseTimer = null;
       }
-      if (html.dataset.universeWebglLifecycle === "active") {
+      if (!released) {
         delete html.dataset.universeWebglLifecycle;
+        delete html.dataset.universeWebglContextGeneration;
       }
     };
-  }, [gl]);
+  }, [gl, onContextLost]);
 
+  return null;
+}
+
+function ScaleFrameWitness({
+  phase,
+  onPresented,
+}: {
+  phase: UniversePhase;
+  onPresented: (phase: UniversePhase) => void;
+}) {
+  // CinematicPipeline owns the draw at priority 1. At priority 2 the
+  // current tree has actually submitted its frame; never draw a second one.
+  useFrame(() => onPresented(phase), 2);
   return null;
 }
 
@@ -105,6 +159,7 @@ export function UniverseCanvas({
   phaseRef,
   worldScalePosition,
   worldScalePositionRef,
+  worldScaleRenderRevision,
   worldScaleContinuous,
   galaxyScaleTarget,
   engineMode,
@@ -115,6 +170,8 @@ export function UniverseCanvas({
   onNavigationFailed,
   selectedSystem,
   selectedPlanet,
+  surfaceFocusEntryId,
+  onSurfaceFocusEntry,
   systemScaleTargetPlanet,
   onSelectSystem,
   onNavigateDestination,
@@ -127,12 +184,14 @@ export function UniverseCanvas({
   scrollDepth,
   reducedMotion,
   onCinematicPhaseComplete,
+  onScaleFramePresented,
   onCinematicUserControlStart,
 }: {
   phase: UniversePhase;
   phaseRef: MutableRefObject<UniversePhase>;
   worldScalePosition: number;
   worldScalePositionRef: MutableRefObject<number>;
+  worldScaleRenderRevision: number;
   worldScaleContinuous: boolean;
   galaxyScaleTarget: UniverseNavigationDestination | null;
   engineMode: UniverseEngine;
@@ -146,6 +205,8 @@ export function UniverseCanvas({
   ) => void;
   selectedSystem: SystemDefinition | null;
   selectedPlanet: PlanetDefinition | null;
+  surfaceFocusEntryId: string | null;
+  onSurfaceFocusEntry: (entryId: string) => void;
   systemScaleTargetPlanet: PlanetDefinition | null;
   onSelectSystem: (marker: GalaxyMarker) => void;
   onNavigateDestination: (
@@ -162,6 +223,7 @@ export function UniverseCanvas({
   scrollDepth: number;
   reducedMotion: boolean;
   onCinematicPhaseComplete: (phase: UniversePhase) => void;
+  onScaleFramePresented: (phase: UniversePhase) => void;
   onCinematicUserControlStart: () => void;
 }) {
   const yeisViewStateRef = useRef<YeisGalaxyViewState | null>(null);
@@ -180,8 +242,36 @@ export function UniverseCanvas({
   const [systemScaleFrame, setSystemScaleFrame] =
     useState<SystemScaleFrame | null>(null);
   const [surfaceFallbackPrimed, setSurfaceFallbackPrimed] = useState(false);
-  const [worldPaintReady, setWorldPaintReady] = useState(false);
-  const [worldPipelineReady, setWorldPipelineReady] = useState(false);
+  const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
+  const [webglContextGeneration, setWebglContextGeneration] = useState(0);
+  const handleWebglContextLost = useCallback(() => {
+    // A restored WebGL context keeps the same Canvas authority but none of the
+    // old first-paint evidence describes the newly restored GPU resources.
+    // Version product paint authority immediately; the retained scene must earn
+    // concrete paint again after Three/ProceduralPlanets restore their state.
+    setWebglContextGeneration((generation) => generation + 1);
+    delete document.documentElement.dataset.universeWorldPaintStarted;
+    delete document.documentElement.dataset.universeWorldPaintReady;
+  }, []);
+  const worldPlanetReleaseRef =
+    useRef<((planet: Planet) => void) | null>(null);
+  const handleBeforeLivePlanetDispose = useCallback((planet: Planet) => {
+    worldPlanetReleaseRef.current?.(planet);
+  }, []);
+  const [worldPaintStartedState, setWorldPaintStartedState] = useState<{
+    identity: string;
+    generation: number;
+    started: boolean;
+  }>({ identity: "", generation: -1, started: false });
+  const [worldPaintState, setWorldPaintState] = useState<{
+    identity: string;
+    generation: number;
+    ready: boolean;
+  }>({ identity: "", generation: -1, ready: false });
+  const [systemTargetSuppression, setSystemTargetSuppression] = useState<{
+    planetId: string | null;
+    generation: number;
+  }>({ planetId: null, generation: -1 });
 
   useEffect(() => {
     if (phase === "atmosphere" || phase === "surface") {
@@ -195,17 +285,156 @@ export function UniverseCanvas({
     phase === "orbit" ||
     phase === "atmosphere" ||
     phase === "surface";
+  const [retainedWorldRenderer, setRetainedWorldRenderer] = useState<{
+    planet: PlanetDefinition;
+    destinationId: string | null;
+  } | null>(null);
 
   useEffect(() => {
-    // Paint readiness belongs to the concrete renderer capability, not only
-    // the planet identity. A quality switch can replace live ProceduralPlanets
-    // with a lightweight/software path (or the reverse) while the same planet
-    // remains selected; keep the System handoff frame until the new authority
-    // has painted as well.
-    setWorldPaintReady(false);
-    setWorldPipelineReady(false);
-    delete document.documentElement.dataset.universeWorldPaintReady;
-  }, [quality, worldPrewarmPlanet?.id]);
+    const requestedDestinationId = navigationRequest?.destinationId;
+    if (!requestedDestinationId) return;
+    setRetainedWorldRenderer((current) =>
+      current && current.destinationId !== requestedDestinationId
+        ? null
+        : current,
+    );
+  }, [navigationRequest?.destinationId]);
+
+  useEffect(() => {
+    if (!worldPrewarmPlanet || (phase !== "system" && !closeWorldPhase)) {
+      return;
+    }
+    const destinationId = galaxyScaleTarget?.id ?? null;
+    setRetainedWorldRenderer((current) =>
+      current?.planet.id === worldPrewarmPlanet.id &&
+      current.destinationId === destinationId
+        ? current
+        : { planet: worldPrewarmPlanet, destinationId },
+    );
+  }, [
+    closeWorldPhase,
+    galaxyScaleTarget?.id,
+    phase,
+    worldPrewarmPlanet,
+  ]);
+
+  // Keep exactly one previously entered world allocated while Galaxy is
+  // presented. Galaxy owns the visible renderer there; this retained world is
+  // parked and does no presentation work. Ordinary Surface -> Galaxy reversal
+  // may clear the active scale target, which must not destroy reusable world
+  // resources.
+  const retainedWorldParkedWithoutTarget =
+    (phase === "galaxy" || phase === "system") &&
+    !worldPrewarmPlanet &&
+    Boolean(retainedWorldRenderer);
+  const worldRendererPlanet =
+    worldPrewarmPlanet ??
+    (retainedWorldParkedWithoutTarget
+      ? retainedWorldRenderer?.planet ?? null
+      : null);
+  const keepWorldRendererMounted = Boolean(
+    worldRendererPlanet &&
+      (phase === "system" ||
+        closeWorldPhase ||
+        retainedWorldParkedWithoutTarget),
+  );
+
+  // Readiness follows the concrete retained renderer identity. Activation
+  // generation below still invalidates authority whenever presentation parks
+  // or re-enters, so retaining identity does not retain paint permission.
+  const worldPaintIdentity =
+    `${worldRendererPlanet?.id ?? "none"}:${quality}`;
+  const worldPaintAuthorityKey =
+    `${worldPaintIdentity}:${closeWorldPhase ? "presenting" : "parked"}:ctx${webglContextGeneration}`;
+  const worldPaintAuthorityRef = useRef({
+    key: worldPaintAuthorityKey,
+    generation: 0,
+  });
+  if (worldPaintAuthorityRef.current.key !== worldPaintAuthorityKey) {
+    worldPaintAuthorityRef.current = {
+      key: worldPaintAuthorityKey,
+      generation: worldPaintAuthorityRef.current.generation + 1,
+    };
+  }
+  const worldPaintGeneration =
+    worldPaintAuthorityRef.current.generation;
+  const worldPaintStarted =
+    closeWorldPhase &&
+    worldPaintStartedState.identity === worldPaintIdentity &&
+    worldPaintStartedState.generation === worldPaintGeneration &&
+    worldPaintStartedState.started;
+  const worldPaintReady =
+    closeWorldPhase &&
+    worldPaintState.identity === worldPaintIdentity &&
+    worldPaintState.generation === worldPaintGeneration &&
+    worldPaintState.ready;
+  const handleWorldPaintStarted = useCallback(
+    (started: boolean) => {
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
+      setWorldPaintStartedState({
+        identity: worldPaintIdentity,
+        generation: worldPaintGeneration,
+        started,
+      });
+    },
+    [
+      worldPaintAuthorityKey,
+      worldPaintGeneration,
+      worldPaintIdentity,
+    ],
+  );
+  const handleWorldPaintReady = useCallback(
+    (ready: boolean) => {
+      // A repeated capability key is not the same paint authority activation.
+      // HIGH -> LOW -> HIGH and System -> Approach re-entry each get a fresh
+      // generation, so an older ready=true token can never resurrect merely
+      // because the string identity happens to match again.
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
+      setWorldPaintState({
+        identity: worldPaintIdentity,
+        generation: worldPaintGeneration,
+        ready,
+      });
+    },
+    [
+      worldPaintAuthorityKey,
+      worldPaintGeneration,
+      worldPaintIdentity,
+    ],
+  );
+
+  useEffect(() => {
+    // Diagnostics follow the same activation generation as product authority.
+    // Clear first-paint evidence synchronously at each committed activation;
+    // the concrete renderer must publish it again for this generation.
+    const html = document.documentElement;
+    html.dataset.universeWorldPaintGeneration =
+      String(worldPaintGeneration);
+    delete html.dataset.universeWorldPaintStarted;
+    delete html.dataset.universeWorldPaintReady;
+    return () => {
+      if (
+        html.dataset.universeWorldPaintGeneration ===
+        String(worldPaintGeneration)
+      ) {
+        delete html.dataset.universeWorldPaintGeneration;
+      }
+      delete html.dataset.universeWorldPaintStarted;
+      delete html.dataset.universeWorldPaintReady;
+    };
+  }, [worldPaintGeneration]);
 
   useEffect(() => {
     if (phase === "system" && systemScaleTargetPlanet) return;
@@ -213,35 +442,97 @@ export function UniverseCanvas({
   }, [phase, systemScaleTargetPlanet]);
 
   const liveWorld = Boolean(selectedPlanet) && closeWorldPhase;
+  const prewarmLiveWorld =
+    Boolean(worldPrewarmPlanet) &&
+    (phase === "system" || closeWorldPhase);
+  const handoffTargetPlanetId =
+    phase === "approach" && worldPaintStarted
+      ? worldPrewarmPlanet?.id ?? null
+      : null;
+  const systemTargetSuppressed =
+    Boolean(handoffTargetPlanetId) &&
+    systemTargetSuppression.planetId === handoffTargetPlanetId &&
+    systemTargetSuppression.generation === worldPaintGeneration;
   const keepSystemForHandoff =
-    closeWorldPhase && Boolean(selectedSystem) && !worldPaintReady;
+    phase === "approach" &&
+    Boolean(selectedSystem) &&
+    (
+      !worldPaintReady ||
+      (Boolean(handoffTargetPlanetId) && !systemTargetSuppressed)
+    );
+  const handleSystemTargetSuppressed = useCallback(
+    (planetId: string) => {
+      const authority = worldPaintAuthorityRef.current;
+      if (
+        authority.key !== worldPaintAuthorityKey ||
+        authority.generation !== worldPaintGeneration
+      ) {
+        return;
+      }
+      setSystemTargetSuppression({
+        planetId,
+        generation: worldPaintGeneration,
+      });
+    },
+    [worldPaintAuthorityKey, worldPaintGeneration],
+  );
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (handoffTargetPlanetId) {
+      html.dataset.universeSystemHandoffTarget = handoffTargetPlanetId;
+    } else {
+      delete html.dataset.universeSystemHandoffTarget;
+    }
+    return () => {
+      if (
+        html.dataset.universeSystemHandoffTarget === handoffTargetPlanetId
+      ) {
+        delete html.dataset.universeSystemHandoffTarget;
+      }
+    };
+  }, [handoffTargetPlanetId]);
+
+  const canvasDpr =
+    quality === "low" ? UNIVERSE_DPR_LOW : UNIVERSE_DPR_DEFAULT;
+  const canvasGl = useMemo(
+    () => ({
+      antialias: quality !== "low",
+      powerPreference: "high-performance" as const,
+      logarithmicDepthBuffer: engineMode === "yeis",
+    }),
+    [engineMode, quality],
+  );
 
   return (
     <Canvas
-      dpr={quality === "low" ? [1, 1] : [1, 1.75]}
-      camera={{ position: [0, 26.5, 43], fov: 48, near: 0.05, far: 260 }}
-      gl={{
-        antialias: quality !== "low",
-        powerPreference: "high-performance",
-        logarithmicDepthBuffer: engineMode === "yeis",
-      }}
+      dpr={canvasDpr}
+      camera={UNIVERSE_CAMERA_CONFIG}
+      gl={canvasGl}
     >
-      <RendererPageLifecycle />
+      <RendererPageLifecycle onContextLost={handleWebglContextLost} />
       {!(engineMode === "yeis" && phase === "galaxy") && (
         <CinematicCamera
           phase={phase}
           phaseRef={phaseRef}
           worldScalePosition={worldScalePosition}
+          worldScaleRenderRevision={worldScaleRenderRevision}
           worldScaleContinuous={worldScaleContinuous}
           scrollDepth={scrollDepth}
           reducedMotion={reducedMotion}
           quality={quality}
+          surfaceIdentity={selectedPlanet?.id ?? null}
           surfaceCameraFrame={surfaceCameraFrame}
           systemScaleFrame={systemScaleFrame}
           galaxyViewState={
             yeisViewStateSnapshot ?? yeisViewStateRef.current
           }
-          worldFrameReady={worldPaintReady || worldPipelineReady}
+          // Settlement belongs to the same current-generation full-paint
+          // authority as the renderer handoff. A first concrete draw starts
+          // target suppression, but it must not publish a settled camera before
+          // the matched world has completed its second presented frame.
+          worldFrameReady={worldPaintReady}
+          surfaceFallbackReady={surfaceFallbackReady}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -286,18 +577,24 @@ export function UniverseCanvas({
             fallback={
               <SystemScene
                 system={selectedSystem}
+                starPointLightVisible={phase === "system"}
                 onSelectPlanet={onSelectPlanet}
                 onScaleFocus={onScaleFocusPlanet}
                 scaleTargetPlanet={systemScaleTargetPlanet}
+                handoffTargetPlanetId={handoffTargetPlanetId}
+                onHandoffTargetSuppressed={handleSystemTargetSuppressed}
                 onScaleFrame={setSystemScaleFrame}
               />
             }
           >
             <LazyYeisSystemScene
               system={selectedSystem}
+              starPointLightVisible={phase === "system"}
               onSelectPlanet={onSelectPlanet}
               onScaleFocus={onScaleFocusPlanet}
               scaleTargetPlanet={systemScaleTargetPlanet}
+              handoffTargetPlanetId={handoffTargetPlanetId}
+              onHandoffTargetSuppressed={handleSystemTargetSuppressed}
               onScaleFrame={setSystemScaleFrame}
               quality={quality}
             />
@@ -305,9 +602,12 @@ export function UniverseCanvas({
         ) : (
           <SystemScene
             system={selectedSystem}
+            starPointLightVisible={phase === "system"}
             onSelectPlanet={onSelectPlanet}
             onScaleFocus={onScaleFocusPlanet}
             scaleTargetPlanet={systemScaleTargetPlanet}
+            handoffTargetPlanetId={handoffTargetPlanetId}
+            onHandoffTargetSuppressed={handleSystemTargetSuppressed}
             onScaleFrame={setSystemScaleFrame}
           />
         )
@@ -325,16 +625,25 @@ export function UniverseCanvas({
           ) : null
         }
       >
-        {worldPrewarmPlanet &&
-          (phase === "system" || closeWorldPhase) && (
+        {worldRendererPlanet &&
+          keepWorldRendererMounted && (
             <LazyPlanetScene
-              planet={worldPrewarmPlanet}
+              planet={worldRendererPlanet}
               quality={quality}
               phase={phase}
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
-              onPaintReady={() => setWorldPaintReady(true)}
+              surfaceFallbackReady={surfaceFallbackReady}
+              approachHandoffReady={
+                phase !== "approach" || systemTargetSuppressed
+              }
+              paintContextGeneration={webglContextGeneration}
+              surfaceFocusEntryId={surfaceFocusEntryId}
+              onSurfaceFocusEntry={onSurfaceFocusEntry}
+              onPaintStartedChange={handleWorldPaintStarted}
+              onPaintReadyChange={handleWorldPaintReady}
               onSurfaceCameraFrame={setSurfaceCameraFrame}
+              onBeforeLivePlanetDispose={handleBeforeLivePlanetDispose}
             />
           )}
       </Suspense>
@@ -346,7 +655,11 @@ export function UniverseCanvas({
             phase={phase}
             phaseRef={phaseRef}
             quality={quality}
-            hasPlanet={Boolean(selectedPlanet)}
+            planet={worldRendererPlanet}
+            surfaceFocusEntryId={surfaceFocusEntryId}
+            onSurfaceFocusEntry={onSurfaceFocusEntry}
+            ready={surfaceFallbackReady}
+            onReadyChange={setSurfaceFallbackReady}
           />
         </Suspense>
       ) : null}
@@ -354,8 +667,12 @@ export function UniverseCanvas({
       <CinematicPipeline
         quality={quality}
         liveWorld={liveWorld}
-        onReadyChange={setWorldPipelineReady}
+        prewarmLiveWorld={prewarmLiveWorld}
+        planetReleaseRef={worldPlanetReleaseRef}
       />
+      {closeWorldPhase && (
+        <ScaleFrameWitness phase={phase} onPresented={onScaleFramePresented} />
+      )}
     </Canvas>
   );
 }

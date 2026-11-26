@@ -1,0 +1,36 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-DREI-STAR-PROGRAM-OWNERSHIP-001",
+  "approved_at": "2026-11-25T18:36:14.707Z",
+  "baseline_commit": "a3ed5954682010a93c380c8d056f4c0fdb2d621a",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-DREI-STAR-PROGRAM-OWNERSHIP-001.json",
+  "record_sha256": "3950a3d7269f9620fd481a884eb7d1d6feb0087105b197d93000f919eb00a618",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-three-drei": "89a72092c79070cf4a49c0cf5af09e50511812dd94fdf74b06961ffff0bda13e",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Own the existing Drei Stars material lifecycle and prove the repeated continuous journey retains only live or intentionally parked resources"
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/LifecycleStars.tsx",
+    "src/components/universe/SystemScene.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "src/components/universe/PlanetScene.tsx",
+    "src/components/universe/CinematicPipeline.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "selected_ids": [
+    "owned-drei-stars",
+    "current-r3f-metrics"
+  ],
+  "candidate_scores": {
+    "owned-drei-stars": 57,
+    "current-r3f-metrics": 57,
+    "global-cache-or-custom-stars": 20
+  }
+}

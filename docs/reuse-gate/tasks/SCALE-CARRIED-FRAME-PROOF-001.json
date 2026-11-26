@@ -1,0 +1,124 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-CARRIED-FRAME-PROOF-001",
+  "title": "Require a rendered frame before applying carried scale",
+  "scope": {
+    "level": "implementation",
+    "subject": "Gate only the held native wheel coordinate on an actual post-render witness from the existing R3F loop."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Cloud profiling found synchronous camera settlement events only 6 ms apart while Orbit and Atmosphere were not guaranteed to be drawn. The existing R3F priority-1 rendering loop is authoritative for actual draws. Add a read-only, order-bound frame callback at priority 2 to release only a single still-current held-coordinate step. No extra FrameLoop, repeated renderer or timer.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Keep the pinned native renderer and its actual applied-frame readiness; neither a generic deadline nor a separate camera may replace it."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/issues/178#issuecomment-7186294655",
+      "finding": "Both product variants reproduced the exact first-attempt sample trace under delayed readiness; the existing deterministic signed response distance and saturated segment are the relevant abstraction."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "Priority-ordered useFrame subscribers are run in increasing priority. Existing priority 1 owns rendering; the passive priority 2 witness consumes a ref after that same draw."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the native implementation and phase ownership."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep single Canvas and its phase presentation."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Extend the existing immediate scale intent authority; detached scroll/animation engines cannot preserve these phase contracts."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep imperative state and render mirror; no event queue."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-wheel-coordinate",
+      "name": "Existing signed response mapping and handoff owner",
+      "level": "subsystem",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseApp, continuousScale and pinned renderer",
+      "license": "Project code and React MIT",
+      "decision": "reuse",
+      "reason": "Use real delivered deltas with existing bounded domain; commit presentation only when ready, invalidate at reversal and takeover.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "synthetic-wheel-replay",
+      "name": "Synthesized wheel event replay or inertia",
+      "level": "component_asset",
+      "source": "Generic event queues or synthetic gesture continuations",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Adds hidden movement and ownership; rejected.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-wheel-coordinate"
+    ],
+    "rationale": "Reuse the current R3F rendering order and React refs rather than a fake timeout or creating a new world transition engine.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If stable direct ownership and immediate reversal cannot be demonstrated, leave isolated and do not publish as release proof."
+  }
+}

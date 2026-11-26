@@ -1,0 +1,33 @@
+{
+  "schema": 3,
+  "task_id": "LIVE-SURFACE-ANCHOR-EDGE-PUBLICATION-001",
+  "approved_at": "2026-11-25T17:53:59.086Z",
+  "baseline_commit": "c7345fbebc254c1c65dd9960014c7257151c6001",
+  "record_path": "docs/reuse-gate/tasks/LIVE-SURFACE-ANCHOR-EDGE-PUBLICATION-001.json",
+  "record_sha256": "1fb0ce813dc62737de70bde160a7e3c88c374666637417a0ab733f9bf39ff099",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "yomotsu-camera-controls": "9d4a7a0ba4afbeab02486542f02d0d56f9eb826bb37ea6ddc8d265a67632794d"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Publish the normalized 4-boundary crossing through the existing immediate coordinate path so the real live landing frame can be attached/revoked even when an ordinary within-phase mirror is deferred."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "selected_ids": [
+    "current-immediate-scale-publisher",
+    "playwright-native-live-mirror-acceptance"
+  ],
+  "candidate_scores": {
+    "replace-camera-sequencer": 29,
+    "current-immediate-scale-publisher": 57,
+    "playwright-native-live-mirror-acceptance": 57
+  }
+}

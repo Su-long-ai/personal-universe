@@ -1,0 +1,126 @@
+{
+  "schema": 2,
+  "task_id": "SURFACE-DECORATIVE-GLTF-DEFER-001",
+  "title": "Defer decorative Surface GLTF loading off software WebGL",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the existing R3F component boundary and Drei useGLTF cache so decorative boulder assets load only on hardware paths that actually render them, while software Surface fallback avoids unused GLTF download, parse, materials and geometry"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "SurfaceTerrain already omits decorative boulder instances on software WebGL, but the component still calls useGLTF unconditionally and also invokes module-level useGLTF.preload, so SwiftShader pays the network, parse and cache cost for an asset it will never render. Keep the same Drei loader and shared GLTF cache, but move the consuming hook behind a hardware-only child and start preload only after renderer capability is known to be hardware. Wrap the decorative child in the existing React/R3F Suspense model so terrain readiness is never blocked by a cosmetic model.",
+  "planned_files": [
+    "src/components/universe/SurfaceTerrain.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://drei.docs.pmnd.rs/loaders/gltf-use-gltf",
+      "finding": "Drei useGLTF wraps cached GLTF loading for R3F and exposes preload; the existing project can keep this loader while moving load initiation to the branch that actually renders the model."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/tutorials/loading-models",
+      "finding": "R3F asset loading composes with React Suspense, allowing a decorative child to suspend independently without replacing the existing Canvas or terrain renderer."
+    },
+    {
+      "url": "https://threejs.org/docs/#examples/en/loaders/GLTFLoader",
+      "finding": "GLTF loading parses model scene resources into Three.js objects, so avoiding an unused load also avoids unnecessary parse/cache work and downstream geometry/material residency."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "This is a narrow asset-loading hot-path correction inside the existing Surface renderer, not a candidate for replacing the rendering solution."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use the existing R3F component and Suspense lifecycle to isolate optional decoration without introducing another asset scheduler or renderer."
+    },
+    {
+      "level": "subsystem",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "No new asset-management subsystem is needed because the current Drei loader already provides caching and preload; only its activation boundary is wrong."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-three-drei"
+      ],
+      "source_refs": [
+        0,
+        2
+      ],
+      "conclusion": "Retain Drei useGLTF for the boulder asset, but invoke preload and the consuming hook only on the hardware visual branch that can render rocks."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-hardware-child-boundary",
+      "name": "R3F hardware-only decorative child with Suspense",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing React Three Fiber component lifecycle",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "It gives the optional asset a lifecycle boundary without creating another Canvas, scheduler, or imperative loader owner.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "drei-usegltf-hardware-load",
+      "name": "Existing Drei useGLTF cache and preload",
+      "level": "component_asset",
+      "registry_id": "react-three-drei",
+      "source": "Existing @react-three/drei dependency",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "The product already depends on and uses useGLTF; moving invocation rather than replacing the loader preserves cache behavior and removes software-only waste.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "r3f-hardware-child-boundary",
+      "drei-usegltf-hardware-load"
+    ],
+    "rationale": "Keep the current Drei GLTF loader and R3F Canvas. Detect the renderer with the existing software capability path, trigger useGLTF.preload only for hardware, and render a Suspense-wrapped hardware-only rock child that consumes the cached model. Software fallback therefore pays zero decorative model request/parse cost while hardware preserves the same rock geometry and placement.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If conditional preload proves visually late on real GPUs, start the same Drei preload earlier from a hardware-capability effect; do not restore unconditional module-level preload or add a separate asset manager."
+  }
+}

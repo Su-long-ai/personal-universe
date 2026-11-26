@@ -68,7 +68,7 @@ jobs:
   build:
     name: Build + Bundle Guard
     needs: reuse-gate
-    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/webgl-surface-release-v1' }}
+    if: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/agent/webgl-surface-release-v1' || github.ref == 'refs/heads/agent/webgl-performance-release-v3' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

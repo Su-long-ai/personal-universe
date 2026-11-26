@@ -291,6 +291,168 @@ export function decorateAuthoredSystem(
   };
 }
 
+export type NativeSystemPopulationMode =
+  | "authored"
+  | "observed"
+  | "catalog-generated"
+  | "generated";
+
+const NATIVE_STAR_PHYSICAL_FIELDS = [
+  "spectralType",
+  "temperatureK",
+  "massSolar",
+  "radiusSolar",
+  "luminositySolar",
+] as const;
+
+type NativePopulationFieldSources = {
+  measuredCatalogStarFields?: readonly string[];
+  explicitOrbitPeriodWorldIds?: ReadonlySet<string>;
+};
+
+/**
+ * Attach the shared population contract to the lightweight product definition
+ * mapped from pinned YEIS. This deliberately does not cache the mapped object:
+ * Universe.system() already owns a bounded native cache, while display names
+ * are localized at mapping time and must remain locale-safe.
+ */
+export function decorateNativeSystemPopulation(
+  system: SystemDefinition,
+  mode: NativeSystemPopulationMode,
+  sources: NativePopulationFieldSources = {},
+): SystemDefinition {
+  if (mode === "authored") return decorateAuthoredSystem(system);
+  if (mode === "generated") return decorateGeneratedSystem(system);
+
+  const catalogGenerated = mode === "catalog-generated";
+  const measuredStarFields = catalogGenerated
+    ? NATIVE_STAR_PHYSICAL_FIELDS.filter((field) =>
+        sources.measuredCatalogStarFields?.includes(field),
+      )
+    : NATIVE_STAR_PHYSICAL_FIELDS;
+  const systemPopulation = observedPopulationMetadata({
+    kind: "system",
+    stableSeed: system.seed,
+    capability: "system-only",
+    tags: [
+      "native",
+      catalogGenerated ? "catalog-star-generated-worlds" : "solar-system",
+    ],
+    observedFields: catalogGenerated
+      ? ["id", "name", "star"]
+      : ["id", "name", "star", "planets"],
+    inferredFields: catalogGenerated ? ["planets"] : [],
+  });
+
+  return {
+    ...system,
+    population: systemPopulation,
+    star: {
+      ...system.star,
+      population: observedPopulationMetadata({
+        kind: "star",
+        stableSeed: system.star.seed,
+        parentId: system.id,
+        capability: "system-only",
+        tags: [
+          "native",
+          "observed-star",
+          `spectral:${system.star.spectralType}`,
+        ],
+        observedFields: ["name", ...measuredStarFields],
+        inferredFields: NATIVE_STAR_PHYSICAL_FIELDS.filter(
+          (field) => !measuredStarFields.includes(field),
+        ),
+      }),
+    },
+    planets: system.planets.map((planet) => {
+      const capability = populationCapabilityForArchetype(planet.archetype);
+      const rarity = populationRarityForSeed(planet.seed);
+
+      if (catalogGenerated) {
+        return {
+          ...planet,
+          population: metadata({
+            kind: "world",
+            provenance: "generated",
+            stableSeed: planet.seed,
+            parentId: system.id,
+            capability,
+            rarity: rarity.rarity,
+            rarityScore: rarity.score,
+            tags: [
+              "native",
+              "generated",
+              "world",
+              `archetype:${planet.archetype}`,
+              `capability:${capability}`,
+              ...(planet.hasRings ? ["ringed"] : []),
+            ],
+            generatedName: true,
+          }),
+          moons: planet.moons.map((moon) => ({
+            ...moon,
+            population: metadata({
+              kind: "moon",
+              provenance: "generated",
+              stableSeed: moon.seed,
+              parentId: planet.id,
+              capability: "orbit-only",
+              tags: ["native", "generated", "moon"],
+              generatedName: true,
+            }),
+          })),
+        };
+      }
+
+      const hasExplicitPeriod =
+        sources.explicitOrbitPeriodWorldIds?.has(planet.id) ?? false;
+      return {
+        ...planet,
+        population: observedPopulationMetadata({
+          kind: "world",
+          stableSeed: planet.seed,
+          parentId: system.id,
+          capability,
+          tags: [
+            "native",
+            "solar-system",
+            "world",
+            `archetype:${planet.archetype}`,
+            `capability:${capability}`,
+          ],
+          // Unit conversions preserve supplied values. A period derived
+          // from semimajor axis and stellar mass is not a supplied value.
+          observedFields: [
+            "name",
+            "radiusEarth",
+            "massEarth",
+            "orbitAU",
+            ...(hasExplicitPeriod ? ["orbitalPeriodYears"] : []),
+          ],
+          inferredFields: [
+            "archetype",
+            "capability",
+            "equilibriumTempK",
+            ...(hasExplicitPeriod ? [] : ["orbitalPeriodYears"]),
+          ],
+        }),
+        moons: planet.moons.map((moon) => ({
+          ...moon,
+          population: observedPopulationMetadata({
+            kind: "moon",
+            stableSeed: moon.seed,
+            parentId: planet.id,
+            capability: "orbit-only",
+            tags: ["native", "solar-system", "moon"],
+            observedFields: ["name", "radiusEarth", "orbitRadius"],
+          }),
+        })),
+      };
+    }),
+  };
+}
+
 function validateMetadata(
   errors: string[],
   id: string,

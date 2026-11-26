@@ -1,0 +1,145 @@
+{
+  "schema": 2,
+  "task_id": "WEBGL-PIPELINE-QUALITY-REUSE-001",
+  "title": "Keep the existing R3F world post-processing pipeline stable across quality changes",
+  "scope": {
+    "level": "implementation",
+    "subject": "Remove avoidable EffectComposer and PlanetPass reconstruction during ordinary quality changes while preserving HIGH visuals and software fallback behavior"
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-25",
+  "research_summary": "The current CinematicPipeline already uses the project-standard React Three Fiber Canvas, Three.js EffectComposer and ProceduralPlanets PlanetPass, but quality is included in the composer memo dependencies. AUTO -> LOW -> AUTO therefore reconstructs the post-processing graph even when the renderer, scene and camera are unchanged. Reuse the existing framework-owned renderer and retain one GPU composer/pass graph on hardware paths, toggling pass enablement and mutable bloom parameters instead of rebuilding it. Keep the software-renderer exception bounded: AUTO/LOW should not allocate PlanetPass under SwiftShader, while HIGH may still construct the live PlanetPass because HIGH explicitly preserves intended live visuals.",
+  "planned_files": [
+    "src/components/universe/CinematicPipeline.tsx",
+    "tests/e2e/webgl-performance.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "React Three Fiber exposes the stable renderer, scene and camera through useThree and drives frame work through useFrame, so post-processing should remain attached to that single renderer rather than create another rendering authority."
+    },
+    {
+      "url": "https://threejs.org/docs/pages/EffectComposer.html",
+      "finding": "Three.js EffectComposer owns an ordered pass chain with explicit setSize, setPixelRatio, render and dispose lifecycle methods; the existing composer can be retained while pass properties change."
+    },
+    {
+      "url": "https://github.com/ZyFou/ProceduralPlanets",
+      "finding": "ProceduralPlanets is already the selected live-world subsystem and its PlanetPass is part of the existing post-processing chain, so reuse its enable/disable lifecycle instead of replacing the planet renderer."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "not_applicable",
+      "registry_refs": [],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "This is a bounded hot-path and resource-lifetime correction inside the selected rendering stack, not a replacement application or renderer."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Keep the R3F-owned WebGLRenderer and one EffectComposer attached to its stable scene/camera instead of rebuilding the graph for every quality value."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "procedural-planets"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Retain the existing ProceduralPlanets PlanetPass as the live-world subsystem and switch its enabled state according to product quality/fallback decisions."
+    },
+    {
+      "level": "component_asset",
+      "status": "none",
+      "registry_refs": [],
+      "source_refs": [
+        1,
+        2
+      ],
+      "conclusion": "No additional post-processing or GPU resource component is needed because the existing EffectComposer and PlanetPass already expose the required lifecycle."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "stable-r3f-composer-lifecycle",
+      "name": "Retain one R3F-owned EffectComposer graph per renderer/scene/camera",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing R3F Canvas plus Three.js EffectComposer lifecycle",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "This keeps the current single renderer authority and removes avoidable GPU target/pass reconstruction without changing product navigation or renderer ownership.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "retained-procedural-planets-pass",
+      "name": "Retain ProceduralPlanets PlanetPass and toggle enablement on supported hardware",
+      "level": "subsystem",
+      "registry_id": "procedural-planets",
+      "source": "Existing ProceduralPlanets PlanetPass integration",
+      "license": "MIT",
+      "decision": "reuse",
+      "reason": "The selected live-world subsystem already supplies the correct planet render pass; retaining it on hardware paths avoids shader/program churn while LOW and software AUTO can keep it disabled.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 4,
+        "performance_fit": 5,
+        "customization_fit": 4,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "custom-postprocess-pool",
+      "name": "Build a project-owned composer/pass cache and GPU resource pool",
+      "level": "subsystem",
+      "source": "New project-specific post-processing resource manager",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "A second resource manager would duplicate R3F, Three.js and ProceduralPlanets ownership, increase teardown complexity and solve a problem already addressed by retaining the existing objects.",
+      "evaluation": {
+        "coverage": 4,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 3,
+        "customization_fit": 5,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "stable-r3f-composer-lifecycle",
+      "retained-procedural-planets-pass"
+    ],
+    "rationale": "Reuse the existing R3F renderer and ProceduralPlanets pass graph. On hardware WebGL, allocate the composer and PlanetPass once for a stable renderer/scene/camera, then mutate enablement and bloom parameters as quality changes. On software WebGL, keep AUTO/LOW lightweight and only allocate PlanetPass for explicit HIGH. This removes ordinary quality-switch reconstruction without weakening HIGH or creating a second renderer/resource authority.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If retained PlanetPass on a real GPU proves to hold excessive idle resources, keep the stable composer but allow only the PlanetPass itself to be lazily created for a close-world live phase; do not recreate the whole composer on every quality change."
+  }
+}

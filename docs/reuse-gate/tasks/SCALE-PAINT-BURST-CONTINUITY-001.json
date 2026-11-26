@@ -1,0 +1,125 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-PAINT-BURST-CONTINUITY-001",
+  "title": "Retain delivered wheel intent during renderer handoff",
+  "scope": {
+    "level": "implementation",
+    "subject": "Reuse the current wheel coordinator and pinned YEIS renderer across the Galaxy-to-System and System-to-Approach inward endpoint handoffs."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "CI 45778806573 and deterministic Chromium A/B reproduced discarding a finite input burst while the native applied-frame gate held Galaxy at one. Preserve the authoritative signed physical intent while retaining valid endpoint presentation, using the current React coordinator, response-distance mapping, native readiness, and handoff ownership. No WheelEvent replay, no input callback loop, no new inertia, no bypass of a real applied frame.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "src/lib/universe/continuousScale.ts",
+    "tests/e2e/universe.spec.ts",
+    "tests/continuous-scale.test.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Keep the pinned native renderer and its actual applied-frame readiness; neither a generic deadline nor a separate camera may replace it."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/issues/178#issuecomment-7186294655",
+      "finding": "Both product variants reproduced the exact first-attempt sample trace under delayed readiness; the existing deterministic signed response distance and saturated segment are the relevant abstraction."
+    },
+    {
+      "url": "https://react.dev/reference/react/useRef",
+      "finding": "Use the existing ref-based coordinator and mirror, not a new scheduler or React render per wheel event."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the native implementation and phase ownership."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep single Canvas and its phase presentation."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Extend the existing immediate scale intent authority; detached scroll/animation engines cannot preserve these phase contracts."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        2
+      ],
+      "conclusion": "Keep imperative state and render mirror; no event queue."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "existing-wheel-coordinate",
+      "name": "Existing signed response mapping and handoff owner",
+      "level": "subsystem",
+      "registry_id": "react-core-hooks",
+      "source": "Current UniverseApp, continuousScale and pinned renderer",
+      "license": "Project code and React MIT",
+      "decision": "reuse",
+      "reason": "Use real delivered deltas with existing bounded domain; commit presentation only when ready, invalidate at reversal and takeover.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "synthetic-wheel-replay",
+      "name": "Synthesized wheel event replay or inertia",
+      "level": "component_asset",
+      "source": "Generic event queues or synthetic gesture continuations",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Adds hidden movement and ownership; rejected.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 5,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 2,
+        "customization_fit": 3,
+        "maturity": 2
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "existing-wheel-coordinate"
+    ],
+    "rationale": "Keep one wheel coordinate authority, one renderer and current native readiness. Preserve actual delivered intent without replaying device samples or adding hysteresis timers.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "If stable direct ownership and immediate reversal cannot be demonstrated, leave isolated and do not publish as release proof."
+  }
+}

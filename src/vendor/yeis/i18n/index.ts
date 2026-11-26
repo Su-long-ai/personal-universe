@@ -52,14 +52,19 @@ export function detectLocale(): Locale {
 }
 
 /** Load the dictionary for the detected locale (call once, before building the UI). */
-export async function initI18n(forced?: Locale): Promise<Locale> {
+export async function initI18n(
+  forced?: Locale,
+  { setDocumentLanguage = true }: { setDocumentLanguage?: boolean } = {},
+): Promise<Locale> {
   current = forced ?? detectLocale();
   dict = {};
   if (current !== 'tr') {
     const mod = await loadDict(current);
     dict = mod;
   }
-  try { document.documentElement.lang = current; } catch { /* no DOM */ }
+  if (setDocumentLanguage) {
+    try { document.documentElement.lang = current; } catch { /* no DOM */ }
+  }
   return current;
 }
 
