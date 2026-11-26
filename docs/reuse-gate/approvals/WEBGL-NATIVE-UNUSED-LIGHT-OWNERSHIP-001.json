@@ -1,0 +1,32 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-NATIVE-UNUSED-LIGHT-OWNERSHIP-001",
+  "approved_at": "2026-11-26T17:57:40.984Z",
+  "baseline_commit": "89ec71236f3f7f3e572fd2375c89c84151f94233",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-NATIVE-UNUSED-LIGHT-OWNERSHIP-001.json",
+  "record_sha256": "32ac68eb59046198a8550ad93b9896014392b600c2068973bbcaa63ec96bbc79",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "three-light-visibility": "59acfb330626a533af3ab15e56e9aeb36fda08a3c7e34fbb17dbeac3a5efad01",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Keep the real native overlap, single renderer and exact close-world body material without a foreign lighting program recipe when spacecraft are absent."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/system-approach-submission.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-three-consumer-visibility"
+  ],
+  "candidate_scores": {
+    "existing-three-consumer-visibility": 57,
+    "separate-render-pass": 21,
+    "lambert-rewrite": 39
+  }
+}
