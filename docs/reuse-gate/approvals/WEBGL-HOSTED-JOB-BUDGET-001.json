@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "task_id": "WEBGL-HOSTED-JOB-BUDGET-001",
+  "approved_at": "2026-11-26T17:06:44.442Z",
+  "baseline_commit": "edc80f096bdc85abe392dce9ebdfc6f2c501a029",
+  "record_path": "docs/reuse-gate/tasks/WEBGL-HOSTED-JOB-BUDGET-001.json",
+  "record_sha256": "e4081f8673a7e107f248f1c1878c55620c0eee128c0da3ba73d160b041378ad4",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "github-actions-matrix": "6686d9fcb00d4643c27f293fb2237c655d8f6d1eaa34c15435d444e592ee65fe",
+    "playwright-ci-sharding": "6d1e34ddefd8058d29715082128fb3f9d98f4e13df84c727654e6cc2010af1fa",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7"
+  },
+  "scope": {
+    "level": "architecture",
+    "subject": "Adjust only GitHub Actions outer job wall time for the immutable one-worker WebGL release lane. Preserve every Playwright timeout, test, retry, threshold, report and required check."
+  },
+  "policy_change": true,
+  "planned_files": [
+    ".github/workflows/ci.yml"
+  ],
+  "selected_ids": [
+    "bounded-18m-native-job"
+  ],
+  "candidate_scores": {
+    "bounded-18m-native-job": 57,
+    "split-webgl-native-shards": 43,
+    "relax-product-clock": 23
+  }
+}
