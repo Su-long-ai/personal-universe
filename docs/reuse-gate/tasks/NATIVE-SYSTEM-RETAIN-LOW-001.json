@@ -1,0 +1,155 @@
+{
+  "schema": 2,
+  "task_id": "NATIVE-SYSTEM-RETAIN-LOW-001",
+  "title": "Park the already painted instance of the selected native System in a close-world round trip",
+  "scope": {
+    "level": "implementation",
+    "subject": "Retain the same pinned System renderer resources across the close-world detour, park presentation and update work, and keep exact camera handoffs."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Exact main 8d394498 CI 45842755667 timed out on LOW repeated return with requested System 1.000 but only a few paints. Original exact local test passes naturally; matching cadence fails with fresh target 1 and positive clamp. Exact local first-use driver APIs block up to 1.1s outbound; current Surface terrain hidden and not drawing. Pinned Three r185 on SwiftShader has no KHR_parallel_shader_compile and a real WebGL shadow finds compileAsync resolves before remaining first-draw blocking. Hiding retains five shader variants, submits no draws and reactivates with existing materials. Existing Surface retained lifecycle is the model, not a parallel camera/cache.",
+  "planned_files": [
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/YeisSystemScene.tsx",
+    "tests/e2e/low-system-retention.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Keep this pinned native BodyRenderer, BodyPoints and OrbitLines under the existing R3F Canvas owner."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/8d394498f0872cebb943d9e2080e68a0ba5df30a/src/components/universe/SurfaceScene.tsx",
+      "finding": "Product already retains a hidden owner and gates visibility synchronously with phaseRef at frame priority -100; updates explicitly stop while parked."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/core/Object3D.visible",
+      "finding": "Installed Three renderer skips invisible subtrees including their lights; preserving geometry/material references retains their program keys until bounded owner disposal."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks",
+      "finding": "R3F subscribers share the original renderer and execute in priority order; existing project draws at priority 1 and publishes post-draw evidence at priority 2."
+    },
+    {
+      "url": "https://threejs.org/docs/#api/en/renderers/WebGLRenderer.compileAsync",
+      "finding": "Installed compileAsync depends on KHR_parallel_shader_compile for actual readiness, missing on the exact local SwiftShader; shadow found first-use stalls after promise."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Preserve the pinned YEIS backbone, not a new renderer or camera."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        3
+      ],
+      "conclusion": "Retain one owner in the existing Canvas; do not add alternate render loop or scene cache."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Reuse the existing Surface lifetime pattern and synchronous presentation fence; keep only one already drawn same identity instance."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "three-light-visibility"
+      ],
+      "source_refs": [
+        2,
+        4
+      ],
+      "conclusion": "Reuse TypeScript lifecycles and Three visible flag; await compileAsync does not guarantee SwiftShader first-use reflection readiness."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "r3f-park-one-painted-yeis",
+      "name": "Park the same native scene as existing Surface owner",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Existing Canvas/SurfaceScene + pinned YEIS renderers",
+      "license": "Existing project and MIT dependencies",
+      "decision": "reuse",
+      "reason": "Preserves same renderer, camera, materials and product authority; hides parked native updates and releases on identity or phase exit.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "three-visibility-owner",
+      "name": "Keep alive with Three group visibility",
+      "level": "component_asset",
+      "registry_id": "three-light-visibility",
+      "source": "Existing installed Three",
+      "license": "Existing project and MIT dependencies",
+      "decision": "partial",
+      "reason": "Useful primitive; does not guard update or scale publications on its own.",
+      "evaluation": {
+        "coverage": 3,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 3,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "three-compile-async-warmup",
+      "name": "Pre-warm with compileAsync",
+      "level": "component_asset",
+      "source": "Installed Three r185 renderer",
+      "license": "Existing project and MIT dependencies",
+      "decision": "reject",
+      "reason": "No KHR extension on the verified SwiftShader; matched shadow still blocks after its promise, and it does not preserve native scene program lifetime.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 2,
+        "customization_fit": 4,
+        "maturity": 5
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "r3f-park-one-painted-yeis"
+    ],
+    "rationale": "Keep the same already published render owner, explicitly cease all native work when hidden, dispose on identity/quality/context/unmount and keep genuine matched camera fences, shader validation, timing and resource guards unchanged.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Keep baseline if identity, dwell, paint, shader timing or resource evidence fails; do not waive the original LOW assertion."
+  }
+}
