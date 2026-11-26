@@ -1,0 +1,121 @@
+{
+  "schema": 2,
+  "task_id": "GALAXY-TARGETLESS-WHEEL-RETURN-001",
+  "title": "Synchronize targetless System wheel return at Galaxy anchor",
+  "scope": {
+    "level": "implementation",
+    "subject": "Correct only the targetless System-to-Galaxy wheel endpoint; preserve the retained native bridge and pointer takeover."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "A/B on exact #183: retained-target deep-link reverses 1 to 0, while a Search-opened targetless route changes phase to Galaxy but leaves 1.000 and then blocks outward input on no-galaxy-focus. The existing generic phase effect intentionally preserves frozen partial values for pointer takeover. Use the existing synchronous scale publisher at the distinct user-driven targetless fallback, as observed in the current handler. This change is separate from unproven WebGL shader 21.",
+  "planned_files": [
+    "src/components/universe/UniverseApp.tsx",
+    "tests/e2e/universe.spec.ts"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/berkcomba/youreyesinspace/tree/e52056897364e060fbd6d00951628f163b57d7a1",
+      "finding": "Current pinned native renderer remains the authority; no upstream patch or new camera."
+    },
+    {
+      "url": "https://react.dev/reference/react/useRef",
+      "finding": "The installed ref-backed state pattern keeps one imperative coordinate with React as a mirror."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0
+      ],
+      "conclusion": "Keep the installed MIT YEIS and current camera entry/return behaviors; not a renderer replacement."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Keep the existing R3F Canvas and React phase state, no new scene or camera."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "yomotsu-camera-controls"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Retain the current wheel dispatcher, phase switch and normalized coordinate publisher."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        1
+      ],
+      "conclusion": "Use the same publishWorldScalePosition helper and existing Galaxy anchor; do not touch the generic pointer-takeover effect."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "reuse-existing-coordinate-publisher",
+      "name": "Existing continuous-scale publisher and Galaxy anchor",
+      "level": "subsystem",
+      "registry_id": "yomotsu-camera-controls",
+      "source": "Existing UniverseApp and continuousScale implementation, #183 exact source",
+      "license": "Project code plus existing MIT camera dependency",
+      "decision": "reuse",
+      "reason": "Reuse same imperative source of truth; synchronize the endpoint on the route where the native retained target does not exist.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "global-phase-resync",
+      "name": "Force anchor on all Galaxy phase entries",
+      "level": "component_asset",
+      "source": "Potential rewrite of the default phase effect",
+      "license": "Project code",
+      "decision": "reject",
+      "reason": "Would reset manual pointer takeover and valid retained-target partial positions; too broad.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 3,
+        "license_fit": 5,
+        "maintenance_health": 3,
+        "performance_fit": 3,
+        "customization_fit": 2,
+        "maturity": 3
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "reuse-existing-coordinate-publisher"
+    ],
+    "rationale": "Reuse the existing scale coordinate publisher and Galaxy anchor only in the targetless System wheel return. Preserve the retained-target branch and general phase/pointer behavior.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Keep isolated until exact fail-before/fix-after and existing navigation controls pass."
+  }
+}
