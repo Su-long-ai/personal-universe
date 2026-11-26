@@ -3025,6 +3025,9 @@ export default function UniverseApp({
             return;
           }
 
+          // No native scale target remains, so this discrete wheel return
+          // cannot finish by scrubbing the retained Galaxy bridge.
+          publishWorldScalePosition(GALAXY_SCALE_MIN, true);
           setSystemScaleTargetPlanet(null);
           setWorldScaleContinuous(false);
           handleReturn();

@@ -3987,6 +3987,42 @@ test("Guided Journey supersedes a partial Galaxy scale path without stale System
   await runtime.assertClean(testInfo);
 });
 
+test("Search-opened Aurora wheel return resets the targetless Galaxy coordinate", async ({
+  page,
+}, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto("/?freeze=1");
+  await waitForYeis(page);
+
+  const dialog = await openNavigator(page);
+  await dialog.getByRole("combobox", { name: "Search universe" }).fill("Aurora");
+  await dialog
+    .locator('.navigator-result-row[data-destination-id="hero:aurora-01"]')
+    .locator(".navigator-result-open")
+    .click();
+  await expect(dialog).toBeHidden();
+
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-universe-active-destination", "hero:aurora-01");
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "approach");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "2.000");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+
+  for (let sample = 0; sample < 8; sample += 1) {
+    if ((await html.getAttribute("data-universe-scale-position")) === "1.000") {
+      break;
+    }
+    await dispatchScaleWheel(page, 96);
+  }
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "system");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "1.000");
+  await dispatchScaleWheel(page, 96);
+  await expect(html).toHaveAttribute("data-universe-navigation-phase", "galaxy");
+  await expect(html).toHaveAttribute("data-universe-scale-position", "0.000");
+  await expect(html).not.toHaveAttribute("data-universe-galaxy-scale-target");
+  await runtime.assertClean(testInfo);
+});
+
 test("manual pointer takeover freezes a partial Galaxy scale coordinate", async ({
   page,
 }, testInfo) => {
