@@ -23,9 +23,9 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
     let id = 0;
     let previousOwner: string | null = null;
     let armed = false;
-    let held: { owner: string; centred: string; distance: number } | null = null;
+    let held: { owner: string; quality: "low"; centred: string; distance: number } | null = null;
     let suspend = false;
-    const resource = (owner?: string) => {
+    const resource = (owner?: string, quality?: "low") => {
       for (const root of roots) {
         const stack = [root.current];
         for (let fiber; (fiber = stack.pop()); ) {
@@ -34,6 +34,7 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
           for (let h = fiber.memoizedState, k = 0; h && k < 100; k++, h = h.next) {
             const state = h.memoizedState;
             if (state?.instance && (!owner || state.instance === owner) &&
+                (!quality || fiber.memoizedProps?.quality === quality) &&
                 state.scene?.isScene && state.scene.visible && state.bodies?.views) {
               return state;
             }
@@ -55,7 +56,9 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
           const draw = gl.render;
           gl.render = function (scene: unknown, camera: any) {
             const result = draw.call(this, scene, camera);
-            if (!armed) return result;
+            if (!armed || scene !== state.scene || gl.getRenderTarget() !== null) {
+              return result;
+            }
             const data = document.documentElement.dataset;
             const owner = data.universeNativeSystemInstance;
             if (!owner || owner === previousOwner || !owner.startsWith("h-aurora:") ||
@@ -63,8 +66,11 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
                 data.universeNativeSystemLifecycle !== "active" ||
                 data.universeCameraSettled !== "system" ||
                 data.universeSystemFocus) return result;
-            const actual = resource(owner);
-            if (!actual) return result;
+            // Before a startup AUTO owner exists, previousOwner can be null.
+            // Its first draw is then "new" too; require committed LOW Fiber
+            // props for the exact native resource in the visible root draw.
+            const actual = resource(owner, "low");
+            if (!actual || actual.scene.parent !== state.scene) return result;
             const size = state.size;
             const candidates = actual.bodies.views.map((view: any) => {
               const projected = view.body.position.clone().project(camera);
@@ -78,7 +84,7 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
               .sort((a: any,b: any) => a.distance - b.distance);
             const first = candidates[0];
             if (first?.distance > 92 || !first) return result;
-            held = { owner, centred: first.id, distance: first.distance };
+            held = { owner, quality: "low", centred: first.id, distance: first.distance };
             armed = false;
             suspend = true;
             return result;
@@ -119,6 +125,10 @@ async function installNativeProbe(page: Page, holdFirstLowPaint = false) {
       __earlyLowPaint: {
         arm() { previousOwner = document.documentElement.dataset.universeNativeSystemInstance ?? null; armed = true; },
         read() { return held; },
+        currentOwner() {
+          const owner = document.documentElement.dataset.universeNativeSystemInstance;
+          return owner && resource(owner, "low") ? owner : null;
+        },
         release() {
           armed = false;
           suspend = false;
@@ -220,18 +230,25 @@ test("LOW parked native System is evicted by quality and a new star gets an inde
   await page.getByLabel("QUALITY").selectOption("low");
   const html=page.locator("html");
   try {
-    await expect.poll(() => page.evaluate(() => (window as any).__earlyLowPaint.read()))
-      .toMatchObject({ owner: /^h-aurora:\d+$/, centred: expect.any(String) });
-    await expect(html).not.toHaveAttribute("data-universe-system-focus");
-    await expect(html).toHaveAttribute("data-universe-camera-settled","system");
-    await wheel(page,[-96]);
     try {
+      const paint = () => page.evaluate(() => (window as any).__earlyLowPaint.read());
+      await expect.poll(paint).toMatchObject({
+        owner: /^h-aurora:\d+$/, quality: "low", centred: expect.any(String),
+      });
+      await expect(html).not.toHaveAttribute("data-universe-system-focus");
+      await expect(html).toHaveAttribute("data-universe-camera-settled","system");
+      const held = await paint();
+      const currentOwner = () => page.evaluate(() => (window as any).__earlyLowPaint.currentOwner());
+      expect(await currentOwner()).toBe(held.owner);
+      await wheel(page,[-96]);
+      expect(await currentOwner()).toBe(held.owner);
       await expect(html).toHaveAttribute("data-universe-scale-position","1.333");
     } finally {
       await info.attach("first-low-system-wheel.json", {
         contentType: "application/json",
         body: JSON.stringify(await page.evaluate(() => ({
           rendered: (window as any).__earlyLowPaint.read(),
+          currentLowOwner: (window as any).__earlyLowPaint.currentOwner(),
           requested: document.documentElement.dataset.universeScalePosition,
           blocked: document.documentElement.dataset.universeScaleBlocked ?? null,
         }))),
