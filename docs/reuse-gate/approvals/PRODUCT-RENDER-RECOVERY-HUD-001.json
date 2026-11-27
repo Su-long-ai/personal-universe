@@ -1,0 +1,39 @@
+{
+  "schema": 3,
+  "task_id": "PRODUCT-RENDER-RECOVERY-HUD-001",
+  "approved_at": "2026-11-27T05:33:21.001Z",
+  "baseline_commit": "04825652036a801ae3250e41b77572178ae6cd0e",
+  "record_path": "docs/reuse-gate/tasks/PRODUCT-RENDER-RECOVERY-HUD-001.json",
+  "record_sha256": "509935714747c0e6921226960c62c458d3acea0053a3dc11c1168be60d95d496",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "webgl-context-loss-api": "a45251980adfd9d57c8b12d69893587dbd7a30f754c06091169068aaa3d1c740",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Small read-only presentation layer over the existing renderer lifecycle and short-landscape responsive HUD with real browser regressions."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseHud.tsx",
+    "src/components/universe/UniverseRenderStatus.tsx",
+    "src/components/universe/universe-hud-adaptive.css",
+    "tests/e2e/product-quality-r2.spec.ts"
+  ],
+  "selected_ids": [
+    "existing-renderer",
+    "browser-webgl",
+    "react-ui",
+    "existing-browser-test"
+  ],
+  "candidate_scores": {
+    "existing-renderer": 57,
+    "browser-webgl": 57,
+    "react-ui": 57,
+    "existing-browser-test": 57
+  }
+}
