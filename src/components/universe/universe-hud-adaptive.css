@@ -1,0 +1,93 @@
+/* HUD hit targets must have their final geometry on the first frame after
+   rotation/resizing. Keep the cosmetic background transition, not width. */
+html .universe-hud {
+  transition-property: background;
+}
+
+.universe-render-status {
+  position: absolute;
+  z-index: 11;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: min(320px, calc(100% - 24px));
+  box-sizing: border-box;
+  color: #e6f5ff;
+  pointer-events: none;
+}
+
+.universe-render-status[data-render-lost="true"] {
+  padding: 14px;
+  border: 1px solid #658298;
+  border-radius: 8px;
+  background: #081522;
+  pointer-events: auto;
+}
+
+.universe-render-status p {
+  margin: 6px 0 10px;
+  font-size: 0.875rem;
+}
+
+.universe-render-status a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: #bbf5f7;
+}
+
+@media (orientation: landscape) and (max-height: 450px) {
+  html .universe-hud {
+    --landscape-hud-inline-start: max(16px, env(safe-area-inset-left));
+    --landscape-hud-block-start: max(16px, env(safe-area-inset-top));
+    /* Keep the center and its nearby touch contacts outside the panel,
+       including the panel's left inset at small landscape widths. */
+    --landscape-hud-width: max(
+      0px,
+      calc(50vw - var(--landscape-hud-inline-start) - 80px)
+    );
+    top: var(--landscape-hud-block-start);
+    left: var(--landscape-hud-inline-start);
+    width: min(220px, var(--landscape-hud-width));
+    box-sizing: border-box;
+    max-height: calc(100vh - var(--landscape-hud-block-start) - 16px);
+    max-height: calc(100dvh - var(--landscape-hud-block-start) - 16px);
+    padding-inline: min(12px, 2vw);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  html .universe-hud.is-collapsed {
+    width: min(155px, var(--landscape-hud-width));
+  }
+
+  .universe-hud .hud-topline,
+  .universe-hud .hud-topline > span,
+  .universe-hud .hud-actions,
+  .universe-hud .hud-actions label {
+    flex-wrap: wrap;
+  }
+
+  .universe-hud .hud-actions {
+    justify-content: flex-start;
+    gap: 6px 10px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 450px) and (max-width: 560px) {
+  .universe-hud .hud-navigate span {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 450px) and (max-width: 439px) {
+  html .universe-hud {
+    /* If a side rail would become unreadably narrow, retain a legible
+       scrollable panel above the center rather than squeezing its controls. */
+    --landscape-hud-width: calc(
+      100vw - var(--landscape-hud-inline-start) -
+      max(16px, env(safe-area-inset-right))
+    );
+    max-height: max(56px, calc(50vh - var(--landscape-hud-block-start) - 20px));
+    max-height: max(56px, calc(50dvh - var(--landscape-hud-block-start) - 20px));
+  }
+}

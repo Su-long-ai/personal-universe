@@ -27,6 +27,7 @@ import type {
   YeisSignalHover,
 } from "./YeisGalaxyScene";
 import type { UniverseContentPlacement } from "../../lib/universe/content";
+import { WORLD_SCALE_MAX } from "../../lib/universe/continuousScale";
 import type {
   UniverseNavigationCameraRequest,
   UniverseNavigationDestination,
@@ -251,6 +252,51 @@ export function UniverseCanvas({
   const [surfaceFallbackReady, setSurfaceFallbackReady] = useState(false);
   const [webglContextGeneration, setWebglContextGeneration] = useState(0);
   const [webglAvailable, setWebglAvailable] = useState(true);
+  const landingKey =
+    phase === "surface" && worldScaleContinuous && !reducedMotion &&
+      worldScalePosition === WORLD_SCALE_MAX && selectedPlanet
+      ? JSON.stringify([selectedPlanet.id, quality, webglContextGeneration])
+      : null;
+  const landingAuthority = useRef({ key: landingKey, generation: 0, poseApplied: false });
+  if (landingAuthority.current.key !== landingKey) {
+    landingAuthority.current = {
+      key: landingKey,
+      generation: landingAuthority.current.generation + 1,
+      poseApplied: false,
+    };
+  }
+  const landingGeneration = landingAuthority.current.generation;
+  const [landingPaint, setLandingPaint] = useState(-1);
+  const permitFallbackPresentation =
+    landingKey === null || landingPaint === landingGeneration;
+  const effectiveFallbackReady = surfaceFallbackReady && permitFallbackPresentation;
+  const fallbackLocalPoseInstalled = useRef(false);
+  const canSubmitCurrentPose = useCallback(
+    () => !fallbackLocalPoseInstalled.current || phaseRef.current === "surface",
+    [phaseRef],
+  );
+  const markFallbackWorldPose = useCallback(() => {
+    const authority = landingAuthority.current;
+    if (landingKey !== null && authority.generation === landingGeneration) {
+      authority.poseApplied = true;
+    }
+  }, [landingGeneration, landingKey]);
+  const handlePresentedScale = useCallback((presented: UniversePhase) => {
+    if (!canSubmitCurrentPose()) return;
+    const landing = landingAuthority.current;
+    if (
+      landingKey !== null && landing.poseApplied &&
+      landing.generation === landingGeneration &&
+      presented === "surface" && phaseRef.current === presented &&
+      worldScalePositionRef.current === WORLD_SCALE_MAX
+    ) {
+      // This is the existing post-draw witness, not the requested wheel
+      // coordinate or the terrain's independently prepared flag.
+      landing.poseApplied = false;
+      setLandingPaint(landingGeneration);
+    }
+    onScaleFramePresented(presented);
+  }, [canSubmitCurrentPose, landingGeneration, landingKey, onScaleFramePresented, phaseRef, worldScalePositionRef]);
   const handleWebglContextLost = useCallback(() => {
     // A restored WebGL context keeps the same Canvas authority but none of the
     // old first-paint evidence describes the newly restored GPU resources.
@@ -565,7 +611,9 @@ export function UniverseCanvas({
           // target suppression, but it must not publish a settled camera before
           // the matched world has completed its second presented frame.
           worldFrameReady={worldPaintReady}
-          surfaceFallbackReady={surfaceFallbackReady}
+          surfaceFallbackReady={effectiveFallbackReady}
+          onFallbackWorldPoseApplied={markFallbackWorldPose}
+          fallbackLocalPoseInstalled={fallbackLocalPoseInstalled}
           onPhaseComplete={onCinematicPhaseComplete}
           onUserControlStart={onCinematicUserControlStart}
         />
@@ -676,7 +724,7 @@ export function UniverseCanvas({
               phase={phase}
               worldScalePosition={worldScalePosition}
               presentationActive={closeWorldPhase}
-              surfaceFallbackReady={surfaceFallbackReady}
+              surfaceFallbackReady={effectiveFallbackReady}
               approachHandoffReady={
                 phase !== "approach" || systemTargetSuppressed
               }
@@ -702,19 +750,21 @@ export function UniverseCanvas({
             surfaceFocusEntryId={surfaceFocusEntryId}
             onSurfaceFocusEntry={onSurfaceFocusEntry}
             ready={surfaceFallbackReady}
+            presentationPermitted={permitFallbackPresentation}
             onReadyChange={setSurfaceFallbackReady}
           />
         </Suspense>
       ) : null}
 
       <CinematicPipeline
+        canSubmitCurrentPose={canSubmitCurrentPose}
         quality={quality}
         liveWorld={liveWorld}
         prewarmLiveWorld={prewarmLiveWorld}
         planetReleaseRef={worldPlanetReleaseRef}
       />
       {(phase === "system" || closeWorldPhase) && (
-        <ScaleFrameWitness phase={phase} onPresented={onScaleFramePresented} />
+        <ScaleFrameWitness phase={phase} onPresented={handlePresentedScale} />
       )}
     </Canvas>
   );

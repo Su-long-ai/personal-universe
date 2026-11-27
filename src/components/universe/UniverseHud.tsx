@@ -1,3 +1,5 @@
+import { UniverseRenderStatus } from "./UniverseRenderStatus";
+import "./universe-hud-adaptive.css";
 import { portfolioPath } from "../../lib/portfolio/paths";
 import type {
   PlanetDefinition,
@@ -88,7 +90,7 @@ export function UniverseHud({
         ? text(locale, "returning")
         : text(locale, "returnSystem");
 
-  return (
+  const hud = (
     <aside className={`universe-hud ${collapsed ? "is-collapsed" : ""}`}>
       <div className="hud-topline">
         <a
@@ -184,5 +186,12 @@ export function UniverseHud({
         </div>
       )}
     </aside>
+  );
+
+  return (
+    <>
+      {hud}
+      <UniverseRenderStatus locale={locale} />
+    </>
   );
 }

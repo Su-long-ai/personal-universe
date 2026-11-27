@@ -1073,6 +1073,13 @@ export default function UniverseApp({
   }, [cancelPendingContinuousScaleIntent, navigatorOpen]);
 
   const handleLocaleChange = useCallback((next: ProductLocale) => {
+    // An incoming URL language takes priority on boot. Keep that override in
+    // sync on selection, while bare URLs still use the stored preference alone.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("lang") && url.searchParams.get("lang") !== next) {
+      url.searchParams.set("lang", next);
+      window.history.replaceState(window.history.state, "", url);
+    }
     setLocale(next);
     applyProductLocale(next);
   }, []);
@@ -2755,8 +2762,13 @@ export default function UniverseApp({
         (previousDirection === "in"
           ? painted > wheel.renderedStart + WORLD_SCALE_EPSILON
           : painted < wheel.renderedStart - WORLD_SCALE_EPSILON);
+      const reversingCarriedFallbackLanding =
+        currentPhase === "surface" && direction === "out" &&
+        data.universeFallbackLandingHandoff === "awaiting-world-paint" &&
+        Number.isFinite(painted);
       const reversePaintedMotion =
-        directionChanged && (reversingCarriedSystemMotion || reversedSamePhaseMotion);
+        directionChanged && (reversingCarriedSystemMotion ||
+          reversingCarriedFallbackLanding || reversedSamePhaseMotion);
       const startingGesture = wheel.direction === null || directionChanged || gestureExpired;
       if (startingGesture || wheel.rendererPhase !== currentPhase) {
         wheel.renderedStart = Number.isFinite(painted)

@@ -3100,6 +3100,7 @@ test("Surface taps stay selection-safe while drag exploration survives departure
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
+  const readLanding = await observeActualSurfaceBackground(page, true);
   await page.goto(
     "/?phase=surface&star=h-aurora&body=aurora-01&freeze=1",
   );
@@ -3188,11 +3189,15 @@ test("Surface taps stay selection-safe while drag exploration survives departure
     "atmosphere",
     { timeout: 10_000 },
   );
+  // Remember the real rendered local pose without treating it as a globe
+  // camera endpoint in a different scene coordinate system.
   await expect(html).toHaveAttribute(
     "data-universe-surface-manual-view",
-    "scale-endpoint",
+    "captured",
     { timeout: 10_000 },
   );
+  const manual = (await readLanding()).manual;
+  expect(manual).not.toBeNull();
   await expect(html).toHaveAttribute(
     "data-universe-scale-camera-segment",
     "atmosphere:surface",
@@ -3219,6 +3224,17 @@ test("Surface taps stay selection-safe while drag exploration survives departure
     { timeout: 30_000 },
   );
 
+  await expect.poll(async () => (await readLanding()).restored).not.toBeNull();
+  const restored = (await readLanding()).restored!;
+  await testInfo.attach("painted-fallback-manual-pose.json", {
+    body: JSON.stringify({ manual, restored }),
+    contentType: "application/json",
+  });
+  expect(Math.hypot(...restored.position.map((value, i) => value - manual!.position[i])))
+    .toBeLessThan(0.04);
+  const dot = Math.abs(restored.orientation.reduce((out, value, i) =>
+    out + value * manual!.orientation[i], 0));
+  expect(2 * Math.acos(Math.min(1, dot))).toBeLessThan(Math.PI / 180);
   await runtime.assertClean(testInfo);
 });
 
@@ -5399,10 +5415,15 @@ test("Hero continuous scale traverses Galaxy to Surface and back without waiting
 });
 
 
-async function observeActualSurfaceBackground(page: Page) {
-  await page.addInitScript(() => {
+type PaintedLocalPose = { position: number[]; orientation: number[] };
+
+async function observeActualSurfaceBackground(page: Page, includePose = false) {
+  await page.addInitScript((capturePose) => {
     const w = window as any;
-    const captures = { frames: 0, surface: 0, leaks: [] as string[], textures: [] as string[] };
+    const captures = {
+      frames: 0, surface: 0, leaks: [] as string[], textures: [] as string[],
+      manual: null as PaintedLocalPose | null, restored: null as PaintedLocalPose | null,
+    };
     let rendererId = 0;
     let installed = false;
     w.__actualSurfaceBackground = captures;
@@ -5416,22 +5437,37 @@ async function observeActualSurfaceBackground(page: Page) {
         for (let fiber; (fiber = stack.pop()); ) {
           if (fiber.child) stack.push(fiber.child);
           if (fiber.sibling) stack.push(fiber.sibling);
-          const gl = fiber.stateNode?.__r3f?.root?.getState()?.gl;
+          const state = fiber.stateNode?.__r3f?.root?.getState();
+          const gl = state?.gl;
           if (!gl) continue;
           installed = true;
           const draw = gl.render;
           gl.render = function (scene: any, camera: any) {
+            if (scene !== state.scene || gl.getRenderTarget() !== null) {
+              return draw.call(this, scene, camera);
+            }
             const backdrop = scene.background;
             const gradient = backdrop?.isDataTexture &&
               backdrop.image?.width === 1 && backdrop.image?.height === 8;
-            const { universeNavigationPhase: phase, universeScalePosition: position } =
-              document.documentElement.dataset;
+            const data = document.documentElement.dataset;
+            const { universeNavigationPhase: phase, universeScalePosition: position } = data;
             const result = draw.call(this, scene, camera);
             captures.frames += 1;
             if (gradient) {
               if (phase === "surface") {
                 captures.surface += 1;
                 if (!captures.textures.includes(backdrop.uuid)) captures.textures.push(backdrop.uuid);
+                if (capturePose && data.universeCameraMode === "manual") {
+                  captures.manual = {
+                    position: camera.position.toArray(), orientation: camera.quaternion.toArray(),
+                  };
+                }
+                if (capturePose && data.universeCameraSettled === "surface" &&
+                    data.universeSurfaceManualView === "restored") {
+                  captures.restored = {
+                    position: camera.position.toArray(), orientation: camera.quaternion.toArray(),
+                  };
+                }
               } else {
                 const signature = phase + ":" + position;
                 if (!captures.leaks.includes(signature)) captures.leaks.push(signature);
@@ -5443,12 +5479,14 @@ async function observeActualSurfaceBackground(page: Page) {
         }
       },
     };
-  });
+  }, includePose);
   return () => page.evaluate(() => (window as any).__actualSurfaceBackground as {
     frames: number;
     surface: number;
     leaks: string[];
     textures: string[];
+    manual: PaintedLocalPose | null;
+    restored: PaintedLocalPose | null;
   });
 }
 

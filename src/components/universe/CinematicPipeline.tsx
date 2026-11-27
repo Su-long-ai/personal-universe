@@ -67,11 +67,13 @@ export function liveWorldFallbackReason(
 }
 
 export function CinematicPipeline({
+  canSubmitCurrentPose,
   quality,
   liveWorld,
   prewarmLiveWorld = false,
   planetReleaseRef,
 }: {
+  canSubmitCurrentPose: () => boolean;
   quality: QualityMode;
   liveWorld: boolean;
   prewarmLiveWorld?: boolean;
@@ -461,6 +463,10 @@ export function CinematicPipeline({
   }, [composer]);
 
   useFrame((_, delta) => {
+    // Wheel intent invalidates local terrain synchronously. If the root
+    // scene has not committed its world camera yet, keep the prior painted
+    // view rather than submitting a blank cross-space frame.
+    if (!canSubmitCurrentPose()) return;
     const desiredImpostorPixels = softwareRenderer ? 180 : highQuality ? 90 : 120;
     const rendererBeforeDraw = planetPass?.planetRenderer;
     if (
