@@ -1,0 +1,36 @@
+{
+  "schema": 3,
+  "task_id": "SCALE-FALLBACK-LANDING-PAINT-FENCE-001",
+  "approved_at": "2026-11-27T05:33:21.084Z",
+  "baseline_commit": "04825652036a801ae3250e41b77572178ae6cd0e",
+  "record_path": "docs/reuse-gate/tasks/SCALE-FALLBACK-LANDING-PAINT-FENCE-001.json",
+  "record_sha256": "a4306a5698fad271c49af8ebc72d0c5e066ed2447f1645b43295b8f644fd787a",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "react-three-fiber": "22516039033f50948351c64115073fc1cbdb9aabd26a7476ea3ba20c7db3af68",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Use current camera-controls and one existing post-draw witness to continue the exported fallback 4 to 5 path before admitting terrain-space pose."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/fallback-landing-presentation.spec.ts",
+    "src/components/universe/CinematicPipeline.tsx"
+  ],
+  "selected_ids": [
+    "reuse-global-paint-witness"
+  ],
+  "candidate_scores": {
+    "reuse-global-paint-witness": 57,
+    "lerp-between-spaces": 21,
+    "timed-landing-or-extra-pass": 19
+  }
+}

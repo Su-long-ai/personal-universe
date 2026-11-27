@@ -1,0 +1,37 @@
+{
+  "schema": 3,
+  "task_id": "PRODUCT-NAVIGATOR-FOCUS-LOCALE-001",
+  "approved_at": "2026-11-27T05:33:20.895Z",
+  "baseline_commit": "04825652036a801ae3250e41b77572178ae6cd0e",
+  "record_path": "docs/reuse-gate/tasks/PRODUCT-NAVIGATOR-FOCUS-LOCALE-001.json",
+  "record_sha256": "a63627ad780f1e0a3f64470ed08f165a3f7545be73d2b34dfcaee5a33c091040",
+  "registry_path": "docs/reuse-gate/registry.json",
+  "registry_entry_hashes": {
+    "cmdk-fuse-navigation": "b58253e925847c073074ec277d3a56b96ca449d2e3045cb293d4ce3e3735c5df",
+    "playwright-test": "3b7cb972d9b636dd1b29f5b81f52392216b863ee394b0ffa2ecb4a2c41bcd8b7",
+    "react-core-hooks": "7080451699cf4caa2df4f8227dc80390dd9a9777ec2556978bd5be3521b843ce",
+    "web-native-modal-dialog": "65488051f27fd9dffea2f7cd9dd85251111a6655394731242cb30b0e3a3bdfa0",
+    "web-url-history-api": "77f33a919f6f3efedd54f6b619b7dda4be7823975a54147bf7f4a55c6d9fd9d8",
+    "your-eyes-in-space-mit-e520568": "9d073c9e578161cfc5fd2480d9ddd4a0e5377b6761760de9a39a55f02421b112"
+  },
+  "scope": {
+    "level": "implementation",
+    "subject": "Use browser-native modal lifecycle for Search / Places and synchronize an explicitly chosen locale on the current history entry without touching camera authority or routes."
+  },
+  "policy_change": false,
+  "planned_files": [
+    "src/components/universe/UniverseNavigator.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/universe.css",
+    "tests/e2e/portfolio.spec.ts"
+  ],
+  "selected_ids": [
+    "native-browser-dialog",
+    "existing-history"
+  ],
+  "candidate_scores": {
+    "native-browser-dialog": 57,
+    "existing-history": 57,
+    "generic-search-replacement": 22
+  }
+}

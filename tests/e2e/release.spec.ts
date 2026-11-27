@@ -700,10 +700,13 @@ test("release: Hero completes the full reversible 0-to-5-to-0 scale journey", as
   await runtime.assertClean(testInfo);
 });
 
+import { setupPaintObserver, readPaints } from "./support/scale-paint-witness";
+
 test("release: rapid sustained wheel cadence crosses every scale authority and reverses immediately @webgl-heavy", async ({
   page,
 }, testInfo) => {
   const runtime = await observeRuntime(page);
+  await setupPaintObserver(page);
   const html = await openHeroScaleJourney(page);
 
   const inwardTrace = await driveReleaseScaleBurst(
@@ -752,7 +755,31 @@ test("release: rapid sustained wheel cadence crosses every scale authority and r
   expect(await page.locator("canvas").count()).toBe(1);
 
   const outwardPhases = new Set(outwardTrace.map((snapshot) => snapshot.phase));
-  for (const phase of ["atmosphere", "orbit", "approach", "system", "galaxy"]) {
+  const { draws, firstOutward } = await readPaints(page);
+  const previous = firstOutward?.frame;
+  // A requested Surface can be exposed while the previous global frame is
+  // still on screen. The same draw witness as the physical fallback tests
+  // distinguishes that case from a completed landing, without delaying input.
+  const reversedFromPaintedAtmosphere = firstOutward?.paintReady === false &&
+    previous?.local === null && previous.applied !== null &&
+    previous.applied >= 4 && previous.applied < 5 &&
+    previous.calls > 0 && previous.triangles > 0;
+  if (reversedFromPaintedAtmosphere) {
+    const nextWorldPaint = draws.slice(firstOutward.drawCount).find(
+      (frame) => frame.local === null && frame.applied !== null &&
+        Math.abs(frame.applied - previous.applied!) > 0.001,
+    );
+    // It is a regression if the outward wheel requests or paints further
+    // inward merely to revisit the logical Atmosphere label.
+    expect(outwardTrace[0].position, "first reverse target must leave the displayed Atmosphere coordinate").toBeLessThan(previous.applied!);
+    expect(nextWorldPaint, "first changed global frame after reversing").toBeDefined();
+    expect(nextWorldPaint!.applied!).toBeLessThan(previous.applied!);
+    expect(nextWorldPaint!.calls).toBeGreaterThan(0);
+    expect(nextWorldPaint!.triangles).toBeGreaterThan(0);
+  } else {
+    expect(outwardPhases.has("atmosphere"), "rapid outward from painted Surface must expose atmosphere").toBeTruthy();
+  }
+  for (const phase of ["orbit", "approach", "system", "galaxy"]) {
     expect(
       outwardPhases.has(phase),
       `rapid outward trace should expose ${phase}`,
@@ -765,6 +792,8 @@ test("release: rapid sustained wheel cadence crosses every scale authority and r
         {
           inward: inwardTrace,
           outward: outwardTrace,
+          firstOutward,
+          firstReverseDraws: firstOutward ? draws.slice(firstOutward.drawCount, firstOutward.drawCount + 8) : [],
         },
         null,
         2,

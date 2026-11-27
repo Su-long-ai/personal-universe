@@ -561,6 +561,22 @@
       "last_checked": "2026-11-23"
     },
     {
+      "id": "web-native-modal-dialog",
+      "name": "HTML dialog modal lifecycle",
+      "url": "https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element",
+      "level": "framework_engine",
+      "license": "Web Platform browser APIs / standards",
+      "status": "adopt",
+      "covers": [
+        "top-layer modal semantics",
+        "inert background",
+        "Escape cancellation",
+        "focus restoration"
+      ],
+      "notes": "Use showModal() and close() for real modal isolation and native focus restoration; APG Tab wrapping can be scoped to the navigator’s own controls.",
+      "last_checked": "2026-11-26"
+    },
+    {
       "id": "three-buffer-geometry-capacity",
       "name": "Three.js BufferGeometry / BufferAttribute capacity management",
       "url": "https://threejs.org/manual/en/how-to-update-things.html",

@@ -65,21 +65,6 @@ function discoveryDensityMode(
   return "world";
 }
 
-// Escape belongs to the open modal, not to the combobox. Register it with
-// the mounted dialog before paint, including while focus is still on its opener.
-function NavigatorKeyboardDismissal({ onClose }: { onClose: () => void }) {
-  useLayoutEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
-      event.preventDefault();
-      onClose();
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [onClose]);
-  return null;
-}
-
 export function UniverseNavigator({
   open,
   markers,
@@ -121,6 +106,8 @@ export function UniverseNavigator({
   navigationTitle: (id: string, title: string) => string;
   locale: ProductLocale;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const resultRefs = useRef(new Map<number, HTMLDivElement>());
   const [query, setQuery] = useState("");
   const [sections, setSections] = useState<UniverseNavigationSection[]>([]);
@@ -332,7 +319,23 @@ export function UniverseNavigator({
     });
   }, [activeIndex, results]);
 
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    // Let the browser make the background inert and remember the opener
+    // before we move focus to the combobox.
+    dialog.showModal();
+    searchRef.current?.focus({ preventScroll: true });
+    return () => dialog.close();
+  }, [open]);
+
   if (!open) return null;
+
+  const closeNavigator = () => {
+    // Close while still connected so the native dialog restores focus.
+    dialogRef.current?.close();
+    onClose();
+  };
 
   const updateQuery = (value: string) => {
     setQuery(value);
@@ -353,7 +356,7 @@ export function UniverseNavigator({
     try {
       await Promise.resolve(onNavigate(destination));
       setPendingAction(null);
-      onClose();
+      closeNavigator();
     } catch (error) {
       console.error("[UNIVERSE-NAV] destination activation failed", error);
       setPendingAction(null);
@@ -372,7 +375,7 @@ export function UniverseNavigator({
     try {
       await Promise.resolve(onLocate(destination));
       setPendingAction(null);
-      onClose();
+      closeNavigator();
     } catch (error) {
       console.error("[UNIVERSE-NAV] destination locate failed", error);
       setPendingAction(null);
@@ -387,19 +390,36 @@ export function UniverseNavigator({
   let flatIndex = -1;
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
       className="universe-navigator-backdrop"
+      aria-label={text(locale, "universeNavigator")}
+      onCancel={(event) => {
+        event.preventDefault();
+        closeNavigator();
+      }}
       onPointerDown={(event) => {
-        if (event.currentTarget === event.target) onClose();
+        if (event.currentTarget === event.target) closeNavigator();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab" || event.defaultPrevented) return;
+        // Native modality excludes the background. Wrap the two document
+        // edges so Tab does not visit browser chrome between dialog controls.
+        const controls = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            "button:enabled, input:enabled, a[href]",
+          ),
+        ).filter((control) => control.tabIndex >= 0 && control.getClientRects().length);
+        const first = controls[0];
+        const last = controls.at(-1);
+        if (!first || !last) return;
+        if (document.activeElement === (event.shiftKey ? first : last)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
       }}
     >
-      <section
-        className="universe-navigator"
-        role="dialog"
-        aria-modal="true"
-        aria-label={text(locale, "universeNavigator")}
-      >
-        <NavigatorKeyboardDismissal onClose={onClose} />
+      <section className="universe-navigator">
         <header className="navigator-header">
           <div>
             <span>{text(locale, "navigationKicker")}</span>
@@ -407,7 +427,7 @@ export function UniverseNavigator({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeNavigator}
             aria-label={text(locale, "closeNavigator")}
           >
             ESC
@@ -417,7 +437,7 @@ export function UniverseNavigator({
         <div className="navigator-input-wrap">
           <span aria-hidden="true">⌕</span>
           <input
-            autoFocus
+            ref={searchRef}
             value={query}
             onChange={(event) => updateQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -521,7 +541,7 @@ export function UniverseNavigator({
                       journey.title,
                       journey.destinations,
                     );
-                    onClose();
+                    closeNavigator();
                   }}
                 >
                   <strong>{journeyTitle(locale, journey.title)}</strong>
@@ -690,6 +710,6 @@ export function UniverseNavigator({
           <span>{text(locale, "closeHint")}</span>
         </footer>
       </section>
-    </div>
+    </dialog>
   );
 }

@@ -146,6 +146,7 @@ export function SurfaceScene({
   surfaceFocusEntryId,
   onSurfaceFocusEntry,
   ready,
+  presentationPermitted,
   onReadyChange,
 }: {
   anchored?: boolean;
@@ -156,6 +157,7 @@ export function SurfaceScene({
   surfaceFocusEntryId: string | null;
   onSurfaceFocusEntry: (entryId: string) => void;
   ready: boolean;
+  presentationPermitted: boolean;
   onReadyChange?: (ready: boolean) => void;
 }) {
   const { gl, scene } = useThree();
@@ -223,7 +225,7 @@ export function SurfaceScene({
     landable &&
     phase === "surface" &&
     Boolean(liveWorldFallbackReason(gl, quality));
-  const presentationActive = surfaceRequested && ready;
+  const presentationActive = surfaceRequested && ready && presentationPermitted;
   const prepare =
     anchored &&
     landable &&

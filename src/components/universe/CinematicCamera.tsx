@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MutableRefObject,
@@ -61,6 +62,8 @@ type CinematicCameraProps = {
   galaxyViewState: YeisGalaxyViewState | null;
   worldFrameReady: boolean;
   surfaceFallbackReady: boolean;
+  onFallbackWorldPoseApplied: () => void;
+  fallbackLocalPoseInstalled: MutableRefObject<boolean>;
   onPhaseComplete: (phase: UniversePhase) => void;
   onUserControlStart: () => void;
 };
@@ -233,6 +236,8 @@ export function CinematicCamera({
   galaxyViewState,
   worldFrameReady,
   surfaceFallbackReady,
+  onFallbackWorldPoseApplied,
+  fallbackLocalPoseInstalled,
   onPhaseComplete,
   onUserControlStart,
 }: CinematicCameraProps) {
@@ -248,6 +253,14 @@ export function CinematicCamera({
     phase === "surface" && surfaceFallbackAvailable;
   const surfaceFallback =
     surfaceFallbackRequested && surfaceFallbackReady;
+  const keepFallbackWorldLanding =
+    surfaceFallbackRequested && worldScaleContinuous && !reducedMotion &&
+    worldScalePosition === WORLD_SCALE_MAX && !surfaceFallback;
+  const continuousWorldCamera =
+    worldScaleContinuous && isWorldScalePhase(phase) &&
+    (!surfaceFallbackAvailable ||
+      worldScalePosition < WORLD_SCALE_MAX - WORLD_SCALE_EPSILON ||
+      keepFallbackWorldLanding);
   const currentWorldFrameReady =
     surfaceFallbackRequested ? surfaceFallbackReady : worldFrameReady;
   const surfaceRendererMode: SurfaceManualCameraView["renderer"] =
@@ -321,7 +334,8 @@ export function CinematicCamera({
   );
 
   const manualCameraEnabled =
-    phase === "system" || phase === "orbit" || phase === "surface";
+    phase === "system" || phase === "orbit" ||
+    (phase === "surface" && (!surfaceFallbackAvailable || surfaceFallback));
   const liveSurfaceScaleCamera =
     !surfaceFallbackAvailable &&
     worldScaleContinuous &&
@@ -334,7 +348,7 @@ export function CinematicCamera({
           ? 1e-8
           : 5
         : phase === "surface"
-          ? surfaceFallbackAvailable
+          ? surfaceFallback
             ? 8
             : 0.015
           : liveSurfaceScaleCamera
@@ -366,7 +380,8 @@ export function CinematicCamera({
       const html = document.documentElement;
       if (
         isWorldScalePhase(phase) &&
-        !worldFrameReadyRef.current
+        (!worldFrameReadyRef.current ||
+          (surfaceFallbackRequested && html.dataset.universeSurfacePaintReady !== "true"))
       ) {
         html.dataset.universeCameraAwaitingWorldFrame = phase;
         return;
@@ -384,7 +399,7 @@ export function CinematicCamera({
         String(expectedGeneration);
       onPhaseComplete(phase);
     },
-    [onPhaseComplete, phase, phaseRef],
+    [onPhaseComplete, phase, phaseRef, surfaceFallbackRequested],
   );
 
   const publishIfReached = useCallback(
@@ -398,13 +413,6 @@ export function CinematicCamera({
         return;
       }
 
-      const continuousWorldCamera =
-        worldScaleContinuous &&
-        isWorldScalePhase(phase) &&
-        (
-          !surfaceFallbackAvailable ||
-          worldScalePosition < WORLD_SCALE_MAX - WORLD_SCALE_EPSILON
-        );
       const continuousScaleCamera =
         continuousSystemCamera || continuousWorldCamera;
       if (
@@ -437,8 +445,7 @@ export function CinematicCamera({
       phaseRef,
       publishSettled,
       continuousSystemCamera,
-      surfaceFallbackAvailable,
-      worldScaleContinuous,
+      continuousWorldCamera,
       worldScalePosition,
     ],
   );
@@ -554,6 +561,10 @@ export function CinematicCamera({
   useFrame(() => {
     if (
       phase !== "surface" ||
+      // Wheel intent already revoked this scene even if React has not
+      // committed the next phase. Do not remember a controls pose that
+      // CinematicPipeline will skip instead of painting.
+      phaseRef.current !== phase ||
       !manualOverride.current ||
       !surfaceIdentity
     ) {
@@ -652,7 +663,14 @@ export function CinematicCamera({
     };
   }, [gl, handleUserControlStart, manualCameraEnabled]);
 
-  useEffect(() => {
+  const configureCamera = useCallback(() => {
+    const priorFallbackLocalPose = fallbackLocalPoseInstalled.current;
+    fallbackLocalPoseInstalled.current = false;
+    if (priorFallbackLocalPose && phase !== "surface" && continuousWorldCamera) {
+      // Terrain-space poses cannot seed the globe path in a different frame
+      // of reference. Return from the same authored global landing endpoint.
+      renderedScalePosition.current = WORLD_SCALE_MAX;
+    }
     completedPhase.current = null;
     configuredPhase.current = null;
     manualOverride.current = false;
@@ -669,6 +687,11 @@ export function CinematicCamera({
     document.documentElement.dataset.universeCameraMode = "cinematic";
     document.documentElement.dataset.universeCameraGeneration =
       String(generation);
+    if (keepFallbackWorldLanding) {
+      document.documentElement.dataset.universeFallbackLandingHandoff = "awaiting-world-paint";
+    } else {
+      delete document.documentElement.dataset.universeFallbackLandingHandoff;
+    }
     const controls = controlsRef.current;
     if (!controls) {
       document.documentElement.dataset.universeCameraAwaitingControls = phase;
@@ -709,13 +732,6 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeSystemEntryView;
     }
 
-    const continuousWorldCamera =
-      worldScaleContinuous &&
-      isWorldScalePhase(phase) &&
-      (
-        !surfaceFallbackAvailable ||
-        worldScalePosition < WORLD_SCALE_MAX - WORLD_SCALE_EPSILON
-      );
     const nearLiveSurface =
       !surfaceFallbackAvailable &&
       Boolean(activeSurfaceCameraFrame) &&
@@ -1000,7 +1016,10 @@ export function CinematicCamera({
                   : "approach";
           const lowerPhase = phaseForIndex(lowerIndex);
           const upperPhase = phaseForIndex(upperIndex);
+          // A remembered terrain-space pose only belongs to the later
+          // local renderer. Never blend it into the global globe motion.
           const rememberedSurfaceView =
+            !surfaceFallbackAvailable &&
             surfaceManualView.current?.identity === surfaceIdentity &&
             surfaceManualView.current?.renderer === surfaceRendererMode
               ? surfaceManualView.current
@@ -1009,14 +1028,10 @@ export function CinematicCamera({
             activeSurfaceCameraFrame && liveSurfaceShot
               ? liveSurfaceShot
               : SHOTS.surface;
-          const rememberedSurfaceBaseShot =
-            rememberedSurfaceView?.renderer === "fallback"
-              ? FALLBACK_SURFACE_SHOT
-              : defaultSurfaceShot;
           const surfaceShot =
-            rememberedSurfaceView && rememberedSurfaceBaseShot
+            rememberedSurfaceView && defaultSurfaceShot
               ? {
-                  ...rememberedSurfaceBaseShot,
+                  ...defaultSurfaceShot,
                   position: rememberedSurfaceView.position,
                   target: rememberedSurfaceView.target,
                 }
@@ -1140,6 +1155,9 @@ export function CinematicCamera({
             PLANET_RENDER_RADIUS,
           );
 
+          if (keepFallbackWorldLanding && clampedPosition === WORLD_SCALE_MAX) {
+            onFallbackWorldPoseApplied();
+          }
           if (
             Math.abs(clampedPosition - scalePhaseIndex(phase)) <=
             WORLD_SCALE_EPSILON
@@ -1182,6 +1200,9 @@ export function CinematicCamera({
           ? surfaceBaseShot
           : SHOTS[phase];
     if (!shot) return;
+    if (phase === "surface" && surfaceFallback) {
+      fallbackLocalPoseInstalled.current = true;
+    }
 
     if (phase === "surface" && rememberedSurfaceView) {
       document.documentElement.dataset.universeSurfaceManualView = "restored";
@@ -1338,6 +1359,10 @@ export function CinematicCamera({
     surfaceRendererMode,
     systemScaleFrame,
     continuousSystemCamera,
+    continuousWorldCamera,
+    keepFallbackWorldLanding,
+    fallbackLocalPoseInstalled,
+    onFallbackWorldPoseApplied,
     viewportHeight,
     viewportWidth,
     worldScaleContinuous,
@@ -1347,6 +1372,21 @@ export function CinematicCamera({
     publishIfReached,
     publishScaleFrameDiagnostics,
   ]);
+
+  // Use the same pose executor at layout only for a fallback scene-space
+  // change, ensuring neither scene draws from the other's camera.
+  const configureBeforePaint =
+    fallbackLocalPoseInstalled.current ||
+    (surfaceFallbackAvailable && phase === "surface");
+  useLayoutEffect(() => {
+    if (configureBeforePaint) return configureCamera();
+  }, [configureBeforePaint, configureCamera]);
+  useLayoutEffect(() => () => {
+    fallbackLocalPoseInstalled.current = false;
+  }, [fallbackLocalPoseInstalled]);
+  useEffect(() => {
+    if (!configureBeforePaint) return configureCamera();
+  }, [configureBeforePaint, configureCamera]);
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -1425,6 +1465,7 @@ export function CinematicCamera({
       delete document.documentElement.dataset.universeCameraSettled;
       delete document.documentElement.dataset.universeCameraMode;
       delete document.documentElement.dataset.universeSurfaceCameraApplied;
+      delete document.documentElement.dataset.universeFallbackLandingHandoff;
       delete document.documentElement.dataset.universeCameraGeneration;
       delete document.documentElement.dataset.universeCameraWatchdog;
       delete document.documentElement.dataset.universeCameraAwaitingControls;

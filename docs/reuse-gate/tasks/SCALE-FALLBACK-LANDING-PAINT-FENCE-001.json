@@ -1,0 +1,160 @@
+{
+  "schema": 2,
+  "task_id": "SCALE-FALLBACK-LANDING-PAINT-FENCE-001",
+  "title": "Keep globe-space 4 to 5 motion until actual fallback landing boundary paint",
+  "scope": {
+    "level": "implementation",
+    "subject": "Use current camera-controls and one existing post-draw witness to continue the exported fallback 4 to 5 path before admitting terrain-space pose."
+  },
+  "policy_change": false,
+  "researched_at": "2026-11-26",
+  "research_summary": "Both frozen R5 and R6 actual submitted browser-frame probes hold only future frames after a real Atmosphere 4.000 draw and deliver last three true mouse notches; both actually reach drawn Surface and have zero physical (4,5) intermediate frames. Current camera switches from globe frames to fixed software terrain-space at logical position 5, treating terrain prepared as pose admission. Keep ready terrain retained and invisible for the old global motion until it really draws exact global exit. Install the unchanged local fallback shot before that terrain scene draws, and publish settled only after actual local Surface paint. A prior manually remembered local fallback shot must not become a globe-space interpolation anchor. Guard selected world/quality/context/current request and reverse promptly; direct Surface, actual live world and reduced motion unchanged. No second renderer/timer, angle or resource budget change. On the strengthened root-scene/default-framebuffer probe, outgoing ready Surface reversal actually submitted one blank main-canvas frame (0 draw calls, 0 triangles, old local camera [0.5,22,18]) while the app phase showed Atmosphere 4.6 but the React R3F/pose transition was not committed. Next actual frame had global 4.747152 and 3 calls/16,128 triangles. Reuse the exact same pose-owned ref to defer the one wrong-camera submission and its existing witness, with no added delay after the correct React/camera commit.",
+  "planned_files": [
+    "src/components/universe/CinematicCamera.tsx",
+    "src/components/universe/UniverseCanvas.tsx",
+    "src/components/universe/UniverseApp.tsx",
+    "src/components/universe/SurfaceScene.tsx",
+    "tests/e2e/universe.spec.ts",
+    "tests/e2e/fallback-landing-presentation.spec.ts",
+    "src/components/universe/CinematicPipeline.tsx"
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/79ee63950921cd6f28548eaa3f013b81a7102ce9/src/components/universe/CinematicCamera.tsx",
+      "finding": "Pinned actual source already separates full globe and local terrain shot, but turns off continuous fallback camera at input target five. Confirmed frozen render-frame comparison both R5 & R6."
+    },
+    {
+      "url": "https://github.com/Su-long-ai/personal-universe/blob/79ee63950921cd6f28548eaa3f013b81a7102ce9/src/components/universe/UniverseCanvas.tsx",
+      "finding": "One existing ScaleFrameWitness at priority 2 follows actual CinematicPipeline priority 1. Reuse it with the same staged ownership rules and a bounded identity key."
+    },
+    {
+      "url": "https://r3f.docs.pmnd.rs/api/hooks#useframe",
+      "finding": "Existing renderer callback ordering can distinguish submitted outgoing pose from a CameraControls mutation before any draw."
+    },
+    {
+      "url": "https://github.com/yomotsu/camera-controls",
+      "finding": "Reuse currently pinned setLookAt/lerpLookAt, authored anchors, shortest-turn motion and setter invocation before draw. Do not interpolate different coordinate systems."
+    }
+  ],
+  "search_ladder": [
+    {
+      "level": "full_solution",
+      "status": "found",
+      "registry_refs": [
+        "your-eyes-in-space-mit-e520568"
+      ],
+      "source_refs": [
+        0,
+        1
+      ],
+      "conclusion": "Preserve existing one-canvas full solution and retained fallback resources."
+    },
+    {
+      "level": "framework_engine",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        1,
+        2,
+        3
+      ],
+      "conclusion": "Reuse actual R3F post-draw and exactly scoped React camera-layout installation."
+    },
+    {
+      "level": "subsystem",
+      "status": "found",
+      "registry_refs": [
+        "react-three-fiber"
+      ],
+      "source_refs": [
+        0,
+        1,
+        2
+      ],
+      "conclusion": "Use existing controls, frame witness, phase ref and same world identity; no new travel coordinator."
+    },
+    {
+      "level": "component_asset",
+      "status": "found",
+      "registry_refs": [
+        "react-core-hooks"
+      ],
+      "source_refs": [
+        0,
+        3
+      ],
+      "conclusion": "Same global Surface anchor and same local terrain shot, including remembered local manual pose only in proper space."
+    }
+  ],
+  "candidates": [
+    {
+      "id": "reuse-global-paint-witness",
+      "name": "Current camera world path and witnessed terrain admission",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Current ScaleFrameWitness, CinematicCamera and canonical terrain-ready callback",
+      "license": "MIT dependencies and existing app",
+      "decision": "reuse",
+      "reason": "Keeps measured intermediate authored globe poses, correct local shot and actual paint; uses a one-use ownership permit without extra rendering. Reuse the existing CinematicPipeline as the only draw consumer; it may defer a mismatched old local pose until the same-frame preview authority commits, not draw a second scene or guess a time allowance.",
+      "evaluation": {
+        "coverage": 5,
+        "integration_cost": 1,
+        "license_fit": 5,
+        "maintenance_health": 5,
+        "performance_fit": 5,
+        "customization_fit": 5,
+        "maturity": 5
+      }
+    },
+    {
+      "id": "lerp-between-spaces",
+      "name": "Run camera damping after local terrain already owns the image",
+      "level": "component_asset",
+      "registry_id": "react-core-hooks",
+      "source": "Existing fallback branch and global path",
+      "license": "Existing app",
+      "decision": "reject",
+      "reason": "Would animate a globe pose inside unrelated fallback terrain coordinates and can accidentally reward synthetic scale diagnostics.",
+      "evaluation": {
+        "coverage": 1,
+        "integration_cost": 2,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 3,
+        "customization_fit": 1,
+        "maturity": 4
+      }
+    },
+    {
+      "id": "timed-landing-or-extra-pass",
+      "name": "Fake settlement delay or dedicated fade/second interpolator",
+      "level": "framework_engine",
+      "registry_id": "react-three-fiber",
+      "source": "Native renderer frame system",
+      "license": "MIT",
+      "decision": "reject",
+      "reason": "Not actual user input-controlled world continuity, duplicates existing handoff and creates unsupported rendering costs.",
+      "evaluation": {
+        "coverage": 2,
+        "integration_cost": 4,
+        "license_fit": 5,
+        "maintenance_health": 2,
+        "performance_fit": 1,
+        "customization_fit": 2,
+        "maturity": 4
+      }
+    }
+  ],
+  "decision": {
+    "mode": "reuse",
+    "selected_ids": [
+      "reuse-global-paint-witness"
+    ],
+    "rationale": "Accept only exact real camera trajectory with bounded intermediate frames, held input, reversal before/after fallback readiness and final stable raster unchanged.",
+    "higher_level_tradeoffs": [],
+    "score_overrides": [],
+    "fallback": "Maintain strict tests and leave candidate local if sampled cold/retained modes regress."
+  }
+}

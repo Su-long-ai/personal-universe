@@ -1,3 +1,4 @@
+import { devices } from "@playwright/test";
 import { test, expect } from "./support/test";
 import { observeRuntime, waitForYeis } from "./support/runtime";
 
@@ -36,10 +37,10 @@ test("regular 3D home keeps Search and links to the shareable project and back",
   await runtime.assertClean(testInfo);
 });
 
-test("keyboard cancels the Navigator before the search field can receive focus", async ({ page }, testInfo) => {
+test("keyboard cancels the Navigator if the search field cannot receive focus", async ({ page }, testInfo) => {
   const runtime = await observeRuntime(page);
-  // Exercise the real key while focus is still on the opener, independent of
-  // browser/runner scheduling of the 3D page's search focus.
+  // Deny explicit input focus to verify the native modal still consumes Escape
+  // and restores its opener after dismissing from the fallback inside control.
   await page.addInitScript(() => {
     const focus = HTMLElement.prototype.focus;
     HTMLElement.prototype.focus = function (options?: FocusOptions) {
@@ -55,9 +56,10 @@ test("keyboard cancels the Navigator before the search field can receive focus",
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: /universe navigator/i });
   await expect(dialog).toBeVisible();
-  await expect(opener).toBeFocused();
+  await expect(dialog.getByRole("button", { name: "Close navigator" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  await expect(opener).toBeFocused();
   await expect(page.locator(".universe-navigator-backdrop")).toHaveCount(0);
   await runtime.assertClean(testInfo);
 });
@@ -83,6 +85,98 @@ for (const target of ["filter", "result"] as const) {
     await runtime.assertClean(testInfo);
   });
 }
+
+
+for (const viewport of ["desktop", "mobile"] as const) {
+  test(`Search modal keeps and restores keyboard focus on ${viewport}`, async ({ browser, baseURL }, testInfo) => {
+    const context = await browser.newContext({
+      baseURL,
+      ...(viewport === "mobile" ? devices["iPhone 13"] : { viewport: { width: 1280, height: 800 } }),
+    });
+    const page = await context.newPage();
+    try {
+      const runtime = await observeRuntime(page);
+      await page.goto(path("/?lang=en&freeze=1"));
+      await waitForYeis(page);
+      const opener = page.getByRole("button", { name: /SEARCH \/ PLACES/i });
+      await opener.focus();
+      await page.keyboard.press("Enter");
+      const dialog = page.getByRole("dialog", { name: /universe navigator/i });
+      const input = dialog.getByRole("combobox");
+      const close = dialog.getByRole("button", { name: "Close navigator" });
+      await expect(input).toBeFocused();
+      // Wait for the initial Places results before asserting wrapping between
+      // two particular endpoints of the changing asynchronous tab sequence.
+      await expect(dialog.locator(".navigator-result-open").first()).toBeVisible();
+      const inside = () => dialog.evaluate((node) => node.contains(document.activeElement));
+
+      // The audited reverse path formerly focused the obscured Search opener.
+      await page.keyboard.press("Shift+Tab");
+      await expect(close).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      expect(await inside()).toBe(true);
+      await page.keyboard.press("Tab");
+      await expect(close).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(input).toBeFocused();
+      await input.fill("no-such-world-qa-focus");
+      await expect(dialog.locator(".navigator-empty:not(.is-loading)")).toBeVisible();
+      await page.keyboard.press("Tab");
+      await expect(close).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(input).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+      await expect(opener).toBeFocused();
+
+      await page.keyboard.press("Control+k");
+      await expect(input).toBeFocused();
+      await close.click();
+      await expect(dialog).toHaveCount(0);
+      await expect(opener).toBeFocused();
+      await runtime.assertClean(testInfo);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("explicit locale selection survives reload of a Portfolio 3D link", async ({ page }, testInfo) => {
+  const runtime = await observeRuntime(page);
+  await page.goto(path("/portfolio/"));
+  await page.getByRole("link", { name: /Explore the 3D universe/ }).click();
+  await waitForYeis(page);
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("lang", "en");
+  expect(new URL(page.url()).searchParams.get("lang")).toBe("en");
+  const initialLength = await page.evaluate(() => history.length);
+  await page.evaluate(() => {
+    const url = new URL(location.href);
+    url.searchParams.set("freeze", "1");
+    url.searchParams.set("audit", "keep");
+    url.hash = "audit-anchor";
+    history.replaceState({ localeFixture: true }, "", url);
+  });
+  const preference = async (button: string, locale: "zh" | "en") => {
+    await page.getByRole("button", { name: button }).click();
+    await expect(html).toHaveAttribute("lang", locale === "zh" ? "zh-CN" : "en");
+    // Reload is the decisive observed failure; a correct editor also preserves
+    // unrelated query data and the existing SPA history entry.
+    expect(await page.evaluate(() => ({ length: history.length, state: history.state })))
+      .toEqual({ length: initialLength, state: { localeFixture: true } });
+    await page.reload();
+    await waitForYeis(page);
+    await expect(html).toHaveAttribute("lang", locale === "zh" ? "zh-CN" : "en");
+    const url = new URL(page.url());
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ lang: locale, audit: "keep", freeze: "1" });
+    expect(url.hash).toBe("#audit-anchor");
+  };
+  await preference("Switch language to Chinese", "zh");
+  await preference("切换语言为英文", "en");
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: "Portfolio" })).toBeVisible();
+  await runtime.assertClean(testInfo);
+});
 
 test("a WebGL initialization failure leaves a browsable native portfolio", async ({ page }) => {
   const initErrors: string[] = [];
